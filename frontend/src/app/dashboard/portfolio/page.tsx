@@ -99,6 +99,7 @@ export default function PortfolioPage() {
   const [txExchangeRate, setTxExchangeRate] = useState<string | number>(1.0);
   const [txExecutedAt, setTxExecutedAt] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isAddingTx, setIsAddingTx] = useState(false);
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
   
   // Autocomplete na Transação
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,6 +107,18 @@ export default function PortfolioPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedAssetCurrency, setSelectedAssetCurrency] = useState('BRL');
+
+  // 8. ABRE MODAL DE EDIÇÃO
+  const handleEditTransaction = (tx: any) => {
+    setEditingTxId(tx.id);
+    setTxTicker(tx.ticker);
+    setTxType(tx.type as 'BUY' | 'SELL' | 'SPLIT');
+    setTxQuantity(tx.quantity);
+    setTxUnitPrice(tx.unit_price);
+    setTxExchangeRate(tx.exchange_rate);
+    setTxExecutedAt(tx.executed_at.split('T')[0]);
+    setShowTxModal(true);
+  };
 
   // 1. CARREGA TODOS OS PORTFÓLIOS
   const loadPortfolios = useCallback(async (selectId?: string) => {
@@ -312,8 +325,13 @@ export default function PortfolioPage() {
 
     setIsAddingTx(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions`, {
-        method: 'POST',
+      const url = editingTxId 
+        ? `${API_URL}/portfolios/${activePortfolioId}/transactions/${editingTxId}`
+        : `${API_URL}/portfolios/${activePortfolioId}/transactions`;
+      const method = editingTxId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ticker: txTicker,
@@ -333,6 +351,7 @@ export default function PortfolioPage() {
         setTxQuantity('');
         setTxUnitPrice('');
         setTxExchangeRate(1.0);
+        setEditingTxId(null);
         setSelectedAssetCurrency('BRL');
         setShowTxModal(false);
 
@@ -621,7 +640,7 @@ export default function PortfolioPage() {
                   </h3>
                   <button
                     className="primary-button"
-                    onClick={() => setShowTxModal(true)}
+                    onClick={() => { setEditingTxId(null); setShowTxModal(true); }}
                     style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
                   >
                     + Lançar Operação
@@ -762,22 +781,48 @@ export default function PortfolioPage() {
                               )}
                             </div>
                             
-                            <button
-                              onClick={() => handleDeleteTransaction(tx.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'rgba(255,255,255,0.2)',
-                                cursor: 'pointer',
-                                fontSize: '0.95rem',
-                                padding: '0.25rem',
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.color = '#ff4a5a'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
-                              title="Remover operação"
-                            >
-                              ✕
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button
+                                onClick={() => handleEditTransaction(tx)}
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  padding: '0.4rem',
+                                  borderRadius: '6px',
+                                  color: 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s',
+                                }}
+                                title="Editar Transação"
+                                onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+                                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTransaction(tx.id)}
+                                style={{
+                                  background: 'rgba(255, 61, 0, 0.08)',
+                                  border: '1px solid rgba(255, 61, 0, 0.2)',
+                                  padding: '0.4rem',
+                                  borderRadius: '6px',
+                                  color: '#ff3d00',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s',
+                                }}
+                                title="Excluir Transação"
+                                onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 61, 0, 0.15)' }}
+                                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 61, 0, 0.08)' }}
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -879,9 +924,20 @@ export default function PortfolioPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
         }}>
           <div className="glass-panel" style={{ maxWidth: '460px', width: '90%', padding: '2rem', textAlign: 'left', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '1.5rem' }}>
-              📝 Registrar Operação
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                {editingTxId ? '✏️ Editar Transação' : '➕ Nova Transação'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowTxModal(false);
+                  setEditingTxId(null);
+                }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.2rem', padding: '0.5rem' }}
+              >
+                ✕
+              </button>
+            </div>
             
             <form onSubmit={handleAddTransaction} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
               
@@ -890,16 +946,27 @@ export default function PortfolioPage() {
                 <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
                   Ativo / Ticker
                 </label>
-                <input
-                  className="form-input"
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Pesquise o ticker (Ex: PETR4, AAPL, IVV)..."
-                  required
-                  disabled={isAddingTx}
-                  autoComplete="off"
-                />
+                {editingTxId ? (
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={txTicker}
+                    readOnly
+                    disabled
+                    style={{ textTransform: 'uppercase', opacity: 0.6 }}
+                  />
+                ) : (
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Pesquise o ticker (Ex: PETR4, AAPL, IVV)..."
+                    required
+                    disabled={isAddingTx}
+                    autoComplete="off"
+                  />
+                )}
                 {isSearching && (
                   <span className="loading-spinner" style={{ position: 'absolute', right: '15px', top: '55%', borderTopColor: 'var(--accent-color)' }}></span>
                 )}
@@ -1077,12 +1144,12 @@ export default function PortfolioPage() {
                   Cancelar
                 </button>
                 <button
-                  className="primary-button"
                   type="submit"
                   disabled={isAddingTx}
-                  style={{ flex: 1, padding: '0.75rem' }}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '0.8rem', fontSize: '0.9rem', justifyContent: 'center' }}
                 >
-                  {isAddingTx ? 'Registrando...' : 'Lançar'}
+                  {isAddingTx ? 'Registrando...' : (editingTxId ? 'Salvar Alterações' : 'Lançar')}
                 </button>
               </div>
             </form>

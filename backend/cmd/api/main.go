@@ -179,6 +179,7 @@ func main() {
 			r.Delete("/portfolios/{id}", portfolioHandler.DeletePortfolio)
 			r.Get("/portfolios/{id}/transactions", portfolioHandler.GetTransactions)
 			r.Post("/portfolios/{id}/transactions", portfolioHandler.AddTransaction)
+			r.Put("/portfolios/{id}/transactions/{txId}", portfolioHandler.UpdateTransaction)
 			r.Delete("/portfolios/{id}/transactions/{txId}", portfolioHandler.DeleteTransaction)
 			r.Get("/portfolios/{id}/performance", portfolioHandler.GetPerformance)
 

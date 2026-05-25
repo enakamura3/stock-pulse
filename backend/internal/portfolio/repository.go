@@ -355,3 +355,22 @@ func (r *Repository) GetAllAssets(ctx context.Context) ([]AssetCompact, error) {
 	}
 	return list, nil
 }
+
+func (r *Repository) UpdateTransaction(ctx context.Context, tx Transaction) error {
+	query := `
+		UPDATE transaction
+		SET type = $1, quantity = $2, unit_price = $3, total_cost = $4, exchange_rate = $5, executed_at = $6
+		WHERE id = $7 AND portfolio_id = $8
+	`
+	tag, err := r.db.Exec(ctx, query,
+		tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.ExchangeRate, tx.ExecutedAt,
+		tx.ID, tx.PortfolioID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("transação não encontrada ou acesso negado")
+	}
+	return nil
+}

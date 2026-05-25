@@ -17,6 +17,7 @@ type PortfolioService interface {
 	GetPortfolios(ctx context.Context, userID string) ([]Portfolio, error)
 	GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*Portfolio, []Position, error)
 	AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error)
+	UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error
 	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	DeletePortfolio(ctx context.Context, id, userID string) error
 	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string) ([]PerformancePoint, error)
@@ -300,4 +301,64 @@ func ctxOrDefault(r *http.Request) context.Context {
 		return context.Background()
 	}
 	return r.Context()
+}
+
+func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok || userID == "" {
+		h.respondWithError(w, http.StatusUnauthorized, "Usuário não autenticado")
+		return
+	}
+
+	portfolioID := chi.URLParam(r, "id")
+	txID := chi.URLParam(r, "txId")
+	if portfolioID == "" || txID == "" {
+		h.respondWithError(w, http.StatusBadRequest, "ID da carteira e da transação são obrigatórios")
+		return
+	}
+
+	var payload transactionPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		h.respondWithError(w, http.StatusBadRequest, "Payload inválido")
+		return
+	}
+
+	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
+	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" {
+		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL ou SPLIT")
+		return
+	}
+
+	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.UnitPrice <= 0) {
+		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits)")
+		return
+	}
+
+	execTime, err := time.Parse("2006-01-02", payload.ExecutedAt)
+	if err != nil {
+		execTime, err = time.Parse(time.RFC3339, payload.ExecutedAt)
+		if err != nil {
+			execTime = time.Now()
+		}
+	}
+
+	rate := payload.ExchangeRate
+	if rate <= 0 {
+		rate = 1.0
+	}
+
+	tx := &Transaction{
+		Type:         payload.Type,
+		Quantity:     payload.Quantity,
+		UnitPrice:    payload.UnitPrice,
+		ExchangeRate: rate,
+		ExecutedAt:   execTime.UTC(),
+	}
+
+	if err := h.service.UpdateTransaction(ctxOrDefault(r), userID, portfolioID, txID, tx); err != nil {
+		h.respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.respondWithJSON(w, http.StatusOK, map[string]string{"message": "Transação atualizada com sucesso"})
 }

@@ -367,3 +367,7 @@ func TestHandler_Unauthorized(t *testing.T) {
 		})
 	}
 }
+
+func (m *MockPortfolioService) UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error {
+	return nil
+}

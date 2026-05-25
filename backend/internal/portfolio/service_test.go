@@ -54,6 +54,10 @@ func (m *MockPortfolioRepo) CreateTransaction(ctx context.Context, tx *Transacti
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) UpdateTransaction(ctx context.Context, tx Transaction) error {
+	return m.Called(ctx, tx).Error(0)
+}
+
 func (m *MockPortfolioRepo) GetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
 	args := m.Called(ctx, portfolioID, userID)
 	if args.Get(0) != nil {

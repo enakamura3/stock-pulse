@@ -22,6 +22,7 @@ type PortfolioRepository interface {
 	GetPortfolioByID(ctx context.Context, id, userID string) (*Portfolio, error)
 	DeletePortfolio(ctx context.Context, id, userID string) error
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
+	UpdateTransaction(ctx context.Context, tx Transaction) error
 	GetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
 	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	SaveDailyPrices(ctx context.Context, assetID string, prices []DailyPrice) error
@@ -604,4 +605,25 @@ func (s *Service) getCurrencyRate(ctx context.Context, fromCurrency, toCurrency 
 		return 5.20 // Fallback seguro e condizente com a média histórica recente
 	}
 	return 1.0
+}
+
+// UpdateTransaction edita uma transação existente de um portfólio.
+func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error {
+	// Anti-IDOR: Valida se a carteira pertence ao usuário logado
+	_, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
+	if err != nil {
+		return errors.New("carteira não encontrada ou acesso não autorizado")
+	}
+
+	tx.ID = txID
+	tx.PortfolioID = portfolioID
+	tx.TotalCost = tx.Quantity * tx.UnitPrice
+
+	// Executa atualização no banco
+	err = s.repo.UpdateTransaction(ctx, *tx)
+	if err != nil {
+		return fmt.Errorf("falha ao atualizar transação: %w", err)
+	}
+
+	return nil
 }
