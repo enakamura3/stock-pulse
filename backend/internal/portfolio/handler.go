@@ -304,7 +304,7 @@ func ctxOrDefault(r *http.Request) context.Context {
 }
 
 func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("user_id").(string)
+	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 	if !ok || userID == "" {
 		h.respondWithError(w, http.StatusUnauthorized, "Usuário não autenticado")
 		return
