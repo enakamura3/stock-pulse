@@ -94,9 +94,9 @@ export default function PortfolioPage() {
   // Forms - Transação
   const [txTicker, setTxTicker] = useState('');
   const [txType, setTxType] = useState<'BUY' | 'SELL'>('BUY');
-  const [txQuantity, setTxQuantity] = useState<number>(0);
-  const [txUnitPrice, setTxUnitPrice] = useState<number>(0);
-  const [txExchangeRate, setTxExchangeRate] = useState<number>(1.0);
+  const [txQuantity, setTxQuantity] = useState<string | number>('');
+  const [txUnitPrice, setTxUnitPrice] = useState<string | number>('');
+  const [txExchangeRate, setTxExchangeRate] = useState<string | number>(1.0);
   const [txExecutedAt, setTxExecutedAt] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isAddingTx, setIsAddingTx] = useState(false);
   
@@ -291,7 +291,11 @@ export default function PortfolioPage() {
   // 6. SUBMETE INSERÇÃO DE TRANSAÇÃO
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!txTicker || txQuantity <= 0 || (txType !== 'SPLIT' && txUnitPrice <= 0)) {
+    const parsedQty = parseFloat(txQuantity.toString());
+    const parsedPrice = parseFloat(txUnitPrice.toString());
+    const parsedRate = parseFloat(txExchangeRate.toString());
+
+    if (!txTicker || isNaN(parsedQty) || parsedQty <= 0 || (txType !== 'SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 0))) {
       alert('Preencha todos os campos obrigatórios corretamente.');
       return;
     }
@@ -300,7 +304,7 @@ export default function PortfolioPage() {
     if (txType === 'SELL') {
       const activePosition = positions.find((p) => p.ticker.toUpperCase() === txTicker.toUpperCase());
       const currentQty = activePosition ? activePosition.quantity : 0;
-      if (txQuantity > currentQty) {
+      if (parsedQty > currentQty) {
         alert(`Saldo insuficiente de ativos. Você possui apenas ${currentQty} cotas de ${txTicker}.`);
         return;
       }
@@ -314,9 +318,9 @@ export default function PortfolioPage() {
         body: JSON.stringify({
           ticker: txTicker,
           type: txType,
-          quantity: txQuantity,
-          unit_price: txType === 'SPLIT' ? 0 : txUnitPrice,
-          exchange_rate: txExchangeRate,
+          quantity: parsedQty,
+          unit_price: txType === 'SPLIT' ? 0 : parsedPrice,
+          exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 1.0 : parsedRate,
           executed_at: txExecutedAt,
         }),
         credentials: 'include', cache: 'no-store',
@@ -326,8 +330,8 @@ export default function PortfolioPage() {
         // Limpa inputs
         setTxTicker('');
         setSearchQuery('');
-        setTxQuantity(0);
-        setTxUnitPrice(0);
+        setTxQuantity('');
+        setTxUnitPrice('');
         setTxExchangeRate(1.0);
         setSelectedAssetCurrency('BRL');
         setShowTxModal(false);
@@ -993,8 +997,8 @@ export default function PortfolioPage() {
                     className="form-input"
                     type="number"
                     step="any"
-                    value={txQuantity || ''}
-                    onChange={(e) => setTxQuantity(parseFloat(e.target.value) || 0)}
+                    value={txQuantity}
+                    onChange={(e) => setTxQuantity(e.target.value)}
                     placeholder={txType === 'SPLIT' ? "Ex: 10 (desdobra) ou 0.1 (agrupa)" : "0"}
                     required
                     disabled={isAddingTx}
@@ -1015,8 +1019,8 @@ export default function PortfolioPage() {
                       className="form-input"
                       type="number"
                       step="any"
-                      value={txUnitPrice || ''}
-                      onChange={(e) => setTxUnitPrice(parseFloat(e.target.value) || 0)}
+                      value={txUnitPrice}
+                      onChange={(e) => setTxUnitPrice(e.target.value)}
                       placeholder="0.00"
                       required
                       disabled={isAddingTx}
@@ -1035,8 +1039,8 @@ export default function PortfolioPage() {
                     className="form-input"
                     type="number"
                     step="any"
-                    value={txExchangeRate || ''}
-                    onChange={(e) => setTxExchangeRate(parseFloat(e.target.value) || 1.0)}
+                    value={txExchangeRate}
+                    onChange={(e) => setTxExchangeRate(e.target.value)}
                     placeholder="Ex: 5.2500"
                     required
                     disabled={isAddingTx}
