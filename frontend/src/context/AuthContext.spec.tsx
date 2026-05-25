@@ -162,6 +162,7 @@ describe('AuthContext', () => {
 
   it('deve repassar o erro se a chamada de login falhar no catch', async () => {
     (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 401 });
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 401 }); // mock refresh
     
     render(
       <AuthProvider>
