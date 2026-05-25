@@ -354,7 +354,7 @@ paths:
         '200':
           description: Portfólio apagado
 
-/portfolios/{id}/transactions/bulk:
+  /portfolios/{id}/transactions/bulk:
     post:
       summary: Importar Transações em Lote (CSV)
       tags:
