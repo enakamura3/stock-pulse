@@ -27,7 +27,8 @@ describe('RegisterPage', () => {
 
     expect(registerMock).toHaveBeenCalledWith('Test User', 'test@test.com', 'password123');
     
-    expect(await screen.findByText(/Criar Minha Conta/i)).toBeInTheDocument();
+    // O texto muda para "Cadastrando..." durante o submit e não volta em caso de sucesso (redirecionamento)
+    expect(await screen.findByText(/Cadastrando.../i)).toBeInTheDocument();
   });
 
   it('validates password length', async () => {
@@ -36,10 +37,16 @@ describe('RegisterPage', () => {
 
     render(<RegisterPage />);
     
+    const nameInput = screen.getByLabelText(/Nome Completo/i);
+    const emailInput = screen.getByLabelText(/E-mail/i);
     const passwordInput = screen.getByLabelText(/Senha/i);
     const submitBtn = screen.getByRole('button', { name: /Criar Minha Conta/i });
 
+    fireEvent.change(nameInput, { target: { value: 'Test' } });
+    fireEvent.change(emailInput, { target: { value: 'test@test.com' } });
     fireEvent.change(passwordInput, { target: { value: '123' } });
+    
+    // Use submit on the form or just click since fields are filled
     fireEvent.click(submitBtn);
 
     expect(registerMock).not.toHaveBeenCalled();

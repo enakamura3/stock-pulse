@@ -24,8 +24,9 @@ describe('LoginPage', () => {
     fireEvent.click(submitBtn);
 
     expect(loginMock).toHaveBeenCalledWith('test@test.com', 'password123');
-    
-    expect(await screen.findByText(/Entrar no Dashboard/i)).toBeInTheDocument();
+
+    // O botão muda de texto no submit e não volta porque simulamos sucesso (o que engatilharia redirecionamento real)
+    expect(await screen.findByText(/Verificando.../i)).toBeInTheDocument();
   });
 
   it('handles login error', async () => {
