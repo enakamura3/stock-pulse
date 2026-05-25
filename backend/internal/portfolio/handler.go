@@ -1,6 +1,8 @@
 package portfolio
 
 import (
+	"mime/multipart"
+
 	"context"
 	"encoding/json"
 	"net/http"
@@ -18,10 +20,11 @@ type PortfolioService interface {
 	GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*Portfolio, []Position, error)
 	AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error)
 	UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error
+	BulkAddTransactions(ctx context.Context, userID, portfolioID string, file multipart.File) (*BulkImportResult, error)
 	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	DeletePortfolio(ctx context.Context, id, userID string) error
 	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string) ([]PerformancePoint, error)
-	
+
 	// Utilizado especificamente pelo Handler para recuperar transações puras
 	repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
 }
@@ -184,13 +187,13 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
-	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" {
-		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL ou SPLIT")
+	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "BONUS" {
+		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT ou BONUS")
 		return
 	}
 
-	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.UnitPrice <= 0) {
-		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits)")
+	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
+		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits e bônus)")
 		return
 	}
 
@@ -324,13 +327,13 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
-	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" {
-		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL ou SPLIT")
+	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "BONUS" {
+		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT ou BONUS")
 		return
 	}
 
-	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.UnitPrice <= 0) {
-		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits)")
+	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
+		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits e bônus)")
 		return
 	}
 
@@ -361,4 +364,42 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.respondWithJSON(w, http.StatusOK, map[string]string{"message": "Transação atualizada com sucesso"})
+}
+
+// BulkImportTransactions processa um arquivo CSV contendo múltiplas transações.
+func (h *Handler) BulkImportTransactions(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserIDKey).(string)
+	if !ok || userID == "" {
+		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	portfolioID := chi.URLParam(r, "id")
+	if portfolioID == "" {
+		h.respondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+		return
+	}
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		h.respondWithError(w, http.StatusBadRequest, "Falha ao processar arquivo")
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		h.respondWithError(w, http.StatusBadRequest, "Arquivo ausente ou inválido")
+		return
+	}
+	defer file.Close()
+
+	res, err := h.service.BulkAddTransactions(ctxOrDefault(r), userID, portfolioID, file)
+	if err != nil {
+		h.respondWithJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"error":   "Erro durante a importação",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	h.respondWithJSON(w, http.StatusOK, res)
 }

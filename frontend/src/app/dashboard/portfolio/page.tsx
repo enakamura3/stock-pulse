@@ -93,7 +93,7 @@ export default function PortfolioPage() {
 
   // Forms - Transação
   const [txTicker, setTxTicker] = useState('');
-  const [txType, setTxType] = useState<'BUY' | 'SELL'>('BUY');
+  const [txType, setTxType] = useState<'BUY' | 'SELL' | 'SPLIT' | 'BONUS'>('BUY');
   const [txQuantity, setTxQuantity] = useState<string | number>('');
   const [txUnitPrice, setTxUnitPrice] = useState<string | number>('');
   const [txExchangeRate, setTxExchangeRate] = useState<string | number>(1.0);
@@ -112,7 +112,7 @@ export default function PortfolioPage() {
   const handleEditTransaction = (tx: any) => {
     setEditingTxId(tx.id);
     setTxTicker(tx.ticker);
-    setTxType(tx.type as 'BUY' | 'SELL' | 'SPLIT');
+    setTxType(tx.type as 'BUY' | 'SELL' | 'SPLIT' | 'BONUS');
     setTxQuantity(tx.quantity);
     setTxUnitPrice(tx.unit_price);
     setTxExchangeRate(tx.exchange_rate);
@@ -638,13 +638,19 @@ export default function PortfolioPage() {
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     📦 Posições Ativas
                   </h3>
-                  <button
-                    className="primary-button"
-                    onClick={() => { setEditingTxId(null); setShowTxModal(true); }}
-                    style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-                  >
-                    + Lançar Operação
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <label className="primary-button" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer', background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', color: 'var(--text-primary)' }}>
+                      📥 Importar CSV
+                      <input type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
+                    </label>
+                    <button
+                      className="primary-button"
+                      onClick={() => { setEditingTxId(null); setShowTxModal(true); }}
+                      style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+                    >
+                      + Lançar Operação
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ overflowX: 'auto', flex: 1 }}>
@@ -741,6 +747,7 @@ export default function PortfolioPage() {
                     transactions.map((tx) => {
                       const isBuy = tx.type === 'BUY';
                       const isSplit = tx.type === 'SPLIT';
+                      const isBonus = tx.type === 'BONUS';
                       return (
                         <div
                           key={tx.id}
@@ -1165,3 +1172,40 @@ export default function PortfolioPage() {
     </main>
   );
 }
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/bulk`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const success = data.success || 0;
+        const errors = data.errors || [];
+        
+        if (errors.length > 0) {
+          alert(`Importação concluída: ${success} registros importados com sucesso.\n\nAtenção, alguns registros falharam:\n- ` + errors.join("\n- "));
+        } else {
+          alert(`Importação concluída com sucesso! ${success} registros importados.`);
+        }
+        
+        await fetchPortfolio();
+      } else {
+        const err = await res.json();
+        alert(`Erro na importação: ${err.error} - ${err.details}`);
+      }
+    } catch (e) {
+      alert("Erro ao conectar com o servidor para importação.");
+    }
+    
+    e.target.value = "";
+  };
+

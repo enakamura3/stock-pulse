@@ -101,7 +101,7 @@ func main() {
 
 	// Inicialização das Camadas da Fase 3 (Alertas & Tempo Real)
 	mailService := mail.NewService()
-	
+
 	wsHub := websocket.NewHub(marketService)
 	wsHandler := websocket.NewHandler(wsHub)
 
@@ -115,15 +115,14 @@ func main() {
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
-	
+
 	go portfolioWorker.Start(workerCtx)
 	go wsHub.Start(workerCtx)
 	go alertWorker.Start(workerCtx)
 
-
 	// Configuração das Rotas (Chi)
 	r := chi.NewRouter()
-	r.Use(customMiddleware.CORS()) // CORS seguro com credenciais
+	r.Use(customMiddleware.CORS())    // CORS seguro com credenciais
 	r.Use(customMiddleware.Metrics()) // Coleta de métricas Prometheus (Fase 4)
 	r.Use(chiMiddleware.Logger)
 	r.Use(chiMiddleware.Recoverer)
@@ -159,7 +158,7 @@ func main() {
 		// Rotas Protegidas (Exige Sessão)
 		r.Group(func(r chi.Router) {
 			r.Use(customMiddleware.AuthRequired([]byte(jwtSecret)))
-			
+
 			// Cotações e Busca
 			r.Get("/quotes/{ticker}", marketHandler.GetQuote)
 			r.Get("/assets/search", marketHandler.Search)
@@ -179,6 +178,7 @@ func main() {
 			r.Delete("/portfolios/{id}", portfolioHandler.DeletePortfolio)
 			r.Get("/portfolios/{id}/transactions", portfolioHandler.GetTransactions)
 			r.Post("/portfolios/{id}/transactions", portfolioHandler.AddTransaction)
+			r.Post("/portfolios/{id}/transactions/bulk", portfolioHandler.BulkImportTransactions)
 			r.Put("/portfolios/{id}/transactions/{txId}", portfolioHandler.UpdateTransaction)
 			r.Delete("/portfolios/{id}/transactions/{txId}", portfolioHandler.DeleteTransaction)
 			r.Get("/portfolios/{id}/performance", portfolioHandler.GetPerformance)
@@ -193,7 +193,6 @@ func main() {
 			r.Put("/alerts/{id}/toggle", alertHandler.ToggleAlert)
 		})
 	})
-
 
 	// Configuração do Servidor HTTP
 	port := os.Getenv("PORT")

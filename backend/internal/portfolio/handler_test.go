@@ -1,6 +1,8 @@
 package portfolio
 
 import (
+	"mime/multipart"
+
 	"bytes"
 	"context"
 	"errors"
@@ -195,7 +197,7 @@ func TestHandler_AddTransaction(t *testing.T) {
 		h.AddTransaction(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
-	
+
 	t.Run("Invalid JSON", func(t *testing.T) {
 		h, _ := setupHandlerTest()
 		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString("invalid")), "u1", map[string]string{"id": "p1"})
@@ -344,7 +346,7 @@ func TestHandler_RespondWithJSON_Error(t *testing.T) {
 func TestHandler_Unauthorized(t *testing.T) {
 	h, _ := setupHandlerTest()
 	req := httptest.NewRequest("GET", "/portfolios", nil)
-	
+
 	tests := []struct {
 		name    string
 		handler http.HandlerFunc
@@ -370,4 +372,8 @@ func TestHandler_Unauthorized(t *testing.T) {
 
 func (m *MockPortfolioService) UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error {
 	return nil
+}
+
+func (m *MockPortfolioService) BulkAddTransactions(ctx context.Context, userID, portfolioID string, file multipart.File) (*BulkImportResult, error) {
+	return &BulkImportResult{Success: 1, Errors: []string{}}, nil
 }

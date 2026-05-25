@@ -153,6 +153,12 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 				pos.Quantity = pos.Quantity * tx.Quantity
 				pos.AveragePrice = pos.AveragePrice / tx.Quantity
 			}
+		} else if tx.Type == "BONUS" {
+			pos.Quantity += tx.Quantity
+			pos.TotalCost += tx.Quantity * tx.UnitPrice * tx.ExchangeRate
+			if pos.Quantity > 0 {
+				pos.AveragePrice = pos.TotalCost / (pos.Quantity * tx.ExchangeRate)
+			}
 		}
 	}
 
@@ -303,7 +309,6 @@ func (s *Service) DeletePortfolio(ctx context.Context, id, userID string) error 
 	return s.repo.DeletePortfolio(ctx, id, userID)
 }
 
-
 // PerformancePoint representa o saldo consolidado de um portfólio em uma data histórica.
 type PerformancePoint struct {
 	Date          string  `json:"date"`
@@ -405,7 +410,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID, user
 
 	for !currDate.After(endDate) {
 		dayStr := currDate.Format("2006-01-02")
-		
+
 		// Consolida as quantidades de ativos e custos acumulados até este dia específico
 		dailyQuantities := make(map[string]float64)
 		dailyCosts := make(map[string]float64)
@@ -596,7 +601,7 @@ func (s *Service) getCurrencyRate(ctx context.Context, fromCurrency, toCurrency 
 	if err == nil && quote.Price > 0 {
 		return quote.Price
 	}
-	
+
 	if fromCurrency == "USD" && toCurrency == "BRL" {
 		quote, err = s.marketService.GetQuote(ctx, "USDBRL=X")
 		if err == nil && quote.Price > 0 {
