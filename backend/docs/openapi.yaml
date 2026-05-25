@@ -354,6 +354,34 @@ paths:
         '200':
           description: Portfólio apagado
 
+/portfolios/{id}/transactions/bulk:
+    post:
+      summary: Importar Transações em Lote (CSV)
+      tags:
+        - Transações
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Transações importadas
+
   /portfolios/{id}/transactions:
     get:
       summary: Listar transações do portfólio
@@ -402,7 +430,7 @@ paths:
                   example: VALE3.SA
                 type:
                   type: string
-                  enum: [BUY, SELL]
+                  enum: [BUY, SELL, SPLIT, BONUS]
                   example: BUY
                 quantity:
                   type: number
