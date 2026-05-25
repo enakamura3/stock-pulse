@@ -111,7 +111,7 @@ export default function PortfolioPage() {
   const loadPortfolios = useCallback(async (selectId?: string) => {
     setIsLoadingPortfolios(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios`, { credentials: 'include' });
+      const res = await fetch(`${API_URL}/portfolios`, { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setPortfolios(data || []);
@@ -133,14 +133,14 @@ export default function PortfolioPage() {
     setIsLoadingDetails(true);
     try {
       // Detalhes / Posições
-      const resDetails = await fetch(`${API_URL}/portfolios/${id}`, { credentials: 'include' });
+      const resDetails = await fetch(`${API_URL}/portfolios/${id}`, { credentials: 'include', cache: 'no-store' });
       if (resDetails.ok) {
         const data = await resDetails.json();
         setPositions(data.positions || []);
       }
 
       // Histórico de Transações
-      const resTxs = await fetch(`${API_URL}/portfolios/${id}/transactions`, { credentials: 'include' });
+      const resTxs = await fetch(`${API_URL}/portfolios/${id}/transactions`, { credentials: 'include', cache: 'no-store' });
       if (resTxs.ok) {
         const txsData = await resTxs.json();
         setTransactions(txsData || []);
@@ -157,7 +157,7 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingPerformance(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`, { credentials: 'include' });
+      const res = await fetch(`${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`, { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setPerformanceData(data || []);
@@ -195,7 +195,7 @@ export default function PortfolioPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`${API_URL}/assets/search?q=${encodeURIComponent(searchQuery)}`, { credentials: 'include' });
+        const res = await fetch(`${API_URL}/assets/search?q=${encodeURIComponent(searchQuery)}`, { credentials: 'include', cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data || []);
@@ -219,13 +219,13 @@ export default function PortfolioPage() {
 
     // Consulta cotação em tempo real para obter a moeda padrão do ativo (ex: USD para AAPL)
     try {
-      const res = await fetch(`${API_URL}/quotes/${encodeURIComponent(symbol)}`, { credentials: 'include' });
+      const res = await fetch(`${API_URL}/quotes/${encodeURIComponent(symbol)}`, { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const quote = await res.json();
         setSelectedAssetCurrency(quote.currency || 'BRL');
         if (quote.currency === 'USD') {
           // Busca cotação atual do USD para ajudar o usuário com exchange_rate sugerido
-          const rateRes = await fetch(`${API_URL}/quotes/USDBRL=X`, { credentials: 'include' });
+          const rateRes = await fetch(`${API_URL}/quotes/USDBRL=X`, { credentials: 'include', cache: 'no-store' });
           if (rateRes.ok) {
             const rateQuote = await rateRes.json();
             setTxExchangeRate(rateQuote.price || 5.25);
@@ -253,7 +253,7 @@ export default function PortfolioPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newPortfolioName, base_currency: newPortfolioCurrency }),
-        credentials: 'include',
+        credentials: 'include', cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
@@ -278,7 +278,7 @@ export default function PortfolioPage() {
     try {
       const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}`, {
         method: 'DELETE',
-        credentials: 'include',
+        credentials: 'include', cache: 'no-store',
       });
       if (res.ok) {
         await loadPortfolios();
@@ -319,7 +319,7 @@ export default function PortfolioPage() {
           exchange_rate: txExchangeRate,
           executed_at: txExecutedAt,
         }),
-        credentials: 'include',
+        credentials: 'include', cache: 'no-store',
       });
 
       if (res.ok) {
@@ -352,7 +352,7 @@ export default function PortfolioPage() {
     try {
       const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`, {
         method: 'DELETE',
-        credentials: 'include',
+        credentials: 'include', cache: 'no-store',
       });
       if (res.ok) {
         await loadPortfolioDetails(activePortfolioId);
