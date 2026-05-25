@@ -741,7 +741,7 @@ export default function PortfolioPage() {
                             </span>
                             <span style={{ fontWeight: 700, color: '#fff' }}>{tx.ticker}</span>
                             <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                              {new Date(tx.executed_at).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                              {new Date(tx.executed_at).toISOString().split('T')[0].replace(/-/g, '/')}
                             </span>
                           </div>
                           
