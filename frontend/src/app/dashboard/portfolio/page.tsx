@@ -199,7 +199,7 @@ export default function PortfolioPage() {
 
   // Efeito Debounce para busca autocomplete dentro do Modal de Cadastro
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    if (!searchQuery.trim() || searchQuery === txTicker) {
       setSearchResults([]);
       setShowDropdown(false);
       return;
@@ -222,7 +222,7 @@ export default function PortfolioPage() {
     }, 350);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery]);
+  }, [searchQuery, txTicker]);
 
   // Seleciona ativo na lista de busca
   const handleSelectAsset = async (symbol: string) => {
