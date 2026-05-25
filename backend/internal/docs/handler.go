@@ -35,18 +35,7 @@ func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
   <style>
     html { box-sizing: border-box; overflow-y: scroll; }
     *, *:before, *:after { box-sizing: inherit; }
-    body { margin: 0; background: #0b0f19; color: #e2e8f0; }
-    
-    /* Filtro invertido premium para Dark Mode no Swagger */
-    .swagger-ui { 
-      background: #0b0f19; 
-      filter: invert(0.88) hue-rotate(180deg);
-      padding: 10px 0;
-    }
-    
-    .swagger-ui .info {
-      margin: 30px 0;
-    }
+    body { margin: 0; background: #fafafa; }
   </style>
 </head>
 <body>
@@ -66,7 +55,7 @@ func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
         plugins: [
           SwaggerUIBundle.plugins.DownloadUrl
         ],
-        layout: "BaseLayout"
+        layout: "StandaloneLayout"
       });
     };
   </script>
