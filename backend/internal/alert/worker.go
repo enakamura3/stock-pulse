@@ -1,0 +1,121 @@
+package alert
+
+import (
+	"context"
+	"log/slog"
+	"os"
+	"time"
+
+	"github.com/onigiri/stockpulse/backend/internal/mail"
+	"github.com/onigiri/stockpulse/backend/internal/market"
+)
+
+// AlertWorker gerencia o monitoramento periódico de alertas de preço ativos.
+type AlertWorker struct {
+	repo          *Repository
+	marketService *market.Service
+	mailService   *mail.Service
+	interval      time.Duration
+}
+
+// NewAlertWorker inicializa o Worker com intervalo customizável (Padrão: 1 minuto).
+func NewAlertWorker(repo *Repository, marketService *market.Service, mailService *mail.Service) *AlertWorker {
+	intervalStr := os.Getenv("ALERT_CHECK_INTERVAL")
+	interval := 1 * time.Minute // Valor padrão aprovado (Opção 1A)
+
+	if intervalStr != "" {
+		if parsed, err := time.ParseDuration(intervalStr); err == nil {
+			interval = parsed
+		}
+	}
+
+	return &AlertWorker{
+		repo:          repo,
+		marketService: marketService,
+		mailService:   mailService,
+		interval:      interval,
+	}
+}
+
+// Start inicia o loop em background da Goroutine do worker.
+func (w *AlertWorker) Start(ctx context.Context) {
+	slog.Info("AlertWorker inicializado com sucesso", "interval", w.interval)
+	ticker := time.NewTicker(w.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			w.checkActiveAlerts(ctx)
+		case <-ctx.Done():
+			slog.Info("Encerrando worker de verificação de alertas...")
+			return
+		}
+	}
+}
+
+// checkActiveAlerts processa a lista de alertas ativos e avalia as condições de preço de mercado.
+func (w *AlertWorker) checkActiveAlerts(ctx context.Context) {
+	// 1. Busca todos os alertas ativos globalmente no banco
+	alerts, err := w.repo.GetActiveAlerts(ctx)
+	if err != nil {
+		slog.Error("Erro ao buscar alertas ativos do banco de dados", "error", err)
+		return
+	}
+
+	if len(alerts) == 0 {
+		return
+	}
+
+	slog.Info("Verificando alertas ativos em background", "count", len(alerts))
+
+	// 2. Para cada alerta, verifica o preço atual do ativo
+	for _, a := range alerts {
+		// Busca a cotação (respeita o cache Redis de 60s conforme aprovado na Opção 2B)
+		quote, err := w.marketService.GetQuote(ctx, a.Ticker)
+		if err != nil {
+			slog.Warn("Falha ao obter cotação para o ticker do alerta", "ticker", a.Ticker, "error", err)
+			continue
+		}
+
+		// 3. Avalia as regras de acionamento
+		triggered := false
+		if a.Condition == "ABOVE" && quote.Price >= a.TargetPrice {
+			triggered = true
+		} else if a.Condition == "BELOW" && quote.Price <= a.TargetPrice {
+			triggered = true
+		}
+
+		// 4. Se disparado, atualiza o status do banco e envia o e-mail
+		if triggered {
+			slog.Warn("ALERTA DE PREÇO DISPARADO!", "ticker", a.Ticker, "target", a.TargetPrice, "current", quote.Price, "condition", a.Condition)
+
+			// Grava o disparo no banco de dados primeiro.
+			// Como o banco bloqueia status != ACTIVE em MarkAlertTriggered, garantimos de forma concorrente
+			// que o e-mail será disparado UMA única vez por alerta.
+			err = w.repo.MarkAlertTriggered(ctx, a.ID)
+			if err != nil {
+				// Outro worker ou processo já marcou o alerta como disparado
+				slog.Warn("Alerta já havia sido disparado ou desativado por concorrência", "id", a.ID, "ticker", a.Ticker)
+				continue
+			}
+
+			// Dispara o e-mail de forma assíncrona para não atrasar a fila de avaliação de alertas
+			go func(aAlert *Alert, currentVal float64, currency string) {
+				emailErr := w.mailService.SendAlertEmail(
+					aAlert.UserEmail,
+					aAlert.UserName,
+					aAlert.Ticker,
+					aAlert.AssetName,
+					currentVal,
+					aAlert.TargetPrice,
+					aAlert.Condition,
+					currency,
+				)
+				if emailErr != nil {
+					slog.Error("Erro ao disparar e-mail de notificação de alerta", "user", aAlert.UserName, "email", aAlert.UserEmail, "ticker", aAlert.Ticker, "error", emailErr)
+				}
+			}(a, quote.Price, quote.Currency)
+		}
+	}
+}

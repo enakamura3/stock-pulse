@@ -1,0 +1,158 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: stockpulse_db
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: stockpulse
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - stockpulse-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d stockpulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: stockpulse_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - stockpulse-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate
+    container_name: stockpulse_migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/migrations:/migrations
+    command:
+      - -path=/migrations
+      - -database=postgres://root:secretpassword@db:5432/stockpulse?sslmode=disable
+      - up
+    networks:
+      - stockpulse-net
+
+  backend:
+    build: 
+      context: ./backend
+    container_name: stockpulse_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=postgres://root:secretpassword@db:5432/stockpulse?sslmode=disable
+      - REDIS_URL=redis:6379
+      - PORT=8080
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - SMTP_FROM=no-reply@stockpulse.com
+      - ALERT_CHECK_INTERVAL=1m
+      - LOG_LEVEL=warn
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - stockpulse-net
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: stockpulse_mailpit
+    ports:
+      - "8025:8025" # Web UI do Mailpit para ver e-mails no navegador
+      - "1025:1025" # Porta SMTP
+    networks:
+      - stockpulse-net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: stockpulse_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+    depends_on:
+      - backend
+    networks:
+      - stockpulse-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: stockpulse_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - stockpulse-net
+
+  loki:
+    image: grafana/loki:latest
+    container_name: stockpulse_loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    networks:
+      - stockpulse-net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: stockpulse_promtail
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - stockpulse-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: stockpulse_grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - stockpulse-net
+
+volumes:
+  pgdata:
+  prometheus-data:
+  loki-data:
+  grafana-data:
+
+networks:
+  stockpulse-net:
+    driver: bridge

@@ -1,0 +1,33 @@
+# Ambiente
+.env
+.env.local
+
+# Node / Next.js (Frontend)
+node_modules/
+.next/
+out/
+build/
+coverage/
+
+# Go / Air (Backend)
+tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Redis / Banco de Dados
+data/
+postgres-data/
+redis-data/
+grafana-data/
+loki-data/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
