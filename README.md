@@ -28,6 +28,7 @@ StockPulse é uma plataforma moderna e completa para acompanhamento de portfóli
 - **Framework:** React 18 com TypeScript
 - **Estilização:** CSS puro ("Glassmorphism", interfaces dark mode premium)
 - **Gráficos:** Lightweight Charts (TradingView)
+- **Testes Unitários:** Vitest & React Testing Library (100% de cobertura)
 - **Testes E2E:** Playwright
 
 ### Infraestrutura & DevOps
@@ -112,3 +113,27 @@ make migrate-create
 - Validação CSRF com Strict/Lax SameSite modes.
 - Fallback elegante se os provedores externos (Yahoo Finance) aplicarem Rate Limits, utilizando cache em Redis.
 - Graceful Shutdown no Go para desligar os Background Workers e encerrar conexões com o PostgreSQL com segurança.
+
+---
+
+## 🧪 Testes e Cobertura (Unit Testing)
+
+A plataforma StockPulse foca em **alta qualidade de código**, visando 100% de cobertura nos testes unitários tanto no backend quanto no frontend.
+
+### Backend (Golang)
+O backend possui um conjunto rigoroso de testes simulando casos de sucesso e tratamento de erros avançados no banco de dados com `pgxmock` (simulação de erros em scan de rows, indisponibilidade, etc).
+```bash
+# Rodar todos os testes de backend e exibir a porcentagem de cobertura
+cd backend
+go test -v -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+```
+
+### Frontend (Next.js)
+O frontend conta com cobertura de testes utilizando `Vitest` em conjunto com a `React Testing Library`. A suíte realiza _smoke testing_, testes de layout, validações de fluxo de formulários (Login e Registro) e _mocking_ de providers e contextos.
+```bash
+# Rodar testes de frontend com geração de relatório de coverage
+cd frontend
+npm run test:coverage
+```
+_Nota: Se você não possuir o Node instalado localmente, os testes podem ser executados dentro de um container Node isolado._
