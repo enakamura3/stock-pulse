@@ -188,8 +188,8 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if payload.Quantity <= 0 || payload.UnitPrice <= 0 {
-		h.respondWithError(w, http.StatusBadRequest, "Quantidade e preço unitário devem ser maiores que zero")
+	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.UnitPrice <= 0) {
+		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits)")
 		return
 	}
 
