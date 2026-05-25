@@ -66,6 +66,18 @@ func TestRepository_GetPortfoliosByUserID(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestRepository_GetPortfoliosByUserID_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, created_at`).
+		WithArgs("u1").
+		WillReturnError(errors.New("db error"))
+
+	_, err := repo.GetPortfoliosByUserID(context.Background(), "u1")
+	assert.ErrorContains(t, err, "db error")
+}
+
 func TestRepository_GetPortfolioByID(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
@@ -340,6 +352,42 @@ func TestRepository_Errors(t *testing.T) {
 	assert.Error(t, err)
 
 	mock.ExpectQuery(`SELECT id, ticker, currency FROM asset`).WillReturnError(errors.New("err"))
+	_, err = repo.GetAllAssets(context.Background())
+	assert.Error(t, err)
+}
+
+func TestRepository_ScanErrors(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	// For GetPortfoliosByUserID
+	rows1 := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "created_at"}).AddRow(nil, nil, nil, nil, "badtime")
+	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, created_at`).
+		WithArgs("u1").
+		WillReturnRows(rows1)
+	_, err := repo.GetPortfoliosByUserID(context.Background(), "u1")
+	assert.Error(t, err)
+
+	// For GetTransactionsByPortfolioID
+	rows2 := pgxmock.NewRows([]string{"id", "portfolio_id", "user_id", "asset_id", "transaction_type", "quantity", "price_per_unit", "transaction_date"}).AddRow(nil, nil, nil, nil, nil, nil, nil, "badtime")
+	mock.ExpectQuery(`SELECT`).
+		WithArgs("p1", "u1").
+		WillReturnRows(rows2)
+	_, err = repo.GetTransactionsByPortfolioID(context.Background(), "p1", "u1")
+	assert.Error(t, err)
+
+	// For GetDailyPrices
+	rows3 := pgxmock.NewRows([]string{"asset_id", "price_date", "close_price"}).AddRow(nil, "badtime", nil)
+	mock.ExpectQuery(`SELECT asset_id`).
+		WithArgs("a1", pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnRows(rows3)
+	_, err = repo.GetDailyPrices(context.Background(), "a1", time.Now(), time.Now())
+	assert.Error(t, err)
+
+	// For GetAllAssets
+	rows4 := pgxmock.NewRows([]string{"id", "ticker", "name", "type"}).AddRow(nil, nil, nil, nil)
+	mock.ExpectQuery(`SELECT id`).
+		WillReturnRows(rows4)
 	_, err = repo.GetAllAssets(context.Background())
 	assert.Error(t, err)
 }
