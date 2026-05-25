@@ -7,6 +7,7 @@ StockPulse é uma plataforma moderna e completa para acompanhamento de portfóli
 - **Monitoramento em Tempo Real:** Conexões via WebSocket garantem que cotações de ativos pisquem na tela sem necessidade de recarregar a página.
 - **Gestão de Portfólio:** Acompanhe rentabilidade, histórico de transações e custo médio dos seus ativos globais ou da B3.
 - **Watchlists Múltiplas:** Crie listas de favoritos customizadas para separar ativos por estratégia.
+- **Valuation Automático:** Calcule o Preço Justo (Fórmula de Graham) de ações via Web Scraping otimizado com cache vitalício no Redis, recebendo alertas visuais (Ação CARA ou DESCONTADA).
 - **Alertas de Preço (E-mail):** Configure alertas disparados automaticamente em background quando um preço atinge uma meta, recebendo um e-mail HTML estilizado.
 - **Segurança Sólida:** Autenticação usando JWT armazenado exclusivamente em cookies `HttpOnly` com criptografia e regras de CORS restritas.
 - **Observabilidade Total:** Telemetria integrada com Prometheus, Grafana e Loki para métricas e logs em tempo real.

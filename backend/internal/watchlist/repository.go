@@ -34,6 +34,8 @@ type Item struct {
 	Price         float64 `json:"price,omitempty"`
 	Change        float64 `json:"change,omitempty"`
 	ChangePercent float64 `json:"change_percent,omitempty"`
+	GrahamValue   float64 `json:"graham_value,omitempty"`
+	BazinValue    float64 `json:"bazin_value,omitempty"`
 }
 
 // DBTX define a interface necessária para realizar queries e abstrair pgxpool.Pool para testes.

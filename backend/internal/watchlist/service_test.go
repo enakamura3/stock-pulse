@@ -76,6 +76,14 @@ func (m *MockMarketService) GetQuote(ctx context.Context, ticker string) (*marke
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketService) GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).(*market.Fundamentals), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 type MockMarketProvider struct {
 	mock.Mock
 }
@@ -181,6 +189,7 @@ func TestService_GetWatchlist(t *testing.T) {
 		repo.On("GetWatchlistItems", mock.Anything, "w1").Return(items, nil)
 
 		ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Price: 150.0}, nil)
+		ms.On("GetFundamentals", mock.Anything, "AAPL").Return(&market.Fundamentals{}, nil)
 		ms.On("GetQuote", mock.Anything, "INVALID").Return(nil, errors.New("not found"))
 
 		w, err := s.GetWatchlist(context.Background(), "w1", "u1")

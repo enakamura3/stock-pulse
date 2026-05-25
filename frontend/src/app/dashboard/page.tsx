@@ -15,6 +15,8 @@ interface Item {
   price?: number;
   change?: number;
   change_percent?: number;
+  graham_value?: number;
+  bazin_value?: number;
 }
 
 interface Watchlist {
@@ -871,6 +873,21 @@ export default function DashboardPage() {
                             <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: wlPos ? '#00e676' : '#ff3d00' }}>
                               {item.change_percent !== undefined ? formatPercentage(item.change_percent) : ''}
                             </span>
+                            {item.graham_value && item.price ? (
+                              <span style={{
+                                display: 'inline-block',
+                                marginTop: '0.2rem',
+                                padding: '0.15rem 0.35rem',
+                                borderRadius: '4px',
+                                fontSize: '0.6rem',
+                                fontWeight: 700,
+                                backgroundColor: item.price < item.graham_value ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 61, 0, 0.15)',
+                                color: item.price < item.graham_value ? '#00e676' : '#ff3d00',
+                                border: `1px solid ${item.price < item.graham_value ? 'rgba(0, 230, 118, 0.3)' : 'rgba(255, 61, 0, 0.3)'}`
+                              }} title={`Graham: ${formatMoney(item.graham_value, item.currency)}`}>
+                                {item.price < item.graham_value ? 'DESC' : 'CARA'}
+                              </span>
+                            ) : null}
                           </div>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>--</span>

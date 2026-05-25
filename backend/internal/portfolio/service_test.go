@@ -108,6 +108,14 @@ func (m *MockMarketService) GetQuote(ctx context.Context, ticker string) (*marke
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketService) GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).(*market.Fundamentals), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]market.SearchResult, error) {
 	args := m.Called(ctx, query)
 	if args.Get(0) != nil {
@@ -231,7 +239,9 @@ func TestService_GetPortfolioDetails(t *testing.T) {
 		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
 
 		ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Price: 170.0, Currency: "USD"}, nil)
+		ms.On("GetFundamentals", mock.Anything, "AAPL").Return(&market.Fundamentals{}, nil)
 		ms.On("GetQuote", mock.Anything, "INVALID").Return(nil, errors.New("err"))
+		ms.On("GetFundamentals", mock.Anything, "INVALID").Return(nil, errors.New("err"))
 		ms.On("GetQuote", mock.Anything, "BRL=X").Return(nil, errors.New("err"))
 		ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(&market.Quote{Price: 5.2}, nil)
 

@@ -28,6 +28,8 @@ interface Position {
   current_value?: number;
   profit_loss?: number;
   return_percent?: number;
+  graham_value?: number;
+  bazin_value?: number;
 }
 
 interface Transaction {
@@ -634,6 +636,7 @@ export default function PortfolioPage() {
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Custo Total</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Valor Atual</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Retorno</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'center' }}>Valuation</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -664,6 +667,24 @@ export default function PortfolioPage() {
                               </td>
                               <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontWeight: 700, color: isPos ? '#00e676' : '#ff3d00' }}>
                                 {pos.return_percent !== undefined ? formatPercentage(pos.return_percent) : '--'}
+                              </td>
+                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'center' }}>
+                                {pos.graham_value && pos.current_price ? (
+                                  <span style={{
+                                    display: 'inline-block',
+                                    padding: '0.2rem 0.5rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    backgroundColor: pos.current_price < pos.graham_value ? 'rgba(0, 230, 118, 0.1)' : 'rgba(255, 61, 0, 0.1)',
+                                    color: pos.current_price < pos.graham_value ? '#00e676' : '#ff3d00',
+                                    border: `1px solid ${pos.current_price < pos.graham_value ? 'rgba(0, 230, 118, 0.3)' : 'rgba(255, 61, 0, 0.3)'}`
+                                  }} title={`Preço Justo (Graham): ${formatMoney(pos.graham_value, pos.currency)}`}>
+                                    {pos.current_price < pos.graham_value ? 'DESCONTADA' : 'CARA'}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>--</span>
+                                )}
                               </td>
                             </tr>
                           );

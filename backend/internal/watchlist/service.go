@@ -26,6 +26,7 @@ type WatchlistRepository interface {
 // MarketService define as operações de mercado suportadas.
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
+	GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error)
 }
 
 // Service implementa as regras de negócio de favoritos e orquestração de cotações.
@@ -86,8 +87,7 @@ func (s *Service) GetWatchlist(ctx context.Context, id, userID string) (*Watchli
 		return nil, fmt.Errorf("erro ao carregar itens da lista: %w", err)
 	}
 
-	// Agrega cotações em tempo real para cada item de forma sequencial ou paralela.
-	// Sequencial é suficiente e seguro para o MVP dado o cache do Redis.
+	// Agrega cotações em tempo real e fundamentos para cada item
 	for i := range items {
 		quote, err := s.marketService.GetQuote(ctx, items[i].Ticker)
 		if err != nil {
@@ -97,6 +97,12 @@ func (s *Service) GetWatchlist(ctx context.Context, id, userID string) (*Watchli
 		items[i].Price = quote.Price
 		items[i].Change = quote.Change
 		items[i].ChangePercent = quote.ChangePercent
+
+		fund, errF := s.marketService.GetFundamentals(ctx, items[i].Ticker)
+		if errF == nil && fund != nil {
+			items[i].GrahamValue = fund.GrahamValue
+			items[i].BazinValue = fund.BazinValue
+		}
 	}
 
 	w.Items = items

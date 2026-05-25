@@ -34,6 +34,7 @@ type PortfolioRepository interface {
 // MarketService define as operações de mercado suportadas.
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
+	GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error)
 }
 
 // Service gerencia as regras de negócio de carteiras, transações e histórico.
@@ -172,6 +173,12 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 			pos.ProfitLoss = pos.CurrentValue - pos.TotalCost
 			if pos.TotalCost > 0 {
 				pos.ReturnPercent = (pos.ProfitLoss / pos.TotalCost) * 100
+			}
+
+			// Injeta fundamentos (Graham e Bazin)
+			if f, errF := s.marketService.GetFundamentals(ctx, pos.Ticker); errF == nil && f != nil {
+				pos.GrahamValue = f.GrahamValue
+				pos.BazinValue = f.BazinValue
 			}
 
 			activePositions = append(activePositions, *pos)
