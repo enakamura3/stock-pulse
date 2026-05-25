@@ -85,6 +85,9 @@ export default function DashboardPage() {
   const [alertErrorMsg, setAlertErrorMsg] = useState<string | null>(null);
   const [alertSuccessMsg, setAlertSuccessMsg] = useState<string | null>(null);
 
+  const getActiveWatchlist = useCallback(() => watchlists.find((w) => w.id === activeWatchlistId), [watchlists, activeWatchlistId]);
+  const activeWL = getActiveWatchlist();
+
   const openAlertModal = () => {
     if (!activeQuote) return;
     setAlertTargetPrice(activeQuote.price.toString());
@@ -394,10 +397,7 @@ export default function DashboardPage() {
   };
 
   // 6. ADICIONA / REMOVE DOS FAVORITOS (ÍCONE DE ESTRELA)
-  const getActiveWatchlist = () => watchlists.find((w) => w.id === activeWatchlistId);
-
   const isAssetFavorited = (symbol: string) => {
-    const activeWL = getActiveWatchlist();
     return activeWL?.items?.some((item) => item.ticker.toUpperCase() === symbol.toUpperCase()) || false;
   };
 
@@ -484,7 +484,6 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  const activeWL = getActiveWatchlist();
   const activeFavorited = activeQuote ? isAssetFavorited(activeQuote.symbol) : false;
 
   return (
