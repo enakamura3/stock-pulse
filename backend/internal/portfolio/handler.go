@@ -11,13 +11,28 @@ import (
 	"github.com/onigiri/stockpulse/backend/internal/auth"
 )
 
+// PortfolioService define as operações que o Handler espera.
+type PortfolioService interface {
+	CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error)
+	GetPortfolios(ctx context.Context, userID string) ([]Portfolio, error)
+	GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*Portfolio, []Position, error)
+	AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error)
+	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
+	DeletePortfolio(ctx context.Context, id, userID string) error
+	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string) ([]PerformancePoint, error)
+	
+	// Utilizado especificamente pelo Handler para recuperar transações puras
+	repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
+}
+
+// Removido do handler.go
 // Handler expõe endpoints HTTP seguros para o módulo de Portfólios.
 type Handler struct {
-	service *Service
+	service PortfolioService
 }
 
 // NewHandler cria uma nova instância de Handler.
-func NewHandler(service *Service) *Handler {
+func NewHandler(service PortfolioService) *Handler {
 	return &Handler{service: service}
 }
 
@@ -138,7 +153,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txs, err := h.service.repo.GetTransactionsByPortfolioID(r.Context(), portfolioID, userID)
+	txs, err := h.service.repoGetTransactionsByPortfolioID(r.Context(), portfolioID, userID)
 	if err != nil {
 		h.respondWithError(w, http.StatusInternalServerError, "Erro ao recuperar transações")
 		return

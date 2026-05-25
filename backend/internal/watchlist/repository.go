@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Watchlist representa o agrupamento de favoritos pertencente a um usuário.
@@ -35,13 +36,20 @@ type Item struct {
 	ChangePercent float64 `json:"change_percent,omitempty"`
 }
 
+// DBTX define a interface necessária para realizar queries e abstrair pgxpool.Pool para testes.
+type DBTX interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
 // Repository lida com a persistência das tabelas watchlist, watchlist_item e asset.
 type Repository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
 // NewRepository cria uma nova instância de Repository.
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db DBTX) *Repository {
 	return &Repository{db: db}
 }
 

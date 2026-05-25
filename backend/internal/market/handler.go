@@ -1,19 +1,26 @@
 package market
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
 
+// MarketService define a interface que o Handler consome.
+type MarketService interface {
+	GetQuote(ctx context.Context, ticker string) (*Quote, error)
+	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
+}
+
 // Handler expõe os endpoints HTTP para busca e cotação.
 type Handler struct {
-	service *Service
+	service MarketService
 }
 
 // NewHandler cria uma nova instância de Handler de mercado.
-func NewHandler(service *Service) *Handler {
+func NewHandler(service MarketService) *Handler {
 	return &Handler{service: service}
 }
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 )
 
 // User representa o modelo do usuário conforme mapeado no banco de dados.
@@ -18,13 +18,18 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// Repository encapsula o pool de conexões para operações na tabela user.
+// DBTX define a interface necessária para realizar queries, abstraindo o pgxpool.Pool para facilitar os testes.
+type DBTX interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// Repository encapsula a conexão para operações na tabela user.
 type Repository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
 // NewRepository cria uma nova instância de Repository.
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db DBTX) *Repository {
 	return &Repository{db: db}
 }
 

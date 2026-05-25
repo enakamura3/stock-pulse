@@ -1,6 +1,7 @@
 package alert
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -8,13 +9,21 @@ import (
 	"github.com/onigiri/stockpulse/backend/internal/auth"
 )
 
+// AlertService define a interface para operações de alertas (usada para mocking nos testes).
+type AlertService interface {
+	CreateAlert(ctx context.Context, userID string, ticker string, targetPrice float64, condition string) (*Alert, error)
+	GetAlerts(ctx context.Context, userID string) ([]*Alert, error)
+	DeleteAlert(ctx context.Context, id string, userID string) error
+	ToggleAlert(ctx context.Context, id string, userID string) (string, error)
+}
+
 // Handler expõe os endpoints HTTP de Alertas de Preço.
 type Handler struct {
-	svc *Service
+	svc AlertService
 }
 
 // NewHandler inicializa o Alert Handler.
-func NewHandler(svc *Service) *Handler {
+func NewHandler(svc AlertService) *Handler {
 	return &Handler{
 		svc: svc,
 	}

@@ -7,6 +7,9 @@ import (
 	"os"
 )
 
+// SendMailFunc define a assinatura para enviar emails, permitindo mock nos testes.
+var SendMailFunc = smtp.SendMail
+
 // Service gerencia o disparo de e-mails do sistema via protocolo SMTP.
 type Service struct {
 	host string
@@ -203,7 +206,7 @@ func (s *Service) SendAlertEmail(to string, userName string, ticker string, asse
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 
 	// Envia o e-mail (sem autenticação local de desenvolvimento, suportando SMTP anônimo do Mailpit)
-	err := smtp.SendMail(addr, nil, s.from, []string{to}, []byte(message))
+	err := SendMailFunc(addr, nil, s.from, []string{to}, []byte(message))
 	if err != nil {
 		log.Printf("[SMTP] Falha ao enviar alerta por e-mail para %s: %v", to, err)
 		return err

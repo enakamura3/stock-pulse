@@ -15,15 +15,22 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// UserRepository define as operações de banco de dados para a entidade de usuário.
+type UserRepository interface {
+	CreateUser(ctx context.Context, name, email, passwordHash string) (*User, error)
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	GetUserByID(ctx context.Context, id string) (*User, error)
+}
+
 // Service lida com regras de negócio de autenticação, hashing e controle de sessão.
 type Service struct {
-	repo      *Repository
+	repo      UserRepository
 	rdb       *redis.Client
 	jwtSecret []byte
 }
 
 // NewService cria uma nova instância de Service.
-func NewService(repo *Repository, rdb *redis.Client, jwtSecret string) *Service {
+func NewService(repo UserRepository, rdb *redis.Client, jwtSecret string) *Service {
 	return &Service{
 		repo:      repo,
 		rdb:       rdb,

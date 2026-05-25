@@ -11,6 +11,11 @@ import (
 	"github.com/onigiri/stockpulse/backend/internal/market"
 )
 
+// MarketProvider define a interface de cotações para o WebSocket Hub.
+type MarketProvider interface {
+	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
+}
+
 // Client representa uma conexão WebSocket ativa de um usuário.
 type Client struct {
 	Hub    *Hub
@@ -146,12 +151,12 @@ type Hub struct {
 	clients    map[*Client]bool
 	register   chan *Client
 	unregister chan *Client
-	marketSvc  *market.Service
+	marketSvc  MarketProvider
 	mu         sync.RWMutex
 }
 
 // NewHub inicializa o WebSocket Hub central.
-func NewHub(marketSvc *market.Service) *Hub {
+func NewHub(marketSvc MarketProvider) *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),

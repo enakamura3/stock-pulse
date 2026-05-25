@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -12,14 +13,24 @@ type contextKey string
 // UserIDKey é a chave usada para armazenar e resgatar o ID do usuário autenticado no contexto HTTP.
 const UserIDKey contextKey = "user_id"
 
+// AuthService define os casos de uso de autenticação que o Handler pode consumir.
+type AuthService interface {
+	Register(ctx context.Context, name, email, password string) (*User, error)
+	Login(ctx context.Context, email, password string) (*User, string, string, error)
+	RevokeRefreshToken(ctx context.Context, token string) error
+	ValidateRefreshToken(ctx context.Context, token string) (string, error)
+	GetUserByID(ctx context.Context, id string) (*User, error)
+	GenerateAccessToken(user *User) (string, error)
+}
+
 // Handler expõe os métodos HTTP da API de Autenticação.
 type Handler struct {
-	service      *Service
+	service      AuthService
 	cookieSecure bool
 }
 
 // NewHandler cria uma nova instância de Handler.
-func NewHandler(service *Service) *Handler {
+func NewHandler(service AuthService) *Handler {
 	// Em modo de desenvolvimento local, cookieSecure pode ser desativado para permitir testes sem HTTPS
 	cookieSecure := os.Getenv("ENV") != "development"
 	return &Handler{

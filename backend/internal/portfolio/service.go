@@ -15,16 +15,37 @@ import (
 	"github.com/onigiri/stockpulse/backend/internal/market"
 )
 
+// PortfolioRepository define as operações de banco de dados para a carteira.
+type PortfolioRepository interface {
+	CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error)
+	GetPortfoliosByUserID(ctx context.Context, userID string) ([]Portfolio, error)
+	GetPortfolioByID(ctx context.Context, id, userID string) (*Portfolio, error)
+	DeletePortfolio(ctx context.Context, id, userID string) error
+	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
+	GetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
+	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
+	SaveDailyPrices(ctx context.Context, assetID string, prices []DailyPrice) error
+	GetDailyPrices(ctx context.Context, assetID string, startDate, endDate time.Time) ([]DailyPrice, error)
+	GetAssetByTicker(ctx context.Context, ticker string) (string, error)
+	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
+	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
+}
+
+// MarketService define as operações de mercado suportadas.
+type MarketService interface {
+	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
+}
+
 // Service gerencia as regras de negócio de carteiras, transações e histórico.
 type Service struct {
-	repo           *Repository
-	marketService  *market.Service
+	repo           PortfolioRepository
+	marketService  MarketService
 	marketProvider market.QuoteProvider
 	httpClient     *http.Client
 }
 
 // NewService cria uma nova instância de Service.
-func NewService(repo *Repository, marketService *market.Service, marketProvider market.QuoteProvider) *Service {
+func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider) *Service {
 	return &Service{
 		repo:           repo,
 		marketService:  marketService,
@@ -258,6 +279,10 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 // DeleteTransaction apaga uma transação da carteira.
 func (s *Service) DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error {
 	return s.repo.DeleteTransaction(ctx, txID, portfolioID, userID)
+}
+
+func (s *Service) repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
+	return s.repo.GetTransactionsByPortfolioID(ctx, portfolioID, userID)
 }
 
 // DeletePortfolio remove a carteira do banco de dados.

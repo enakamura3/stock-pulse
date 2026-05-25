@@ -10,15 +10,33 @@ import (
 	"github.com/onigiri/stockpulse/backend/internal/market"
 )
 
+// WatchlistRepository define as operações de banco de dados.
+type WatchlistRepository interface {
+	CreateWatchlist(ctx context.Context, userID, name string) (*Watchlist, error)
+	GetWatchlistsByUserID(ctx context.Context, userID string) ([]Watchlist, error)
+	GetWatchlistByID(ctx context.Context, id, userID string) (*Watchlist, error)
+	DeleteWatchlist(ctx context.Context, id, userID string) error
+	GetAssetByTicker(ctx context.Context, ticker string) (string, error)
+	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
+	AddWatchlistItem(ctx context.Context, watchlistID, assetID string) (*Item, error)
+	RemoveWatchlistItem(ctx context.Context, watchlistID, ticker string) error
+	GetWatchlistItems(ctx context.Context, watchlistID string) ([]Item, error)
+}
+
+// MarketService define as operações de mercado suportadas.
+type MarketService interface {
+	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
+}
+
 // Service implementa as regras de negócio de favoritos e orquestração de cotações.
 type Service struct {
-	repo           *Repository
-	marketService  *market.Service
+	repo           WatchlistRepository
+	marketService  MarketService
 	marketProvider market.QuoteProvider
 }
 
 // NewService cria uma nova instância de Service.
-func NewService(repo *Repository, marketService *market.Service, marketProvider market.QuoteProvider) *Service {
+func NewService(repo WatchlistRepository, marketService MarketService, marketProvider market.QuoteProvider) *Service {
 	return &Service{
 		repo:           repo,
 		marketService:  marketService,

@@ -10,12 +10,12 @@ import (
 
 // DailyWorker gerencia Goroutines em segundo plano para capturar snapshots de fechamento de mercado.
 type DailyWorker struct {
-	repo           *Repository
+	repo           PortfolioRepository
 	marketProvider market.QuoteProvider
 }
 
 // NewDailyWorker cria uma nova instância do DailyWorker.
-func NewDailyWorker(repo *Repository, marketProvider market.QuoteProvider) *DailyWorker {
+func NewDailyWorker(repo PortfolioRepository, marketProvider market.QuoteProvider) *DailyWorker {
 	return &DailyWorker{
 		repo:           repo,
 		marketProvider: marketProvider,

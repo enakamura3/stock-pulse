@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Portfolio representa o agrupamento de ativos pertencente a um usuário.
@@ -60,13 +61,21 @@ type DailyPrice struct {
 	ClosePrice float64   `json:"close_price"`
 }
 
+// DBTX define a interface necessária para realizar queries e abstrair pgxpool.Pool para testes.
+type DBTX interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 // Repository lida com as interações de banco de dados do módulo de Portfólio.
 type Repository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
 // NewRepository cria uma nova instância de Repository.
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db DBTX) *Repository {
 	return &Repository{db: db}
 }
 

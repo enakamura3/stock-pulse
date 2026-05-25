@@ -6,8 +6,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// DBTX define a interface necessária para realizar queries e abstrair pgxpool.Pool para testes.
+type DBTX interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
 
 // Alert representa o modelo de dados de um alerta de preço.
 type Alert struct {
@@ -30,11 +37,11 @@ type Alert struct {
 
 // Repository gerencia a persistência das regras de alertas no PostgreSQL.
 type Repository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
 // NewRepository inicializa o repositório de Alertas.
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db DBTX) *Repository {
 	return &Repository{
 		db: db,
 	}

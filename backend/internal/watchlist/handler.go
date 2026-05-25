@@ -1,6 +1,7 @@
 package watchlist
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -8,13 +9,23 @@ import (
 	"github.com/onigiri/stockpulse/backend/internal/auth"
 )
 
+// WatchlistService define as operações de negócio da watchlist que o Handler pode consumir.
+type WatchlistService interface {
+	CreateWatchlist(ctx context.Context, userID, name string) (*Watchlist, error)
+	GetWatchlists(ctx context.Context, userID string) ([]Watchlist, error)
+	GetWatchlist(ctx context.Context, id, userID string) (*Watchlist, error)
+	DeleteWatchlist(ctx context.Context, id, userID string) error
+	AddAssetToWatchlist(ctx context.Context, watchlistID, userID, ticker string) (*Item, error)
+	RemoveAssetFromWatchlist(ctx context.Context, watchlistID, userID, ticker string) error
+}
+
 // Handler expõe endpoints REST protegidos para gerenciamento de favoritos.
 type Handler struct {
-	service *Service
+	service WatchlistService
 }
 
 // NewHandler cria uma nova instância de Handler.
-func NewHandler(service *Service) *Handler {
+func NewHandler(service WatchlistService) *Handler {
 	return &Handler{service: service}
 }
 

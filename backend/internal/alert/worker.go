@@ -6,26 +6,30 @@ import (
 	"os"
 	"time"
 
-	"github.com/onigiri/stockpulse/backend/internal/mail"
 	"github.com/onigiri/stockpulse/backend/internal/market"
 )
 
+// MailProvider define as operações necessárias para envio de e-mails de alerta.
+type MailProvider interface {
+	SendAlertEmail(toEmail, toName, ticker, assetName string, currentVal, targetVal float64, condition, currency string) error
+}
+
 // AlertWorker gerencia o monitoramento periódico de alertas de preço ativos.
 type AlertWorker struct {
-	repo          *Repository
-	marketService *market.Service
-	mailService   *mail.Service
+	repo          AlertRepository
+	marketService market.QuoteProvider
+	mailService   MailProvider
 	interval      time.Duration
 }
 
 // NewAlertWorker inicializa o Worker com intervalo customizável (Padrão: 1 minuto).
-func NewAlertWorker(repo *Repository, marketService *market.Service, mailService *mail.Service) *AlertWorker {
+func NewAlertWorker(repo AlertRepository, marketService market.QuoteProvider, mailService MailProvider) *AlertWorker {
 	intervalStr := os.Getenv("ALERT_CHECK_INTERVAL")
 	interval := 1 * time.Minute // Valor padrão aprovado (Opção 1A)
 
 	if intervalStr != "" {
-		if parsed, err := time.ParseDuration(intervalStr); err == nil {
-			interval = parsed
+		if d, err := time.ParseDuration(intervalStr); err == nil {
+			interval = d
 		}
 	}
 

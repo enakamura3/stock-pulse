@@ -10,14 +10,26 @@ import (
 	"github.com/onigiri/stockpulse/backend/internal/market"
 )
 
+// AlertRepository define as operações de banco de dados necessárias para alertas.
+type AlertRepository interface {
+	GetAssetByTicker(ctx context.Context, ticker string) (string, error)
+	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
+	CreateAlert(ctx context.Context, a *Alert) error
+	GetAlertsByUserID(ctx context.Context, userID string) ([]*Alert, error)
+	DeleteAlert(ctx context.Context, id string, userID string) error
+	GetActiveAlerts(ctx context.Context) ([]*Alert, error)
+	MarkAlertTriggered(ctx context.Context, id string) error
+	ToggleAlertStatus(ctx context.Context, id string, userID string) (string, error)
+}
+
 // Service implementa as regras de negócio para a gestão de alertas de preço.
 type Service struct {
-	repo           *Repository
+	repo           AlertRepository
 	marketProvider market.QuoteProvider
 }
 
 // NewService inicializa o Alert Service.
-func NewService(repo *Repository, marketProvider market.QuoteProvider) *Service {
+func NewService(repo AlertRepository, marketProvider market.QuoteProvider) *Service {
 	return &Service{
 		repo:           repo,
 		marketProvider: marketProvider,
@@ -51,10 +63,10 @@ func (s *Service) CreateAlert(ctx context.Context, userID string, ticker string,
 
 		// 3. Cadastra o ativo de forma inteligente no banco local
 		assetType := "EQUITY"
-		if quote.Currency == "USD" && !strings.Contains(ticker, ".") {
-			assetType = "EQUITY_US"
-		} else if strings.Contains(ticker, "-") {
+		if strings.Contains(ticker, "-") {
 			assetType = "CRYPTO"
+		} else if quote.Currency == "USD" && !strings.Contains(ticker, ".") {
+			assetType = "EQUITY_US"
 		}
 
 		assetID, err = s.repo.CreateAsset(ctx, ticker, quote.Name, assetType, quote.Currency)
