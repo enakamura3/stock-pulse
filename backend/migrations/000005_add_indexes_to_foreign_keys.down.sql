@@ -1,0 +1,10 @@
+DROP INDEX IF EXISTS idx_portfolio_user_id;
+DROP INDEX IF EXISTS idx_asset_daily_price_asset_id;
+DROP INDEX IF EXISTS idx_asset_event_asset_id;
+DROP INDEX IF EXISTS idx_transaction_portfolio_id;
+DROP INDEX IF EXISTS idx_transaction_asset_id;
+DROP INDEX IF EXISTS idx_watchlist_user_id;
+DROP INDEX IF EXISTS idx_watchlist_item_watchlist_id;
+DROP INDEX IF EXISTS idx_watchlist_item_asset_id;
+DROP INDEX IF EXISTS idx_alert_user_id;
+DROP INDEX IF EXISTS idx_alert_asset_id;

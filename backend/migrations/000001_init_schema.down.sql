@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS alert;
+DROP TABLE IF EXISTS watchlist_item;
+DROP TABLE IF EXISTS watchlist;
+DROP TABLE IF EXISTS transaction;
+DROP TABLE IF EXISTS asset_event;
+DROP TABLE IF EXISTS asset_daily_price;
+DROP TABLE IF EXISTS asset;
+DROP TABLE IF EXISTS portfolio;
+DROP TABLE IF EXISTS "user";

@@ -1,0 +1,1 @@
+ALTER TABLE asset_event DROP CONSTRAINT IF EXISTS asset_event_asset_id_ex_date_type_key;

@@ -1,0 +1,30 @@
+# Configuração do Caddy para Produção e Teste Local (Opção 2A)
+
+# Domínio do Frontend (Produção)
+stock-pulse.com, www.stock-pulse.com {
+    # Habilita compressão de conteúdo
+    encode zstd gzip
+
+    # Proxy reverso direcionando para o container Next.js
+    reverse_proxy frontend:3000
+}
+
+# Domínio do Backend (Produção - API & WebSockets)
+api.stock-pulse.com {
+    # Habilita compressão de conteúdo
+    encode zstd gzip
+
+    # Proxy reverso direcionando para o container Go
+    reverse_proxy backend:8080
+}
+
+# Bloco de Desenvolvimento / Teste Local (Acesso HTTP)
+http://stock-pulse.localhost, http://localhost {
+    encode zstd gzip
+    reverse_proxy frontend:3000
+}
+
+http://api.stock-pulse.localhost {
+    encode zstd gzip
+    reverse_proxy backend:8080
+}

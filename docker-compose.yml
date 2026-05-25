@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: stock-pulse-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - stock-pulse-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: stock-pulse-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - stock-pulse-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate
+    container_name: stock-pulse-migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/migrations:/migrations
+    command:
+      - -path=/migrations
+      - -database=${DB_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable}
+      - up
+    networks:
+      - stock-pulse-net
+
+  backend:
+    build: 
+      context: ./backend
+    container_name: stock-pulse-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=${DB_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable}
+      - REDIS_URL=redis:6379
+      - PORT=8080
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - SMTP_FROM=no-reply@stock-pulse.com
+      - ALERT_CHECK_INTERVAL=1m
+      - LOG_LEVEL=warn
+      - JWT_SECRET=${JWT_SECRET}
+      - MOCK_EXTERNAL_APIS=${MOCK_EXTERNAL_APIS:-false}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - stock-pulse-net
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: stock-pulse-mailpit
+    ports:
+      - "8025:8025" # Web UI do Mailpit para ver e-mails no navegador
+      - "1025:1025" # Porta SMTP
+    networks:
+      - stock-pulse-net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: stock-pulse-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - backend
+    networks:
+      - stock-pulse-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: stock-pulse-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - stock-pulse-net
+
+  loki:
+    image: grafana/loki:latest
+    container_name: stock-pulse-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    networks:
+      - stock-pulse-net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: stock-pulse-promtail
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - stock-pulse-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: stock-pulse-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - stock-pulse-net
+
+volumes:
+  pgdata:
+  prometheus-data:
+  loki-data:
+  grafana-data:
+
+networks:
+  stock-pulse-net:
+    driver: bridge

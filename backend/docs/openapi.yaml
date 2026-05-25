@@ -1,0 +1,583 @@
+openapi: 3.0.3
+info:
+  title: stock-pulse API
+  description: API REST para a plataforma stock-pulse - Sistema modular para monitoramento de ações, favoritos (watchlists), portfólios financeiros de multi-moeda e cotações em tempo real.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Servidor de Desenvolvimento Local
+paths:
+  /auth/register:
+    post:
+      summary: Registrar um novo usuário
+      tags:
+        - Autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: OBJECT
+              required:
+                - email
+                - password
+                - name
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: investidor@gmail.com
+                password:
+                  type: string
+                  format: password
+                  example: SenhaSegura123
+                name:
+                  type: string
+                  example: João Silva
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                type: OBJECT
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  email:
+                    type: string
+                  name:
+                    type: string
+        '400':
+          description: Erro de validação ou e-mail em uso
+
+  /auth/login:
+    post:
+      summary: Autenticar usuário
+      description: Valida e-mail e senha e retorna cookies HttpOnly seguros contendo o Access Token e o Refresh Token.
+      tags:
+        - Autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: OBJECT
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: investidor@gmail.com
+                password:
+                  type: string
+                  format: password
+                  example: SenhaSegura123
+      responses:
+        '200':
+          description: Login efetuado com sucesso (Cookies de sessão injetados)
+          content:
+            application/json:
+              schema:
+                type: OBJECT
+                properties:
+                  user:
+                    type: OBJECT
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      email:
+                        type: string
+                      name:
+                        type: string
+        '401':
+          description: Credenciais incorretas
+
+  /auth/logout:
+    post:
+      summary: Encerrar sessão
+      description: Destrói a sessão no Redis e expira os cookies do navegador.
+      tags:
+        - Autenticação
+      responses:
+        '200':
+          description: Logout efetuado com sucesso
+
+  /auth/refresh:
+    post:
+      summary: Renovar tokens silenciosamente
+      description: Utiliza o cookie do Refresh Token para re-emitir um Access Token renovado no cabeçalho do cookie.
+      tags:
+        - Autenticação
+      responses:
+        '200':
+          description: Sessão renovada com sucesso
+
+  /auth/me:
+    get:
+      summary: Obter dados do usuário ativo
+      tags:
+        - Autenticação
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dados do usuário retornado com sucesso
+
+  /quotes/{ticker}:
+    get:
+      summary: Obter cotação atualizada de um ativo
+      tags:
+        - Dados de Mercado
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+            example: PETR4.SA
+      responses:
+        '200':
+          description: Cotação retornada com sucesso
+
+  /assets/search:
+    get:
+      summary: Pesquisa autocomplete de ativos globais
+      tags:
+        - Dados de Mercado
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            example: VALE3
+      responses:
+        '200':
+          description: Resultados da busca textual
+
+  /watchlists:
+    get:
+      summary: Listar watchlists do usuário
+      tags:
+        - Watchlists
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Listagem retornada (Cria a padrão "Favoritos" automaticamente no onboarding)
+    post:
+      summary: Criar nova watchlist
+      tags:
+        - Watchlists
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: OBJECT
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: Tecnologia
+      responses:
+        '201':
+          description: Watchlist criada com sucesso
+
+  /watchlists/{id}:
+    get:
+      summary: Detalhes de uma watchlist com cotações integradas
+      tags:
+        - Watchlists
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Watchlist detalhada
+    delete:
+      summary: Excluir uma watchlist
+      tags:
+        - Watchlists
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Watchlist apagada
+
+  /watchlists/{id}/items:
+    post:
+      summary: Favoritar ativo em uma watchlist
+      tags:
+        - Watchlists
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: OBJECT
+              required:
+                - ticker
+              properties:
+                ticker:
+                  type: string
+                  example: AAPL
+      responses:
+        '201':
+          description: Ativo favoritado com sucesso (Auto-importa se inédito)
+
+  /watchlists/{id}/items/{ticker}:
+    delete:
+      summary: Remover ativo favorito de uma watchlist
+      tags:
+        - Watchlists
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+            example: AAPL
+      responses:
+        '200':
+          description: Ativo removido
+
+  /portfolios:
+    get:
+      summary: Listar portfólios do usuário
+      tags:
+        - Portfólios
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Listagem com consolidado financeiro
+    post:
+      summary: Criar novo portfólio
+      tags:
+        - Portfólios
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: OBJECT
+              required:
+                - name
+                - base_currency
+              properties:
+                name:
+                  type: string
+                  example: Aposentadoria
+                base_currency:
+                  type: string
+                  example: BRL
+      responses:
+        '201':
+          description: Portfólio criado
+
+  /portfolios/{id}:
+    get:
+      summary: Detalhes analíticos consolidados do portfólio (Rentabilidade, Preço Médio)
+      tags:
+        - Portfólios
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalhes do portfólio
+    delete:
+      summary: Excluir portfólio
+      tags:
+        - Portfólios
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Portfólio apagado
+
+  /portfolios/{id}/transactions/bulk:
+    post:
+      summary: Importar Transações em Lote (CSV)
+      tags:
+        - Transações
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Transações importadas
+
+  /portfolios/{id}/transactions:
+    get:
+      summary: Listar transações do portfólio
+      tags:
+        - Transações
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Histórico de transações
+    post:
+      summary: Registrar nova transação de compra/venda
+      tags:
+        - Transações
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: OBJECT
+              required:
+                - ticker
+                - type
+                - quantity
+                - unit_price
+                - executed_at
+              properties:
+                ticker:
+                  type: string
+                  example: VALE3.SA
+                type:
+                  type: string
+                  enum: [BUY, SELL, SPLIT, REVERSE_SPLIT, BONUS]
+                  example: BUY
+                quantity:
+                  type: number
+                  example: 50
+                unit_price:
+                  type: number
+                  example: 83.10
+                exchange_rate:
+                  type: number
+                  example: 1.0000
+                executed_at:
+                  type: string
+                  format: date
+                  example: "2026-05-20"
+      responses:
+        '201':
+          description: Transação registrada (E auto-importa histórico de 5 anos se ticker for inédito)
+
+  /portfolios/{id}/transactions/{txId}:
+    delete:
+      summary: Remover transação do portfólio
+      tags:
+        - Transações
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: txId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transação removida e carteira recalculada
+
+  /portfolios/{id}/performance:
+    get:
+      summary: Evolução Patrimonial Diária do Portfólio (LOCF)
+      tags:
+        - Portfólios
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [1M, 3M, 6M, 1Y, ALL]
+            example: ALL
+      responses:
+        '200':
+          description: Série histórica de evolução de saldo para gráficos
+
+  /alerts:
+    get:
+      summary: Listar alertas de preço do usuário
+      tags:
+        - Alertas
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Listagem de alertas ativos, disparados e pausados
+    post:
+      summary: Criar alerta de preço personalizado
+      tags:
+        - Alertas
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: OBJECT
+              required:
+                - ticker
+                - target_price
+                - condition
+              properties:
+                ticker:
+                  type: string
+                  example: PETR4.SA
+                target_price:
+                  type: number
+                  example: 38.50
+                condition:
+                  type: string
+                  enum: [ABOVE, BELOW]
+                  example: ABOVE
+      responses:
+        '201':
+          description: Alerta ativado com sucesso (E auto-onboarda ativo se inédito)
+
+  /alerts/{id}:
+    delete:
+      summary: Excluir alerta de preço
+      tags:
+        - Alertas
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Alerta deletado
+
+  /alerts/{id}/toggle:
+    put:
+      summary: Pausar ou reativar alerta
+      tags:
+        - Alertas
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status alternado com sucesso
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
