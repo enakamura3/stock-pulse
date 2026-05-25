@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi, AreaSeries, LineSeries } from 'lightweight-charts';
 
 interface ChartPoint {
   date: string;
@@ -50,7 +50,7 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     });
 
     // Série 1: Valor de Mercado (Area Series Neon Cyan)
-    const valueSeries = chart.addAreaSeries({
+    const valueSeries = chart.addSeries(AreaSeries, {
       lineColor: '#00f2fe',
       topColor: 'rgba(0, 242, 254, 0.15)',
       bottomColor: 'rgba(0, 242, 254, 0.0)',
@@ -63,7 +63,7 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     });
 
     // Série 2: Custo de Aquisição (Line Series Dashed White)
-    const costSeries = chart.addLineSeries({
+    const costSeries = chart.addSeries(LineSeries, {
       color: 'rgba(255, 255, 255, 0.35)',
       lineWidth: 1.5,
       lineStyle: 2, // Dashed

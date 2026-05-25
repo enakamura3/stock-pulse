@@ -4,10 +4,7 @@ import React from 'react';
 import { vi } from 'vitest';
 
 vi.mock('lightweight-charts', () => {
-  const addAreaSeriesMock = vi.fn().mockReturnValue({
-    setData: vi.fn(),
-  });
-  const addLineSeriesMock = vi.fn().mockReturnValue({
+  const addSeriesMock = vi.fn().mockReturnValue({
     setData: vi.fn(),
   });
   const fitContentMock = vi.fn();
@@ -15,10 +12,11 @@ vi.mock('lightweight-charts', () => {
   const applyOptionsMock = vi.fn();
 
   return {
+    AreaSeries: 'AreaSeries',
+    LineSeries: 'LineSeries',
     ColorType: { Solid: 'Solid' },
     createChart: vi.fn().mockReturnValue({
-      addAreaSeries: addAreaSeriesMock,
-      addLineSeries: addLineSeriesMock,
+      addSeries: addSeriesMock,
       timeScale: vi.fn().mockReturnValue({ fitContent: fitContentMock }),
       remove: removeMock,
       applyOptions: applyOptionsMock,
