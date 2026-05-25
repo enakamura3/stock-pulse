@@ -147,6 +147,11 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 				pos.TotalCost = 0
 				pos.AveragePrice = 0
 			}
+		} else if tx.Type == "SPLIT" {
+			if pos.Quantity > 0 && tx.Quantity > 0 {
+				pos.Quantity = pos.Quantity * tx.Quantity
+				pos.AveragePrice = pos.AveragePrice / tx.Quantity
+			}
 		}
 	}
 
@@ -426,6 +431,10 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID, user
 				} else {
 					dailyQuantities[tx.AssetID] = 0
 					dailyCosts[tx.AssetID] = 0
+				}
+			} else if tx.Type == "SPLIT" {
+				if dailyQuantities[tx.AssetID] > 0 && tx.Quantity > 0 {
+					dailyQuantities[tx.AssetID] = dailyQuantities[tx.AssetID] * tx.Quantity
 				}
 			}
 		}

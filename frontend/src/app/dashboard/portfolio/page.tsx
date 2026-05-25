@@ -291,7 +291,7 @@ export default function PortfolioPage() {
   // 6. SUBMETE INSERÇÃO DE TRANSAÇÃO
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!txTicker || txQuantity <= 0 || txUnitPrice <= 0) {
+    if (!txTicker || txQuantity <= 0 || (txType !== 'SPLIT' && txUnitPrice <= 0)) {
       alert('Preencha todos os campos obrigatórios corretamente.');
       return;
     }
@@ -315,7 +315,7 @@ export default function PortfolioPage() {
           ticker: txTicker,
           type: txType,
           quantity: txQuantity,
-          unit_price: txUnitPrice,
+          unit_price: txType === 'SPLIT' ? 0 : txUnitPrice,
           exchange_rate: txExchangeRate,
           executed_at: txExecutedAt,
         }),
@@ -712,6 +712,7 @@ export default function PortfolioPage() {
                   {transactions.length > 0 ? (
                     transactions.map((tx) => {
                       const isBuy = tx.type === 'BUY';
+                      const isSplit = tx.type === 'SPLIT';
                       return (
                         <div
                           key={tx.id}
@@ -733,11 +734,11 @@ export default function PortfolioPage() {
                               borderRadius: '4px',
                               fontSize: '0.65rem',
                               fontWeight: 700,
-                              background: isBuy ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 61, 0, 0.08)',
-                              color: isBuy ? '#00e676' : '#ff3d00',
+                              background: isBuy ? 'rgba(0, 230, 118, 0.08)' : isSplit ? 'rgba(0, 242, 254, 0.08)' : 'rgba(255, 61, 0, 0.08)',
+                              color: isBuy ? '#00e676' : isSplit ? '#00f2fe' : '#ff3d00',
                               marginRight: '0.5rem',
                             }}>
-                              {isBuy ? 'COMPRA' : 'VENDA'}
+                              {isBuy ? 'COMPRA' : isSplit ? 'SPLIT' : 'VENDA'}
                             </span>
                             <span style={{ fontWeight: 700, color: '#fff' }}>{tx.ticker}</span>
                             <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -748,11 +749,13 @@ export default function PortfolioPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <div style={{ textAlign: 'right' }}>
                               <span style={{ display: 'block', fontWeight: 700 }}>
-                                {tx.quantity} un.
+                                {isSplit ? `Fator: ${tx.quantity}x` : `${tx.quantity} un.`}
                               </span>
-                              <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                                {formatMoney(tx.unit_price, tx.currency || 'BRL')}
-                              </span>
+                              {!isSplit && (
+                                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                  {formatMoney(tx.unit_price, tx.currency || 'BRL')}
+                                </span>
+                              )}
                             </div>
                             
                             <button
@@ -960,14 +963,31 @@ export default function PortfolioPage() {
                   >
                     🔴 VENDA
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTxType('SPLIT');
+                      setTxUnitPrice(0);
+                    }}
+                    disabled={isAddingTx}
+                    style={{
+                      flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem',
+                      border: txType === 'SPLIT' ? '1px solid #00f2fe' : '1px solid var(--panel-border)',
+                      background: txType === 'SPLIT' ? 'rgba(0, 242, 254, 0.08)' : 'transparent',
+                      color: txType === 'SPLIT' ? '#00f2fe' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    ✂️ SPLIT
+                  </button>
                 </div>
               </div>
 
               {/* Quantidade & Preço Unitário */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                    Quantidade
+                    {txType === 'SPLIT' ? 'Fator / Multiplicador' : 'Quantidade'}
                   </label>
                   <input
                     className="form-input"
@@ -975,27 +995,34 @@ export default function PortfolioPage() {
                     step="any"
                     value={txQuantity || ''}
                     onChange={(e) => setTxQuantity(parseFloat(e.target.value) || 0)}
-                    placeholder="0"
+                    placeholder={txType === 'SPLIT' ? "Ex: 10 (desdobra) ou 0.1 (agrupa)" : "0"}
                     required
                     disabled={isAddingTx}
                   />
+                  {txType === 'SPLIT' && (
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.4rem', display: 'block' }}>
+                      Ex: Desdobramento 1 para 10 = Fator 10. Agrupamento 10 para 1 = Fator 0.1.
+                    </span>
+                  )}
                 </div>
 
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                    Preço Unitário ({selectedAssetCurrency})
-                  </label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    step="any"
-                    value={txUnitPrice || ''}
-                    onChange={(e) => setTxUnitPrice(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    required
-                    disabled={isAddingTx}
-                  />
-                </div>
+                {txType !== 'SPLIT' && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                      Preço Unitário ({selectedAssetCurrency})
+                    </label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      step="any"
+                      value={txUnitPrice || ''}
+                      onChange={(e) => setTxUnitPrice(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      required
+                      disabled={isAddingTx}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Taxa de Câmbio (Mostrada dinamicamente apenas se o ativo for USD e a carteira BRL) */}

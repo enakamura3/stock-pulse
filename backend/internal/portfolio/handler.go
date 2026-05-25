@@ -183,8 +183,8 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
-	if payload.Type != "BUY" && payload.Type != "SELL" {
-		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY ou SELL")
+	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" {
+		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL ou SPLIT")
 		return
 	}
 
