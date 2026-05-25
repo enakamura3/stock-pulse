@@ -39,6 +39,76 @@ StockPulse é uma plataforma moderna e completa para acompanhamento de portfóli
 
 ---
 
+## 📊 Arquitetura e Fluxos de Dados
+
+Para entender melhor como os serviços se comunicam sob o capô, abaixo estão os diagramas de arquitetura e dos fluxos principais.
+
+### 1. Diagrama de Blocos (Alto Nível)
+Representa a orquestração via Docker Compose e como o tráfego externo é roteado até os provedores de dados.
+
+```mermaid
+graph TD
+    Client[Navegador do Usuário] -->|HTTPS| Caddy[Caddy Proxy Reverso]
+    Caddy -->|/api/*| GoAPI[Backend Go]
+    Caddy -->|/| NextJS[Frontend Next.js]
+    
+    subgraph Data Layer
+        GoAPI -->|Leitura/Escrita| PG[(PostgreSQL)]
+        GoAPI -->|Cache Rápido| Redis[(Redis)]
+    end
+    
+    subgraph Integrações
+        GoAPI -->|Disparo de Alertas| Mailpit[Servidor SMTP Local]
+        GoAPI -->|Fetch de Cotações| Yahoo[Yahoo Finance API]
+    end
+```
+
+### 2. Fluxo de Cotações em Tempo Real (WebSockets)
+Como o sistema entrega piscadas na tela instantaneamente ao cliente.
+
+```mermaid
+sequenceDiagram
+    participant User as Frontend (React)
+    participant API as Backend (Go Hub)
+    participant Redis as Redis Cache
+    participant Yahoo as Yahoo Finance
+
+    User->>API: Conecta via WebSocket (/ws)
+    User->>API: Envia "subscribe" para PETR4
+    API->>Redis: Verifica cache de PETR4
+    alt Não está no cache
+        API->>Yahoo: GET /v8/finance/chart/PETR4.SA
+        Yahoo-->>API: Retorna JSON
+        API->>Redis: Salva novo preço no cache (TTL 3m)
+    end
+    API-->>User: Dispara BroadCast (Cotação PETR4)
+    Note over User: Gráfico do Dashboard é atualizado!
+```
+
+### 3. Fluxograma de Alertas (Background Workers)
+Goroutines rodando infinitamente em background para checar se o preço atingiu o alvo configurado.
+
+```mermaid
+flowchart TD
+    Start[Worker Inicializado] --> FetchAlerts[Busca Alertas 'Ativos' no Banco]
+    FetchAlerts --> Loop[Itera sobre cada Alerta]
+    Loop --> CheckCache{Preço Atual no Cache?}
+    
+    CheckCache -- Sim --> Compare[Compara Preço Atual vs Preço Alvo]
+    CheckCache -- Não --> FetchAPI[Busca preço na API e Salva no Cache] --> Compare
+    
+    Compare -- Atingiu Meta! --> Dispara[Gera Email e Envia ao Mailpit]
+    Compare -- Não Atingiu --> Skip[Ignora]
+    
+    Dispara --> MarcaInativo[Atualiza Alerta para 'Disparado' no DB]
+    MarcaInativo --> Loop
+    Skip --> Loop
+    
+    Loop --> Sleep[Dorme 60s] --> FetchAlerts
+```
+
+---
+
 ## 📂 Arquitetura do Repositório (Monorepo)
 
 ```text
