@@ -386,6 +386,44 @@ export default function PortfolioPage() {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/bulk`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const success = data.success || 0;
+        const errors = data.errors || [];
+        
+        if (errors.length > 0) {
+          alert(`Importação concluída: ${success} registros importados com sucesso.\n\nAtenção, alguns registros falharam:\n- ` + errors.join("\n- "));
+        } else {
+          alert(`Importação concluída com sucesso! ${success} registros importados.`);
+        }
+        
+        await loadPortfolioDetails(activePortfolioId);
+        await loadPerformance(activePortfolioId, period);
+      } else {
+        const err = await res.json();
+        alert(`Erro na importação: ${err.error} - ${err.details}`);
+      }
+    } catch (e) {
+      alert("Erro ao conectar com o servidor para importação.");
+    }
+    
+    e.target.value = "";
+  };
+
   // Formatadores Auxiliares
   const getActivePortfolio = () => portfolios.find((p) => p.id === activePortfolioId);
 
@@ -1172,40 +1210,3 @@ export default function PortfolioPage() {
     </main>
   );
 }
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/bulk`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const success = data.success || 0;
-        const errors = data.errors || [];
-        
-        if (errors.length > 0) {
-          alert(`Importação concluída: ${success} registros importados com sucesso.\n\nAtenção, alguns registros falharam:\n- ` + errors.join("\n- "));
-        } else {
-          alert(`Importação concluída com sucesso! ${success} registros importados.`);
-        }
-        
-        await fetchPortfolio();
-      } else {
-        const err = await res.json();
-        alert(`Erro na importação: ${err.error} - ${err.details}`);
-      }
-    } catch (e) {
-      alert("Erro ao conectar com o servidor para importação.");
-    }
-    
-    e.target.value = "";
-  };
-
