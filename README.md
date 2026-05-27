@@ -44,11 +44,11 @@ stock-pulse é uma plataforma moderna e completa para acompanhamento de portfól
 O stock-pulse permite a importação massiva de histórico de operações através de um arquivo `.csv` ou `.txt`. 
 O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primeira linha é ignorado):
 
-`DATA, TICKER, TIPO, QUANTIDADE, PRECO`
+`DATE, TICKER, TYPE, QUANTITY, PRICE`
 
-- **DATA**: Formato internacional (`YYYY-MM-DD`) ou brasileiro (`DD/MM/YYYY`).
+- **DATE**: Formato internacional (`YYYY-MM-DD`) ou brasileiro (`DD/MM/YYYY`).
 - **TICKER**: Código do ativo (ex: `PETR4.SA`, `AAPL`).
-- **TIPO**: Define o comportamento das colunas Quantidade e Preço:
+- **TYPE**: Define o comportamento das colunas Quantidade e Preço:
   - **`BUY` (Compra):** Quantidade e Preço devem ser maiores que zero.
   - **`SELL` (Venda):** Quantidade e Preço devem ser maiores que zero.
   - **`BONUS` (Bonificação):** Quantidade (ações recebidas) > 0. O sistema ignora o preço (pode informar `0.00`).
@@ -56,7 +56,7 @@ O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primei
 
 **Exemplo Completo de Arquivo CSV:**
 ```csv
-DATA, TICKER, TIPO, QUANTIDADE, PRECO
+DATE, TICKER, TYPE, QUANTITY, PRICE
 2024-01-10, WEGE3, BUY, 100, 32.50
 2024-02-15, WEGE3, SELL, 50, 38.00
 2024-03-01, PETR4, BUY, 200, 35.10
