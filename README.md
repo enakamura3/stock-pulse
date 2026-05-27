@@ -230,3 +230,16 @@ cd frontend
 npm run test:coverage
 ```
 _Nota: Se você não possuir o Node instalado localmente, os testes podem ser executados dentro de um container Node isolado._
+
+## ☁️ Arquitetura de Deploy (Cloud Gratuita)
+
+O **stock-pulse** foi desenhado para ser facilmente distribuído em serviços de nuvem gratuitos (Free Tiers), permitindo que você hospede seu próprio ambiente de produção com **custo zero**:
+
+- **Frontend:** [Vercel](https://vercel.com/) (Hospedagem nativa Next.js, Serverless & CDN Global)
+- **Backend (API/Workers):** [Koyeb](https://koyeb.com/) (Serviço Eco gratuito para containers Docker rodando as rotinas 24/7) ou Google Cloud Platform (VM `e2-micro` Always Free)
+- **Banco de Dados:** [Supabase](https://supabase.com/) (PostgreSQL dedicado gratuito de 500MB, backups diários)
+- **Cache & WebSockets:** [Redis Cloud](https://redis.com/try-free/) (Cluster gerenciado de 30MB gratuito, ideal para cache temporário de cotações)
+
+Com essa distribuição, o sistema evita gargalos de memória e ganha resiliência, separando a persistência (Supabase) da lógica computacional (Go) e da entrega de interface (Vercel).
+
+---
