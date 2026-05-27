@@ -48,16 +48,20 @@ O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primei
 
 - **DATA**: Formato internacional (`YYYY-MM-DD`) ou brasileiro (`DD/MM/YYYY`).
 - **TICKER**: Código do ativo (ex: `PETR4.SA`, `AAPL`).
-- **TIPO**: `BUY` (Compra), `SELL` (Venda), `SPLIT` (Desdobramento/Agrupamento), ou `BONUS` (Bonificação).
-- **QUANTIDADE**: Valor numérico.
-- **PRECO**: Valor unitário da transação.
+- **TIPO**: Define o comportamento das colunas Quantidade e Preço:
+  - **`BUY` (Compra):** Quantidade e Preço devem ser maiores que zero.
+  - **`SELL` (Venda):** Quantidade e Preço devem ser maiores que zero.
+  - **`BONUS` (Bonificação):** Quantidade (ações recebidas) > 0. O sistema ignora o preço (pode informar `0.00`).
+  - **`SPLIT` (Desdobramento/Agrupamento):** Quantidade representa o fator da divisão/multiplicação. O sistema ignora o preço (pode informar `0.00`).
 
-**Exemplo de conteúdo do arquivo:**
+**Exemplo Completo de Arquivo CSV:**
 ```csv
-data,ticker,tipo,quantidade,preco
-2023-10-10,PETR4.SA,BUY,100,35.50
-2024-04-15,ITSA4.SA,BONUS,15,0.00
-15/05/2024,WEGE3.SA,SELL,50,42.00
+DATA, TICKER, TIPO, QUANTIDADE, PRECO
+2024-01-10, WEGE3, BUY, 100, 32.50
+2024-02-15, WEGE3, SELL, 50, 38.00
+2024-03-01, PETR4, BUY, 200, 35.10
+2024-04-10, PETR4, BONUS, 20, 0.00
+2024-05-20, ITUB4, SPLIT, 2, 0.00
 ```
 
 ---
