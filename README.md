@@ -40,6 +40,28 @@ StockPulse é uma plataforma moderna e completa para acompanhamento de portfóli
 
 ---
 
+### Importação de Transações em Lote (CSV)
+O StockPulse permite a importação massiva de histórico de operações através de um arquivo `.csv` ou `.txt`. 
+O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primeira linha é ignorado):
+
+`DATA, TICKER, TIPO, QUANTIDADE, PRECO`
+
+- **DATA**: Formato internacional (`YYYY-MM-DD`) ou brasileiro (`DD/MM/YYYY`).
+- **TICKER**: Código do ativo (ex: `PETR4.SA`, `AAPL`).
+- **TIPO**: `BUY` (Compra), `SELL` (Venda), `SPLIT` (Desdobramento/Agrupamento), ou `BONUS` (Bonificação).
+- **QUANTIDADE**: Valor numérico.
+- **PRECO**: Valor unitário da transação.
+
+**Exemplo de conteúdo do arquivo:**
+```csv
+data,ticker,tipo,quantidade,preco
+2023-10-10,PETR4.SA,BUY,100,35.50
+2024-04-15,ITSA4.SA,BONUS,15,0.00
+15/05/2024,WEGE3.SA,SELL,50,42.00
+```
+
+---
+
 ## 📊 Arquitetura e Fluxos de Dados
 
 Para entender melhor como os serviços se comunicam sob o capô, abaixo estão os diagramas de arquitetura e dos fluxos principais.
