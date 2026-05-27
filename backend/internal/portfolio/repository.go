@@ -315,6 +315,17 @@ func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (strin
 	return id, nil
 }
 
+// GetAssetAndCurrencyByTicker busca o ID e a moeda de um ativo pelo ticker.
+func (r *Repository) GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error) {
+	var id, currency string
+	query := `SELECT id, currency FROM asset WHERE UPPER(ticker) = UPPER($1)`
+	err := r.db.QueryRow(ctx, query, ticker).Scan(&id, &currency)
+	if err != nil {
+		return "", "", err
+	}
+	return id, currency, nil
+}
+
 // CreateAsset cadastra localmente um novo ativo.
 func (r *Repository) CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error) {
 	query := `

@@ -28,6 +28,7 @@ type PortfolioRepository interface {
 	SaveDailyPrices(ctx context.Context, assetID string, prices []DailyPrice) error
 	GetDailyPrices(ctx context.Context, assetID string, startDate, endDate time.Time) ([]DailyPrice, error)
 	GetAssetByTicker(ctx context.Context, ticker string) (string, error)
+	GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error)
 	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
 	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
 }
@@ -219,8 +220,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	}
 
 	// Busca ou cria o ativo na base local
-	assetID, err := s.repo.GetAssetByTicker(ctx, tx.Ticker)
-	var currency string
+	assetID, currency, err := s.repo.GetAssetAndCurrencyByTicker(ctx, tx.Ticker)
 	if err != nil {
 		// Importa metadados do Yahoo Finance
 		log.Printf("[Portfolio] Ativo %s não existe na base. Importando...", tx.Ticker)
@@ -241,14 +241,6 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 			return nil, fmt.Errorf("erro ao registrar ativo localmente: %w", err)
 		}
 		currency = quote.Currency
-	} else {
-		// Recupera cotação para identificar a moeda do ativo
-		quote, err := s.marketService.GetQuote(ctx, tx.Ticker)
-		if err == nil {
-			currency = quote.Currency
-		} else {
-			currency = "BRL"
-		}
 	}
 
 	tx.AssetID = assetID

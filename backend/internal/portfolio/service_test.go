@@ -87,6 +87,11 @@ func (m *MockPortfolioRepo) GetAssetByTicker(ctx context.Context, ticker string)
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error) {
+	args := m.Called(ctx, ticker)
+	return args.String(0), args.String(1), args.Error(2)
+}
+
 func (m *MockPortfolioRepo) CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error) {
 	args := m.Called(ctx, ticker, name, assetType, currency)
 	return args.String(0), args.Error(1)
@@ -329,10 +334,9 @@ func TestService_AddTransaction(t *testing.T) {
 	})
 
 	t.Run("Existing Asset", func(t *testing.T) {
-		s, repo, ms, _ := setupServiceTest()
+		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
-		ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Currency: "USD"}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
 		
 		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
 		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
@@ -343,27 +347,12 @@ func TestService_AddTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "tx1", res.ID)
 	})
-	
-	t.Run("Existing Asset - Market service err", func(t *testing.T) {
-		s, repo, ms, _ := setupServiceTest()
-		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
-		ms.On("GetQuote", mock.Anything, "AAPL").Return(nil, errors.New("err"))
-		
-		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
-		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
 
-		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil) // backfill skip
-
-		res, err := s.AddTransaction(context.Background(), "u1", tx)
-		assert.NoError(t, err)
-		assert.Equal(t, "tx1", res.ID)
-	})
 
 	t.Run("New Asset - Provider Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(nil, errors.New("err"))
 
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
@@ -373,7 +362,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New Crypto Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetByTicker", mock.Anything, "BTC-USD").Return("", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "BTC-USD").Return("", "", errors.New("err"))
 		mp.On("GetQuote", mock.Anything, "BTC-USD").Return(&market.Quote{Currency: "USD", Name: "Bitcoin"}, nil)
 		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "EQUITY_US", "USD").Return("", errors.New("err"))
 
@@ -384,7 +373,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New US Equity Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Currency: "USD", Name: "Apple"}, nil)
 		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "EQUITY_US", "USD").Return("", errors.New("err"))
 
@@ -393,10 +382,9 @@ func TestService_AddTransaction(t *testing.T) {
 	})
 
 	t.Run("Create Tx Error", func(t *testing.T) {
-		s, repo, ms, _ := setupServiceTest()
+		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
-		ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Currency: "USD"}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
 		
 		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
 		repo.On("CreateTransaction", mock.Anything, tx).Return((*Transaction)(nil), errors.New("db error"))
