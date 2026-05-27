@@ -679,7 +679,13 @@ export default function PortfolioPage() {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <label className="primary-button" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer', background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', color: 'var(--text-primary)' }}>
                       📥 Importar CSV
-                      <input type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleFileUpload} />
+                      <input 
+                        type="file" 
+                        accept=".csv,.txt" 
+                        style={{ display: 'none' }} 
+                        onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
+                        onChange={handleFileUpload} 
+                      />
                     </label>
                     <button
                       className="primary-button"
