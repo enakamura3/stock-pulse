@@ -1,6 +1,6 @@
-# Cobertura de Testes - StockPulse
+# Cobertura de Testes - stock-pulse
 
-Este documento registra o estado atual e a arquitetura da cobertura de testes unitários da aplicação StockPulse, separados entre Backend e Frontend.
+Este documento registra o estado atual e a arquitetura da cobertura de testes unitários da aplicação stock-pulse, separados entre Backend e Frontend.
 
 ## 🖥️ Backend (Golang) - Média Global: 86.8%
 

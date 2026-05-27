@@ -492,7 +492,7 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            StockPulse
+            stock-pulse
             <span style={{ 
               width: 8, 
               height: 8, 

@@ -22,14 +22,14 @@ func (h *Handler) ServeYAML(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, h.yamlPath)
 }
 
-// ServeUI renderiza a UI interativa do Swagger UI estilizada com o tema escuro do StockPulse.
+// ServeUI renderiza a UI interativa do Swagger UI estilizada com o tema escuro do stock-pulse.
 func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
 	tmpl := `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>StockPulse - Documentação de API</title>
+  <title>stock-pulse - Documentação de API</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
   <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5/favicon-32x32.png" />
   <style>

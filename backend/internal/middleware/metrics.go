@@ -14,7 +14,7 @@ var (
 	// HTTPRequestsTotal conta a quantidade total de requisições HTTP processadas.
 	HTTPRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "stockpulse_http_requests_total",
+			Name: "stock-pulse_http_requests_total",
 			Help: "Quantidade total de requisições HTTP recebidas pela API",
 		},
 		[]string{"method", "path", "status"},
@@ -23,7 +23,7 @@ var (
 	// HTTPRequestDuration calcula o tempo de resposta das requisições HTTP da API.
 	HTTPRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "stockpulse_http_request_duration_seconds",
+			Name:    "stock-pulse_http_request_duration_seconds",
 			Help:    "Latência de processamento das requisições HTTP da API em segundos",
 			Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0},
 		},

@@ -14,16 +14,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/onigiri/stockpulse/backend/internal/alert"
-	"github.com/onigiri/stockpulse/backend/internal/auth"
-	"github.com/onigiri/stockpulse/backend/internal/database"
-	"github.com/onigiri/stockpulse/backend/internal/docs"
-	"github.com/onigiri/stockpulse/backend/internal/mail"
-	"github.com/onigiri/stockpulse/backend/internal/market"
-	customMiddleware "github.com/onigiri/stockpulse/backend/internal/middleware"
-	"github.com/onigiri/stockpulse/backend/internal/portfolio"
-	"github.com/onigiri/stockpulse/backend/internal/watchlist"
-	"github.com/onigiri/stockpulse/backend/internal/websocket"
+	"github.com/onigiri/stock-pulse/backend/internal/alert"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/database"
+	"github.com/onigiri/stock-pulse/backend/internal/docs"
+	"github.com/onigiri/stock-pulse/backend/internal/mail"
+	"github.com/onigiri/stock-pulse/backend/internal/market"
+	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
+	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
+	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
+	"github.com/onigiri/stock-pulse/backend/internal/websocket"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
@@ -75,7 +75,7 @@ func main() {
 	// Configuração de Segredos
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "stockpulse-dev-secret-key-super-secure"
+		jwtSecret = "stock-pulse-dev-secret-key-super-secure"
 	}
 
 	// Inicialização de Camadas de Autenticação
@@ -207,7 +207,7 @@ func main() {
 
 	// Graceful Shutdown (RNF09)
 	go func() {
-		fmt.Printf("Servidor StockPulse rodando na porta %s\n", port)
+		fmt.Printf("Servidor stock-pulse rodando na porta %s\n", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Erro crítico no servidor: %v\n", err)
 		}

@@ -1,6 +1,6 @@
-# StockPulse 📈
+# stock-pulse 📈
 
-StockPulse é uma plataforma moderna e completa para acompanhamento de portfólios de investimentos, listas de favoritos (watchlists) e configuração de alertas de preços em tempo real. O sistema possui arquitetura baseada em micro-serviços orquestrados via Docker, com um backend robusto em Golang e um frontend moderno em Next.js.
+stock-pulse é uma plataforma moderna e completa para acompanhamento de portfólios de investimentos, listas de favoritos (watchlists) e configuração de alertas de preços em tempo real. O sistema possui arquitetura baseada em micro-serviços orquestrados via Docker, com um backend robusto em Golang e um frontend moderno em Next.js.
 
 ## 🚀 Funcionalidades
 
@@ -41,7 +41,7 @@ StockPulse é uma plataforma moderna e completa para acompanhamento de portfóli
 ---
 
 ### Importação de Transações em Lote (CSV)
-O StockPulse permite a importação massiva de histórico de operações através de um arquivo `.csv` ou `.txt`. 
+O stock-pulse permite a importação massiva de histórico de operações através de um arquivo `.csv` ou `.txt`. 
 O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primeira linha é ignorado):
 
 `DATA, TICKER, TIPO, QUANTIDADE, PRECO`
@@ -182,8 +182,8 @@ make down
 
 O `Caddy` vai expor os serviços de forma elegante:
 
-- **Frontend (Interface do Usuário):** [http://stockpulse.localhost](http://stockpulse.localhost) ou [http://localhost:3000](http://localhost:3000)
-- **Backend (API Base):** [http://api.stockpulse.localhost](http://api.stockpulse.localhost) ou [http://localhost:8080](http://localhost:8080)
+- **Frontend (Interface do Usuário):** [http://stock-pulse.localhost](http://stock-pulse.localhost) ou [http://localhost:3000](http://localhost:3000)
+- **Backend (API Base):** [http://api.stock-pulse.localhost](http://api.stock-pulse.localhost) ou [http://localhost:8080](http://localhost:8080)
 - **Mailpit (Caixa de Entrada Local para Alertas):** [http://localhost:8025](http://localhost:8025)
 - **Grafana (Dashboards de Monitoramento):** [http://localhost:3001](http://localhost:3001) (Usuário/Senha Padrão: admin / admin)
 
@@ -211,7 +211,7 @@ make migrate-create
 
 ## 🧪 Testes e Cobertura (Unit Testing)
 
-A plataforma StockPulse foca em **alta qualidade de código**, visando 100% de cobertura nos testes unitários tanto no backend quanto no frontend.
+A plataforma stock-pulse foca em **alta qualidade de código**, visando 100% de cobertura nos testes unitários tanto no backend quanto no frontend.
 
 ### Backend (Golang)
 O backend possui um conjunto rigoroso de testes simulando casos de sucesso e tratamento de erros avançados no banco de dados com `pgxmock` (simulação de erros em scan de rows, indisponibilidade, etc).

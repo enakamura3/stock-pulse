@@ -1,4 +1,4 @@
-# Software Design Document (SDD) - StockPulse: Sistema de Monitoramento de Ações
+# Software Design Document (SDD) - stock-pulse: Sistema de Monitoramento de Ações
 
 | Campo             | Valor                                  |
 |-------------------|----------------------------------------|
@@ -29,7 +29,7 @@
 ## 1. Introdução
 
 ### 1.1 Propósito
-Este documento define a arquitetura, o design técnico e as decisões de engenharia para o **StockPulse** — uma aplicação web de monitoramento de papéis e ações nacionais (B3) e internacionais (NYSE, NASDAQ e outras). O objetivo é fornecer aos usuários uma plataforma para acompanhar cotações, gerenciar portfólios pessoais, visualizar gráficos históricos e receber alertas de variação de preço.
+Este documento define a arquitetura, o design técnico e as decisões de engenharia para o **stock-pulse** — uma aplicação web de monitoramento de papéis e ações nacionais (B3) e internacionais (NYSE, NASDAQ e outras). O objetivo é fornecer aos usuários uma plataforma para acompanhar cotações, gerenciar portfólios pessoais, visualizar gráficos históricos e receber alertas de variação de preço.
 
 ### 1.2 Escopo
 O escopo inicial (MVP) contempla:

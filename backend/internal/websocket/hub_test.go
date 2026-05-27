@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/onigiri/stockpulse/backend/internal/auth"
-	"github.com/onigiri/stockpulse/backend/internal/market"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

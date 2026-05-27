@@ -45,5 +45,5 @@ func TestHandler_ServeUI(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get("Content-Type"))
-	assert.Contains(t, rec.Body.String(), "<title>StockPulse - Documentação de API</title>")
+	assert.Contains(t, rec.Body.String(), "<title>stock-pulse - Documentação de API</title>")
 }

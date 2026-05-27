@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/onigiri/stockpulse/backend/internal/market"
+	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
 // MarketProvider define a interface de cotações para o WebSocket Hub.

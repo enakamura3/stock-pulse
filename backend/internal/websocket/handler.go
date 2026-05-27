@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/onigiri/stockpulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
 )
 
 var upgrader = websocket.Upgrader{

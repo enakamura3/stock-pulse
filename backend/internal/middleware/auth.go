@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/onigiri/stockpulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
 )
 
 

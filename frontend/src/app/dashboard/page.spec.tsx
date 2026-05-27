@@ -30,7 +30,7 @@ describe('DashboardPage', () => {
   it('renders dashboard layout and fetches watchlists', async () => {
     render(<DashboardPage />);
     
-    expect(screen.getByText('StockPulse')).toBeInTheDocument();
+    expect(screen.getByText('stock-pulse')).toBeInTheDocument();
     
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/watchlists'), expect.any(Object));

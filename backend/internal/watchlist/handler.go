@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/onigiri/stockpulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
 )
 
 // WatchlistService define as operações de negócio da watchlist que o Handler pode consumir.

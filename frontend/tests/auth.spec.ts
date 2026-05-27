@@ -3,13 +3,13 @@ import { test, expect } from '@playwright/test';
 test.describe('Fluxo de Autenticação e Route Guard', () => {
   const timestamp = Date.now();
   const testName = `Teste Playwright ${timestamp}`;
-  const testEmail = `playwright_${timestamp}@stockpulse.com`;
+  const testEmail = `playwright_${timestamp}@stock-pulse.com`;
   const testPassword = 'securepassword123';
 
   test('deve registrar um novo usuário, acessar o dashboard, deslogar e bloquear acesso não autenticado', async ({ page }) => {
     // 1. Acessa a página de Login
     await page.goto('/login');
-    await expect(page).toHaveTitle(/StockPulse/);
+    await expect(page).toHaveTitle(/stock-pulse/);
 
     // 2. Navega para a página de Registro
     await page.click('text=Cadastre-se grátis');

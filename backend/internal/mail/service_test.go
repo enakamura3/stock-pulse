@@ -28,7 +28,7 @@ func TestNewService(t *testing.T) {
 
 	assert.Equal(t, "localhost", svcDefault.host)
 	assert.Equal(t, "1025", svcDefault.port)
-	assert.Equal(t, "no-reply@stockpulse.com", svcDefault.from)
+	assert.Equal(t, "no-reply@stock-pulse.com", svcDefault.from)
 }
 
 func TestService_SendAlertEmail(t *testing.T) {
@@ -38,7 +38,7 @@ func TestService_SendAlertEmail(t *testing.T) {
 	t.Run("Success ABOVE", func(t *testing.T) {
 		SendMailFunc = func(addr string, a smtp.Auth, from string, to []string, msg []byte) error {
 			assert.Equal(t, "localhost:1025", addr)
-			assert.Equal(t, "no-reply@stockpulse.com", from)
+			assert.Equal(t, "no-reply@stock-pulse.com", from)
 			assert.Equal(t, []string{"user@test.com"}, to)
 			assert.Contains(t, string(msg), "atingiu o preço alvo")
 			assert.Contains(t, string(msg), "subiu para")

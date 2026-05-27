@@ -27,7 +27,7 @@ export default function LoginPage() {
   return (
     <main className="container">
       <div className="glass-panel auth-card">
-        <h2>StockPulse</h2>
+        <h2>stock-pulse</h2>
         <p className="subtitle">Entre para acompanhar seus investimentos em tempo real</p>
 
         {error && <div className="alert-error">{error}</div>}

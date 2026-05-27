@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/onigiri/stockpulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
 )
 
 // PortfolioService define as operações que o Handler espera.

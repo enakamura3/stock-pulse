@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: StockPulse API
-  description: API REST para a plataforma StockPulse - Sistema modular para monitoramento de ações, favoritos (watchlists), portfólios financeiros de multi-moeda e cotações em tempo real.
+  title: stock-pulse API
+  description: API REST para a plataforma stock-pulse - Sistema modular para monitoramento de ações, favoritos (watchlists), portfólios financeiros de multi-moeda e cotações em tempo real.
   version: 1.0.0
 servers:
   - url: http://localhost:8080/api/v1

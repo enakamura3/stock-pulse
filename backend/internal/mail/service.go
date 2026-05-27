@@ -29,7 +29,7 @@ func NewService() *Service {
 	}
 	from := os.Getenv("SMTP_FROM")
 	if from == "" {
-		from = "no-reply@stockpulse.com"
+		from = "no-reply@stock-pulse.com"
 	}
 
 	return &Service{
@@ -56,7 +56,7 @@ func (s *Service) SendAlertEmail(to string, userName string, ticker string, asse
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alerta StockPulse</title>
+    <title>Alerta stock-pulse</title>
     <style>
         body {
             margin: 0;
@@ -167,7 +167,7 @@ func (s *Service) SendAlertEmail(to string, userName string, ticker string, asse
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">StockPulse</div>
+            <div class="logo">stock-pulse</div>
         </div>
         <div class="card">
             <div class="status-badge" style="color: %s; border: 1px solid %s;">
@@ -188,7 +188,7 @@ func (s *Service) SendAlertEmail(to string, userName string, ticker string, asse
             <a href="http://localhost:3000/dashboard" class="btn">Visualizar no Painel</a>
         </div>
         <div class="footer">
-            &copy; 2026 StockPulse. Todos os direitos reservados.<br>
+            &copy; 2026 stock-pulse. Todos os direitos reservados.<br>
             Este é um e-mail automático do seu monitor de investimentos.
         </div>
     </div>

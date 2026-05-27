@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onigiri/stockpulse/backend/internal/market"
+	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
 // PortfolioRepository define as operações de banco de dados para a carteira.

@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <main className="container">
       <div className="glass-panel">
-        <h1>StockPulse</h1>
+        <h1>stock-pulse</h1>
         <p>A arquitetura foi estabelecida. A infraestrutura 100% Dockerizada está no ar.</p>
         <Link href="/dashboard" passHref>
           <button className="primary-button">Entrar no Dashboard</button>

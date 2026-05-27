@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/onigiri/stockpulse/backend/internal/market"
+	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
 // DailyWorker gerencia Goroutines em segundo plano para capturar snapshots de fechamento de mercado.

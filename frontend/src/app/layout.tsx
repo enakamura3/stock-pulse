@@ -3,7 +3,7 @@ import "@/styles/index.css";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "StockPulse | Seu Dashboard Financeiro",
+  title: "stock-pulse | Seu Dashboard Financeiro",
   description: "Monitoramento de Ações, FIIs e Criptomoedas em tempo real.",
 };
 

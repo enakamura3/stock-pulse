@@ -30,7 +30,7 @@ describe('AlertsPage', () => {
   it('renders alerts layout', async () => {
     render(<AlertsPage />);
     
-    expect(screen.getByText('StockPulse')).toBeInTheDocument();
+    expect(screen.getByText('stock-pulse')).toBeInTheDocument();
     
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/alerts'), expect.any(Object));

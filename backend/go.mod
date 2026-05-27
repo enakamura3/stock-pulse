@@ -1,4 +1,4 @@
-module github.com/onigiri/stockpulse/backend
+module github.com/onigiri/stock-pulse/backend
 
 go 1.24
 

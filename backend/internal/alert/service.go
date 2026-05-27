@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/onigiri/stockpulse/backend/internal/market"
+	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
 // AlertRepository define as operações de banco de dados necessárias para alertas.
