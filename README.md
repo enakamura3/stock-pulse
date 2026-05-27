@@ -52,7 +52,7 @@ O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primei
   - **`BUY` (Compra):** Quantidade e Preço devem ser maiores que zero.
   - **`SELL` (Venda):** Quantidade e Preço devem ser maiores que zero.
   - **`BONUS` (Bonificação):** Quantidade (ações recebidas) > 0. O sistema ignora o preço (pode informar `0.00`).
-  - **`SPLIT` (Desdobramento/Agrupamento):** Quantidade representa o fator da divisão/multiplicação. O sistema ignora o preço (pode informar `0.00`).
+  - **`SPLIT` (Desdobramento/Agrupamento):** Quantidade representa o fator da operação. Para desdobramentos (ex: 1 pra 2), use inteiros (ex: `2`). Para agrupamentos (ex: 10 pra 1), use decimais (ex: `0.1`). O sistema ignora o preço (pode informar `0.00`).
 
 **Exemplo Completo de Arquivo CSV:**
 ```csv
@@ -62,6 +62,7 @@ DATA, TICKER, TIPO, QUANTIDADE, PRECO
 2024-03-01, PETR4, BUY, 200, 35.10
 2024-04-10, PETR4, BONUS, 20, 0.00
 2024-05-20, ITUB4, SPLIT, 2, 0.00
+2024-06-15, COGN3, SPLIT, 0.1, 0.00
 ```
 
 ---
