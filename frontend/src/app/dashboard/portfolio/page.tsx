@@ -74,6 +74,9 @@ export default function PortfolioPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
   
+  // Filtro de Transações
+  const [filterTxTicker, setFilterTxTicker] = useState<string>('');
+  
   // Período do gráfico
   const [period, setPeriod] = useState<string>('ALL');
 
@@ -782,13 +785,39 @@ export default function PortfolioPage() {
             {/* Histórico de Operações (Direita) */}
             <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="glass-panel" style={{ padding: '1.75rem 1.5rem', textAlign: 'left', minHeight: '380px', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  📜 Últimas Operações
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    📜 Últimas Operações
+                  </h3>
+                  
+                  {transactions.length > 0 && (
+                    <select
+                      value={filterTxTicker}
+                      onChange={(e) => setFilterTxTicker(e.target.value)}
+                      style={{
+                        padding: '0.3rem 0.6rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--panel-border)',
+                        background: 'var(--panel-bg)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.8rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">Todos os Ativos</option>
+                      {Array.from(new Set(transactions.map(tx => tx.ticker))).sort().map(ticker => (
+                        <option key={ticker} value={ticker}>{ticker}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
                 
                 <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '310px' }}>
                   {transactions.length > 0 ? (
-                    transactions.map((tx) => {
+                    transactions
+                      .filter(tx => filterTxTicker === '' || tx.ticker === filterTxTicker)
+                      .map((tx) => {
                       const isBuy = tx.type === 'BUY';
                       const isSplit = tx.type === 'SPLIT';
                       const isBonus = tx.type === 'BONUS';
