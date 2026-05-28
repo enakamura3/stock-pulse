@@ -798,16 +798,16 @@ export default function PortfolioPage() {
                         padding: '0.3rem 0.6rem',
                         borderRadius: '6px',
                         border: '1px solid var(--panel-border)',
-                        background: 'var(--panel-bg)',
-                        color: 'var(--text-primary)',
+                        background: '#1E293B',
+                        color: '#FFFFFF',
                         fontSize: '0.8rem',
                         outline: 'none',
                         cursor: 'pointer'
                       }}
                     >
-                      <option value="">Todos os Ativos</option>
+                      <option value="" style={{ background: '#1E293B', color: '#FFFFFF' }}>Todos os Ativos</option>
                       {Array.from(new Set(transactions.map(tx => tx.ticker))).sort().map(ticker => (
-                        <option key={ticker} value={ticker}>{ticker}</option>
+                        <option key={ticker} value={ticker} style={{ background: '#1E293B', color: '#FFFFFF' }}>{ticker}</option>
                       ))}
                     </select>
                   )}
