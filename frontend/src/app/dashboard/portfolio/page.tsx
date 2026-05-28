@@ -813,7 +813,7 @@ export default function PortfolioPage() {
                   )}
                 </div>
                 
-                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '310px' }}>
+                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '550px' }}>
                   {transactions.length > 0 ? (
                     transactions
                       .filter(tx => filterTxTicker === '' || tx.ticker === filterTxTicker)
@@ -856,12 +856,18 @@ export default function PortfolioPage() {
                           
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <div style={{ textAlign: 'right' }}>
-                              <span style={{ display: 'block', fontWeight: 700 }}>
-                                {isSplit ? `Fator: ${tx.quantity}x` : `${tx.quantity} un.`}
-                              </span>
-                              {!isSplit && (
-                                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                                  {formatMoney(tx.unit_price, tx.currency || 'BRL')}
+                              {!isSplit ? (
+                                <>
+                                  <span style={{ display: 'block', fontWeight: 700 }}>
+                                    {formatMoney(tx.quantity * tx.unit_price, tx.currency || 'BRL')}
+                                  </span>
+                                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                    {tx.quantity} un. x {formatMoney(tx.unit_price, tx.currency || 'BRL')}
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ display: 'block', fontWeight: 700 }}>
+                                  Fator: {tx.quantity}x
                                 </span>
                               )}
                             </div>
