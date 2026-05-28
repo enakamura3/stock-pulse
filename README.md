@@ -91,7 +91,7 @@ DATE, TICKER, TYPE, QUANTITY, PRICE
 2024-03-01, PETR4, BUY, 200, 35.10
 2024-04-10, PETR4, BONUS, 20, 0.00
 2024-05-20, ITUB4, SPLIT, 2, 0.00
-2024-06-15, COGN3, SPLIT, 0.1, 0.00
+2024-06-15, COGN3, REVERSE_SPLIT, 10, 0.00
 ```
 
 ---
@@ -116,7 +116,9 @@ graph TD
     
     subgraph Integrações
         GoAPI -->|Disparo de Alertas| Mailpit[Servidor SMTP Local]
-        GoAPI -->|Fetch de Cotações| Yahoo[Yahoo Finance API]
+        GoAPI -->|Cotações e Busca| Yahoo[Yahoo Finance API]
+        GoAPI -->|Fundamentos B3| Fundamentus[Fundamentus]
+        GoAPI -->|Fundamentos Globais| Finviz[Finviz]
     end
 ```
 
