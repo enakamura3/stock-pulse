@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, IChartApi, ISeriesApi, AreaSeries, LineSeries } from 'lightweight-charts';
 
 interface ChartPoint {
@@ -18,6 +18,10 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
   const chartRef = useRef<IChartApi | null>(null);
   const valueSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const costSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+
+  const [showValue, setShowValue] = useState(true);
+  const [showCost, setShowCost] = useState(true);
+  const [viewMode, setViewMode] = useState<'currency' | 'percent'>('currency');
 
   useEffect(() => {
     if (!containerRef.current || data.length === 0) return;
@@ -49,46 +53,54 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       },
     });
 
-    // Série 1: Valor de Mercado (Area Series Neon Cyan)
-    const valueSeries = chart.addSeries(AreaSeries, {
-      lineColor: '#00f2fe',
-      topColor: 'rgba(0, 242, 254, 0.15)',
-      bottomColor: 'rgba(0, 242, 254, 0.0)',
-      lineWidth: 2,
-      priceFormat: {
-        type: 'price',
-        precision: 2,
-        minMove: 0.01,
-      },
-    });
+    let valueSeries: ISeriesApi<"Area"> | null = null;
+    let costSeries: ISeriesApi<"Line"> | null = null;
 
-    // Série 2: Custo de Aquisição (Line Series Dashed White)
-    const costSeries = chart.addSeries(LineSeries, {
-      color: 'rgba(255, 255, 255, 0.35)',
-      lineWidth: 2,
-      lineStyle: 2, // Dashed
-      priceFormat: {
-        type: 'price',
-        precision: 2,
-        minMove: 0.01,
-      },
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-    });
+    // Formatador de preço
+    const priceFormat = viewMode === 'percent' 
+      ? { type: 'custom' as const, formatter: (price: number) => `${price.toFixed(2)}%`, minMove: 0.01 }
+      : { type: 'price' as const, precision: 2, minMove: 0.01 };
 
-    // Formata pontos para a biblioteca
-    const valueData = data.map((pt) => ({
-      time: pt.date,
-      value: pt.value,
-    }));
+    // Série 1: Valor de Mercado
+    if (showValue) {
+      valueSeries = chart.addSeries(AreaSeries, {
+        lineColor: '#00f2fe',
+        topColor: 'rgba(0, 242, 254, 0.15)',
+        bottomColor: 'rgba(0, 242, 254, 0.0)',
+        lineWidth: 2,
+        priceFormat,
+      });
 
-    const costData = data.map((pt) => ({
-      time: pt.date,
-      value: pt.total_invested,
-    }));
+      const valueData = data.map((pt) => {
+        let val = pt.value;
+        if (viewMode === 'percent') {
+          val = pt.total_invested > 0 ? ((pt.value - pt.total_invested) / pt.total_invested) * 100 : 0;
+        }
+        return { time: pt.date, value: val };
+      });
+      valueSeries.setData(valueData);
+    }
 
-    valueSeries.setData(valueData);
-    costSeries.setData(costData);
+    // Série 2: Custo de Aquisição
+    if (showCost) {
+      costSeries = chart.addSeries(LineSeries, {
+        color: 'rgba(255, 255, 255, 0.35)',
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        priceFormat,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+      });
+
+      const costData = data.map((pt) => {
+        let val = pt.total_invested;
+        if (viewMode === 'percent') {
+          val = 0; // Baseline é zero no modo %
+        }
+        return { time: pt.date, value: val };
+      });
+      costSeries.setData(costData);
+    }
 
     chart.timeScale().fitContent();
 
@@ -109,19 +121,38 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [data]);
+  }, [data, showValue, showCost, viewMode]);
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
-      {/* Legenda Dinâmica no Topo */}
-      <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.8rem', fontSize: '0.75rem', fontWeight: 600 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#00f2fe' }}></span>
-          <span style={{ color: 'var(--text-primary)' }}>Evolução Patrimonial</span>
+      {/* Controles Dinâmicos */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', fontSize: '0.75rem', fontWeight: 600 }}>
+        {/* Toggle Linhas */}
+        <div style={{ display: 'flex', gap: '1.5rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={showValue} onChange={e => setShowValue(e.target.checked)} className="accent-[#00f2fe]" />
+            <span style={{ color: 'var(--text-primary)' }}>Evolução Patrimonial</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={showCost} onChange={e => setShowCost(e.target.checked)} className="accent-white" />
+            <span style={{ color: 'var(--text-secondary)' }}>Custo Médio Investido</span>
+          </label>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ display: 'inline-block', width: '10px', height: '2px', borderTop: '2px dashed rgba(255,255,255,0.6)' }}></span>
-          <span style={{ color: 'var(--text-secondary)' }}>Custo Médio Investido</span>
+        
+        {/* Toggle Moeda / Percentual */}
+        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '6px' }}>
+          <button 
+            onClick={() => setViewMode('currency')}
+            style={{ padding: '2px 8px', borderRadius: '4px', background: viewMode === 'currency' ? '#00f2fe' : 'transparent', color: viewMode === 'currency' ? '#000' : 'var(--text-secondary)' }}
+          >
+            R$
+          </button>
+          <button 
+            onClick={() => setViewMode('percent')}
+            style={{ padding: '2px 8px', borderRadius: '4px', background: viewMode === 'percent' ? '#00f2fe' : 'transparent', color: viewMode === 'percent' ? '#000' : 'var(--text-secondary)' }}
+          >
+            %
+          </button>
         </div>
       </div>
       <div ref={containerRef} style={{ width: '100%', minHeight: '300px' }} />
