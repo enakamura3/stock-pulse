@@ -915,7 +915,6 @@ export default function PortfolioPage() {
                                 🗑️
                               </button>
                             </div>
-                          </div>
                         </div>
                       );
                     })
