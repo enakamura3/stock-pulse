@@ -23,7 +23,7 @@ type PortfolioService interface {
 	BulkAddTransactions(ctx context.Context, userID, portfolioID string, file multipart.File) (*BulkImportResult, error)
 	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	DeletePortfolio(ctx context.Context, id, userID string) error
-	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string) ([]PerformancePoint, error)
+	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string, filterTickers []string) ([]PerformancePoint, error)
 
 	// Utilizado especificamente pelo Handler para recuperar transações puras
 	repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
