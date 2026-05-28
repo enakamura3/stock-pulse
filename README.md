@@ -7,7 +7,8 @@ stock-pulse é uma plataforma moderna e completa para acompanhamento de portfól
 - **Monitoramento em Tempo Real:** Conexões via WebSocket garantem que cotações de ativos pisquem na tela sem necessidade de recarregar a página.
 - **Gestão de Portfólio:** Acompanhe rentabilidade, histórico de transações e custo médio dos seus ativos globais ou da B3. Suporta edição de transações, Desdobramentos/Agrupamentos (Splits), Bonificações e Importação em Lote (Bulk Import via CSV).
 - **Watchlists Múltiplas:** Crie listas de favoritos customizadas para separar ativos por estratégia.
-- **Valuation Automático:** Calcule o Preço Justo de ações segundo as metodologias de Benjamin Graham e Décio Bazin. Receba alertas visuais diretamente na tabela de posições identificando oportunidades (Ação CARA ou DESCONTADA).
+- **Valuation e Indicadores (P/VP, P/L, Yield):** Calcule o Preço Justo de ações segundo as metodologias de Benjamin Graham e Décio Bazin. Acompanhe em tempo real na sua tabela de posições ativas os múltiplos P/VP, P/L e Dividend Yield atualizados via scraping (suporte inteligente a Ações e FIIs da B3 via Fundamentus, e ativos globais via Finviz). Receba alertas visuais diretamente na tabela identificando oportunidades (ex: P/VP < 1.0 ou preços descontados ficam destacados em verde).
+- **Visualização Avançada de Histórico:** Histórico de transações em layout fluido (single-line), com filtros inteligentes por Ticker para auditar operações e custos passados com facilidade.
 - **Alertas de Preço (E-mail):** Configure alertas disparados automaticamente em background quando um preço atinge uma meta, recebendo um e-mail HTML estilizado.
 - **Segurança Sólida:** Autenticação usando JWT armazenado exclusivamente em cookies `HttpOnly` com criptografia e regras de CORS restritas.
 - **Observabilidade Total:** Telemetria integrada com Prometheus, Grafana e Loki para métricas e logs em tempo real.
@@ -22,7 +23,7 @@ stock-pulse é uma plataforma moderna e completa para acompanhamento de portfól
 - **Cache & Sessão:** Redis 7 (`go-redis/v9`)
 - **Autenticação:** JWT (JSON Web Tokens)
 - **Migrações de DB:** `golang-migrate`
-- **Fornecedor de Dados de Mercado:** Yahoo Finance API (Cotações e Busca)
+- **Fornecedor de Dados de Mercado:** Yahoo Finance API (Cotações e Busca), Fundamentus & Finviz (Scraping de Fundamentos)
 - **Background Workers:** Goroutines para verificação de alertas e rotinas de portfólio.
 
 ### Frontend (Next.js 14)
