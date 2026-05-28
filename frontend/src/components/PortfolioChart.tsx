@@ -65,13 +65,15 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     // Série 2: Custo de Aquisição (Line Series Dashed White)
     const costSeries = chart.addSeries(LineSeries, {
       color: 'rgba(255, 255, 255, 0.35)',
-      lineWidth: 1.5,
+      lineWidth: 2,
       lineStyle: 2, // Dashed
       priceFormat: {
         type: 'price',
         precision: 2,
         minMove: 0.01,
       },
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
     });
 
     // Formata pontos para a biblioteca
