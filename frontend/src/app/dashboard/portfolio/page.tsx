@@ -468,7 +468,7 @@ export default function PortfolioPage() {
   const kpiCurrency = activeP ? activeP.base_currency : 'BRL';
 
   return (
-    <main className="container" style={{ maxWidth: 1100 }}>
+    <main className="container" style={{ maxWidth: 1400 }}>
       {/* Header Centralizado com Navbar Tabs */}
       <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}>
         <div>

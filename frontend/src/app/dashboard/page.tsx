@@ -487,7 +487,7 @@ export default function DashboardPage() {
   const activeFavorited = activeQuote ? isAssetFavorited(activeQuote.symbol) : false;
 
   return (
-    <main className="container" style={{ maxWidth: 1100 }}>
+    <main className="container" style={{ maxWidth: 1400 }}>
       {/* Header */}
       <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}>
         <div>
