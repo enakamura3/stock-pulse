@@ -79,10 +79,14 @@ func (s *Scraper) ScrapeFundamentus(ctx context.Context, symbol string) (*Fundam
 
 	lpaRe := regexp.MustCompile(`(?is)<span[^>]*>LPA</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
 	vpaRe := regexp.MustCompile(`(?is)<span[^>]*>VPA</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
+	vpCotaRe := regexp.MustCompile(`(?is)<span[^>]*>VP/Cota</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
 	divRe := regexp.MustCompile(`(?is)<span[^>]*>Div\. Yield</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
 
 	eps := parseBrFloat(extractRegex(lpaRe, html))
 	bv := parseBrFloat(extractRegex(vpaRe, html))
+	if bv == 0 {
+		bv = parseBrFloat(extractRegex(vpCotaRe, html))
+	}
 	dy := parseBrFloat(extractRegex(divRe, html))
 
 	return s.calculateFormulas(&Fundamentals{

@@ -87,7 +87,7 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 		return nil, fmt.Errorf("símbolo do ativo inválido")
 	}
 
-	key := fmt.Sprintf("fundamentals:%s", symbol)
+	key := fmt.Sprintf("fundamentals:v2:%s", symbol)
 
 	// Tenta buscar no Redis (Cache Hit)
 	val, err := s.rdb.Get(ctx, key).Result()
