@@ -188,10 +188,18 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 				pos.ReturnPercent = (pos.ProfitLoss / pos.TotalCost) * 100
 			}
 
-			// Injeta fundamentos (Graham e Bazin)
+			// Injeta fundamentos (Graham, Bazin, P/VP, P/L)
 			if f, errF := s.marketService.GetFundamentals(ctx, pos.Ticker); errF == nil && f != nil {
 				pos.GrahamValue = f.GrahamValue
 				pos.BazinValue = f.BazinValue
+				pos.DividendYield = f.DividendYield
+				
+				if f.BookValue > 0 {
+					pos.PVP = pos.CurrentPrice / f.BookValue
+				}
+				if f.EPS > 0 {
+					pos.PE = pos.CurrentPrice / f.EPS
+				}
 			}
 
 			activePositions = append(activePositions, *pos)

@@ -54,6 +54,9 @@ type Position struct {
 	ReturnPercent float64 `json:"return_percent,omitempty"`
 	GrahamValue   float64 `json:"graham_value,omitempty"`
 	BazinValue    float64 `json:"bazin_value,omitempty"`
+	PVP           float64 `json:"pvp,omitempty"`
+	PE            float64 `json:"pe,omitempty"`
+	DividendYield float64 `json:"dividend_yield,omitempty"`
 }
 
 // DailyPrice representa a cotação histórica diária de um ativo.

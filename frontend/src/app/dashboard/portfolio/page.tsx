@@ -30,6 +30,9 @@ interface Position {
   return_percent?: number;
   graham_value?: number;
   bazin_value?: number;
+  pvp?: number;
+  pe?: number;
+  dividend_yield?: number;
 }
 
 interface Transaction {
@@ -714,6 +717,9 @@ export default function PortfolioPage() {
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Retorno</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P. Justo Graham</th>
                           <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P. Justo Bazin</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Yield</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P/L</th>
+                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P/VP</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -766,6 +772,15 @@ export default function PortfolioPage() {
                                 ) : (
                                   <span style={{ color: 'var(--text-secondary)' }}>--</span>
                                 )}
+                              </td>
+                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#00e676' }}>
+                                {pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}
+                              </td>
+                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
+                                {pos.pe ? pos.pe.toFixed(2) : '--'}
+                              </td>
+                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', color: pos.pvp && pos.pvp < 1.0 ? '#00e676' : 'inherit' }}>
+                                {pos.pvp ? pos.pvp.toFixed(2) : '--'}
                               </td>
                             </tr>
                           );
