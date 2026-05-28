@@ -516,7 +516,7 @@ export default function PortfolioPage() {
   );
   
   const filteredTransactions = transactions.filter(tx => 
-    activeCategoryFilter === 'Todas' || getAssetCategory(tx.ticker, tx.asset_name || '') === activeCategoryFilter
+    activeCategoryFilter === 'Todas' || getAssetCategory(tx.ticker || '', tx.asset_name || '') === activeCategoryFilter
   );
 
   // Cálculos Consolidados de Resumo Financeiro (KPI Cards) baseados no filtro atual
