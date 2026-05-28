@@ -279,3 +279,10 @@ O **stock-pulse** foi desenhado para ser facilmente distribuído em serviços de
 Com essa distribuição, o sistema evita gargalos de memória e ganha resiliência, separando a persistência (Supabase) da lógica computacional (Go) e da entrega de interface (Vercel).
 
 ---
+
+## ⚖️ Licença
+
+Este projeto está licenciado sob a **AGPLv3 (GNU Affero General Public License v3.0)**.
+Isto significa que o código é aberto e livre, mas qualquer modificação ou obra derivada, caso seja distribuída ou hospedada como um serviço web, obrigatoriamente deve ter seu código-fonte aberto sob os mesmos termos. O uso privado sem abertura de código é proibido para serviços públicos de rede.
+
+Consulte o arquivo [`LICENSE`](LICENSE) para mais detalhes.
