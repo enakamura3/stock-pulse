@@ -166,6 +166,38 @@ flowchart TD
     Loop --> Sleep[Dorme 60s] --> FetchAlerts
 ```
 
+### 4. Fluxo de Scraping de Fundamentos e Valuation
+Como o sistema recupera e exibe em tempo real indicadores pesados (P/VP, P/L, Yield) sem sobrecarregar provedores lentos.
+
+```mermaid
+sequenceDiagram
+    participant User as Frontend (React)
+    participant API as Backend (Go API)
+    participant Redis as Redis Cache
+    participant Fund as Fundamentus (B3)
+    participant Finviz as Finviz (Global)
+
+    User->>API: GET /api/portfolio/fundamentals?symbol=MXRF11.SA
+    API->>Redis: Verifica cache 'fundamentals:v2:MXRF11.SA'
+    alt Cache Hit (Válido por 24h)
+        Redis-->>API: Retorna Fundamentos Salvos
+    else Cache Miss
+        alt Ativo é Brasileiro (.SA)
+            API->>Fund: Faz Scraping da página HTML (detalhes.php)
+            Fund-->>API: Retorna HTML
+            Note over API: Executa Regex (VPA, VP/Cota, LPA, Yield)
+        else Ativo é Global
+            API->>Finviz: Faz Scraping da página HTML (quote.ashx)
+            Finviz-->>API: Retorna HTML
+            Note over API: Executa Regex (EPS, Book Value)
+        end
+        API->>API: Calcula Fórmulas de Graham e Bazin
+        API->>Redis: Salva resultado no Cache (TTL 24h)
+    end
+    API-->>User: Retorna JSON (P/VP, P/L, Graham, etc.)
+    Note over User: Tabela de Posições é atualizada!
+```
+
 ---
 
 ## 📂 Arquitetura do Repositório (Monorepo)
