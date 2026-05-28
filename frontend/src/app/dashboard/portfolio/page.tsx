@@ -99,7 +99,7 @@ export default function PortfolioPage() {
 
   // Forms - Transação
   const [txTicker, setTxTicker] = useState('');
-  const [txType, setTxType] = useState<'BUY' | 'SELL' | 'SPLIT' | 'BONUS'>('BUY');
+  const [txType, setTxType] = useState<'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS'>('BUY');
   const [txQuantity, setTxQuantity] = useState<string | number>('');
   const [txUnitPrice, setTxUnitPrice] = useState<string | number>('');
   const [txExchangeRate, setTxExchangeRate] = useState<string | number>(1.0);
@@ -118,7 +118,7 @@ export default function PortfolioPage() {
   const handleEditTransaction = (tx: any) => {
     setEditingTxId(tx.id);
     setTxTicker(tx.ticker);
-    setTxType(tx.type as 'BUY' | 'SELL' | 'SPLIT' | 'BONUS');
+    setTxType(tx.type as 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS');
     setTxQuantity(tx.quantity);
     setTxUnitPrice(tx.unit_price);
     setTxExchangeRate(tx.exchange_rate);
@@ -314,7 +314,7 @@ export default function PortfolioPage() {
     const parsedPrice = parseFloat(txUnitPrice.toString());
     const parsedRate = parseFloat(txExchangeRate.toString());
 
-    if (!txTicker || isNaN(parsedQty) || parsedQty <= 0 || (txType !== 'SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 0))) {
+    if (!txTicker || isNaN(parsedQty) || parsedQty <= 0 || (txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 0))) {
       alert('Preencha todos os campos obrigatórios corretamente.');
       return;
     }
@@ -343,7 +343,7 @@ export default function PortfolioPage() {
           ticker: txTicker,
           type: txType,
           quantity: parsedQty,
-          unit_price: txType === 'SPLIT' ? 0 : parsedPrice,
+          unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
           exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 1.0 : parsedRate,
           executed_at: txExecutedAt,
         }),
@@ -833,9 +833,9 @@ export default function PortfolioPage() {
                     transactions
                       .filter(tx => filterTxTicker === '' || tx.ticker === filterTxTicker)
                       .map((tx) => {
-                      const isBuy = tx.type === 'BUY';
-                      const isSplit = tx.type === 'SPLIT';
-                      const isBonus = tx.type === 'BONUS';
+                      const isBuy = tx.type === 'BUY' || tx.type === 'BONUS';
+                      const isSplit = tx.type === 'SPLIT' || tx.type === 'REVERSE_SPLIT';
+                      const isReverse = tx.type === 'REVERSE_SPLIT';
                       return (
                         <div
                           key={tx.id}
@@ -857,10 +857,10 @@ export default function PortfolioPage() {
                               borderRadius: '4px',
                               fontSize: '0.65rem',
                               fontWeight: 700,
-                              background: isBuy ? 'rgba(0, 230, 118, 0.08)' : isSplit ? 'rgba(0, 242, 254, 0.08)' : 'rgba(255, 61, 0, 0.08)',
-                              color: isBuy ? '#00e676' : isSplit ? '#00f2fe' : '#ff3d00',
+                              background: isBuy ? 'rgba(0, 230, 118, 0.08)' : tx.type === 'SPLIT' ? 'rgba(0, 242, 254, 0.08)' : tx.type === 'REVERSE_SPLIT' ? 'rgba(156, 39, 176, 0.08)' : 'rgba(255, 61, 0, 0.08)',
+                              color: isBuy ? '#00e676' : tx.type === 'SPLIT' ? '#00f2fe' : tx.type === 'REVERSE_SPLIT' ? '#e040fb' : '#ff3d00',
                             }}>
-                              {isBuy ? 'COMPRA' : isSplit ? 'SPLIT' : 'VENDA'}
+                              {isBuy ? (tx.type === 'BONUS' ? 'BÔNUS' : 'COMPRA') : tx.type === 'SPLIT' ? 'SPLIT' : tx.type === 'REVERSE_SPLIT' ? 'AGRUPAMENTO' : 'VENDA'}
                             </span>
                             
                             <span style={{ fontWeight: 700, color: '#fff' }}>{tx.ticker}</span>
@@ -882,7 +882,7 @@ export default function PortfolioPage() {
                                 </>
                               ) : (
                                 <span style={{ fontWeight: 700 }}>
-                                  Fator: {tx.quantity}x
+                                  Fator: {isReverse ? `1 para ${tx.quantity}` : `${tx.quantity} para 1`}
                                 </span>
                               )}
                             </div>
@@ -1111,7 +1111,7 @@ export default function PortfolioPage() {
                 <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
                   Operação
                 </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => setTxType('BUY')}
@@ -1157,6 +1157,23 @@ export default function PortfolioPage() {
                   >
                     ✂️ SPLIT
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTxType('REVERSE_SPLIT');
+                      setTxUnitPrice(0);
+                    }}
+                    disabled={isAddingTx}
+                    style={{
+                      flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem',
+                      border: txType === 'REVERSE_SPLIT' ? '1px solid #e040fb' : '1px solid var(--panel-border)',
+                      background: txType === 'REVERSE_SPLIT' ? 'rgba(156, 39, 176, 0.08)' : 'transparent',
+                      color: txType === 'REVERSE_SPLIT' ? '#e040fb' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    🗜️ AGRUP.
+                  </button>
                 </div>
               </div>
 
@@ -1164,7 +1181,7 @@ export default function PortfolioPage() {
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                    {txType === 'SPLIT' ? 'Fator / Multiplicador' : 'Quantidade'}
+                    {(txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 'Fator / Multiplicador' : 'Quantidade'}
                   </label>
                   <input
                     className="form-input"
@@ -1172,18 +1189,18 @@ export default function PortfolioPage() {
                     step="any"
                     value={txQuantity}
                     onChange={(e) => setTxQuantity(e.target.value)}
-                    placeholder={txType === 'SPLIT' ? "Ex: 10 (desdobra) ou 0.1 (agrupa)" : "0"}
+                    placeholder={(txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? "Ex: 10" : "0"}
                     required
                     disabled={isAddingTx}
                   />
-                  {txType === 'SPLIT' && (
+                  {(txType === 'SPLIT' || txType === 'REVERSE_SPLIT') && (
                     <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.4rem', display: 'block' }}>
-                      Ex: Desdobramento 1 para 10 = Fator 10. Agrupamento 10 para 1 = Fator 0.1.
+                      {txType === 'SPLIT' ? 'Ex: Desdobramento 1 para 10 = Fator 10.' : 'Ex: Agrupamento 10 para 1 = Fator 10.'}
                     </span>
                   )}
                 </div>
 
-                {txType !== 'SPLIT' && (
+                {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (
                   <div className="form-group" style={{ flex: 1 }}>
                     <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
                       Preço Unitário ({selectedAssetCurrency})

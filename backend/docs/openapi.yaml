@@ -430,7 +430,7 @@ paths:
                   example: VALE3.SA
                 type:
                   type: string
-                  enum: [BUY, SELL, SPLIT, BONUS]
+                  enum: [BUY, SELL, SPLIT, REVERSE_SPLIT, BONUS]
                   example: BUY
                 quantity:
                   type: number

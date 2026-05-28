@@ -80,7 +80,8 @@ O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primei
   - **`BUY` (Compra):** Quantidade e Preço devem ser maiores que zero.
   - **`SELL` (Venda):** Quantidade e Preço devem ser maiores que zero.
   - **`BONUS` (Bonificação):** Quantidade (ações recebidas) > 0. O preço deve ser o **Custo Atribuído** (declarado pela empresa no Fato Relevante). O sistema usará este valor para aumentar o seu custo total e recalcular o Preço Médio (se preferir não alterar o custo, informe `0.00`).
-  - **`SPLIT` (Desdobramento/Agrupamento):** Quantidade representa o fator da operação. Para desdobramentos (ex: 1 pra 2), use inteiros (ex: `2`). Para agrupamentos (ex: 10 pra 1), use decimais (ex: `0.1`). O sistema ignora o preço (pode informar `0.00`).
+  - **`SPLIT` (Desdobramento):** Quantidade representa o fator de multiplicação (ex: `2` para 1 virar 2). O sistema ignora o preço (pode informar `0.00`).
+  - **`REVERSE_SPLIT` (Agrupamento):** Quantidade representa o fator de divisão (ex: `10` para 10 virar 1). O sistema ignora o preço (pode informar `0.00`).
 
 **Exemplo Completo de Arquivo CSV:**
 ```csv

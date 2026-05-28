@@ -187,12 +187,12 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
-	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "BONUS" {
-		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT ou BONUS")
+	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" {
+		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT, REVERSE_SPLIT ou BONUS")
 		return
 	}
 
-	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
+	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
 		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits e bônus)")
 		return
 	}
@@ -327,12 +327,12 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
-	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "BONUS" {
-		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT ou BONUS")
+	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" {
+		h.respondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT, REVERSE_SPLIT ou BONUS")
 		return
 	}
 
-	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
+	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
 		h.respondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits e bônus)")
 		return
 	}
