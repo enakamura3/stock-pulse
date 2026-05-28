@@ -73,6 +73,7 @@ export default function PortfolioPage() {
   // Estados de Portfólios
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [activePortfolioId, setActivePortfolioId] = useState<string>('');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('Todas');
   const [positions, setPositions] = useState<Position[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
@@ -430,8 +431,21 @@ export default function PortfolioPage() {
     e.target.value = "";
   };
 
-  // Formatadores Auxiliares
+  // Formatadores e Helpers
   const getActivePortfolio = () => portfolios.find((p) => p.id === activePortfolioId);
+
+  const getAssetCategory = (ticker: string, name: string) => {
+    if (!ticker) return 'Ações (B3)';
+    if (ticker.includes('-')) return 'Cripto';
+    if (!ticker.endsWith('.SA')) return 'Internacional';
+    
+    const lowerName = name ? name.toLowerCase() : '';
+    if (ticker.endsWith('11.SA')) {
+      if (lowerName.includes('fundo de investimento imobili') || lowerName.includes(' fii')) return 'FIIs';
+      if (lowerName.includes('ishares') || lowerName.includes('etf') || lowerName.includes('índice')) return 'ETFs Nacionais';
+    }
+    return 'Ações (B3)';
+  };
 
   const formatMoney = (val: number, currency: string) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -460,9 +474,18 @@ export default function PortfolioPage() {
 
   const activeP = getActivePortfolio();
   
-  // Cálculos Consolidados de Resumo Financeiro (KPI Cards)
-  const totalCost = positions.reduce((acc, pos) => acc + pos.total_cost, 0);
-  const currentValue = positions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
+  // Filtros
+  const filteredPositions = positions.filter(pos => 
+    activeCategoryFilter === 'Todas' || getAssetCategory(pos.ticker, pos.name) === activeCategoryFilter
+  );
+  
+  const filteredTransactions = transactions.filter(tx => 
+    activeCategoryFilter === 'Todas' || getAssetCategory(tx.ticker, tx.asset_name || '') === activeCategoryFilter
+  );
+
+  // Cálculos Consolidados de Resumo Financeiro (KPI Cards) baseados no filtro atual
+  const totalCost = filteredPositions.reduce((acc, pos) => acc + pos.total_cost, 0);
+  const currentValue = filteredPositions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
   const profitLoss = currentValue - totalCost;
   const returnPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0.0;
   const kpiCurrency = activeP ? activeP.base_currency : 'BRL';
@@ -557,6 +580,29 @@ export default function PortfolioPage() {
             🗑️ Excluir Carteira
           </button>
         )}
+      </div>
+
+      {/* Filtro de Categoria de Ativos */}
+      <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        {['Todas', 'Ações (B3)', 'FIIs', 'ETFs Nacionais', 'Internacional', 'Cripto'].map(cat => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategoryFilter(cat)}
+            style={{
+              padding: '0.4rem 1rem',
+              fontSize: '0.8rem',
+              borderRadius: '20px',
+              border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)',
+              background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+              color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontWeight: activeCategoryFilter === cat ? 700 : 600,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {cat}
+          </button>
+        ))}
       </div>
 
       {isLoadingDetails ? (
@@ -704,7 +750,7 @@ export default function PortfolioPage() {
                 </div>
 
                 <div style={{ overflowX: 'auto', flex: 1 }}>
-                  {positions.length > 0 ? (
+                  {filteredPositions.length > 0 ? (
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--panel-border)', color: 'var(--text-secondary)' }}>
@@ -723,7 +769,7 @@ export default function PortfolioPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {positions.map((pos) => {
+                        {filteredPositions.map((pos) => {
                           const isPos = (pos.profit_loss || 0) >= 0;
                           return (
                             <tr key={pos.asset_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', verticalAlign: 'middle' }}>
@@ -829,8 +875,8 @@ export default function PortfolioPage() {
                 </div>
                 
                 <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '550px' }}>
-                  {transactions.length > 0 ? (
-                    transactions
+                  {filteredTransactions.length > 0 ? (
+                    filteredTransactions
                       .filter(tx => filterTxTicker === '' || tx.ticker === filterTxTicker)
                       .map((tx) => {
                       const isBuy = tx.type === 'BUY' || tx.type === 'BONUS';
