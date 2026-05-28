@@ -221,9 +221,12 @@ export default function PortfolioPage() {
         if (t.includes('-') && activeCategoryFilter === 'Cripto') return true;
         if (!t.endsWith('.SA') && !t.includes('-') && activeCategoryFilter === 'Internacional') return true;
         if (t.endsWith('11.SA')) {
-          if ((n.includes('fundo de investimento imobili') || n.includes(' fii')) && activeCategoryFilter === 'FIIs') return true;
-          if ((n.includes('ishares') || n.includes('etf') || n.includes('índice')) && activeCategoryFilter === 'ETFs Nacionais') return true;
-          if (!(n.includes('fundo de investimento imobili') || n.includes(' fii')) && !(n.includes('ishares') || n.includes('etf') || n.includes('índice')) && activeCategoryFilter === 'Ações (B3)') return true;
+          const isEtf = /etf|ishares|índice|indice/i.test(n);
+          const isFii = /fii|fundo.*imob|fdo.*imob|imobili[aá]ri[ao]s?|real estate|receb[ií]veis/i.test(n);
+          
+          if (isFii && activeCategoryFilter === 'FIIs') return true;
+          if (isEtf && activeCategoryFilter === 'ETFs Nacionais') return true;
+          if (!isFii && !isEtf && activeCategoryFilter === 'Ações (B3)') return true;
         } else if (t.endsWith('.SA') && !t.endsWith('11.SA') && activeCategoryFilter === 'Ações (B3)') {
           return true;
         }
@@ -477,8 +480,11 @@ export default function PortfolioPage() {
     
     const lowerName = name ? name.toLowerCase() : '';
     if (ticker.endsWith('11.SA')) {
-      if (lowerName.includes('fundo de investimento imobili') || lowerName.includes(' fii')) return 'FIIs';
-      if (lowerName.includes('ishares') || lowerName.includes('etf') || lowerName.includes('índice')) return 'ETFs Nacionais';
+      const isEtf = /etf|ishares|índice|indice/i.test(lowerName);
+      const isFii = /fii|fundo.*imob|fdo.*imob|imobili[aá]ri[ao]s?|real estate|receb[ií]veis/i.test(lowerName);
+
+      if (isEtf) return 'ETFs Nacionais';
+      if (isFii) return 'FIIs';
     }
     return 'Ações (B3)';
   };
