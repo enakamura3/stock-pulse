@@ -173,11 +173,15 @@ export default function PortfolioPage() {
   }, []);
 
   // 3. CARREGA DADOS DE EVOLUÇÃO PATRIMONIAL (GRÁFICO)
-  const loadPerformance = useCallback(async (id: string, selectPeriod: string) => {
+  const loadPerformance = useCallback(async (id: string, selectPeriod: string, filterTickers: string[] = []) => {
     if (!id) return;
     setIsLoadingPerformance(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`, { credentials: 'include', cache: 'no-store' });
+      let url = `${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`;
+      if (filterTickers.length > 0) {
+        url += `&tickers=${filterTickers.join(',')}`;
+      }
+      const res = await fetch(url, { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setPerformanceData(data || []);
@@ -196,13 +200,45 @@ export default function PortfolioPage() {
     }
   }, [user, loadPortfolios]);
 
-  // Carrega dados da carteira quando a ID muda ou o período muda
+  // Carrega os detalhes da carteira (posições e histórico) quando a ID da carteira mudar
   useEffect(() => {
     if (activePortfolioId) {
       loadPortfolioDetails(activePortfolioId);
-      loadPerformance(activePortfolioId, period);
     }
-  }, [activePortfolioId, period, loadPortfolioDetails, loadPerformance]);
+  }, [activePortfolioId, loadPortfolioDetails]);
+
+  // Carrega a performance (gráfico) reagindo a mudanças no período, filtro de categoria ou atualização de posições
+  useEffect(() => {
+    if (!activePortfolioId) return;
+    
+    let targetTickers: string[] = [];
+    if (activeCategoryFilter !== 'Todas') {
+      // Re-aplica a lógica do getAssetCategory para extrair os tickers relevantes
+      const filtered = positions.filter(pos => {
+        const t = pos.ticker;
+        const n = pos.name ? pos.name.toLowerCase() : '';
+        if (!t) return false;
+        if (t.includes('-') && activeCategoryFilter === 'Cripto') return true;
+        if (!t.endsWith('.SA') && !t.includes('-') && activeCategoryFilter === 'Internacional') return true;
+        if (t.endsWith('11.SA')) {
+          if ((n.includes('fundo de investimento imobili') || n.includes(' fii')) && activeCategoryFilter === 'FIIs') return true;
+          if ((n.includes('ishares') || n.includes('etf') || n.includes('índice')) && activeCategoryFilter === 'ETFs Nacionais') return true;
+          if (!(n.includes('fundo de investimento imobili') || n.includes(' fii')) && !(n.includes('ishares') || n.includes('etf') || n.includes('índice')) && activeCategoryFilter === 'Ações (B3)') return true;
+        } else if (t.endsWith('.SA') && !t.endsWith('11.SA') && activeCategoryFilter === 'Ações (B3)') {
+          return true;
+        }
+        return false;
+      });
+      targetTickers = filtered.map(p => p.ticker);
+      
+      // Se há um filtro ativo, mas não há ativos nessa categoria, enviamos um ticker dummy para forçar gráfico vazio
+      if (targetTickers.length === 0) {
+        targetTickers = ['NONE_FOUND'];
+      }
+    }
+
+    loadPerformance(activePortfolioId, period, targetTickers);
+  }, [activePortfolioId, period, activeCategoryFilter, positions, loadPerformance]);
 
   // Efeito Debounce para busca autocomplete dentro do Modal de Cadastro
   useEffect(() => {

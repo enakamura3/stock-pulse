@@ -274,7 +274,13 @@ func (h *Handler) GetPerformance(w http.ResponseWriter, r *http.Request) {
 		period = "ALL"
 	}
 
-	points, err := h.service.GetPortfolioPerformance(r.Context(), portfolioID, userID, period)
+	tickersParam := r.URL.Query().Get("tickers")
+	var filterTickers []string
+	if tickersParam != "" {
+		filterTickers = strings.Split(tickersParam, ",")
+	}
+
+	points, err := h.service.GetPortfolioPerformance(r.Context(), portfolioID, userID, period, filterTickers)
 	if err != nil {
 		h.respondWithError(w, http.StatusBadRequest, err.Error())
 		return

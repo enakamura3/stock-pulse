@@ -321,8 +321,8 @@ type PerformancePoint struct {
 	TotalInvested float64 `json:"total_invested"`
 }
 
-// GetPortfolioPerformance reconstrói a série histórica diária de evolução patrimonial aplicando LOCF.
-func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string) ([]PerformancePoint, error) {
+// GetPortfolioPerformance constrói a série histórica de rentabilidade consolidada.
+func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID string, userID string, period string, filterTickers []string) ([]PerformancePoint, error) {
 	// Anti-IDOR: Valida a posse
 	p, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
 	if err != nil {
@@ -338,7 +338,26 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID, user
 		return []PerformancePoint{}, nil
 	}
 
-	// Ordena cronologicamente
+	// Filtra as transações caso o usuário tenha selecionado uma categoria específica
+	if len(filterTickers) > 0 {
+		tickerMap := make(map[string]bool)
+		for _, t := range filterTickers {
+			tickerMap[t] = true
+		}
+		filteredTxs := make([]Transaction, 0)
+		for _, tx := range txs {
+			if tickerMap[tx.Ticker] {
+				filteredTxs = append(filteredTxs, tx)
+			}
+		}
+		txs = filteredTxs
+	}
+
+	if len(txs) == 0 {
+		return []PerformancePoint{}, nil
+	}
+
+	// Ordena cronologicamente do mais antigo para o mais novo
 	sort.Slice(txs, func(i, j int) bool {
 		return txs[i].ExecutedAt.Before(txs[j].ExecutedAt)
 	})
