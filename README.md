@@ -41,6 +41,33 @@ stock-pulse é uma plataforma moderna e completa para acompanhamento de portfól
 
 ---
 
+## 📡 Fornecedores de Dados (Data Providers)
+
+O stock-pulse não possui uma base de dados interna estática de ativos financeiros. Ele atua de forma dinâmica buscando informações atualizadas (Cotações e Fundamentos) através de integrações com APIs e Web Scraping:
+
+### 1. Yahoo Finance API (Cotações e Busca)
+Responsável por entregar as cotações em tempo real e fornecer a busca (autocomplete) de ativos.
+- **Busca de Tickers (Search):**
+  - `GET https://query1.finance.yahoo.com/v1/finance/search?q={query}`
+- **Cotação Atual e Preço de Fechamento (Chart/Quote):**
+  - `GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d`
+  
+*(Nota: Para evitar bloqueios do Yahoo Finance, o backend injeta rotineiramente cabeçalhos `User-Agent` customizados nas requisições).*
+
+### 2. Fundamentus (Scraping de Fundamentos - Brasil)
+Como as APIs gratuitas do Yahoo não fornecem indicadores fundamentalistas estruturados e confiáveis para o Brasil, o backend faz o web scraping das páginas do Fundamentus para ativos com o sufixo `.SA` (Ações e FIIs da B3).
+- **Endpoint Analisado:** 
+  - `GET https://www.fundamentus.com.br/detalhes.php?papel={symbol}`
+- **Métricas Extraídas via Regex:** Lucro Por Ação (LPA), Valor Patrimonial por Ação (VPA), VP/Cota (para FIIs) e Dividend Yield.
+
+### 3. Finviz (Scraping de Fundamentos - Global)
+Para ativos americanos ou globais (sem o sufixo `.SA`), o sistema roteia o scraping para o portal Finviz, que possui uma tabela rica de indicadores de mercado internacional.
+- **Endpoint Analisado:**
+  - `GET https://finviz.com/quote.ashx?t={symbol}`
+- **Métricas Extraídas via Regex:** EPS (ttm), Book/sh e Dividend %.
+
+---
+
 ### Importação de Transações em Lote (CSV)
 O stock-pulse permite a importação massiva de histórico de operações através de um arquivo `.csv` ou `.txt`. 
 O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primeira linha é ignorado):
