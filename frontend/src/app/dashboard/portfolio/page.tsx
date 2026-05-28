@@ -835,7 +835,7 @@ export default function PortfolioPage() {
                             fontSize: '0.8rem',
                           }}
                         >
-                          <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, flexWrap: 'wrap' }}>
                             <span style={{
                               display: 'inline-block',
                               padding: '0.15rem 0.4rem',
@@ -844,36 +844,37 @@ export default function PortfolioPage() {
                               fontWeight: 700,
                               background: isBuy ? 'rgba(0, 230, 118, 0.08)' : isSplit ? 'rgba(0, 242, 254, 0.08)' : 'rgba(255, 61, 0, 0.08)',
                               color: isBuy ? '#00e676' : isSplit ? '#00f2fe' : '#ff3d00',
-                              marginRight: '0.5rem',
                             }}>
                               {isBuy ? 'COMPRA' : isSplit ? 'SPLIT' : 'VENDA'}
                             </span>
+                            
                             <span style={{ fontWeight: 700, color: '#fff' }}>{tx.ticker}</span>
-                            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                            
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', borderRight: '1px solid var(--panel-border)', paddingRight: '0.5rem' }}>
                               {new Date(tx.executed_at).toISOString().split('T')[0].replace(/-/g, '/')}
                             </span>
-                          </div>
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ textAlign: 'right' }}>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}>
                               {!isSplit ? (
                                 <>
-                                  <span style={{ display: 'block', fontWeight: 700 }}>
-                                    {formatMoney(tx.quantity * tx.unit_price, tx.currency || 'BRL')}
-                                  </span>
-                                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                  <span style={{ color: 'var(--text-secondary)' }}>
                                     {tx.quantity} un. x {formatMoney(tx.unit_price, tx.currency || 'BRL')}
+                                  </span>
+                                  <span style={{ color: 'var(--text-secondary)' }}>=</span>
+                                  <span style={{ fontWeight: 700 }}>
+                                    {formatMoney(tx.quantity * tx.unit_price, tx.currency || 'BRL')}
                                   </span>
                                 </>
                               ) : (
-                                <span style={{ display: 'block', fontWeight: 700 }}>
+                                <span style={{ fontWeight: 700 }}>
                                   Fator: {tx.quantity}x
                                 </span>
                               )}
                             </div>
-                            
-                            <div style={{ display: 'flex', gap: '0.4rem' }}>
-                              <button
+                          </div>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', paddingLeft: '0.5rem' }}>
+                            <button
                                 onClick={() => handleEditTransaction(tx)}
                                 style={{
                                   background: 'rgba(255, 255, 255, 0.05)',
