@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -156,7 +157,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 			}
 		} else if tx.Type == "REVERSE_SPLIT" {
 			if pos.Quantity > 0 && tx.Quantity > 0 {
-				pos.Quantity = pos.Quantity / tx.Quantity
+				pos.Quantity = math.Floor(pos.Quantity / tx.Quantity)
 				pos.AveragePrice = pos.AveragePrice * tx.Quantity
 			}
 		} else if tx.Type == "BONUS" {
@@ -468,7 +469,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				}
 			} else if tx.Type == "REVERSE_SPLIT" {
 				if dailyQuantities[tx.AssetID] > 0 && tx.Quantity > 0 {
-					dailyQuantities[tx.AssetID] = dailyQuantities[tx.AssetID] / tx.Quantity
+					dailyQuantities[tx.AssetID] = math.Floor(dailyQuantities[tx.AssetID] / tx.Quantity)
 				}
 			}
 		}
