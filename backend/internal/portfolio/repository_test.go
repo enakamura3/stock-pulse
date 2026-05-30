@@ -292,10 +292,10 @@ func TestRepository_GetAllAssets(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	rows := pgxmock.NewRows([]string{"id", "ticker", "currency"}).
-		AddRow("a1", "AAPL", "USD")
+	rows := pgxmock.NewRows([]string{"id", "ticker", "currency", "asset_type"}).
+		AddRow("a1", "AAPL", "USD", "stock")
 
-	mock.ExpectQuery(`SELECT id, ticker, currency FROM asset`).
+	mock.ExpectQuery(`SELECT id, ticker, currency, asset_type FROM asset WHERE is_active = true`).
 		WillReturnRows(rows)
 
 	list, err := repo.GetAllAssets(context.Background())
@@ -385,8 +385,8 @@ func TestRepository_ScanErrors(t *testing.T) {
 	assert.Error(t, err)
 
 	// For GetAllAssets
-	rows4 := pgxmock.NewRows([]string{"id", "ticker", "name", "type"}).AddRow(nil, nil, nil, nil)
-	mock.ExpectQuery(`SELECT id`).
+	rows4 := pgxmock.NewRows([]string{"id", "ticker", "currency", "asset_type"}).AddRow("id", "ticker", "currency", "asset_type").RowError(0, errors.New("scan error"))
+	mock.ExpectQuery(`SELECT id, ticker, currency, asset_type FROM asset WHERE is_active = true`).
 		WillReturnRows(rows4)
 	_, err = repo.GetAllAssets(context.Background())
 	assert.Error(t, err)

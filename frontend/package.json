@@ -15,22 +15,23 @@
     "lightweight-charts": "^5.2.0",
     "next": "^14.2.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^15.0.7",
+    "@testing-library/user-event": "^14.5.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.6.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "jsdom": "^24.0.0",
     "typescript": "^5",
-    "vitest": "^1.6.0",
-    "@testing-library/react": "^15.0.7",
-    "@testing-library/jest-dom": "^6.4.2",
-    "@testing-library/user-event": "^14.5.2",
-    "@vitest/coverage-v8": "^1.6.0",
-    "@vitejs/plugin-react": "^4.2.1"
+    "vitest": "^1.6.0"
   }
 }

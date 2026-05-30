@@ -1,0 +1,69 @@
+package portfolio
+
+import (
+	"context"
+	"database/sql"
+	"time"
+)
+
+type AssetEvent struct {
+	ID          string    `json:"id"`
+	AssetID     string    `json:"asset_id"`
+	Type        string    `json:"type"`
+	GrossAmount float64   `json:"gross_amount"`
+	NetAmount   float64   `json:"net_amount"`
+	ExDate      time.Time `json:"ex_date"`
+	PaymentDate time.Time `json:"payment_date"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (r *Repository) UpsertAssetEvent(ctx context.Context, event AssetEvent) error {
+	query := `
+		INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, ex_date, payment_date)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (asset_id, type, gross_amount, payment_date) 
+		DO UPDATE SET 
+			ex_date = EXCLUDED.ex_date,
+			net_amount = EXCLUDED.net_amount,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE
+			asset_event.ex_date IS DISTINCT FROM EXCLUDED.ex_date OR
+			asset_event.net_amount IS DISTINCT FROM EXCLUDED.net_amount
+	`
+	var paymentDate interface{} = event.PaymentDate
+	if event.PaymentDate.IsZero() {
+		paymentDate = nil
+	}
+	_, err := r.db.Exec(ctx, query,
+		event.AssetID, event.Type, event.GrossAmount, event.NetAmount, event.ExDate, paymentDate,
+	)
+	return err
+}
+
+func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error) {
+	query := `
+		SELECT id, asset_id, type, gross_amount, net_amount, ex_date, payment_date, updated_at
+		FROM asset_event
+		WHERE asset_id = $1
+		ORDER BY ex_date DESC
+	`
+	rows, err := r.db.Query(ctx, query, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []AssetEvent
+	for rows.Next() {
+		var e AssetEvent
+		var paymentDate sql.NullTime
+		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.ExDate, &paymentDate, &e.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if paymentDate.Valid {
+			e.PaymentDate = paymentDate.Time
+		}
+		list = append(list, e)
+	}
+	return list, nil
+}

@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 
 // Importa o gráfico dinamicamente desativando SSR para evitar erros de renderização no servidor (Lightweight Charts)
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
+const DividendsChart = dynamic(() => import('@/components/DividendsChart'), { ssr: false });
 
 interface Portfolio {
   id: string;
@@ -58,6 +59,23 @@ interface PerformancePoint {
   total_invested: number;
 }
 
+interface CalculatedDividend {
+  asset_id: string;
+  ticker: string;
+  ex_date: string;
+  payment_date: string;
+  gross_amount: number;
+  net_amount: number;
+  currency: string;
+  original_gross_amount?: number;
+  original_net_amount?: number;
+  type: string;
+  quantity: number;
+  per_share_amount: number;
+  asset_type: string;
+  asset_name: string;
+}
+
 interface SearchResult {
   symbol: string;
   name: string;
@@ -77,10 +95,15 @@ export default function PortfolioPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
+  const [dividends, setDividends] = useState<CalculatedDividend[]>([]);
   
-  // Filtro de Transações
+  // Filtro de Transações e Proventos
   const [filterTxTicker, setFilterTxTicker] = useState<string>('');
-  
+  const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
+  const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'ativos' | 'proventos'>('ativos');
+
   // Período do gráfico
   const [period, setPeriod] = useState<string>('ALL');
 
@@ -92,6 +115,7 @@ export default function PortfolioPage() {
   const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+  const [isLoadingDividends, setIsLoadingDividends] = useState(false);
 
   // Forms - Portfólio
   const [newPortfolioName, setNewPortfolioName] = useState('');
@@ -193,6 +217,23 @@ export default function PortfolioPage() {
     }
   }, []);
 
+  // 4. CARREGA PROVENTOS DA CARTEIRA
+  const loadDividends = useCallback(async (id: string) => {
+    if (!id) return;
+    setIsLoadingDividends(true);
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${id}/dividends`, { credentials: 'include', cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setDividends(data || []);
+      }
+    } catch (e) {
+      console.error('Erro ao buscar dividendos da carteira:', e);
+    } finally {
+      setIsLoadingDividends(false);
+    }
+  }, []);
+
   // Onmount ou troca de usuário
   useEffect(() => {
     if (user) {
@@ -204,8 +245,9 @@ export default function PortfolioPage() {
   useEffect(() => {
     if (activePortfolioId) {
       loadPortfolioDetails(activePortfolioId);
+      loadDividends(activePortfolioId);
     }
-  }, [activePortfolioId, loadPortfolioDetails]);
+  }, [activePortfolioId, loadPortfolioDetails, loadDividends]);
 
   // Carrega a performance (gráfico) reagindo a mudanças no período, filtro de categoria ou atualização de posições
   useEffect(() => {
@@ -473,20 +515,18 @@ export default function PortfolioPage() {
   // Formatadores e Helpers
   const getActivePortfolio = () => portfolios.find((p) => p.id === activePortfolioId);
 
-  const getAssetCategory = (ticker: string, name: string) => {
-    if (!ticker) return 'Ações (B3)';
-    if (ticker.includes('-')) return 'Cripto';
-    if (!ticker.endsWith('.SA')) return 'Internacional';
-    
-    const lowerName = name ? name.toLowerCase() : '';
-    if (ticker.endsWith('11.SA')) {
-      const isEtf = /etf|ishares|índice|indice/i.test(lowerName);
-      const isFii = /fii|fundo.*imob|fdo.*imob|imobili[aá]ri[ao]s?|real estate|receb[ií]veis/i.test(lowerName);
-
-      if (isEtf) return 'ETFs Nacionais';
-      if (isFii) return 'FIIs';
+  const getAssetCategory = (dbType: string) => {
+    switch (dbType) {
+      case 'STOCK_BR': return 'Ações (B3)';
+      case 'FII': return 'FIIs';
+      case 'FIAGRO': return 'FIAGROs';
+      case 'ETF_BR': return 'ETFs Nacionais';
+      case 'BDR': return 'BDRs';
+      case 'STOCK_US': return 'Ações EUA';
+      case 'ETF_US': return 'ETF Internacional';
+      case 'CRYPTO': return 'Cripto';
+      default: return 'Desconhecido';
     }
-    return 'Ações (B3)';
   };
 
   const formatMoney = (val: number, currency: string) => {
@@ -518,12 +558,35 @@ export default function PortfolioPage() {
   
   // Filtros
   const filteredPositions = positions.filter(pos => 
-    activeCategoryFilter === 'Todas' || getAssetCategory(pos.ticker, pos.name) === activeCategoryFilter
+    activeCategoryFilter === 'Todas' || getAssetCategory(pos.type) === activeCategoryFilter
   );
   
   const filteredTransactions = transactions.filter(tx => 
-    activeCategoryFilter === 'Todas' || getAssetCategory(tx.ticker || '', tx.asset_name || '') === activeCategoryFilter
+    activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter
   );
+
+  const filteredDividends = dividends.filter(div => {
+    const categoryMatch = activeCategoryFilter === 'Todas' || getAssetCategory(div.asset_type) === activeCategoryFilter;
+    if (!categoryMatch) return false;
+
+    const isValidPayment = div.payment_date && !div.payment_date.startsWith('0001');
+    const dateStr = isValidPayment ? div.payment_date : div.ex_date;
+    if (!dateStr) return true;
+
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(5, 7);
+
+    const yearMatch = filterDivYear === 'Todos' || year === filterDivYear;
+    const monthMatch = filterDivMonth === 'Todos' || month === filterDivMonth;
+
+    return yearMatch && monthMatch;
+  });
+
+  const availableYears = Array.from(new Set(dividends.map(d => {
+    const isValidPayment = d.payment_date && !d.payment_date.startsWith('0001');
+    const dt = isValidPayment ? d.payment_date : d.ex_date;
+    return (dt || '').substring(0, 4);
+  }).filter(Boolean))).sort((a, b) => b.localeCompare(a));
 
   // Cálculos Consolidados de Resumo Financeiro (KPI Cards) baseados no filtro atual
   const totalCost = filteredPositions.reduce((acc, pos) => acc + pos.total_cost, 0);
@@ -626,7 +689,7 @@ export default function PortfolioPage() {
 
       {/* Filtro de Categoria de Ativos */}
       <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {['Todas', 'Ações (B3)', 'FIIs', 'ETFs Nacionais', 'Internacional', 'Cripto'].map(cat => (
+        {['Todas', 'Ações (B3)', 'FIIs', 'FIAGROs', 'BDRs', 'ETFs Nacionais', 'Ações EUA', 'ETF Internacional', 'Cripto'].map(cat => (
           <button
             key={cat}
             onClick={() => setActiveCategoryFilter(cat)}
@@ -712,7 +775,8 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          {/* Gráfico de Evolução Patrimonial */}
+          {/* Gráfico de Evolução Patrimonial (Exibido apenas na aba de ativos) */}
+          {activeTab === 'ativos' && (
           <div className="glass-panel" style={{ padding: '1.75rem 2rem', textAlign: 'left', display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.8rem' }}>
               <div>
@@ -759,11 +823,40 @@ export default function PortfolioPage() {
               </div>
             )}
           </div>
+          )}
 
-          {/* Seção Dupla de Posições e Histórico */}
-          <div style={{ display: 'flex', gap: '2rem', flexFlow: 'row wrap', alignItems: 'stretch' }}>
-            
-            {/* Posições Ativas (Esquerda) */}
+          {/* TAB SELECTOR */}
+          <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '1.5rem', marginTop: '2rem' }}>
+            <button 
+              onClick={() => setActiveTab('ativos')}
+              style={{
+                background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer',
+                color: activeTab === 'ativos' ? '#00e676' : 'var(--text-secondary)',
+                borderBottom: activeTab === 'ativos' ? '2px solid #00e676' : '2px solid transparent',
+                fontWeight: activeTab === 'ativos' ? 700 : 500, fontSize: '0.9rem', transition: 'all 0.2s'
+              }}
+            >
+              📊 Ativos e Transações
+            </button>
+            <button 
+              onClick={() => setActiveTab('proventos')}
+              style={{
+                background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer',
+                color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)',
+                borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent',
+                fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem', transition: 'all 0.2s'
+              }}
+            >
+              💰 Proventos
+            </button>
+          </div>
+
+          {activeTab === 'ativos' && (
+          <>
+            {/* Seção Dupla de Posições e Histórico */}
+            <div style={{ display: 'flex', gap: '2rem', flexFlow: 'row wrap', alignItems: 'stretch' }}>
+              
+              {/* Posições Ativas (Esquerda) */}
             <div style={{ flex: '2 1 600px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="glass-panel" style={{ padding: '1.75rem 2rem', textAlign: 'left', minHeight: '380px', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
@@ -1032,6 +1125,136 @@ export default function PortfolioPage() {
             </div>
 
           </div>
+          </>
+          )}
+
+          {activeTab === 'proventos' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div className="glass-panel" style={{ padding: '1.75rem 1.5rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    💰 Histórico de Proventos
+                  </h3>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select
+                      className="glass-input"
+                      value={filterDivYear}
+                      onChange={(e) => setFilterDivYear(e.target.value)}
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: 'auto' }}
+                    >
+                      <option value="Todos">Todos os Anos</option>
+                      {availableYears.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="glass-input"
+                      value={filterDivMonth}
+                      onChange={(e) => setFilterDivMonth(e.target.value)}
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: 'auto' }}
+                    >
+                      <option value="Todos">Todos os Meses</option>
+                      {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {isLoadingDividends ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Carregando proventos...</div>
+                ) : dividends.length > 0 ? (
+                  <>
+                    <div style={{ height: '350px', marginBottom: '2rem' }}>
+                      <DividendsChart data={filteredDividends} />
+                    </div>
+                    
+                    <div style={{ overflowX: 'auto', border: '1px solid var(--panel-border)', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Ativo</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Papel</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Tipo</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Data Com</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Pagamento</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Qtd</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'right' }}>Vlr / Cota</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'right' }}>Vlr Bruto</th>
+                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'right' }}>Vlr Líquido</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredDividends.map((div, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600 }}>{div.ticker}</td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                                {getAssetCategory(div.asset_type)}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                                <span style={{
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  textTransform: 'uppercase',
+                                  backgroundColor: !div.type ? 'rgba(255,255,255,0.1)' : 
+                                                  div.type.toLowerCase().includes('jcp') ? 'rgba(255, 152, 0, 0.15)' :
+                                                  div.type.toLowerCase().includes('rendimento') ? 'rgba(156, 39, 176, 0.15)' :
+                                                  div.type.toLowerCase().includes('amorti') ? 'rgba(244, 67, 54, 0.15)' :
+                                                  'rgba(33, 150, 243, 0.15)',
+                                  color: !div.type ? '#aaa' : 
+                                         div.type.toLowerCase().includes('jcp') ? '#ff9800' :
+                                         div.type.toLowerCase().includes('rendimento') ? '#e040fb' :
+                                         div.type.toLowerCase().includes('amorti') ? '#ff5252' :
+                                         '#64b5f6'
+                                }}>
+                                  {div.type || 'DIVIDENDO'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                {new Date(div.ex_date).toISOString().split('T')[0].replace(/-/g, '/')}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                {(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 500 }}>
+                                {div.quantity}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 500 }}>
+                                {formatMoney(div.per_share_amount, div.currency)}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                                {formatMoney(div.gross_amount, div.currency)}
+                                {div.currency === 'BRL' && div.original_gross_amount && (
+                                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                                    (US$ {div.original_gross_amount.toFixed(2)})
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#00e676' }}>
+                                {formatMoney(div.net_amount, div.currency)}
+                                {div.currency === 'BRL' && div.original_net_amount && (
+                                  <div style={{ fontSize: '0.65rem', color: 'rgba(0, 230, 118, 0.7)' }}>
+                                    (US$ {div.original_net_amount.toFixed(2)})
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontSize: '2rem', display: 'block', marginBottom: '1rem' }}>🏜️</span>
+                    <p>Nenhum provento recebido ainda.</p>
+                    <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>Aguarde a "Data Com" das suas ações para começar a receber!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         </div>
       )}

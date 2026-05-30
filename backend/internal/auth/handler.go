@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -60,6 +61,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.service.Register(r.Context(), payload.Name, payload.Email, payload.Password)
 	if err != nil {
+		slog.Warn("Falha no registro", "email", payload.Email, "error", err.Error())
 		h.respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -77,6 +79,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, accessToken, refreshToken, err := h.service.Login(r.Context(), payload.Email, payload.Password)
 	if err != nil {
+		slog.Warn("Falha de autenticação", "email", payload.Email, "error", err.Error())
 		h.respondWithError(w, http.StatusUnauthorized, err.Error())
 		return
 	}

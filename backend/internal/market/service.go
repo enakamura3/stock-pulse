@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -13,19 +14,23 @@ import (
 
 // Service gerencia cotações de ativos agregando cacheamento Redis de alta performance.
 type Service struct {
-	provider QuoteProvider
-	scraper  *Scraper
-	rdb      *redis.Client
-	ttl      time.Duration
+	provider     QuoteProvider
+	scraper      *Scraper
+	fundamentus  *FundamentusScraper
+	stockAnalysis *StockAnalysisScraper
+	rdb          *redis.Client
+	ttl          time.Duration
 }
 
 // NewService cria uma nova instância de Service com o TTL configurado para 60 segundos.
 func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 	return &Service{
-		provider: provider,
-		scraper:  NewScraper(),
-		rdb:      rdb,
-		ttl:      60 * time.Second, // Decisão aprovada pelo usuário
+		provider:      provider,
+		scraper:       NewScraper(),
+		fundamentus:   NewFundamentusScraper(),
+		stockAnalysis: NewStockAnalysisScraper(),
+		rdb:           rdb,
+		ttl:           60 * time.Second, // Decisão aprovada pelo usuário
 	}
 }
 
@@ -67,6 +72,156 @@ func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
 	}
 
 	return quote, nil
+}
+
+// GetDividends busca os proventos de um ativo e faz cache.
+func (s *Service) GetDividends(ctx context.Context, symbol string, assetType string) ([]DividendEvent, error) {
+	cacheKey := fmt.Sprintf("dividends:%s", symbol)
+	
+	// Tenta no Redis primeiro
+	val, err := s.rdb.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var cached []DividendEvent
+		if err := json.Unmarshal([]byte(val), &cached); err == nil {
+			return cached, nil
+		}
+	}
+
+	// Roteamento: tenta buscar com o scraper correto
+	var events []DividendEvent
+	var fetchErr error
+
+	if strings.HasSuffix(strings.ToUpper(symbol), ".SA") {
+		events, fetchErr = s.fundamentus.GetDividends(ctx, symbol, assetType)
+		if fetchErr != nil || len(events) == 0 {
+			// Fallback para StockAnalysis caso o Fundamentus falhe (ex: ETFs BR)
+			log.Printf("[Market] Fundamentus falhou para %s. Tentando StockAnalysis...", symbol)
+			events, fetchErr = s.stockAnalysis.GetDividends(ctx, symbol, assetType)
+		}
+	} else {
+		events, fetchErr = s.stockAnalysis.GetDividends(ctx, symbol, assetType)
+	}
+
+	// Fallback para Yahoo Finance caso dê erro
+	if fetchErr != nil || len(events) == 0 {
+		log.Printf("[Market] Falha no scraper de proventos para %s (%v). Usando fallback do Yahoo Finance.", symbol, fetchErr)
+		events, err = s.provider.GetDividends(ctx, symbol, assetType)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Cacheia por 24 horas (proventos não mudam com frequência)
+	if data, err := json.Marshal(events); err == nil {
+		s.rdb.Set(ctx, cacheKey, data, 24*time.Hour)
+	}
+
+	return events, nil
+}
+
+// getExchangeRatesMap fetches the 10y history of BRL=X and returns it as a map[string]float64 (date string "YYYY-MM-DD" -> rate).
+// It caches the entire map in Redis for 24 hours.
+func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, error) {
+	cacheKey := "fx:BRL=X:10y"
+	val, err := s.rdb.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var rates map[string]float64
+		if err := json.Unmarshal([]byte(val), &rates); err == nil {
+			return rates, nil
+		}
+	}
+
+	// Fetch from Yahoo Finance
+	url := "https://query2.finance.yahoo.com/v8/finance/chart/BRL=X?interval=1d&range=10y"
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := s.provider.(*YahooFinanceProvider).client.Do(req)
+	// We need to use http.DefaultClient since we can't easily access the unexported client.
+	// Actually, just create a temporary client here for simplicity, since it's just an internal helper.
+	if err != nil {
+		// fallback to generic http
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err = client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+	} else if resp == nil {
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err = client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("yahoo finance fx error: %d", resp.StatusCode)
+	}
+
+	// Parse Yahoo Finance Chart response manually or use a map
+	var data struct {
+		Chart struct {
+			Result []struct {
+				Timestamp []int64 `json:"timestamp"`
+				Indicators struct {
+					Quote []struct {
+						Close []float64 `json:"close"`
+					} `json:"quote"`
+				} `json:"indicators"`
+			} `json:"result"`
+		} `json:"chart"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	rates := make(map[string]float64)
+	if len(data.Chart.Result) > 0 {
+		res := data.Chart.Result[0]
+		if len(res.Indicators.Quote) > 0 {
+			closes := res.Indicators.Quote[0].Close
+			for i, ts := range res.Timestamp {
+				if i < len(closes) && closes[i] > 0 {
+					dateStr := time.Unix(ts, 0).Format("2006-01-02")
+					rates[dateStr] = closes[i]
+				}
+			}
+		}
+	}
+
+	if len(rates) > 0 {
+		if cacheData, err := json.Marshal(rates); err == nil {
+			s.rdb.Set(ctx, cacheKey, cacheData, 24*time.Hour)
+		}
+	}
+
+	return rates, nil
+}
+
+// GetHistoricalExchangeRate returns the USD to BRL exchange rate for a specific past date.
+func (s *Service) GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error) {
+	rates, err := s.getExchangeRatesMap(ctx)
+	if err != nil {
+		return 5.0, err // fallback to generic 5.0
+	}
+
+	// Try exactly the date
+	dateStr := date.Format("2006-01-02")
+	if rate, exists := rates[dateStr]; exists {
+		return rate, nil
+	}
+
+	// If exact date (e.g. weekend/holiday) is missing, search backwards up to 7 days
+	for i := 1; i <= 7; i++ {
+		prevDateStr := date.AddDate(0, 0, -i).Format("2006-01-02")
+		if rate, exists := rates[prevDateStr]; exists {
+			return rate, nil
+		}
+	}
+
+	return 5.0, fmt.Errorf("rate not found for date %s", dateStr)
 }
 
 // SearchAssets repassa a busca diretamente para o autocomplete do provedor.

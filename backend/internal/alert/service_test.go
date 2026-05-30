@@ -245,3 +245,11 @@ func TestService_ToggleAlert(t *testing.T) {
 		assert.Equal(t, "DISABLED", status)
 	})
 }
+
+func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.DividendEvent), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

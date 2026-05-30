@@ -98,6 +98,7 @@ func main() {
 	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider)
 	portfolioHandler := portfolio.NewHandler(portfolioService)
 	portfolioWorker := portfolio.NewDailyWorker(portfolioRepo, marketProvider)
+	dividendWorker := portfolio.NewDividendWorker(portfolioRepo, marketService)
 
 	// Inicialização das Camadas da Fase 3 (Alertas & Tempo Real)
 	mailService := mail.NewService()
@@ -117,6 +118,7 @@ func main() {
 	defer workerCancel()
 
 	go portfolioWorker.Start(workerCtx)
+	go dividendWorker.Start(workerCtx)
 	go wsHub.Start(workerCtx)
 	go alertWorker.Start(workerCtx)
 
@@ -182,6 +184,7 @@ func main() {
 			r.Put("/portfolios/{id}/transactions/{txId}", portfolioHandler.UpdateTransaction)
 			r.Delete("/portfolios/{id}/transactions/{txId}", portfolioHandler.DeleteTransaction)
 			r.Get("/portfolios/{id}/performance", portfolioHandler.GetPerformance)
+			r.Get("/portfolios/{id}/dividends", portfolioHandler.GetDividends)
 
 			// Conexão WebSocket em Tempo Real (Fase 3)
 			r.Get("/ws", wsHandler.ServeWS)
