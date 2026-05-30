@@ -54,17 +54,24 @@ Responsável por entregar as cotações em tempo real e fornecer a busca (autoco
   
 *(Nota: Para evitar bloqueios do Yahoo Finance, o backend injeta rotineiramente cabeçalhos `User-Agent` customizados nas requisições).*
 
-### 2. Fundamentus (Scraping de Fundamentos - Brasil)
-Como as APIs gratuitas do Yahoo não fornecem indicadores fundamentalistas estruturados e confiáveis para o Brasil, o backend faz o web scraping das páginas do Fundamentus para ativos com o sufixo `.SA` (Ações e FIIs da B3).
-- **Endpoint Analisado:** 
-  - `GET https://www.fundamentus.com.br/detalhes.php?papel={symbol}`
-- **Métricas Extraídas via Regex:** Lucro Por Ação (LPA), Valor Patrimonial por Ação (VPA), VP/Cota (para FIIs) e Dividend Yield.
+### 2. Fundamentus (Scraping de Fundamentos e Proventos - Brasil)
+Como as APIs gratuitas do Yahoo não fornecem indicadores fundamentalistas estruturados e nem histórico de dividendos 100% confiáveis para o Brasil, o backend faz o web scraping das páginas do Fundamentus para ativos com o sufixo `.SA` (Ações e FIIs da B3).
+- **Fundamentos:** Extração via Regex de VPA, VP/Cota, LPA e Yield (`/detalhes.php`).
+- **Histórico de Proventos:** Extração da tabela de dividendos (`/proventos.php`), utilizando um **Motor de Deduplicação Heurística** que limpa dados sujos da fonte:
+  - **Regra de FIIs:** Garante e agrupa apenas 1 pagamento de rendimento por mês.
+  - **Regra de Ações:** Diferencia e preserva pagamentos múltiplos baseando-se no valor exato do provento.
 
 ### 3. Finviz (Scraping de Fundamentos - Global)
 Para ativos americanos ou globais (sem o sufixo `.SA`), o sistema roteia o scraping para o portal Finviz, que possui uma tabela rica de indicadores de mercado internacional.
 - **Endpoint Analisado:**
   - `GET https://finviz.com/quote.ashx?t={symbol}`
 - **Métricas Extraídas via Regex:** EPS (ttm), Book/sh e Dividend %.
+
+### 4. StockAnalysis (Scraping de Proventos - Fallback Global e ETFs Brasileiros)
+Utilizado primariamente para recuperar o histórico de dividendos de ativos globais, mas estendido como fallback crucial para ETFs brasileiros (ex: `SPYI11.SA` ou `BNDX11.SA`) que não possuem informações no Fundamentus.
+- **Endpoint Global:** `/stock/{symbol}/dividend`
+- **Endpoint B3:** `/quote/bvmf/{symbol}/dividend`
+- **Métricas:** Para ativos brasileiros na B3, priorizamos a coluna **Record Date** (Data Com) no lugar da *Ex-Dividend Date* tradicional americana, refletindo perfeitamente a legislação financeira nacional.
 
 ---
 
@@ -211,14 +218,15 @@ sequenceDiagram
 
     Note over Worker,Scrapers: Rotina Assíncrona (A cada 24h)
     Worker->>DB: Busca todos os Ativos cadastrados
-    Worker->>Scrapers: Scraping Inteligente (BR via Fundamentus, Global via StockAnalysis)
+    Worker->>Scrapers: Scraping Inteligente (BR via Fundamentus, ETFs BR via StockAnalysis)
     alt Sucesso no Scraping
-        Scrapers-->>Worker: Retorna Histórico Preciso (Data Com, Pagamento, Tipo)
+        Scrapers-->>Worker: Retorna Histórico Deduplicado (Data Com, Pagamento, Tipo)
     else Falha ou Indisponibilidade
         Worker->>Yahoo: Aciona Fallback
         Yahoo-->>Worker: Retorna Histórico Básico
     end
-    Worker->>DB: Faz Upsert na tabela 'asset_event'
+    Worker->>DB: Faz Upsert Seguro na tabela 'asset_event'
+    Note over Worker,DB: UNIQUE (asset_id, type, amount, payment_date) previne clones com Data Com erradas
 
     Note over User,API: Carregamento do Portfólio (Tempo Real)
     User->>API: GET /api/portfolios/{id}/dividends
