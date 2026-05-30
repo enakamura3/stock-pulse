@@ -33,7 +33,7 @@ func (m *MockQuoteProvider) SearchAssets(ctx context.Context, query string) ([]S
 	return nil, args.Error(1)
 }
 
-func (m *MockQuoteProvider) GetDividends(ctx context.Context, ticker string) ([]DividendEvent, error) {
+func (m *MockQuoteProvider) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
 	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
 		return args.Get(0).([]DividendEvent), args.Error(1)

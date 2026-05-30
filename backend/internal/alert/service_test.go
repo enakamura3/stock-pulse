@@ -246,7 +246,7 @@ func TestService_ToggleAlert(t *testing.T) {
 	})
 }
 
-func (m *MockMarketService) GetDividends(ctx context.Context, ticker string) ([]market.DividendEvent, error) {
+func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
 	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
 		return args.Get(0).([]market.DividendEvent), args.Error(1)
