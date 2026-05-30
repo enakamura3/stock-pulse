@@ -84,7 +84,13 @@ func main() {
 	authHandler := auth.NewHandler(authService)
 
 	// Inicialização de Camadas de Market Data
-	marketProvider := market.NewYahooFinanceProvider()
+	var marketProvider market.QuoteProvider
+	if os.Getenv("MOCK_EXTERNAL_APIS") == "true" {
+		marketProvider = market.NewMockProvider()
+		fmt.Println("Aviso: Inicializando Market Data usando MockProvider (MOCK_EXTERNAL_APIS=true)")
+	} else {
+		marketProvider = market.NewYahooFinanceProvider()
+	}
 	marketService := market.NewService(marketProvider, rdb)
 	marketHandler := market.NewHandler(marketService)
 

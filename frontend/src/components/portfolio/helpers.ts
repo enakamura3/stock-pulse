@@ -23,3 +23,9 @@ export const formatPercentage = (val: number) => {
   const isPos = val >= 0;
   return `${isPos ? '+' : ''}${val.toFixed(2)}%`;
 };
+
+export const formatQuantity = (val: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    maximumFractionDigits: 3,
+  }).format(val);
+};

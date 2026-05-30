@@ -1,6 +1,6 @@
 import React from 'react';
 import { Position } from './types';
-import { formatMoney, formatPercentage } from './helpers';
+import { formatMoney, formatPercentage, formatQuantity } from './helpers';
 
 interface AssetListProps {
   positions: Position[];
@@ -53,13 +53,10 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
                 const isPos = (pos.profit_loss || 0) >= 0;
                 return (
                   <tr key={pos.asset_id}>
-                    <td>
-                      <span className="font-bold text-accent block">{pos.ticker}</span>
-                      <span className="text-xs text-secondary block" style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {pos.name}
-                      </span>
+                    <td title={pos.name} style={{ cursor: 'help' }}>
+                      <span className="font-bold text-accent">{pos.ticker}</span>
                     </td>
-                    <td className="text-right font-semibold" style={{ fontFamily: 'monospace' }}>{pos.quantity}</td>
+                    <td className="text-right font-semibold" style={{ fontFamily: 'monospace' }}>{formatQuantity(pos.quantity)}</td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{formatMoney(pos.average_price, pos.currency)}</td>
                     <td className="text-right font-semibold" style={{ fontFamily: 'monospace' }}>{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}</td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{formatMoney(pos.total_cost, kpiCurrency)}</td>

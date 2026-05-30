@@ -374,7 +374,7 @@ export default function PortfolioPage() {
           </div>
 
           {activeTab === 'ativos' && (
-            <div className="flex-row gap-xl flex-wrap items-stretch">
+            <div className="flex-col gap-xl w-full">
               <AssetList positions={filteredPositions} kpiCurrency={kpiCurrency} onImportCsv={handleFileUpload} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} />
               <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} />
             </div>

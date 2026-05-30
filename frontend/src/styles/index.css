@@ -195,6 +195,7 @@ body {
 .gap-sm { gap: 0.5rem; }
 .gap-md { gap: 1rem; }
 .gap-lg { gap: 1.5rem; }
+.gap-xl { gap: 2rem; }
 .w-full { width: 100%; }
 .mt-sm { margin-top: 0.5rem; }
 .mt-md { margin-top: 1rem; }

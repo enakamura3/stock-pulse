@@ -1,6 +1,6 @@
 import React from 'react';
 import { Transaction } from './types';
-import { formatMoney } from './helpers';
+import { formatMoney, formatQuantity } from './helpers';
 
 interface TransactionHistoryProps {
   transactions: Transaction[];
@@ -57,12 +57,12 @@ export default function TransactionHistory({
                   <div className="flex-row items-center gap-sm text-xs">
                     {!isSplit ? (
                       <>
-                        <span className="text-secondary">{tx.quantity} un. x {formatMoney(tx.unit_price, tx.currency || 'BRL')}</span>
+                        <span className="text-secondary">{formatQuantity(tx.quantity)} un. x {formatMoney(tx.unit_price, tx.currency || 'BRL')}</span>
                         <span className="text-secondary">=</span>
                         <span className="font-bold">{formatMoney(tx.quantity * tx.unit_price, tx.currency || 'BRL')}</span>
                       </>
                     ) : (
-                      <span className="font-bold">Fator: {isReverse ? `1 para ${tx.quantity}` : `${tx.quantity} para 1`}</span>
+                      <span className="font-bold">Fator: {isReverse ? `1 para ${formatQuantity(tx.quantity)}` : `${formatQuantity(tx.quantity)} para 1`}</span>
                     )}
                   </div>
                 </div>

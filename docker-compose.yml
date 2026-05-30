@@ -63,6 +63,8 @@ services:
       - SMTP_FROM=no-reply@stock-pulse.com
       - ALERT_CHECK_INTERVAL=1m
       - LOG_LEVEL=warn
+      - JWT_SECRET=${JWT_SECRET}
+      - MOCK_EXTERNAL_APIS=${MOCK_EXTERNAL_APIS:-false}
     volumes:
       - ./backend:/app
     depends_on:
@@ -93,6 +95,7 @@ services:
       - /app/node_modules
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       - backend
     networks:
