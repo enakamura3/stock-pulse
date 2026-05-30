@@ -122,23 +122,7 @@ export default function PortfolioPage() {
     if (!activePortfolioId) return;
     let targetTickers: string[] = [];
     if (activeCategoryFilter !== 'Todas') {
-      const filtered = positions.filter(pos => {
-        const t = pos.ticker;
-        const n = pos.name ? pos.name.toLowerCase() : '';
-        if (!t) return false;
-        if (t.includes('-') && activeCategoryFilter === 'Cripto') return true;
-        if (!t.endsWith('.SA') && !t.includes('-') && activeCategoryFilter === 'Internacional') return true;
-        if (t.endsWith('11.SA')) {
-          const isEtf = /etf|ishares|índice|indice/i.test(n);
-          const isFii = /fii|fundo.*imob|fdo.*imob|imobili[aá]ri[ao]s?|real estate|receb[ií]veis/i.test(n);
-          if (isFii && activeCategoryFilter === 'FIIs') return true;
-          if (isEtf && activeCategoryFilter === 'ETFs Nacionais') return true;
-          if (!isFii && !isEtf && activeCategoryFilter === 'Ações (B3)') return true;
-        } else if (t.endsWith('.SA') && !t.endsWith('11.SA') && activeCategoryFilter === 'Ações (B3)') {
-          return true;
-        }
-        return false;
-      });
+      const filtered = positions.filter(pos => getAssetCategory(pos.type) === activeCategoryFilter);
       targetTickers = filtered.map(p => p.ticker);
       if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
     }
