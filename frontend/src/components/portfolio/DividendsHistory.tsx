@@ -26,10 +26,9 @@ export default function DividendsHistory({
           <h3 className="card-title">💰 Histórico de Proventos</h3>
           <div className="flex-row gap-sm">
             <select
-              className="form-input"
               value={filterDivYear}
               onChange={(e) => setFilterDivYear(e.target.value)}
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: 'auto' }}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
             >
               <option value="Todos">Todos os Anos</option>
               {availableYears.map(year => (
@@ -37,10 +36,9 @@ export default function DividendsHistory({
               ))}
             </select>
             <select
-              className="form-input"
               value={filterDivMonth}
               onChange={(e) => setFilterDivMonth(e.target.value)}
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: 'auto' }}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
             >
               <option value="Todos">Todos os Meses</option>
               {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (

@@ -303,6 +303,9 @@ export default function PortfolioPage() {
   const profitLoss = currentValue - totalCost;
   const returnPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0.0;
 
+  const availableCategories = Array.from(new Set(positions.map(pos => getAssetCategory(pos.type)))).sort();
+  const filterCategories = ['Todas', ...availableCategories];
+
   return (
     <main className="container" style={{ maxWidth: 1400 }}>
       <PortfolioHeader userName={user.name} onLogout={logout} />
@@ -314,7 +317,7 @@ export default function PortfolioPage() {
       />
 
       <div className="flex-row gap-sm mb-lg flex-wrap">
-        {['Todas', 'Ações (B3)', 'FIIs', 'FIAGROs', 'BDRs', 'ETFs Nacionais', 'Ações EUA', 'ETF Internacional', 'Cripto'].map(cat => (
+        {filterCategories.map(cat => (
           <button
             key={cat} onClick={() => setActiveCategoryFilter(cat)}
             className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
