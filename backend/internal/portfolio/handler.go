@@ -24,6 +24,7 @@ type PortfolioService interface {
 	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	DeletePortfolio(ctx context.Context, id, userID string) error
 	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string, filterTickers []string) ([]PerformancePoint, error)
+	GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]CalculatedDividend, error)
 
 	// Utilizado especificamente pelo Handler para recuperar transações puras
 	repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
@@ -408,4 +409,27 @@ func (h *Handler) BulkImportTransactions(w http.ResponseWriter, r *http.Request)
 	}
 
 	h.respondWithJSON(w, http.StatusOK, res)
+}
+
+// GetDividends calcula e retorna o histórico de proventos pagos baseando-se no histórico de transações.
+func (h *Handler) GetDividends(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserIDKey).(string)
+	if !ok || userID == "" {
+		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	portfolioID := chi.URLParam(r, "id")
+	if portfolioID == "" {
+		h.respondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+		return
+	}
+
+	divs, err := h.service.GetPortfolioDividends(r.Context(), portfolioID, userID)
+	if err != nil {
+		h.respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.respondWithJSON(w, http.StatusOK, divs)
 }

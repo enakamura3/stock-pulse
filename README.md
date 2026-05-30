@@ -197,6 +197,37 @@ sequenceDiagram
     API-->>User: Retorna JSON (P/VP, P/L, Graham, etc.)
     Note over User: Tabela de Posições é atualizada!
 ```
+### 5. Fluxo de Processamento de Proventos (Dividendos)
+Para evitar lentidão na interface e limites de API, os eventos de proventos são processados em background e calculados de forma cruzada com a custódia do usuário.
+
+```mermaid
+sequenceDiagram
+    participant User as Frontend (React)
+    participant API as Backend (Go API)
+    participant Worker as Dividend Worker (Go)
+    participant DB as PostgreSQL (asset_event)
+    participant Scrapers as Fundamentus / StockAnalysis
+    participant Yahoo as Yahoo Finance (Fallback)
+
+    Note over Worker,Scrapers: Rotina Assíncrona (A cada 24h)
+    Worker->>DB: Busca todos os Ativos cadastrados
+    Worker->>Scrapers: Scraping Inteligente (BR via Fundamentus, Global via StockAnalysis)
+    alt Sucesso no Scraping
+        Scrapers-->>Worker: Retorna Histórico Preciso (Data Com, Pagamento, Tipo)
+    else Falha ou Indisponibilidade
+        Worker->>Yahoo: Aciona Fallback
+        Yahoo-->>Worker: Retorna Histórico Básico
+    end
+    Worker->>DB: Faz Upsert na tabela 'asset_event'
+
+    Note over User,API: Carregamento do Portfólio (Tempo Real)
+    User->>API: GET /api/portfolios/{id}/dividends
+    API->>DB: Busca transações do usuário e eventos da 'asset_event'
+    Note over API: Avalia Custódia na Data-Com (Ex-Date)
+    Note over API: Aplica regras de Imposto (EUA: 30%, JCP: 15%) e Câmbio
+    API-->>User: Retorna lista consolidada de recebimentos
+    Note over User: Exibe Gráfico de Barras e Tabela Filtrável
+```
 
 ---
 

@@ -346,13 +346,14 @@ func (r *Repository) CreateAsset(ctx context.Context, ticker, name, assetType, c
 
 // GetAllAssets retorna todos os ativos cadastrados no banco (útil para o Daily Worker).
 type AssetCompact struct {
-	ID       string `json:"id"`
-	Ticker   string `json:"ticker"`
-	Currency string `json:"currency"`
+	ID        string `json:"id"`
+	Ticker    string `json:"ticker"`
+	Currency  string `json:"currency"`
+	AssetType string `json:"asset_type"`
 }
 
 func (r *Repository) GetAllAssets(ctx context.Context) ([]AssetCompact, error) {
-	query := `SELECT id, ticker, currency FROM asset WHERE is_active = true`
+	query := `SELECT id, ticker, currency, asset_type FROM asset WHERE is_active = true`
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		return nil, err
@@ -362,7 +363,7 @@ func (r *Repository) GetAllAssets(ctx context.Context) ([]AssetCompact, error) {
 	var list []AssetCompact
 	for rows.Next() {
 		var a AssetCompact
-		if err := rows.Scan(&a.ID, &a.Ticker, &a.Currency); err != nil {
+		if err := rows.Scan(&a.ID, &a.Ticker, &a.Currency, &a.AssetType); err != nil {
 			return nil, err
 		}
 		list = append(list, a)

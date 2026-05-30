@@ -7,8 +7,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 )
+
+type DividendEvent struct {
+	Date        time.Time `json:"date"`
+	PaymentDate time.Time `json:"payment_date"`
+	Amount      float64   `json:"amount"`
+	Type        string    `json:"type"`
+}
 
 // Quote representa os dados consolidados da cotação em tempo real de um ativo.
 type Quote struct {
@@ -31,10 +39,11 @@ type SearchResult struct {
 	Type     string `json:"type"`
 }
 
-// QuoteProvider é a interface que abstrai a obtenção de dados de cotações externas.
+// QuoteProvider define o contrato para fornecer cotações, buscas de ativos e eventos corporativos.
 type QuoteProvider interface {
 	GetQuote(ctx context.Context, symbol string) (*Quote, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
+	GetDividends(ctx context.Context, symbol string, assetType string) ([]DividendEvent, error)
 }
 
 // YahooFinanceProvider implementa QuoteProvider consumindo endpoints públicos do Yahoo Finance.
@@ -200,4 +209,61 @@ func (y *YahooFinanceProvider) SearchAssets(ctx context.Context, query string) (
 	}
 
 	return results, nil
+}
+
+type yahooDividendResponse struct {
+	Chart struct {
+		Result []struct {
+			Events struct {
+				Dividends map[string]struct {
+					Amount float64 `json:"amount"`
+					Date   int64   `json:"date"`
+				} `json:"dividends"`
+			} `json:"events"`
+		} `json:"result"`
+	} `json:"chart"`
+}
+
+func (y *YahooFinanceProvider) GetDividends(ctx context.Context, symbol string, assetType string) ([]DividendEvent, error) {
+	url := fmt.Sprintf("https://query2.finance.yahoo.com/v8/finance/chart/%s?events=div&range=10y&interval=1d", symbol)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	resp, err := y.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("yahoo finance api error: %d", resp.StatusCode)
+	}
+
+	var data yahooDividendResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	var events []DividendEvent
+	if len(data.Chart.Result) > 0 && data.Chart.Result[0].Events.Dividends != nil {
+		for _, div := range data.Chart.Result[0].Events.Dividends {
+			t := time.Unix(div.Date, 0)
+			events = append(events, DividendEvent{
+				Date:        t,
+				PaymentDate: t, // Fallback to Ex-Date
+				Amount:      div.Amount,
+				Type:        "Dividendo",
+			})
+		}
+	}
+	
+	// Sort by date ascending
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Date.Before(events[j].Date)
+	})
+
+	return events, nil
 }

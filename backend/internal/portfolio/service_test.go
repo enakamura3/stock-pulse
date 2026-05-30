@@ -105,6 +105,19 @@ func (m *MockPortfolioRepo) GetAllAssets(ctx context.Context) ([]AssetCompact, e
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) UpsertAssetEvent(ctx context.Context, event AssetEvent) error {
+	args := m.Called(ctx, event)
+	return args.Error(0)
+}
+
+func (m *MockPortfolioRepo) GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error) {
+	args := m.Called(ctx, assetID)
+	if args.Get(0) != nil {
+		return args.Get(0).([]AssetEvent), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 type MockMarketService struct {
 	mock.Mock
 }
@@ -127,8 +140,13 @@ func (m *MockMarketService) GetFundamentals(ctx context.Context, ticker string) 
 
 func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]market.SearchResult, error) {
 	args := m.Called(ctx, query)
+	return args.Get(0).([]market.SearchResult), args.Error(1)
+}
+
+func (m *MockMarketService) GetDividends(ctx context.Context, ticker string) ([]market.DividendEvent, error) {
+	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
-		return args.Get(0).([]market.SearchResult), args.Error(1)
+		return args.Get(0).([]market.DividendEvent), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -147,8 +165,13 @@ func (m *MockMarketProvider) GetQuote(ctx context.Context, ticker string) (*mark
 
 func (m *MockMarketProvider) SearchAssets(ctx context.Context, query string) ([]market.SearchResult, error) {
 	args := m.Called(ctx, query)
+	return args.Get(0).([]market.SearchResult), args.Error(1)
+}
+
+func (m *MockMarketProvider) GetDividends(ctx context.Context, ticker string) ([]market.DividendEvent, error) {
+	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
-		return args.Get(0).([]market.SearchResult), args.Error(1)
+		return args.Get(0).([]market.DividendEvent), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -364,7 +387,7 @@ func TestService_AddTransaction(t *testing.T) {
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
 		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "BTC-USD").Return("", "", errors.New("err"))
 		mp.On("GetQuote", mock.Anything, "BTC-USD").Return(&market.Quote{Currency: "USD", Name: "Bitcoin"}, nil)
-		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "EQUITY_US", "USD").Return("", errors.New("err"))
+		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "CRYPTO", "USD").Return("", errors.New("err"))
 
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "BTC-USD"})
 		assert.ErrorContains(t, err, "erro ao registrar ativo")
@@ -375,7 +398,7 @@ func TestService_AddTransaction(t *testing.T) {
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
 		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Currency: "USD", Name: "Apple"}, nil)
-		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "EQUITY_US", "USD").Return("", errors.New("err"))
+		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "STOCK_US", "USD").Return("", errors.New("err"))
 
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
 		assert.ErrorContains(t, err, "erro ao registrar ativo")
@@ -399,7 +422,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
 
-		_, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M")
+		_, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
 		assert.ErrorContains(t, err, "carteira não encontrada")
 	})
 
@@ -408,7 +431,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
 		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
 
-		_, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M")
+		_, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
 		assert.ErrorContains(t, err, "erro ao carregar transações")
 	})
 
@@ -417,7 +440,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
 		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{}, nil)
 
-		res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M")
+		res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
 		assert.NoError(t, err)
 		assert.Len(t, res, 0)
 	})
@@ -438,7 +461,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 			{AssetID: "a1", PriceDate: start.Add(24 * time.Hour), ClosePrice: 160},
 		}, nil)
 
-		res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M")
+		res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
 		assert.NoError(t, err)
 		assert.True(t, len(res) > 0)
 	})
@@ -457,7 +480,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 
 		// Test various periods
 		for _, period := range []string{"1M", "3M", "6M", "1Y", "ALL"} {
-			res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", period)
+			res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", period, nil)
 			assert.NoError(t, err)
 			assert.True(t, len(res) >= 0)
 		}
@@ -481,7 +504,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 			{AssetID: "a1", PriceDate: start, ClosePrice: 150},
 		}, nil)
 
-		res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M")
+		res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
 		assert.NoError(t, err)
 		assert.True(t, len(res) > 0)
 	})
@@ -628,3 +651,9 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.URL.Host = strings.TrimPrefix(m.serverURL, "http://")
 	return http.DefaultTransport.RoundTrip(req)
 }
+
+func (m *MockMarketService) GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error) {
+	args := m.Called(ctx, date)
+	return args.Get(0).(float64), args.Error(1)
+}
+

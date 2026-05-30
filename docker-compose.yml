@@ -3,7 +3,7 @@ version: '3.8'
 services:
   db:
     image: postgres:16-alpine
-    container_name: stock-pulse_db
+    container_name: stock-pulse-db
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: secretpassword
@@ -22,7 +22,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: stock-pulse_redis
+    container_name: stock-pulse-redis
     ports:
       - "6379:6379"
     networks:
@@ -35,7 +35,7 @@ services:
 
   migrate:
     image: migrate/migrate
-    container_name: stock-pulse_migrate
+    container_name: stock-pulse-migrate
     depends_on:
       db:
         condition: service_healthy
@@ -51,7 +51,7 @@ services:
   backend:
     build: 
       context: ./backend
-    container_name: stock-pulse_backend
+    container_name: stock-pulse-backend
     ports:
       - "8080:8080"
     environment:
@@ -75,7 +75,7 @@ services:
 
   mailpit:
     image: axllent/mailpit
-    container_name: stock-pulse_mailpit
+    container_name: stock-pulse-mailpit
     ports:
       - "8025:8025" # Web UI do Mailpit para ver e-mails no navegador
       - "1025:1025" # Porta SMTP
@@ -85,7 +85,7 @@ services:
   frontend:
     build:
       context: ./frontend
-    container_name: stock-pulse_frontend
+    container_name: stock-pulse-frontend
     ports:
       - "3000:3000"
     volumes:
@@ -100,7 +100,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: stock-pulse_prometheus
+    container_name: stock-pulse-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -111,7 +111,7 @@ services:
 
   loki:
     image: grafana/loki:latest
-    container_name: stock-pulse_loki
+    container_name: stock-pulse-loki
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
@@ -122,7 +122,7 @@ services:
 
   promtail:
     image: grafana/promtail:latest
-    container_name: stock-pulse_promtail
+    container_name: stock-pulse-promtail
     volumes:
       - ./promtail-config.yml:/etc/promtail/config.yml
       - /var/run/docker.sock:/var/run/docker.sock
@@ -134,7 +134,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: stock-pulse_grafana
+    container_name: stock-pulse-grafana
     ports:
       - "3001:3000"
     environment:

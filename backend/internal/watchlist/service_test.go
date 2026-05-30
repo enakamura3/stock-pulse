@@ -296,3 +296,19 @@ func TestService_RemoveAssetFromWatchlist(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func (m *MockMarketService) GetDividends(ctx context.Context, ticker string) ([]market.DividendEvent, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.DividendEvent), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketProvider) GetDividends(ctx context.Context, ticker string) ([]market.DividendEvent, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.DividendEvent), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

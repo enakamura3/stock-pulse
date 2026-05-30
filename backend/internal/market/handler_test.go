@@ -115,3 +115,11 @@ func TestHandler_RespondWithJSON_Error(t *testing.T) {
 	h.respondWithJSON(rec, http.StatusOK, failMarshal{})
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }
+
+func (m *MockMarketService) GetDividends(ctx context.Context, ticker string) ([]DividendEvent, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).([]DividendEvent), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

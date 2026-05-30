@@ -13,8 +13,54 @@ import (
 	"strings"
 	"time"
 
+
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
+
+// determineAssetType define a categoria oficial do ativo no banco
+func determineAssetType(ticker, name, currency string) string {
+	if strings.Contains(ticker, "-") {
+		return "CRYPTO"
+	}
+	
+	if !strings.HasSuffix(ticker, ".SA") {
+		// Internacional
+		lowerName := strings.ToLower(name)
+		if strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "trust") || strings.Contains(lowerName, "fund") {
+			return "ETF_US"
+		}
+		return "STOCK_US"
+	}
+	
+	// É do Brasil (.SA)
+	if strings.HasSuffix(ticker, "34.SA") || strings.HasSuffix(ticker, "35.SA") || strings.HasSuffix(ticker, "39.SA") {
+		return "BDR"
+	}
+	
+	if strings.HasSuffix(ticker, "11.SA") {
+		lowerName := strings.ToLower(name)
+		isEtf := strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "ishares") || strings.Contains(lowerName, "índice") || strings.Contains(lowerName, "indice")
+		isFiagro := strings.Contains(lowerName, "fiagro") || strings.Contains(lowerName, "agro")
+		isFii := strings.Contains(lowerName, "fii") || strings.Contains(lowerName, "fundo") || strings.Contains(lowerName, "fdo") || strings.Contains(lowerName, "imob") || strings.Contains(lowerName, "lajes") || strings.Contains(lowerName, "shopping")
+		
+		if isEtf {
+			return "ETF_BR"
+		}
+		if isFiagro {
+			return "FIAGRO"
+		}
+		// Hardcoded common FIIs if name misses
+		tickerUpper := strings.ToUpper(ticker)
+		if isFii || tickerUpper == "MXRF11.SA" || tickerUpper == "HGLG11.SA" || tickerUpper == "KNRI11.SA" || tickerUpper == "BTLG11.SA" || tickerUpper == "XPML11.SA" || tickerUpper == "VISC11.SA" {
+			return "FII"
+		}
+		if tickerUpper == "SPYI11.SA" || tickerUpper == "QQQI11.SA" || tickerUpper == "IVVB11.SA" || tickerUpper == "NASD11.SA" || tickerUpper == "BOVA11.SA" {
+			return "ETF_BR"
+		}
+	}
+	
+	return "STOCK_BR"
+}
 
 // PortfolioRepository define as operações de banco de dados para a carteira.
 type PortfolioRepository interface {
@@ -32,12 +78,16 @@ type PortfolioRepository interface {
 	GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error)
 	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
 	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
+	UpsertAssetEvent(ctx context.Context, event AssetEvent) error
+	GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error)
 }
 
 // MarketService define as operações de mercado suportadas.
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
 	GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error)
+	GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error)
+	GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error)
 }
 
 // Service gerencia as regras de negócio de carteiras, transações e histórico.
@@ -91,6 +141,167 @@ func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio
 	}
 
 	return lists, nil
+}
+
+// CalculatedDividend representa o dividendo calculado para o usuário.
+type CalculatedDividend struct {
+	AssetID      string    `json:"asset_id"`
+	Ticker       string    `json:"ticker"`
+	ExDate       time.Time `json:"ex_date"`
+	PaymentDate  time.Time `json:"payment_date"`
+	GrossAmount  float64   `json:"gross_amount"`
+	NetAmount    float64   `json:"net_amount"`
+	Currency     string    `json:"currency"`
+	OriginalGross float64   `json:"original_gross_amount,omitempty"`
+	OriginalNet   float64   `json:"original_net_amount,omitempty"`
+	Type          string    `json:"type"`
+	Quantity      float64   `json:"quantity"`
+	PerShareAmount float64  `json:"per_share_amount"`
+	AssetType     string    `json:"asset_type"`
+	AssetName     string    `json:"asset_name"`
+}
+
+// GetPortfolioDividends calcula todos os dividendos (históricos e futuros) com base na posição da carteira na data ex-dividendo.
+func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]CalculatedDividend, error) {
+	// Verifica a existência do portfólio para garantir autorização
+	_, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Busca todas as transações para calcular as posições no tempo
+	transactions, err := s.repo.GetTransactionsByPortfolioID(ctx, portfolioID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Agrupa transações por ticker para facilitar processamento cronológico
+	txByTicker := make(map[string][]Transaction)
+	for _, tx := range transactions {
+		txByTicker[tx.Ticker] = append(txByTicker[tx.Ticker], tx)
+	}
+
+	var results []CalculatedDividend
+
+	// Para cada ativo, buscamos os proventos e iteramos para calcular
+	for ticker, txs := range txByTicker {
+		// Ordena transações cronologicamente
+		sort.Slice(txs, func(i, j int) bool {
+			return txs[i].ExecutedAt.Before(txs[j].ExecutedAt)
+		})
+
+		// A moeda base do ativo (BRL ou USD)
+		currency := "BRL"
+		if len(txs) > 0 && txs[0].Currency != "" {
+			currency = txs[0].Currency
+		}
+
+		divs, err := s.repo.GetAssetEvents(ctx, txs[0].AssetID)
+		if err != nil {
+			log.Printf("Aviso: falha ao buscar dividendos locais para %s: %v", ticker, err)
+			continue
+		}
+
+		for _, div := range divs {
+			exDate := div.ExDate
+
+			// Calcula a quantidade na carteira no fechamento do dia anterior à ex-date,
+			// Ou seja, compras efetuadas ATÉ a ex-date (pois na ex-date a ação já é negociada sem o dividendo,
+			// mas o comprador do dia D-1 recebe o dividendo).
+			// Simplificando: compras onde ExecutedAt < exDate (começo do dia).
+			var quantity float64 = 0
+			for _, tx := range txs {
+				// Se a transação ocorreu depois do início do exDate, interrompe a soma (lista tá ordenada)
+				if tx.ExecutedAt.After(exDate) || tx.ExecutedAt.Equal(exDate) {
+					break
+				}
+
+				if tx.Type == "BUY" {
+					quantity += tx.Quantity
+				} else if tx.Type == "SELL" {
+					quantity -= tx.Quantity
+				} else if tx.Type == "SPLIT" {
+					quantity = quantity * tx.Quantity
+				} else if tx.Type == "REVERSE_SPLIT" {
+					if tx.Quantity > 0 {
+						quantity = math.Floor(quantity / tx.Quantity)
+					}
+				} else if tx.Type == "BONUS" {
+					quantity += tx.Quantity
+				}
+			}
+
+			// Se a quantidade resultante é > 0, o usuário tem direito ao dividendo!
+			if quantity > 0 {
+				grossAmount := quantity * div.GrossAmount
+				netAmount := grossAmount
+				divCurrency := currency // cópia local para não afetar as próximas iterações
+
+				// Regras de Impostos
+				if divCurrency == "USD" {
+					// EUA: 30% retido na fonte
+					netAmount = grossAmount * 0.70
+				} else if divCurrency == "BRL" {
+					if div.Type == "JCP" {
+						// JCP: 15% de imposto retido na fonte
+						netAmount = grossAmount * 0.85
+					} else if strings.HasPrefix(txs[0].AssetType, "ETF") {
+						// Exceção: ETFs na B3 que sofrem tributação de 15% nos dividendos retidos na fonte
+						netAmount = grossAmount * 0.85
+					} else {
+						// Dividendos, Rendimentos (FII), Amortização: 0% de imposto
+						netAmount = grossAmount
+					}
+				}
+
+				exchangeRate := 1.0
+				var originalGross float64 = 0
+				var originalNet float64 = 0
+
+				// Conversão Cambial (Apenas para USD -> BRL)
+				if divCurrency == "USD" {
+					originalGross = grossAmount
+					originalNet = netAmount
+
+					fx, err := s.marketService.GetHistoricalExchangeRate(ctx, exDate)
+					if err == nil {
+						exchangeRate = fx
+					} else {
+						exchangeRate = 5.0 // fallback
+					}
+					
+					// Converte Gross e Net para a moeda base do Portfolio (assumindo BRL)
+					grossAmount = grossAmount * exchangeRate
+					netAmount = netAmount * exchangeRate
+					divCurrency = "BRL"
+				}
+
+				results = append(results, CalculatedDividend{
+					AssetID:      txs[0].AssetID,
+					Ticker:       ticker,
+					ExDate:       exDate,
+					PaymentDate:  div.PaymentDate,
+					GrossAmount:  grossAmount,
+					NetAmount:    netAmount,
+					Currency:     divCurrency,
+					OriginalGross: originalGross,
+					OriginalNet:   originalNet,
+					Type:         div.Type,
+					Quantity:     quantity,
+					PerShareAmount: div.GrossAmount * exchangeRate,
+					AssetType:    txs[0].AssetType,
+					AssetName:    txs[0].AssetName,
+				})
+			}
+		}
+	}
+
+	// Ordena do mais recente para o mais antigo
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].PaymentDate.After(results[j].PaymentDate)
+	})
+
+	return results, nil
 }
 
 // GetPortfolioDetails calcula o consolidado da carteira (posições ativas, custo e lucro médio).
@@ -243,12 +454,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 			return nil, fmt.Errorf("ativo '%s' não encontrado no mercado: %w", tx.Ticker, err)
 		}
 
-		assetType := "EQUITY"
-		if quote.Currency == "USD" && !strings.Contains(tx.Ticker, ".") {
-			assetType = "EQUITY_US"
-		} else if strings.Contains(tx.Ticker, "-") {
-			assetType = "CRYPTO"
-		}
+		assetType := determineAssetType(tx.Ticker, quote.Name, quote.Currency)
 
 		assetID, err = s.repo.CreateAsset(ctx, tx.Ticker, quote.Name, assetType, quote.Currency)
 		if err != nil {

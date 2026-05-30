@@ -60,8 +60,8 @@ func (m *MockPortfolioService) DeletePortfolio(ctx context.Context, id, userID s
 	return m.Called(ctx, id, userID).Error(0)
 }
 
-func (m *MockPortfolioService) GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string) ([]PerformancePoint, error) {
-	args := m.Called(ctx, portfolioID, userID, period)
+func (m *MockPortfolioService) GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string, filterTickers []string) ([]PerformancePoint, error) {
+	args := m.Called(ctx, portfolioID, userID, period, filterTickers)
 	if args.Get(0) != nil {
 		return args.Get(0).([]PerformancePoint), args.Error(1)
 	}
@@ -76,6 +76,14 @@ func (m *MockPortfolioService) repoGetTransactionsByPortfolioID(ctx context.Cont
 	args := m.Called(ctx, portfolioID, userID)
 	if args.Get(0) != nil {
 		return args.Get(0).([]Transaction), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockPortfolioService) GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]CalculatedDividend, error) {
+	args := m.Called(ctx, portfolioID, userID)
+	if args.Get(0) != nil {
+		return args.Get(0).([]CalculatedDividend), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -314,7 +322,7 @@ func TestHandler_GetPortfolioPerformance(t *testing.T) {
 
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("GetPortfolioPerformance", mock.Anything, "p1", "u1", "1M").Return(([]PerformancePoint)(nil), errors.New("err"))
+		s.On("GetPortfolioPerformance", mock.Anything, "p1", "u1", "1M", mock.Anything).Return(([]PerformancePoint)(nil), errors.New("err"))
 		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/performance?period=1M", nil), "u1", map[string]string{"id": "p1"})
 		rec := httptest.NewRecorder()
 		h.GetPerformance(rec, req)
@@ -323,7 +331,7 @@ func TestHandler_GetPortfolioPerformance(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("GetPortfolioPerformance", mock.Anything, "p1", "u1", "1M").Return([]PerformancePoint{}, nil)
+		s.On("GetPortfolioPerformance", mock.Anything, "p1", "u1", "1M", mock.Anything).Return([]PerformancePoint{}, nil)
 		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/performance?period=1M", nil), "u1", map[string]string{"id": "p1"})
 		rec := httptest.NewRecorder()
 		h.GetPerformance(rec, req)
