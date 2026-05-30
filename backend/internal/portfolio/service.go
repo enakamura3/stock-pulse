@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 
@@ -382,46 +383,59 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 
 	// Filtra apenas posições ativas (quantidade > 0)
 	var activePositions []Position
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
 	for _, pos := range posMap {
 		if pos.Quantity > 0 {
-			// Injeta cotações em tempo real e calcula rentabilidade
-			quote, err := s.marketService.GetQuote(ctx, pos.Ticker)
-			if err != nil {
-				log.Printf("[Portfolio] Erro ao recuperar cotação atual para %s: %v", pos.Ticker, err)
+			wg.Add(1)
+			go func(pos *Position) {
+				defer wg.Done()
+
+				// Injeta cotações em tempo real e calcula rentabilidade
+				quote, err := s.marketService.GetQuote(ctx, pos.Ticker)
+				if err != nil {
+					log.Printf("[Portfolio] Erro ao recuperar cotação atual para %s: %v", pos.Ticker, err)
+					mu.Lock()
+					activePositions = append(activePositions, *pos)
+					mu.Unlock()
+					return
+				}
+
+				// Conversão cambial em tempo real (se ativo for USD e carteira for BRL)
+				rate := 1.0
+				if pos.Currency != p.BaseCurrency {
+					rate = s.getCurrencyRate(ctx, pos.Currency, p.BaseCurrency)
+				}
+
+				pos.CurrentPrice = quote.Price
+				pos.CurrentValue = pos.Quantity * quote.Price * rate
+				pos.ProfitLoss = pos.CurrentValue - pos.TotalCost
+				if pos.TotalCost > 0 {
+					pos.ReturnPercent = (pos.ProfitLoss / pos.TotalCost) * 100
+				}
+
+				// Injeta fundamentos (Graham, Bazin, P/VP, P/L)
+				if f, errF := s.marketService.GetFundamentals(ctx, pos.Ticker); errF == nil && f != nil {
+					pos.GrahamValue = f.GrahamValue
+					pos.BazinValue = f.BazinValue
+					pos.DividendYield = f.DividendYield
+					
+					if f.BookValue > 0 {
+						pos.PVP = pos.CurrentPrice / f.BookValue
+					}
+					if f.EPS > 0 {
+						pos.PE = pos.CurrentPrice / f.EPS
+					}
+				}
+
+				mu.Lock()
 				activePositions = append(activePositions, *pos)
-				continue
-			}
-
-			// Conversão cambial em tempo real (se ativo for USD e carteira for BRL)
-			rate := 1.0
-			if pos.Currency != p.BaseCurrency {
-				rate = s.getCurrencyRate(ctx, pos.Currency, p.BaseCurrency)
-			}
-
-			pos.CurrentPrice = quote.Price
-			pos.CurrentValue = pos.Quantity * quote.Price * rate
-			pos.ProfitLoss = pos.CurrentValue - pos.TotalCost
-			if pos.TotalCost > 0 {
-				pos.ReturnPercent = (pos.ProfitLoss / pos.TotalCost) * 100
-			}
-
-			// Injeta fundamentos (Graham, Bazin, P/VP, P/L)
-			if f, errF := s.marketService.GetFundamentals(ctx, pos.Ticker); errF == nil && f != nil {
-				pos.GrahamValue = f.GrahamValue
-				pos.BazinValue = f.BazinValue
-				pos.DividendYield = f.DividendYield
-				
-				if f.BookValue > 0 {
-					pos.PVP = pos.CurrentPrice / f.BookValue
-				}
-				if f.EPS > 0 {
-					pos.PE = pos.CurrentPrice / f.EPS
-				}
-			}
-
-			activePositions = append(activePositions, *pos)
+				mu.Unlock()
+			}(pos)
 		}
 	}
+	wg.Wait()
 
 	// Re-ordena as posições por Ticker alfabético para exibição elegante
 	sort.Slice(activePositions, func(i, j int) bool {

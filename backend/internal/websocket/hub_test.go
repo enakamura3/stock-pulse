@@ -53,7 +53,9 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 
 	// Connect to WS
-	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	header := http.Header{}
+	header.Add("Origin", "http://localhost:3000")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, header)
 	assert.NoError(t, err)
 	defer ws.Close()
 

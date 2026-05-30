@@ -11,6 +11,7 @@ import (
 // MarketService define a interface que o Handler consome.
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*Quote, error)
+	GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
 }
 
@@ -32,10 +33,16 @@ func (h *Handler) GetQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	quote, err := h.service.GetQuote(r.Context(), ticker)
+	quote, hit, err := h.service.GetQuoteWithCacheStatus(r.Context(), ticker)
 	if err != nil {
 		h.respondWithError(w, http.StatusNotFound, err.Error())
 		return
+	}
+
+	if hit {
+		w.Header().Set("X-Cache", "HIT")
+	} else {
+		w.Header().Set("X-Cache", "MISS")
 	}
 
 	h.respondWithJSON(w, http.StatusOK, quote)

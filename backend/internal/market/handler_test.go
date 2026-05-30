@@ -24,6 +24,14 @@ func (m *MockMarketService) GetQuote(ctx context.Context, ticker string) (*Quote
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketService) GetQuoteWithCacheStatus(ctx context.Context, ticker string) (*Quote, bool, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).(*Quote), args.Bool(1), args.Error(2)
+	}
+	return nil, false, args.Error(2)
+}
+
 func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]SearchResult, error) {
 	args := m.Called(ctx, query)
 	if args.Get(0) != nil {
@@ -56,7 +64,7 @@ func TestHandler_GetQuote(t *testing.T) {
 
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("GetQuote", mock.Anything, "INVALID").Return(nil, errors.New("not found"))
+		s.On("GetQuoteWithCacheStatus", mock.Anything, "INVALID").Return((*Quote)(nil), false, errors.New("not found"))
 		req := reqWithParams(httptest.NewRequest("GET", "/quote/INVALID", nil), map[string]string{"ticker": "INVALID"})
 		rec := httptest.NewRecorder()
 		h.GetQuote(rec, req)
@@ -65,7 +73,7 @@ func TestHandler_GetQuote(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("GetQuote", mock.Anything, "AAPL").Return(&Quote{Symbol: "AAPL", Price: 150.0}, nil)
+		s.On("GetQuoteWithCacheStatus", mock.Anything, "AAPL").Return(&Quote{Symbol: "AAPL", Price: 150.0}, true, nil)
 		req := reqWithParams(httptest.NewRequest("GET", "/quote/AAPL", nil), map[string]string{"ticker": "AAPL"})
 		rec := httptest.NewRecorder()
 		h.GetQuote(rec, req)

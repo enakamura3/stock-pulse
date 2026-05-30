@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { createChart, ColorType } from 'lightweight-charts';
+import Link from 'next/link';
 
 interface Item {
   id: string;
@@ -182,7 +184,7 @@ export default function DashboardPage() {
 
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     // O backend roda na porta 8080 em desenvolvimento local
-    const wsUrl = `${wsProto}//localhost:8080/api/v1/ws`;
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `${wsProto}//localhost:8080/api/v1/ws`;
     
     let socket: WebSocket;
     let reconnectTimeout: NodeJS.Timeout;
@@ -327,16 +329,16 @@ export default function DashboardPage() {
     }
     
     try {
-      const startTime = performance.now();
       const res = await fetch(`${API_URL}/quotes/${encodeURIComponent(symbol)}`, {
         credentials: 'include',
       });
-      const duration = performance.now() - startTime;
+      
+      const cacheHeader = res.headers.get('X-Cache');
       
       const data = await res.json();
       if (res.ok) {
         setActiveQuote(data);
-        if (duration < 50) {
+        if (cacheHeader === 'HIT') {
           setCacheStatus('hit');
         } else {
           setCacheStatus('miss');
@@ -506,15 +508,15 @@ export default function DashboardPage() {
           
           {/* Navegação entre telas do Dashboard */}
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}>
-            <a href="/dashboard" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              📊 Monitoramento
-            </a>
-            <a href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              💼 Minha Carteira
-            </a>
-            <a href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              🔔 Meus Alertas
-            </a>
+            <Link href="/dashboard" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              📊 Painel
+            </Link>
+            <Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              💼 Carteiras
+            </Link>
+            <Link href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              🔔 Alertas
+            </Link>
           </div>
         </div>
         

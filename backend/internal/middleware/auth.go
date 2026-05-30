@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
@@ -69,8 +68,8 @@ func CORS() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			// Apenas autoriza a origem se coincidir com o Frontend cadastrado ou rodando localmente
-			if origin == frontendURL || strings.HasPrefix(origin, "http://localhost:") {
+			// Apenas autoriza a origem se coincidir com o Frontend cadastrado
+			if origin == frontendURL {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 			}
 			
