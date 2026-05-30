@@ -75,7 +75,7 @@ func main() {
 	// Configuração de Segredos
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "stock-pulse-dev-secret-key-super-secure"
+		log.Fatal("Variável de ambiente JWT_SECRET é obrigatória e não foi configurada.")
 	}
 
 	// Inicialização de Camadas de Autenticação

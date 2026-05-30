@@ -34,11 +34,11 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 	}
 }
 
-// GetQuote resgata a cotação do cache do Redis ou faz bypass consultando o provedor Yahoo.
-func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
+// GetQuoteWithCacheStatus resgata a cotação e indica se foi hit ou miss no cache.
+func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error) {
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
 	if symbol == "" {
-		return nil, fmt.Errorf("símbolo do ativo inválido")
+		return nil, false, fmt.Errorf("símbolo do ativo inválido")
 	}
 
 	key := fmt.Sprintf("quote:%s", symbol)
@@ -49,7 +49,7 @@ func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
 		var cachedQuote Quote
 		if err := json.Unmarshal([]byte(val), &cachedQuote); err == nil {
 			log.Printf("[Redis] CACHE HIT para o ativo %s", symbol)
-			return &cachedQuote, nil
+			return &cachedQuote, true, nil
 		}
 	}
 
@@ -57,7 +57,7 @@ func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
 	log.Printf("[Redis] CACHE MISS para o ativo %s. Consultando provedor...", symbol)
 	quote, err := s.provider.GetQuote(ctx, symbol)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// Serializa e salva no Redis de forma assíncrona (ou imediata) com TTL de 60s
@@ -71,7 +71,13 @@ func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
 		}
 	}
 
-	return quote, nil
+	return quote, false, nil
+}
+
+// GetQuote faz o wrapper para manter retrocompatibilidade com interfaces existentes.
+func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
+	q, _, err := s.GetQuoteWithCacheStatus(ctx, symbol)
+	return q, err
 }
 
 // GetDividends busca os proventos de um ativo e faz cache.

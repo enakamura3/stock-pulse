@@ -151,10 +151,10 @@ func TestCORS(t *testing.T) {
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name:           "Allowed localhost prefix",
+			name:           "Disallowed localhost port",
 			method:         http.MethodGet,
 			origin:         "http://localhost:8080",
-			expectedOrigin: "http://localhost:8080",
+			expectedOrigin: "",
 			expectedStatus: http.StatusOK,
 		},
 		{

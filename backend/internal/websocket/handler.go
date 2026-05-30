@@ -3,6 +3,7 @@ package websocket
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/websocket"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
@@ -11,9 +12,14 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Valida a origem do request de forma flexível em desenvolvimento local
+	// Valida a origem do request verificando FRONTEND_URL
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		frontendURL := os.Getenv("FRONTEND_URL")
+		if frontendURL == "" {
+			frontendURL = "http://localhost:3000"
+		}
+		return origin == frontendURL
 	},
 }
 

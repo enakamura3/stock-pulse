@@ -1,0 +1,10 @@
+CREATE INDEX IF NOT EXISTS idx_portfolio_user_id ON portfolio(user_id);
+CREATE INDEX IF NOT EXISTS idx_asset_daily_price_asset_id ON asset_daily_price(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_event_asset_id ON asset_event(asset_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_portfolio_id ON transaction(portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_asset_id ON transaction(asset_id);
+CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
+CREATE INDEX IF NOT EXISTS idx_watchlist_item_watchlist_id ON watchlist_item(watchlist_id);
+CREATE INDEX IF NOT EXISTS idx_watchlist_item_asset_id ON watchlist_item(asset_id);
+CREATE INDEX IF NOT EXISTS idx_alert_user_id ON alert(user_id);
+CREATE INDEX IF NOT EXISTS idx_alert_asset_id ON alert(asset_id);
