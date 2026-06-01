@@ -17,13 +17,23 @@ export default function TransactionHistory({
   const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
 
   const cumulativeQuantities: Record<string, number> = {};
+  const cumulativeInvested: Record<string, number> = {};
   const transactionsWithBalance = [...transactions].reverse().map(tx => {
     let currentBalance = cumulativeQuantities[tx.ticker] || 0;
+    let currentInvested = cumulativeInvested[tx.ticker] || 0;
     
-    if (tx.type === 'BUY' || tx.type === 'BONUS') {
+    if (tx.type === 'BUY') {
+      currentBalance += tx.quantity;
+      currentInvested += tx.quantity * tx.unit_price;
+    } else if (tx.type === 'BONUS') {
       currentBalance += tx.quantity;
     } else if (tx.type === 'SELL') {
+      const prevBalance = currentBalance;
       currentBalance -= tx.quantity;
+      if (prevBalance > 0) {
+        const avgCost = currentInvested / prevBalance;
+        currentInvested = currentBalance > 0 ? currentBalance * avgCost : 0;
+      }
     } else if (tx.type === 'SPLIT') {
       currentBalance = currentBalance * tx.quantity;
     } else if (tx.type === 'REVERSE_SPLIT') {
@@ -31,7 +41,8 @@ export default function TransactionHistory({
     }
     
     cumulativeQuantities[tx.ticker] = currentBalance;
-    return { ...tx, resulting_quantity: currentBalance };
+    cumulativeInvested[tx.ticker] = currentInvested;
+    return { ...tx, resulting_quantity: currentBalance, resulting_invested: currentInvested };
   }).reverse();
 
   const filteredTransactions = transactionsWithBalance.filter(tx => {
@@ -133,6 +144,8 @@ export default function TransactionHistory({
 
                     <span className="text-secondary" style={{ marginLeft: '1rem', borderLeft: '1px solid var(--panel-border)', paddingLeft: '1rem', fontSize: '0.75rem' }}>
                       Saldo após: <span className="font-bold text-primary" style={{ color: '#00f2fe' }}>{formatQuantity(tx.resulting_quantity)} un.</span>
+                      <span className="text-secondary" style={{ marginLeft: '0.5rem', marginRight: '0.5rem' }}>|</span>
+                      Investido: <span className="font-bold text-primary" style={{ color: '#00e676' }}>{formatMoney(tx.resulting_invested, tx.currency || 'BRL')}</span>
                     </span>
                   </div>
                 </div>
