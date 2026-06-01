@@ -24,8 +24,15 @@ done
 
 echo "✅ Ambiente pronto!"
 
-echo "🧪 Rodando testes E2E com Playwright..."
-docker compose exec -T frontend npm run test:e2e
+echo "🧪 Rodando testes E2E com Playwright em um container isolado..."
+docker run --rm \
+  --network stock-pulse_stock-pulse-net \
+  -v $(pwd)/frontend:/app \
+  -w /app \
+  -e NEXT_PUBLIC_API_URL=http://backend:8080/api/v1 \
+  -e PLAYWRIGHT_TEST_BASE_URL=http://frontend:3000 \
+  mcr.microsoft.com/playwright:v1.44.0-jammy \
+  bash -c "npm install && npx playwright test"
 
 echo "🧹 Limpando ambiente de testes (revertendo o backend para a base de Dev)..."
 docker compose up -d
