@@ -6,6 +6,15 @@ test.describe('Fluxo de Autenticação e Route Guard', () => {
   const testEmail = `playwright_${timestamp}@stock-pulse.com`;
   const testPassword = 'securepassword123';
 
+  test.beforeEach(async ({ page }) => {
+    // Redireciona chamadas da API do frontend (localhost:8080) para o container backend (backend:8080)
+    await page.route('http://localhost:8080/**/*', async (route) => {
+      const url = route.request().url().replace('localhost:8080', 'backend:8080');
+      const response = await route.fetch({ url });
+      await route.fulfill({ response });
+    });
+  });
+
   test('deve registrar um novo usuário, acessar o dashboard, deslogar e bloquear acesso não autenticado', async ({ page }) => {
     // 1. Acessa a página de Login
     await page.goto('/login');

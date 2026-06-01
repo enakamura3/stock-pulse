@@ -117,16 +117,16 @@ func (s *Service) GetDividends(ctx context.Context, symbol string, assetType str
 		}
 	}
 
-	// Cacheia por 24 horas (proventos não mudam com frequência)
+	// Cacheia por 12 horas (proventos não mudam com frequência)
 	if data, err := json.Marshal(events); err == nil {
-		s.rdb.Set(ctx, cacheKey, data, 24*time.Hour)
+		s.rdb.Set(ctx, cacheKey, data, 12*time.Hour)
 	}
 
 	return events, nil
 }
 
 // getExchangeRatesMap fetches the 10y history of BRL=X and returns it as a map[string]float64 (date string "YYYY-MM-DD" -> rate).
-// It caches the entire map in Redis for 24 hours.
+// It caches the entire map in Redis for 12 hours.
 func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, error) {
 	cacheKey := "fx:BRL=X:10y"
 	val, err := s.rdb.Get(ctx, cacheKey).Result()
@@ -199,7 +199,7 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 
 	if len(rates) > 0 {
 		if cacheData, err := json.Marshal(rates); err == nil {
-			s.rdb.Set(ctx, cacheKey, cacheData, 24*time.Hour)
+			s.rdb.Set(ctx, cacheKey, cacheData, 12*time.Hour)
 		}
 	}
 
@@ -281,8 +281,8 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 
 	fundJSON, err := json.Marshal(fund)
 	if err == nil {
-		// Salva no Redis com TTL longo de 24 horas, já que muda a cada trimestre
-		err = s.rdb.Set(ctx, key, fundJSON, 24*time.Hour).Err()
+		// Salva no Redis com TTL de 12 horas
+		err = s.rdb.Set(ctx, key, fundJSON, 12*time.Hour).Err()
 		if err != nil {
 			log.Printf("[Redis] Erro ao salvar cache de fundamentos para %s: %v", symbol, err)
 		}

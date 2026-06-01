@@ -130,8 +130,8 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		Name:     "access_token",
 		Value:    newAccessToken,
 		Path:     "/",
-		Expires:  time.Now().Add(15 * time.Minute),
-		MaxAge:   900,
+		Expires:  time.Now().Add(2 * time.Hour),
+		MaxAge:   7200,
 		HttpOnly: true,
 		Secure:   h.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
@@ -159,13 +159,13 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 // setTokenCookies injeta os cookies access_token e refresh_token.
 func (h *Handler) setTokenCookies(w http.ResponseWriter, accessToken, refreshToken string) {
-	// Access Token: 15 minutos
+	// Access Token: 2 horas
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    accessToken,
 		Path:     "/",
-		Expires:  time.Now().Add(15 * time.Minute),
-		MaxAge:   900,
+		Expires:  time.Now().Add(2 * time.Hour),
+		MaxAge:   7200,
 		HttpOnly: true,
 		Secure:   h.cookieSecure,
 		SameSite: http.SameSiteLaxMode,

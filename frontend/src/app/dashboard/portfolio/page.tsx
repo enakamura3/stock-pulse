@@ -2,94 +2,26 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
-// Importa o gráfico dinamicamente desativando SSR para evitar erros de renderização no servidor (Lightweight Charts)
+import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult } from '@/components/portfolio/types';
+import { getAssetCategory } from '@/components/portfolio/helpers';
+
+import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
+import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
+import PortfolioSummaryCards from '@/components/portfolio/PortfolioSummaryCards';
+import AssetList from '@/components/portfolio/AssetList';
+import TransactionHistory from '@/components/portfolio/TransactionHistory';
+import DividendsHistory from '@/components/portfolio/DividendsHistory';
+import Modals from '@/components/portfolio/Modals';
+
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
-const DividendsChart = dynamic(() => import('@/components/DividendsChart'), { ssr: false });
-
-interface Portfolio {
-  id: string;
-  user_id: string;
-  name: string;
-  base_currency: string;
-  created_at: string;
-}
-
-interface Position {
-  asset_id: string;
-  ticker: string;
-  name: string;
-  type: string;
-  currency: string;
-  quantity: number;
-  average_price: number;
-  total_cost: number;
-  current_price?: number;
-  current_value?: number;
-  profit_loss?: number;
-  return_percent?: number;
-  graham_value?: number;
-  bazin_value?: number;
-  pvp?: number;
-  pe?: number;
-  dividend_yield?: number;
-}
-
-interface Transaction {
-  id: string;
-  portfolio_id: string;
-  asset_id: string;
-  ticker?: string;
-  asset_name?: string;
-  asset_type?: string;
-  currency?: string;
-  type: string; // "BUY" ou "SELL"
-  quantity: number;
-  unit_price: number;
-  total_cost: number;
-  exchange_rate: number;
-  executed_at: string;
-  created_at: string;
-}
-
-interface PerformancePoint {
-  date: string;
-  value: number;
-  total_invested: number;
-}
-
-interface CalculatedDividend {
-  asset_id: string;
-  ticker: string;
-  ex_date: string;
-  payment_date: string;
-  gross_amount: number;
-  net_amount: number;
-  currency: string;
-  original_gross_amount?: number;
-  original_net_amount?: number;
-  type: string;
-  quantity: number;
-  per_share_amount: number;
-  asset_type: string;
-  asset_name: string;
-}
-
-interface SearchResult {
-  symbol: string;
-  name: string;
-  exchange: string;
-  type: string;
-}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 export default function PortfolioPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
 
-  // Estados de Portfólios
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [activePortfolioId, setActivePortfolioId] = useState<string>('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('Todas');
@@ -98,32 +30,25 @@ export default function PortfolioPage() {
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
   const [dividends, setDividends] = useState<CalculatedDividend[]>([]);
   
-  // Filtro de Transações e Proventos
   const [filterTxTicker, setFilterTxTicker] = useState<string>('');
+  const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
   const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
   const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
-  // Tabs
-  const [activeTab, setActiveTab] = useState<'ativos' | 'proventos'>('ativos');
-
-  // Período do gráfico
+  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
-  // Modais
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showTxModal, setShowTxModal] = useState(false);
   
-  // Loading states
   const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
   const [isLoadingDividends, setIsLoadingDividends] = useState(false);
 
-  // Forms - Portfólio
   const [newPortfolioName, setNewPortfolioName] = useState('');
   const [newPortfolioCurrency, setNewPortfolioCurrency] = useState('BRL');
   const [isCreatingPortfolio, setIsCreatingPortfolio] = useState(false);
 
-  // Forms - Transação
   const [txTicker, setTxTicker] = useState('');
   const [txType, setTxType] = useState<'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS'>('BUY');
   const [txQuantity, setTxQuantity] = useState<string | number>('');
@@ -133,26 +58,12 @@ export default function PortfolioPage() {
   const [isAddingTx, setIsAddingTx] = useState(false);
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   
-  // Autocomplete na Transação
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedAssetCurrency, setSelectedAssetCurrency] = useState('BRL');
 
-  // 8. ABRE MODAL DE EDIÇÃO
-  const handleEditTransaction = (tx: any) => {
-    setEditingTxId(tx.id);
-    setTxTicker(tx.ticker);
-    setTxType(tx.type as 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS');
-    setTxQuantity(tx.quantity);
-    setTxUnitPrice(tx.unit_price);
-    setTxExchangeRate(tx.exchange_rate);
-    setTxExecutedAt(tx.executed_at.split('T')[0]);
-    setShowTxModal(true);
-  };
-
-  // 1. CARREGA TODOS OS PORTFÓLIOS
   const loadPortfolios = useCallback(async (selectId?: string) => {
     setIsLoadingPortfolios(true);
     try {
@@ -165,84 +76,42 @@ export default function PortfolioPage() {
           setActivePortfolioId(nextId);
         }
       }
-    } catch (e) {
-      console.error('Erro ao buscar portfólios:', e);
-    } finally {
-      setIsLoadingPortfolios(false);
-    }
+    } catch (e) { console.error('Erro ao buscar portfólios:', e); } finally { setIsLoadingPortfolios(false); }
   }, []);
 
-  // 2. CARREGA DETALHES CONSOLIDADOS (POSIÇÕES & DADOS ATUAIS)
   const loadPortfolioDetails = useCallback(async (id: string) => {
     if (!id) return;
     setIsLoadingDetails(true);
     try {
-      // Detalhes / Posições
       const resDetails = await fetch(`${API_URL}/portfolios/${id}`, { credentials: 'include', cache: 'no-store' });
-      if (resDetails.ok) {
-        const data = await resDetails.json();
-        setPositions(data.positions || []);
-      }
-
-      // Histórico de Transações
+      if (resDetails.ok) setPositions((await resDetails.json()).positions || []);
       const resTxs = await fetch(`${API_URL}/portfolios/${id}/transactions`, { credentials: 'include', cache: 'no-store' });
-      if (resTxs.ok) {
-        const txsData = await resTxs.json();
-        setTransactions(txsData || []);
-      }
-    } catch (e) {
-      console.error('Erro ao buscar detalhes do portfólio:', e);
-    } finally {
-      setIsLoadingDetails(false);
-    }
+      if (resTxs.ok) setTransactions(await resTxs.json() || []);
+    } catch (e) { console.error('Erro ao buscar detalhes:', e); } finally { setIsLoadingDetails(false); }
   }, []);
 
-  // 3. CARREGA DADOS DE EVOLUÇÃO PATRIMONIAL (GRÁFICO)
   const loadPerformance = useCallback(async (id: string, selectPeriod: string, filterTickers: string[] = []) => {
     if (!id) return;
     setIsLoadingPerformance(true);
     try {
       let url = `${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`;
-      if (filterTickers.length > 0) {
-        url += `&tickers=${filterTickers.join(',')}`;
-      }
+      if (filterTickers.length > 0) url += `&tickers=${filterTickers.join(',')}`;
       const res = await fetch(url, { credentials: 'include', cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setPerformanceData(data || []);
-      }
-    } catch (e) {
-      console.error('Erro ao buscar série histórica do gráfico:', e);
-    } finally {
-      setIsLoadingPerformance(false);
-    }
+      if (res.ok) setPerformanceData(await res.json() || []);
+    } catch (e) { console.error('Erro ao buscar série histórica:', e); } finally { setIsLoadingPerformance(false); }
   }, []);
 
-  // 4. CARREGA PROVENTOS DA CARTEIRA
   const loadDividends = useCallback(async (id: string) => {
     if (!id) return;
     setIsLoadingDividends(true);
     try {
       const res = await fetch(`${API_URL}/portfolios/${id}/dividends`, { credentials: 'include', cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setDividends(data || []);
-      }
-    } catch (e) {
-      console.error('Erro ao buscar dividendos da carteira:', e);
-    } finally {
-      setIsLoadingDividends(false);
-    }
+      if (res.ok) setDividends(await res.json() || []);
+    } catch (e) { console.error('Erro ao buscar dividendos:', e); } finally { setIsLoadingDividends(false); }
   }, []);
 
-  // Onmount ou troca de usuário
-  useEffect(() => {
-    if (user) {
-      loadPortfolios();
-    }
-  }, [user, loadPortfolios]);
+  useEffect(() => { if (user) loadPortfolios(); }, [user, loadPortfolios]);
 
-  // Carrega os detalhes da carteira (posições e histórico) quando a ID da carteira mudar
   useEffect(() => {
     if (activePortfolioId) {
       loadPortfolioDetails(activePortfolioId);
@@ -250,147 +119,78 @@ export default function PortfolioPage() {
     }
   }, [activePortfolioId, loadPortfolioDetails, loadDividends]);
 
-  // Carrega a performance (gráfico) reagindo a mudanças no período, filtro de categoria ou atualização de posições
   useEffect(() => {
     if (!activePortfolioId) return;
-    
     let targetTickers: string[] = [];
     if (activeCategoryFilter !== 'Todas') {
-      // Re-aplica a lógica do getAssetCategory para extrair os tickers relevantes
-      const filtered = positions.filter(pos => {
-        const t = pos.ticker;
-        const n = pos.name ? pos.name.toLowerCase() : '';
-        if (!t) return false;
-        if (t.includes('-') && activeCategoryFilter === 'Cripto') return true;
-        if (!t.endsWith('.SA') && !t.includes('-') && activeCategoryFilter === 'Internacional') return true;
-        if (t.endsWith('11.SA')) {
-          const isEtf = /etf|ishares|índice|indice/i.test(n);
-          const isFii = /fii|fundo.*imob|fdo.*imob|imobili[aá]ri[ao]s?|real estate|receb[ií]veis/i.test(n);
-          
-          if (isFii && activeCategoryFilter === 'FIIs') return true;
-          if (isEtf && activeCategoryFilter === 'ETFs Nacionais') return true;
-          if (!isFii && !isEtf && activeCategoryFilter === 'Ações (B3)') return true;
-        } else if (t.endsWith('.SA') && !t.endsWith('11.SA') && activeCategoryFilter === 'Ações (B3)') {
-          return true;
-        }
-        return false;
-      });
+      const filtered = positions.filter(pos => getAssetCategory(pos.type) === activeCategoryFilter);
       targetTickers = filtered.map(p => p.ticker);
-      
-      // Se há um filtro ativo, mas não há ativos nessa categoria, enviamos um ticker dummy para forçar gráfico vazio
-      if (targetTickers.length === 0) {
-        targetTickers = ['NONE_FOUND'];
-      }
+      if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
+    }
+
+    if (filterChartTicker !== 'Todos') {
+      targetTickers = [filterChartTicker];
     }
 
     loadPerformance(activePortfolioId, period, targetTickers);
-  }, [activePortfolioId, period, activeCategoryFilter, positions, loadPerformance]);
+  }, [activePortfolioId, period, activeCategoryFilter, filterChartTicker, positions, loadPerformance]);
 
-  // Efeito Debounce para busca autocomplete dentro do Modal de Cadastro
   useEffect(() => {
     if (!searchQuery.trim() || searchQuery === txTicker) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      return;
+      setSearchResults([]); setShowDropdown(false); return;
     }
-
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
         const res = await fetch(`${API_URL}/assets/search?q=${encodeURIComponent(searchQuery)}`, { credentials: 'include', cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(data || []);
-          setShowDropdown(true);
-        }
-      } catch (e) {
-        console.error('Erro na busca de ativos:', e);
-      } finally {
-        setIsSearching(false);
-      }
+        if (res.ok) { setSearchResults(await res.json() || []); setShowDropdown(true); }
+      } catch (e) { console.error('Erro na busca:', e); } finally { setIsSearching(false); }
     }, 350);
-
     return () => clearTimeout(delayDebounce);
   }, [searchQuery, txTicker]);
 
-  // Seleciona ativo na lista de busca
   const handleSelectAsset = async (symbol: string) => {
-    setTxTicker(symbol);
-    setSearchQuery(symbol);
-    setShowDropdown(false);
-
-    // Consulta cotação em tempo real para obter a moeda padrão do ativo (ex: USD para AAPL)
+    setTxTicker(symbol); setSearchQuery(symbol); setShowDropdown(false);
     try {
       const res = await fetch(`${API_URL}/quotes/${encodeURIComponent(symbol)}`, { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const quote = await res.json();
         setSelectedAssetCurrency(quote.currency || 'BRL');
         if (quote.currency === 'USD') {
-          // Busca cotação atual do USD para ajudar o usuário com exchange_rate sugerido
           const rateRes = await fetch(`${API_URL}/quotes/USDBRL=X`, { credentials: 'include', cache: 'no-store' });
-          if (rateRes.ok) {
-            const rateQuote = await rateRes.json();
-            setTxExchangeRate(rateQuote.price || 5.25);
-          } else {
-            setTxExchangeRate(5.25);
-          }
-        } else {
-          setTxExchangeRate(1.0);
-        }
+          if (rateRes.ok) setTxExchangeRate((await rateRes.json()).price || 5.25);
+          else setTxExchangeRate(5.25);
+        } else { setTxExchangeRate(1.0); }
       }
-    } catch (e) {
-      console.error(e);
-      setSelectedAssetCurrency('BRL');
-      setTxExchangeRate(1.0);
-    }
+    } catch (e) { setSelectedAssetCurrency('BRL'); setTxExchangeRate(1.0); }
   };
 
-  // 4. SUBMETE CRIAÇÃO DE CARTEIRA
   const handleCreatePortfolio = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPortfolioName.trim()) return;
     setIsCreatingPortfolio(true);
     try {
       const res = await fetch(`${API_URL}/portfolios`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newPortfolioName, base_currency: newPortfolioCurrency }),
         credentials: 'include', cache: 'no-store',
       });
       if (res.ok) {
-        const data = await res.json();
-        setNewPortfolioName('');
-        setShowPortfolioModal(false);
-        await loadPortfolios(data.id);
+        setNewPortfolioName(''); setShowPortfolioModal(false);
+        await loadPortfolios((await res.json()).id);
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsCreatingPortfolio(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsCreatingPortfolio(false); }
   };
 
-  // 5. SUBMETE EXCLUSÃO DE CARTEIRA ATIVA
   const handleDeletePortfolio = async () => {
-    if (portfolios.length <= 1) {
-      alert('Você precisa manter pelo menos uma carteira ativa no sistema.');
-      return;
-    }
-    if (!confirm('Deseja realmente apagar esta carteira? Todas as transações históricas serão excluídas definitivamente.')) return;
+    if (portfolios.length <= 1) return alert('Você precisa manter pelo menos uma carteira ativa no sistema.');
+    if (!confirm('Deseja realmente apagar esta carteira? Todas as transações serão excluídas.')) return;
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}`, {
-        method: 'DELETE',
-        credentials: 'include', cache: 'no-store',
-      });
-      if (res.ok) {
-        await loadPortfolios();
-      }
-    } catch (e) {
-      console.error(e);
-    }
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
+      if (res.ok) await loadPortfolios();
+    } catch (e) { console.error(e); }
   };
 
-  // 6. SUBMETE INSERÇÃO DE TRANSAÇÃO
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedQty = parseFloat(txQuantity.toString());
@@ -398,34 +198,22 @@ export default function PortfolioPage() {
     const parsedRate = parseFloat(txExchangeRate.toString());
 
     if (!txTicker || isNaN(parsedQty) || parsedQty <= 0 || (txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 0))) {
-      alert('Preencha todos os campos obrigatórios corretamente.');
-      return;
+      return alert('Preencha todos os campos obrigatórios corretamente.');
     }
 
-    // Validação local de saldo para transações de venda (SELL)
     if (txType === 'SELL') {
-      const activePosition = positions.find((p) => p.ticker.toUpperCase() === txTicker.toUpperCase());
-      const currentQty = activePosition ? activePosition.quantity : 0;
-      if (parsedQty > currentQty) {
-        alert(`Saldo insuficiente de ativos. Você possui apenas ${currentQty} cotas de ${txTicker}.`);
-        return;
-      }
+      const currentQty = positions.find((p) => p.ticker.toUpperCase() === txTicker.toUpperCase())?.quantity || 0;
+      if (parsedQty > currentQty) return alert(`Saldo insuficiente. Você possui apenas ${currentQty} cotas.`);
     }
 
     setIsAddingTx(true);
     try {
-      const url = editingTxId 
-        ? `${API_URL}/portfolios/${activePortfolioId}/transactions/${editingTxId}`
-        : `${API_URL}/portfolios/${activePortfolioId}/transactions`;
-      const method = editingTxId ? 'PUT' : 'POST';
-
+      const url = editingTxId ? `${API_URL}/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `${API_URL}/portfolios/${activePortfolioId}/transactions`;
       const res = await fetch(url, {
-        method: method,
+        method: editingTxId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticker: txTicker,
-          type: txType,
-          quantity: parsedQty,
+          ticker: txTicker, type: txType, quantity: parsedQty,
           unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
           exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 1.0 : parsedRate,
           executed_at: txExecutedAt,
@@ -434,112 +222,41 @@ export default function PortfolioPage() {
       });
 
       if (res.ok) {
-        // Limpa inputs
-        setTxTicker('');
-        setSearchQuery('');
-        setTxQuantity('');
-        setTxUnitPrice('');
-        setTxExchangeRate(1.0);
-        setEditingTxId(null);
-        setSelectedAssetCurrency('BRL');
-        setShowTxModal(false);
-
-        // Recarrega todos os dados de forma consolidada
-        await loadPortfolioDetails(activePortfolioId);
-        await loadPerformance(activePortfolioId, period);
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Erro ao cadastrar transação.');
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsAddingTx(false);
-    }
+        setTxTicker(''); setSearchQuery(''); setTxQuantity(''); setTxUnitPrice(''); setTxExchangeRate(1.0);
+        setEditingTxId(null); setSelectedAssetCurrency('BRL'); setShowTxModal(false);
+        await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period);
+      } else { alert((await res.json()).error || 'Erro ao cadastrar transação.'); }
+    } catch (e) { console.error(e); } finally { setIsAddingTx(false); }
   };
 
-  // 7. REMOVE UMA TRANSAÇÃO CADASTRADA
   const handleDeleteTransaction = async (txId: string) => {
-    if (!confirm('Deseja realmente excluir esta transação? A rentabilidade histórica e a média da carteira serão recalculadas automaticamente.')) return;
+    if (!confirm('Deseja realmente excluir esta transação?')) return;
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`, {
-        method: 'DELETE',
-        credentials: 'include', cache: 'no-store',
-      });
-      if (res.ok) {
-        await loadPortfolioDetails(activePortfolioId);
-        await loadPerformance(activePortfolioId, period);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
+      if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleEditTransaction = (tx: Transaction) => {
+    setEditingTxId(tx.id); setTxTicker(tx.ticker!); setTxType(tx.type as any);
+    setTxQuantity(tx.quantity); setTxUnitPrice(tx.unit_price); setTxExchangeRate(tx.exchange_rate);
+    setTxExecutedAt(tx.executed_at.split('T')[0]); setShowTxModal(true);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-
+    const formData = new FormData(); formData.append("file", file);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/bulk`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/bulk`, { method: "POST", credentials: "include", body: formData });
       if (res.ok) {
         const data = await res.json();
-        const success = data.success || 0;
-        const errors = data.errors || [];
-        
-        if (errors.length > 0) {
-          alert(`Importação concluída: ${success} registros importados com sucesso.\n\nAtenção, alguns registros falharam:\n- ` + errors.join("\n- "));
-        } else {
-          alert(`Importação concluída com sucesso! ${success} registros importados.`);
-        }
-        
-        await loadPortfolioDetails(activePortfolioId);
-        await loadPerformance(activePortfolioId, period);
-      } else {
-        const err = await res.json();
-        alert(`Erro na importação: ${err.error} - ${err.details}`);
-      }
-    } catch (e) {
-      alert("Erro ao conectar com o servidor para importação.");
-    }
-    
+        if (data.errors?.length > 0) alert(`Importados com sucesso: ${data.success}\nFalhas:\n- ${data.errors.join("\n- ")}`);
+        else alert(`Importação concluída com sucesso! ${data.success} registros importados.`);
+        await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period);
+      } else { alert(`Erro na importação: ${(await res.json()).error}`); }
+    } catch (e) { alert("Erro ao conectar com o servidor."); }
     e.target.value = "";
-  };
-
-  // Formatadores e Helpers
-  const getActivePortfolio = () => portfolios.find((p) => p.id === activePortfolioId);
-
-  const getAssetCategory = (dbType: string) => {
-    switch (dbType) {
-      case 'STOCK_BR': return 'Ações (B3)';
-      case 'FII': return 'FIIs';
-      case 'FIAGRO': return 'FIAGROs';
-      case 'ETF_BR': return 'ETFs Nacionais';
-      case 'BDR': return 'BDRs';
-      case 'STOCK_US': return 'Ações EUA';
-      case 'ETF_US': return 'ETF Internacional';
-      case 'CRYPTO': return 'Cripto';
-      default: return 'Desconhecido';
-    }
-  };
-
-  const formatMoney = (val: number, currency: string) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: currency || 'BRL',
-    }).format(val);
-  };
-
-  const formatPercentage = (val: number) => {
-    const isPos = val >= 0;
-    return `${isPos ? '+' : ''}${val.toFixed(2)}%`;
   };
 
   if (authLoading || isLoadingPortfolios) {
@@ -547,7 +264,7 @@ export default function PortfolioPage() {
       <main className="container">
         <div className="glass-panel">
           <span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}></span>
-          <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}>Carregando dados financeiros seguros...</p>
+          <p className="text-secondary mt-lg">Carregando dados financeiros seguros...</p>
         </div>
       </main>
     );
@@ -555,156 +272,46 @@ export default function PortfolioPage() {
 
   if (!user) return null;
 
-  const activeP = getActivePortfolio();
-  
-  // Filtros
-  const filteredPositions = positions.filter(pos => 
-    activeCategoryFilter === 'Todas' || getAssetCategory(pos.type) === activeCategoryFilter
-  );
-  
-  const filteredTransactions = transactions.filter(tx => 
-    activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter
-  );
+  const activeP = portfolios.find((p) => p.id === activePortfolioId);
+  const kpiCurrency = activeP ? activeP.base_currency : 'BRL';
 
+  const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || getAssetCategory(pos.type) === activeCategoryFilter);
+  const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter);
   const filteredDividends = dividends.filter(div => {
-    const categoryMatch = activeCategoryFilter === 'Todas' || getAssetCategory(div.asset_type) === activeCategoryFilter;
-    if (!categoryMatch) return false;
-
-    const isValidPayment = div.payment_date && !div.payment_date.startsWith('0001');
-    const dateStr = isValidPayment ? div.payment_date : div.ex_date;
+    if (activeCategoryFilter !== 'Todas' && getAssetCategory(div.asset_type) !== activeCategoryFilter) return false;
+    const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
     if (!dateStr) return true;
-
     const year = dateStr.substring(0, 4);
     const month = dateStr.substring(5, 7);
-
-    const yearMatch = filterDivYear === 'Todos' || year === filterDivYear;
-    const monthMatch = filterDivMonth === 'Todos' || month === filterDivMonth;
-
-    return yearMatch && monthMatch;
+    return (filterDivYear === 'Todos' || year === filterDivYear) && (filterDivMonth === 'Todos' || month === filterDivMonth);
   });
 
-  const availableYears = Array.from(new Set(dividends.map(d => {
-    const isValidPayment = d.payment_date && !d.payment_date.startsWith('0001');
-    const dt = isValidPayment ? d.payment_date : d.ex_date;
-    return (dt || '').substring(0, 4);
-  }).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  const availableYears = Array.from(new Set(dividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.ex_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
 
-  // Cálculos Consolidados de Resumo Financeiro (KPI Cards) baseados no filtro atual
   const totalCost = filteredPositions.reduce((acc, pos) => acc + pos.total_cost, 0);
   const currentValue = filteredPositions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
   const profitLoss = currentValue - totalCost;
   const returnPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0.0;
-  const kpiCurrency = activeP ? activeP.base_currency : 'BRL';
+
+  const availableCategories = Array.from(new Set(positions.map(pos => getAssetCategory(pos.type)))).sort();
+  const filterCategories = ['Todas', ...availableCategories];
 
   return (
     <main className="container" style={{ maxWidth: 1400 }}>
-      {/* Header Centralizado com Navbar Tabs */}
-      <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800 }}>stock-pulse</h1>
-          
-          {/* Navegação entre telas do Dashboard */}
-          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}>
-            <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              📊 Monitoramento
-            </Link>
-            <Link href="/dashboard/portfolio" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              💼 Minha Carteira
-            </Link>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>{user.name}</span>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sessão Segura</span>
-          </div>
-          <button className="primary-button" onClick={logout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
-            Sair
-          </button>
-        </div>
-      </div>
+      <PortfolioHeader userName={user.name} onLogout={logout} />
 
-      {/* Seletor Lateral e Superior de Múltiplas Carteiras */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        {/* Abas de Portfólio */}
-        <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
-          {portfolios.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setActivePortfolioId(p.id)}
-              style={{
-                padding: '0.5rem 1.1rem',
-                fontSize: '0.85rem',
-                borderRadius: '8px',
-                border: '1px solid',
-                borderColor: activePortfolioId === p.id ? 'var(--accent-color)' : 'var(--panel-border)',
-                background: activePortfolioId === p.id ? 'rgba(0, 242, 254, 0.08)' : 'transparent',
-                color: activePortfolioId === p.id ? 'var(--accent-color)' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                fontWeight: activePortfolioId === p.id ? 700 : 600,
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              💼 {p.name} <span style={{ fontSize: '0.65rem', opacity: 0.65, marginLeft: '3px' }}>({p.base_currency})</span>
-            </button>
-          ))}
-          <button
-            onClick={() => setShowPortfolioModal(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.85rem',
-              borderRadius: '8px',
-              border: '1px dashed var(--accent-color)',
-              background: 'transparent',
-              color: 'var(--accent-color)',
-              cursor: 'pointer',
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            + Criar Carteira
-          </button>
-        </div>
+      <PortfolioTabs 
+        portfolios={portfolios} 
+        activePortfolioId={activePortfolioId} setActivePortfolioId={setActivePortfolioId} 
+        setShowPortfolioModal={setShowPortfolioModal} handleDeletePortfolio={handleDeletePortfolio} 
+      />
 
-        {/* Botão de Excluir Portfólio */}
-        {activeP && portfolios.length > 1 && (
+      <div className="flex-row gap-sm mb-lg flex-wrap">
+        {filterCategories.map(cat => (
           <button
-            onClick={handleDeletePortfolio}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#ff4a5a',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              padding: '0.5rem',
-            }}
-            title="Excluir carteira atual"
-          >
-            🗑️ Excluir Carteira
-          </button>
-        )}
-      </div>
-
-      {/* Filtro de Categoria de Ativos */}
-      <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {['Todas', 'Ações (B3)', 'FIIs', 'FIAGROs', 'BDRs', 'ETFs Nacionais', 'Ações EUA', 'ETF Internacional', 'Cripto'].map(cat => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategoryFilter(cat)}
-            style={{
-              padding: '0.4rem 1rem',
-              fontSize: '0.8rem',
-              borderRadius: '20px',
-              border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)',
-              background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-              color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontWeight: activeCategoryFilter === cat ? 700 : 600,
-              transition: 'all 0.15s ease'
-            }}
+            key={cat} onClick={() => setActiveCategoryFilter(cat)}
+            className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
+            style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)', color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)' }}
           >
             {cat}
           </button>
@@ -712,886 +319,99 @@ export default function PortfolioPage() {
       </div>
 
       {isLoadingDetails ? (
-        <div className="glass-panel" style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="glass-panel flex-row items-center justify-center" style={{ minHeight: '300px' }}>
           <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 35, height: 35 }}></span>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          
-          {/* KPI Dashboard Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.25rem' }}>
-            {/* Card 1: Patrimônio */}
-            <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
-                Patrimônio Atual
-              </span>
-              <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', marginTop: '0.4rem', letterSpacing: '-0.02em' }}>
-                {formatMoney(currentValue, kpiCurrency)}
-              </span>
-            </div>
-            
-            {/* Card 2: Aplicado */}
-            <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
-                Total Investido
-              </span>
-              <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', marginTop: '0.4rem', letterSpacing: '-0.02em' }}>
-                {formatMoney(totalCost, kpiCurrency)}
-              </span>
-            </div>
+        <div className="flex-col gap-xl">
+          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} kpiCurrency={kpiCurrency} />
 
-            {/* Card 3: Lucro nominal */}
-            <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
-                Lucro / Prejuízo
-              </span>
-              <span style={{
-                fontSize: '1.8rem',
-                fontWeight: 800,
-                color: profitLoss >= 0 ? '#00e676' : '#ff3d00',
-                marginTop: '0.4rem',
-                letterSpacing: '-0.02em'
-              }}>
-                {profitLoss >= 0 ? '▲' : '▼'} {formatMoney(profitLoss, kpiCurrency)}
-              </span>
-            </div>
+          {activeTab === 'ativos' && (
+            <div className="card flex-col" style={{ padding: '1.75rem 2rem', minHeight: '380px' }}>
+              <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
+                <div>
+                  <h3 className="card-title">📈 Evolução da Carteira</h3>
+                  <p className="text-xs text-secondary mt-sm">Valores ponderados na moeda base ({kpiCurrency})</p>
+                </div>
+                <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                  <select 
+                    value={filterChartTicker} 
+                    onChange={(e) => setFilterChartTicker(e.target.value)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.5rem', fontWeight: 600 }}
+                  >
+                    <option value="Todos" style={{ background: '#1c1f24', color: '#fff' }}>Todos os Tickers</option>
+                    {Array.from(new Set(positions.map(p => p.ticker))).sort().map(t => (
+                      <option key={t} value={t} style={{ background: '#1c1f24', color: '#fff' }}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                  {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
+                    <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? '#000' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            {/* Card 4: Rentabilidade percentual */}
-            <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
-                Rentabilidade
-              </span>
-              <span style={{
-                fontSize: '1.8rem',
-                fontWeight: 800,
-                color: profitLoss >= 0 ? '#00e676' : '#ff3d00',
-                marginTop: '0.4rem',
-                letterSpacing: '-0.02em'
-              }}>
-                {formatPercentage(returnPercent)}
-              </span>
-              {totalCost > 0 && profitLoss > 0 && (
-                <span className="pulse-dot" style={{ position: 'absolute', top: '15px', right: '15px', width: '8px', height: '8px', background: '#00e676', borderRadius: '50%' }}></span>
+              {isLoadingPerformance ? (
+                <div className="flex-row items-center justify-center w-full" style={{ height: '300px' }}>
+                  <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 30, height: 30 }}></span>
+                </div>
+              ) : performanceData.length > 0 ? (
+                <PortfolioChart data={performanceData} />
+              ) : (
+                <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
+                  <span className="text-2xl mb-sm">💼</span>
+                  <p className="text-sm m-0">Cadastre a sua primeira transação abaixo para começar a visualizar o histórico de rentabilidade.</p>
+                </div>
               )}
             </div>
-          </div>
-
-          {/* Gráfico de Evolução Patrimonial (Exibido apenas na aba de ativos) */}
-          {activeTab === 'ativos' && (
-          <div className="glass-panel" style={{ padding: '1.75rem 2rem', textAlign: 'left', display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.8rem' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  📈 Evolução da Carteira
-                </h3>
-                <p style={{ margin: '0.1rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Valores ponderados na moeda base ({kpiCurrency})</p>
-              </div>
-              
-              {/* Seletores de Período */}
-              <div style={{ display: 'flex', gap: '0.35rem', background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
-                {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPeriod(p)}
-                    style={{
-                      padding: '0.25rem 0.65rem',
-                      fontSize: '0.7rem',
-                      borderRadius: '4px',
-                      border: 'none',
-                      background: period === p ? 'var(--accent-gradient)' : 'transparent',
-                      color: period === p ? '#000' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {isLoadingPerformance ? (
-              <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 30, height: 30 }}></span>
-              </div>
-            ) : performanceData.length > 0 ? (
-              <PortfolioChart data={performanceData} />
-            ) : (
-              <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', color: 'var(--text-secondary)', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
-                <span style={{ fontSize: '1.7rem', marginBottom: '0.5rem' }}>💼</span>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>Cadastre a sua primeira transação abaixo para começar a visualizar o histórico de rentabilidade.</p>
-              </div>
-            )}
-          </div>
           )}
 
-          {/* TAB SELECTOR */}
-          <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '1.5rem', marginTop: '2rem' }}>
-            <button 
-              onClick={() => setActiveTab('ativos')}
-              style={{
-                background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer',
-                color: activeTab === 'ativos' ? '#00e676' : 'var(--text-secondary)',
-                borderBottom: activeTab === 'ativos' ? '2px solid #00e676' : '2px solid transparent',
-                fontWeight: activeTab === 'ativos' ? 700 : 500, fontSize: '0.9rem', transition: 'all 0.2s'
-              }}
-            >
-              📊 Ativos e Transações
+          <div className="flex-row gap-md mt-xl mb-lg" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <button onClick={() => setActiveTab('ativos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'ativos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'ativos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'ativos' ? 700 : 500, fontSize: '0.9rem' }}>
+              📊 Ativos
             </button>
-            <button 
-              onClick={() => setActiveTab('proventos')}
-              style={{
-                background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer',
-                color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)',
-                borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent',
-                fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem', transition: 'all 0.2s'
-              }}
-            >
+            <button onClick={() => setActiveTab('operacoes')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'operacoes' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'operacoes' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'operacoes' ? 700 : 500, fontSize: '0.9rem' }}>
+              📜 Histórico de Transações
+            </button>
+            <button onClick={() => setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}>
               💰 Proventos
             </button>
           </div>
 
           {activeTab === 'ativos' && (
-          <>
-            {/* Seção Dupla de Posições e Histórico */}
-            <div style={{ display: 'flex', gap: '2rem', flexFlow: 'row wrap', alignItems: 'stretch' }}>
-              
-              {/* Posições Ativas (Esquerda) */}
-            <div style={{ flex: '2 1 600px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="glass-panel" style={{ padding: '1.75rem 2rem', textAlign: 'left', minHeight: '380px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    📦 Posições Ativas
-                  </h3>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <label className="primary-button" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer', background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', color: 'var(--text-primary)' }}>
-                      📥 Importar CSV
-                      <input 
-                        type="file" 
-                        accept=".csv,.txt" 
-                        style={{ display: 'none' }} 
-                        onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
-                        onChange={handleFileUpload} 
-                      />
-                    </label>
-                    <button
-                      className="primary-button"
-                      onClick={() => { setEditingTxId(null); setShowTxModal(true); }}
-                      style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-                    >
-                      + Lançar Operação
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ overflowX: 'auto', flex: 1 }}>
-                  {filteredPositions.length > 0 ? (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--panel-border)', color: 'var(--text-secondary)' }}>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>Ativo</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Qtd</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Preço Médio</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Cotação Atual</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Custo Total</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Valor Atual</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Retorno</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P. Justo Graham</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P. Justo Bazin</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>Yield</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P/L</th>
-                          <th style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textAlign: 'right' }}>P/VP</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredPositions.map((pos) => {
-                          const isPos = (pos.profit_loss || 0) >= 0;
-                          return (
-                            <tr key={pos.asset_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', verticalAlign: 'middle' }}>
-                              <td style={{ padding: '0.9rem 0.5rem' }}>
-                                <span style={{ display: 'block', fontWeight: 700, color: 'var(--accent-color)' }}>{pos.ticker}</span>
-                                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {pos.name}
-                                </span>
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontWeight: 600, fontFamily: 'monospace' }}>
-                                {pos.quantity}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
-                                {formatMoney(pos.average_price, pos.currency)}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>
-                                {pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
-                                {formatMoney(pos.total_cost, kpiCurrency)}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#fff' }}>
-                                {pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontWeight: 700, color: isPos ? '#00e676' : '#ff3d00' }}>
-                                {pos.return_percent !== undefined ? formatPercentage(pos.return_percent) : '--'}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
-                                {pos.graham_value ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-                                    <span style={{ fontWeight: 600, color: pos.current_price && pos.current_price < pos.graham_value ? '#00e676' : '#ff3d00' }}>
-                                      {formatMoney(pos.graham_value, pos.currency)}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span style={{ color: 'var(--text-secondary)' }}>--</span>
-                                )}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
-                                {pos.bazin_value ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-                                    <span style={{ fontWeight: 600, color: pos.current_price && pos.current_price < pos.bazin_value ? '#00e676' : '#ff3d00' }}>
-                                      {formatMoney(pos.bazin_value, pos.currency)}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span style={{ color: 'var(--text-secondary)' }}>--</span>
-                                )}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#00e676' }}>
-                                {pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
-                                {pos.pe ? pos.pe.toFixed(2) : '--'}
-                              </td>
-                              <td style={{ padding: '0.9rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', color: pos.pvp && pos.pvp < 1.0 ? '#00e676' : 'inherit' }}>
-                                {pos.pvp ? pos.pvp.toFixed(2) : '--'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', color: 'var(--text-secondary)' }}>
-                      <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📁</span>
-                      <p style={{ margin: 0, fontSize: '0.85rem' }}>Esta carteira ainda não possui ativos ativos.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="flex-col gap-xl w-full">
+              <AssetList positions={filteredPositions} kpiCurrency={kpiCurrency} onImportCsv={handleFileUpload} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} />
             </div>
+          )}
 
-            {/* Histórico de Operações (Direita) */}
-            <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="glass-panel" style={{ padding: '1.75rem 1.5rem', textAlign: 'left', minHeight: '380px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    📜 Últimas Operações
-                  </h3>
-                  
-                  {transactions.length > 0 && (
-                    <select
-                      value={filterTxTicker}
-                      onChange={(e) => setFilterTxTicker(e.target.value)}
-                      style={{
-                        padding: '0.3rem 0.6rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--panel-border)',
-                        background: '#1E293B',
-                        color: '#FFFFFF',
-                        fontSize: '0.8rem',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="" style={{ background: '#1E293B', color: '#FFFFFF' }}>Todos os Ativos</option>
-                      {Array.from(new Set(transactions.map(tx => tx.ticker))).sort().map(ticker => (
-                        <option key={ticker} value={ticker} style={{ background: '#1E293B', color: '#FFFFFF' }}>{ticker}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                
-                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '550px' }}>
-                  {filteredTransactions.length > 0 ? (
-                    filteredTransactions
-                      .filter(tx => filterTxTicker === '' || tx.ticker === filterTxTicker)
-                      .map((tx) => {
-                      const isBuy = tx.type === 'BUY' || tx.type === 'BONUS';
-                      const isSplit = tx.type === 'SPLIT' || tx.type === 'REVERSE_SPLIT';
-                      const isReverse = tx.type === 'REVERSE_SPLIT';
-                      return (
-                        <div
-                          key={tx.id}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '0.75rem',
-                            background: 'rgba(255,255,255,0.015)',
-                            border: '1px solid var(--panel-border)',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, flexWrap: 'wrap' }}>
-                            <span style={{
-                              display: 'inline-block',
-                              padding: '0.15rem 0.4rem',
-                              borderRadius: '4px',
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              background: isBuy ? 'rgba(0, 230, 118, 0.08)' : tx.type === 'SPLIT' ? 'rgba(0, 242, 254, 0.08)' : tx.type === 'REVERSE_SPLIT' ? 'rgba(156, 39, 176, 0.08)' : 'rgba(255, 61, 0, 0.08)',
-                              color: isBuy ? '#00e676' : tx.type === 'SPLIT' ? '#00f2fe' : tx.type === 'REVERSE_SPLIT' ? '#e040fb' : '#ff3d00',
-                            }}>
-                              {isBuy ? (tx.type === 'BONUS' ? 'BÔNUS' : 'COMPRA') : tx.type === 'SPLIT' ? 'SPLIT' : tx.type === 'REVERSE_SPLIT' ? 'AGRUPAMENTO' : 'VENDA'}
-                            </span>
-                            
-                            <span style={{ fontWeight: 700, color: '#fff' }}>{tx.ticker}</span>
-                            
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', borderRight: '1px solid var(--panel-border)', paddingRight: '0.5rem' }}>
-                              {new Date(tx.executed_at).toISOString().split('T')[0].replace(/-/g, '/')}
-                            </span>
-                            
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}>
-                              {!isSplit ? (
-                                <>
-                                  <span style={{ color: 'var(--text-secondary)' }}>
-                                    {tx.quantity} un. x {formatMoney(tx.unit_price, tx.currency || 'BRL')}
-                                  </span>
-                                  <span style={{ color: 'var(--text-secondary)' }}>=</span>
-                                  <span style={{ fontWeight: 700 }}>
-                                    {formatMoney(tx.quantity * tx.unit_price, tx.currency || 'BRL')}
-                                  </span>
-                                </>
-                              ) : (
-                                <span style={{ fontWeight: 700 }}>
-                                  Fator: {isReverse ? `1 para ${tx.quantity}` : `${tx.quantity} para 1`}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', paddingLeft: '0.5rem' }}>
-                            <button
-                                onClick={() => handleEditTransaction(tx)}
-                                style={{
-                                  background: 'rgba(255, 255, 255, 0.05)',
-                                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                                  padding: '0.4rem',
-                                  borderRadius: '6px',
-                                  color: 'var(--text-secondary)',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.2s',
-                                }}
-                                title="Editar Transação"
-                                onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
-                                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTransaction(tx.id)}
-                                style={{
-                                  background: 'rgba(255, 61, 0, 0.08)',
-                                  border: '1px solid rgba(255, 61, 0, 0.2)',
-                                  padding: '0.4rem',
-                                  borderRadius: '6px',
-                                  color: '#ff3d00',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.2s',
-                                }}
-                                title="Excluir Transação"
-                                onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 61, 0, 0.15)' }}
-                                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 61, 0, 0.08)' }}
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: 'var(--text-secondary)', border: '1px dashed var(--panel-border)', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>📝</span>
-                      <p style={{ margin: 0, fontSize: '0.75rem', textAlign: 'center' }}>Sem transações registradas nesta carteira.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {activeTab === 'operacoes' && (
+            <div className="flex-col gap-xl w-full">
+              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} />
             </div>
-
-          </div>
-          </>
           )}
 
           {activeTab === 'proventos' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div className="glass-panel" style={{ padding: '1.75rem 1.5rem' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    💰 Histórico de Proventos
-                  </h3>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <select
-                      className="glass-input"
-                      value={filterDivYear}
-                      onChange={(e) => setFilterDivYear(e.target.value)}
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: 'auto' }}
-                    >
-                      <option value="Todos">Todos os Anos</option>
-                      {availableYears.map(year => (
-                        <option key={year} value={year}>{year}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="glass-input"
-                      value={filterDivMonth}
-                      onChange={(e) => setFilterDivMonth(e.target.value)}
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', width: 'auto' }}
-                    >
-                      <option value="Todos">Todos os Meses</option>
-                      {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {isLoadingDividends ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Carregando proventos...</div>
-                ) : dividends.length > 0 ? (
-                  <>
-                    <div style={{ height: '350px', marginBottom: '2rem' }}>
-                      <DividendsChart data={filteredDividends} />
-                    </div>
-                    
-                    <div style={{ overflowX: 'auto', border: '1px solid var(--panel-border)', borderRadius: '8px' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                        <thead>
-                          <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Ativo</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Papel</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Tipo</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Data Com</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Pagamento</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'center' }}>Qtd</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'right' }}>Vlr / Cota</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'right' }}>Vlr Bruto</th>
-                            <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--panel-border)', textAlign: 'right' }}>Vlr Líquido</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredDividends.map((div, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600 }}>{div.ticker}</td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                                {getAssetCategory(div.asset_type)}
-                              </td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                <span style={{
-                                  padding: '0.2rem 0.5rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 600,
-                                  textTransform: 'uppercase',
-                                  backgroundColor: !div.type ? 'rgba(255,255,255,0.1)' : 
-                                                  div.type.toLowerCase().includes('jcp') ? 'rgba(255, 152, 0, 0.15)' :
-                                                  div.type.toLowerCase().includes('rendimento') ? 'rgba(156, 39, 176, 0.15)' :
-                                                  div.type.toLowerCase().includes('amorti') ? 'rgba(244, 67, 54, 0.15)' :
-                                                  'rgba(33, 150, 243, 0.15)',
-                                  color: !div.type ? '#aaa' : 
-                                         div.type.toLowerCase().includes('jcp') ? '#ff9800' :
-                                         div.type.toLowerCase().includes('rendimento') ? '#e040fb' :
-                                         div.type.toLowerCase().includes('amorti') ? '#ff5252' :
-                                         '#64b5f6'
-                                }}>
-                                  {div.type || 'DIVIDENDO'}
-                                </span>
-                              </td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                {new Date(div.ex_date).toISOString().split('T')[0].replace(/-/g, '/')}
-                              </td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                {(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}
-                              </td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 500 }}>
-                                {div.quantity}
-                              </td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 500 }}>
-                                {formatMoney(div.per_share_amount, div.currency)}
-                              </td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                {formatMoney(div.gross_amount, div.currency)}
-                                {div.currency === 'BRL' && div.original_gross_amount && (
-                                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                                    (US$ {div.original_gross_amount.toFixed(2)})
-                                  </div>
-                                )}
-                              </td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#00e676' }}>
-                                {formatMoney(div.net_amount, div.currency)}
-                                {div.currency === 'BRL' && div.original_net_amount && (
-                                  <div style={{ fontSize: '0.65rem', color: 'rgba(0, 230, 118, 0.7)' }}>
-                                    (US$ {div.original_net_amount.toFixed(2)})
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                    <span style={{ fontSize: '2rem', display: 'block', marginBottom: '1rem' }}>🏜️</span>
-                    <p>Nenhum provento recebido ainda.</p>
-                    <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>Aguarde a "Data Com" das suas ações para começar a receber!</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <DividendsHistory dividends={filteredDividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
           )}
-
         </div>
       )}
 
-      {/* MODAL 1: CRIAÇÃO DE CARTEIRA */}
-      {showPortfolioModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-        }}>
-          <div className="glass-panel" style={{ maxWidth: '400px', width: '90%', padding: '2rem', textAlign: 'left' }}>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '1.5rem' }}>
-              💼 Nova Carteira
-            </h3>
-            
-            <form onSubmit={handleCreatePortfolio} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="form-group">
-                <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                  Nome da Carteira
-                </label>
-                <input
-                  className="form-input"
-                  type="text"
-                  value={newPortfolioName}
-                  onChange={(e) => setNewPortfolioName(e.target.value)}
-                  placeholder="Ex: Minha Aposentadoria, Ações B3..."
-                  required
-                  disabled={isCreatingPortfolio}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                  Moeda Base
-                </label>
-                <select
-                  value={newPortfolioCurrency}
-                  onChange={(e) => setNewPortfolioCurrency(e.target.value)}
-                  disabled={isCreatingPortfolio}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid var(--panel-border)',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontSize: '0.95rem',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="BRL" style={{ background: '#1c1f24' }}>BRL (R$) - Real Brasileiro</option>
-                  <option value="USD" style={{ background: '#1c1f24' }}>USD ($) - Dólar Americano</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowPortfolioModal(false)}
-                  style={{ flex: 1, padding: '0.75rem', background: 'transparent', border: '1px solid var(--panel-border)', color: 'var(--text-secondary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={isCreatingPortfolio}
-                  style={{ flex: 1, padding: '0.75rem' }}
-                >
-                  {isCreatingPortfolio ? 'Criando...' : 'Salvar'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: CADASTRO DE TRANSAÇÃO (Lançar Operação) */}
-      {showTxModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-        }}>
-          <div className="glass-panel" style={{ maxWidth: '460px', width: '90%', padding: '2rem', textAlign: 'left', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {editingTxId ? '✏️ Editar Transação' : '➕ Nova Transação'}
-              </h2>
-              <button
-                onClick={() => {
-                  setShowTxModal(false);
-                  setEditingTxId(null);
-                }}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.2rem', padding: '0.5rem' }}
-              >
-                ✕
-              </button>
-            </div>
-            
-            <form onSubmit={handleAddTransaction} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-              
-              {/* Autocomplete Asset Search */}
-              <div className="form-group" style={{ position: 'relative' }}>
-                <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                  Ativo / Ticker
-                </label>
-                {editingTxId ? (
-                  <input
-                    className="form-input"
-                    type="text"
-                    value={txTicker}
-                    readOnly
-                    disabled
-                    style={{ textTransform: 'uppercase', opacity: 0.6 }}
-                  />
-                ) : (
-                  <input
-                    className="form-input"
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Pesquise o ticker (Ex: PETR4, AAPL, IVV)..."
-                    required
-                    disabled={isAddingTx}
-                    autoComplete="off"
-                  />
-                )}
-                {isSearching && (
-                  <span className="loading-spinner" style={{ position: 'absolute', right: '15px', top: '55%', borderTopColor: 'var(--accent-color)' }}></span>
-                )}
-
-                {/* Suggestions List */}
-                {showDropdown && searchResults.length > 0 && (
-                  <div className="glass-panel" style={{
-                    position: 'absolute', top: '100%', left: 0, width: '100%',
-                    marginTop: '0.4rem', zIndex: 101, padding: '0.4rem',
-                    textAlign: 'left', maxHeight: '200px', overflowY: 'auto',
-                    boxShadow: '0 16px 40px rgba(0,0,0,0.7)', border: '1px solid var(--panel-border)'
-                  }}>
-                    {searchResults.map((item) => (
-                      <div
-                        key={item.symbol}
-                        onClick={() => handleSelectAsset(item.symbol)}
-                        style={{ padding: '0.55rem 0.8rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        <div>
-                          <span style={{ fontWeight: 700, color: 'var(--accent-color)', marginRight: '0.6rem' }}>{item.symbol}</span>
-                          <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>{item.name}</span>
-                        </div>
-                        <span style={{ fontSize: '0.6rem', padding: '0.15rem 0.35rem', background: 'rgba(0, 242, 254, 0.08)', color: 'var(--accent-color)', borderRadius: '3px', textTransform: 'uppercase' }}>
-                          {item.exchange}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Tipo de Operação (BUY/SELL) */}
-              <div className="form-group">
-                <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                  Operação
-                </label>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => setTxType('BUY')}
-                    disabled={isAddingTx}
-                    style={{
-                      flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem',
-                      border: txType === 'BUY' ? '1px solid #00e676' : '1px solid var(--panel-border)',
-                      background: txType === 'BUY' ? 'rgba(0, 230, 118, 0.08)' : 'transparent',
-                      color: txType === 'BUY' ? '#00e676' : 'var(--text-secondary)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    🟢 COMPRA
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTxType('SELL')}
-                    disabled={isAddingTx}
-                    style={{
-                      flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem',
-                      border: txType === 'SELL' ? '1px solid #ff3d00' : '1px solid var(--panel-border)',
-                      background: txType === 'SELL' ? 'rgba(255, 61, 0, 0.08)' : 'transparent',
-                      color: txType === 'SELL' ? '#ff3d00' : 'var(--text-secondary)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    🔴 VENDA
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTxType('SPLIT');
-                      setTxUnitPrice(0);
-                    }}
-                    disabled={isAddingTx}
-                    style={{
-                      flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem',
-                      border: txType === 'SPLIT' ? '1px solid #00f2fe' : '1px solid var(--panel-border)',
-                      background: txType === 'SPLIT' ? 'rgba(0, 242, 254, 0.08)' : 'transparent',
-                      color: txType === 'SPLIT' ? '#00f2fe' : 'var(--text-secondary)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    ✂️ SPLIT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTxType('REVERSE_SPLIT');
-                      setTxUnitPrice(0);
-                    }}
-                    disabled={isAddingTx}
-                    style={{
-                      flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem',
-                      border: txType === 'REVERSE_SPLIT' ? '1px solid #e040fb' : '1px solid var(--panel-border)',
-                      background: txType === 'REVERSE_SPLIT' ? 'rgba(156, 39, 176, 0.08)' : 'transparent',
-                      color: txType === 'REVERSE_SPLIT' ? '#e040fb' : 'var(--text-secondary)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    🗜️ AGRUP.
-                  </button>
-                </div>
-              </div>
-
-              {/* Quantidade & Preço Unitário */}
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                    {(txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 'Fator / Multiplicador' : 'Quantidade'}
-                  </label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    step="any"
-                    value={txQuantity}
-                    onChange={(e) => setTxQuantity(e.target.value)}
-                    placeholder={(txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? "Ex: 10" : "0"}
-                    required
-                    disabled={isAddingTx}
-                  />
-                  {(txType === 'SPLIT' || txType === 'REVERSE_SPLIT') && (
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.4rem', display: 'block' }}>
-                      {txType === 'SPLIT' ? 'Ex: Desdobramento 1 para 10 = Fator 10.' : 'Ex: Agrupamento 10 para 1 = Fator 10.'}
-                    </span>
-                  )}
-                </div>
-
-                {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (
-                  <div className="form-group" style={{ flex: 1 }}>
-                    <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                      Preço Unitário ({selectedAssetCurrency})
-                    </label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      step="any"
-                      value={txUnitPrice}
-                      onChange={(e) => setTxUnitPrice(e.target.value)}
-                      placeholder="0.00"
-                      required
-                      disabled={isAddingTx}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Taxa de Câmbio (Mostrada dinamicamente apenas se o ativo for USD e a carteira BRL) */}
-              {selectedAssetCurrency === 'USD' && kpiCurrency === 'BRL' && (
-                <div className="form-group">
-                  <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#ffc107', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                    Taxa Cambial USDBRL de Aquisição
-                  </label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    step="any"
-                    value={txExchangeRate}
-                    onChange={(e) => setTxExchangeRate(e.target.value)}
-                    placeholder="Ex: 5.2500"
-                    required
-                    disabled={isAddingTx}
-                    style={{ borderColor: 'rgba(255, 193, 7, 0.4)' }}
-                  />
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.2rem', display: 'block' }}>
-                    Sugerido com base no fechamento cambial recente. Ajuste se comprou com outra taxa cambial.
-                  </span>
-                </div>
-              )}
-
-              {/* Data da Operação */}
-              <div className="form-group">
-                <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                  Data de Execução
-                </label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={txExecutedAt}
-                  onChange={(e) => setTxExecutedAt(e.target.value)}
-                  required
-                  disabled={isAddingTx}
-                />
-              </div>
-
-              {/* Ações */}
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowTxModal(false)}
-                  style={{ flex: 1, padding: '0.75rem', background: 'transparent', border: '1px solid var(--panel-border)', color: 'var(--text-secondary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isAddingTx}
-                  className="btn-primary"
-                  style={{ flex: 1, padding: '0.8rem', fontSize: '0.9rem', justifyContent: 'center' }}
-                >
-                  {isAddingTx ? 'Registrando...' : (editingTxId ? 'Salvar Alterações' : 'Lançar')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      <Modals 
+        showPortfolioModal={showPortfolioModal} setShowPortfolioModal={setShowPortfolioModal}
+        newPortfolioName={newPortfolioName} setNewPortfolioName={setNewPortfolioName}
+        newPortfolioCurrency={newPortfolioCurrency} setNewPortfolioCurrency={setNewPortfolioCurrency}
+        isCreatingPortfolio={isCreatingPortfolio} handleCreatePortfolio={handleCreatePortfolio}
+        showTxModal={showTxModal} setShowTxModal={setShowTxModal} editingTxId={editingTxId} setEditingTxId={setEditingTxId}
+        txTicker={txTicker} searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearching={isSearching}
+        showDropdown={showDropdown} searchResults={searchResults} handleSelectAsset={handleSelectAsset}
+        isAddingTx={isAddingTx} txType={txType} setTxType={setTxType} txQuantity={txQuantity} setTxQuantity={setTxQuantity}
+        txUnitPrice={txUnitPrice} setTxUnitPrice={setTxUnitPrice} txExchangeRate={txExchangeRate} setTxExchangeRate={setTxExchangeRate}
+        txExecutedAt={txExecutedAt} setTxExecutedAt={setTxExecutedAt} selectedAssetCurrency={selectedAssetCurrency} kpiCurrency={kpiCurrency}
+        handleAddTransaction={handleAddTransaction}
+      />
     </main>
   );
 }

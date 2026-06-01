@@ -498,7 +498,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 			return
 		}
 
-		log.Printf("[Backfill] Iniciando preenchimento histórico de 5 anos para %s...", ticker)
+		log.Printf("[Backfill] Iniciando preenchimento histórico máximo (max) para %s...", ticker)
 		if err := s.BackfillHistoricalPrices(bgCtx, id, ticker); err != nil {
 			log.Printf("[Backfill] Falha ao rodar backfill histórico de %s: %v", ticker, err)
 		}
@@ -643,7 +643,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 	// LOCF helper
 	getPriceLOCF := func(assetID string, d time.Time) float64 {
 		chk := d
-		for i := 0; i < 30; i++ {
+		for i := 0; i < 100; i++ {
 			dateStr := chk.Format("2006-01-02")
 			if val, ok := pricesMap[assetID][dateStr]; ok && val > 0 {
 				return val
@@ -761,10 +761,10 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 	return finalPoints, nil
 }
 
-// BackfillHistoricalPrices realiza a chamada de 5 anos histórica ao Yahoo e grava os dados.
+// BackfillHistoricalPrices realiza a chamada histórica ao Yahoo e grava os dados usando 10 anos de histórico diário.
 func (s *Service) BackfillHistoricalPrices(ctx context.Context, assetID, ticker string) error {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
-	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=5y", url.PathEscape(ticker))
+	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=10y", url.PathEscape(ticker))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
