@@ -17,10 +17,10 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const valueSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
-  const costSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const investedSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
 
   const [showValue, setShowValue] = useState(true);
-  const [showCost, setShowCost] = useState(true);
+  const [showInvested, setShowInvested] = useState(true);
   const [viewMode, setViewMode] = useState<'currency' | 'percent'>('currency');
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     });
 
     let valueSeries: ISeriesApi<"Area"> | null = null;
-    let costSeries: ISeriesApi<"Line"> | null = null;
+    let investedSeries: ISeriesApi<"Area"> | null = null;
 
     // Formatador de preço
     const priceFormat = viewMode === 'percent' 
@@ -81,32 +81,31 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       valueSeries.setData(valueData);
     }
 
-    // Série 2: Custo de Aquisição
-    if (showCost) {
-      costSeries = chart.addSeries(LineSeries, {
-        color: 'rgba(255, 255, 255, 0.35)',
+    // Série 2: Valor Investido
+    if (showInvested) {
+      investedSeries = chart.addSeries(AreaSeries, {
+        lineColor: '#00e676',
+        topColor: 'rgba(0, 230, 118, 0.15)',
+        bottomColor: 'rgba(0, 230, 118, 0.0)',
         lineWidth: 2,
-        lineStyle: 2, // Dashed
         priceFormat,
-        crosshairMarkerVisible: false,
-        lastValueVisible: false,
       });
 
-      const costData = data.map((pt) => {
+      const investedData = data.map((pt) => {
         let val = pt.total_invested;
         if (viewMode === 'percent') {
           val = 0; // Baseline é zero no modo %
         }
         return { time: pt.date, value: val };
       });
-      costSeries.setData(costData);
+      investedSeries.setData(investedData);
     }
 
     chart.timeScale().fitContent();
 
     chartRef.current = chart;
     valueSeriesRef.current = valueSeries;
-    costSeriesRef.current = costSeries;
+    investedSeriesRef.current = investedSeries;
 
     // Redimensionamento automático responsivo
     const handleResize = () => {
@@ -121,7 +120,7 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [data, showValue, showCost, viewMode]);
+  }, [data, showValue, showInvested, viewMode]);
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -134,8 +133,8 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
             <span style={{ color: 'var(--text-primary)' }}>Evolução Patrimonial</span>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showCost} onChange={e => setShowCost(e.target.checked)} className="accent-white" />
-            <span style={{ color: 'var(--text-secondary)' }}>Custo Médio Investido</span>
+            <input type="checkbox" checked={showInvested} onChange={e => setShowInvested(e.target.checked)} className="accent-[#00e676]" />
+            <span style={{ color: 'var(--text-secondary)' }}>Valor Investido</span>
           </label>
         </div>
         
