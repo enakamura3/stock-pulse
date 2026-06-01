@@ -5,7 +5,8 @@ stock-pulse é uma plataforma moderna e completa para acompanhamento de portfól
 ## 🚀 Funcionalidades
 
 - **Monitoramento em Tempo Real:** Conexões via WebSocket garantem que cotações de ativos pisquem na tela sem necessidade de recarregar a página.
-- **Gestão de Portfólio:** Acompanhe rentabilidade, histórico de transações e custo médio dos seus ativos globais ou da B3. Suporta edição de transações, Desdobramentos/Agrupamentos (Splits), Bonificações e Importação em Lote (Bulk Import via CSV).
+- **Gestão de Portfólio Modular:** Acompanhe rentabilidade, histórico de transações e custo médio dos seus ativos globais ou da B3. A interface do portfólio é organizada em abas (Visão Geral, Transações, Proventos) garantindo uma experiência de usuário limpa e fluida. Suporta edição de transações, Desdobramentos/Agrupamentos (Splits), Bonificações e Importação em Lote (Bulk Import via CSV).
+- **Precisão Matemática e Backtesting:** Motor de rentabilidade inteligente com "Olhar do Futuro". Desdobramentos e agrupamentos futuros são retroativamente calculados nas suas quantidades históricas, garantindo que o seu gráfico de Evolução Patrimonial empate perfeitamente com as cotações "Split-Adjusted" do Yahoo Finance, prevenindo falsos picos de lucros ou perdas.
 - **Watchlists Múltiplas:** Crie listas de favoritos customizadas para separar ativos por estratégia.
 - **Valuation e Indicadores (P/VP, P/L, Yield):** Calcule o Preço Justo de ações segundo as metodologias de Benjamin Graham e Décio Bazin. Acompanhe em tempo real na sua tabela de posições ativas os múltiplos P/VP, P/L e Dividend Yield atualizados via scraping (suporte inteligente a Ações e FIIs da B3 via Fundamentus, e ativos globais via Finviz). Receba alertas visuais diretamente na tabela identificando oportunidades (ex: P/VP < 1.0 ou preços descontados ficam destacados em verde).
 - **Visualização Avançada de Histórico:** Histórico de transações em layout fluido (single-line), com filtros inteligentes por Ticker para auditar operações e custos passados com facilidade.
@@ -281,6 +282,9 @@ make up
 # Para acompanhar os logs de todos os serviços:
 make logs
 
+# Para rodar a suíte de testes E2E automatizada (requer ambiente local no ar):
+make e2e
+
 # Para derrubar o ambiente:
 make down
 ```
@@ -323,20 +327,34 @@ A plataforma stock-pulse foca em **alta qualidade de código**, visando 100% de 
 ### Backend (Golang)
 O backend possui um conjunto rigoroso de testes simulando casos de sucesso e tratamento de erros avançados no banco de dados com `pgxmock` (simulação de erros em scan de rows, indisponibilidade, etc).
 ```bash
-# Rodar todos os testes de backend e exibir a porcentagem de cobertura
+# Rodar todos os testes de backend localmente
 cd backend
 go test -v -coverprofile=coverage.out ./...
-go tool cover -func=coverage.out
+
+# Ou rodar via Docker (sem precisar ter Go instalado localmente)
+make test-backend
 ```
 
 ### Frontend (Next.js)
 O frontend conta com cobertura de testes utilizando `Vitest` em conjunto com a `React Testing Library`. A suíte realiza _smoke testing_, testes de layout, validações de fluxo de formulários (Login e Registro) e _mocking_ de providers e contextos.
 ```bash
-# Rodar testes de frontend com geração de relatório de coverage
+# Rodar testes de frontend localmente
 cd frontend
 npm run test:coverage
+
+# Ou rodar via Docker (sem precisar ter Node instalado localmente)
+make test-frontend
 ```
-_Nota: Se você não possuir o Node instalado localmente, os testes podem ser executados dentro de um container Node isolado._
+
+### Testes End-to-End (E2E)
+A validação de fluxos reais de usuário é garantida através do **Playwright**. Em vez de duplicar a arquitetura criando containers específicos e pesados para E2E, o sistema conta com uma solução de infraestrutura inteligente e limpa:
+- **`scripts/run-e2e.sh`**: Script unificado que gerencia todo o ciclo de vida dos testes E2E.
+- **Isolamento Dinâmico**: O script reaproveita a instância ativa do PostgreSQL, criando e provisionando sob demanda um *schema/database* chamado `stockpulse_test`. Em seguida, reinicia exclusivamente o backend de testes com a injeção da flag `MOCK_EXTERNAL_APIS=true` para garantir testes imunes a oscilações de mercado e bloqueios do Yahoo Finance. Ao final dos testes, o backend original é restaurado e o banco de testes é destruído, mantendo o ambiente de dev intacto.
+
+```bash
+# Rodar todos os testes E2E com isolamento automático de banco de dados
+make e2e
+```
 
 ## ☁️ Arquitetura de Deploy (Cloud Gratuita)
 

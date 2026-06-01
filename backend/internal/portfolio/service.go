@@ -662,9 +662,22 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 		dailyCurrencies := make(map[string]string)
 		dailyTickers := make(map[string]string)
 
+		dailySplitAdjustments := make(map[string]float64)
+
 		for _, tx := range txs {
-			// Ignora transações ocorridas após a data analisada
+			// Ignora transações ocorridas após a data analisada, mas acumula o fator de split futuro
 			if tx.ExecutedAt.After(currDate) {
+				if tx.Type == "SPLIT" && tx.Quantity > 0 {
+					if dailySplitAdjustments[tx.AssetID] == 0 {
+						dailySplitAdjustments[tx.AssetID] = 1.0
+					}
+					dailySplitAdjustments[tx.AssetID] *= tx.Quantity
+				} else if tx.Type == "REVERSE_SPLIT" && tx.Quantity > 0 {
+					if dailySplitAdjustments[tx.AssetID] == 0 {
+						dailySplitAdjustments[tx.AssetID] = 1.0
+					}
+					dailySplitAdjustments[tx.AssetID] /= tx.Quantity
+				}
 				continue
 			}
 
@@ -717,7 +730,13 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 					}
 				}
 
-				totalMarketValue += qty * price * rate
+				adjFactor := dailySplitAdjustments[assetID]
+				if adjFactor == 0 {
+					adjFactor = 1.0
+				}
+				adjustedQty := qty * adjFactor
+
+				totalMarketValue += adjustedQty * price * rate
 				totalInvested += cost
 			}
 		}
