@@ -160,12 +160,12 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 	return user, accessToken, refreshToken, nil
 }
 
-// GenerateAccessToken gera um JWT Access Token assinado com validade de 15 minutos.
+// GenerateAccessToken gera um JWT Access Token assinado com validade de 2 horas.
 func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
-		"exp":     time.Now().Add(15 * time.Minute).Unix(),
+		"exp":     time.Now().Add(2 * time.Hour).Unix(),
 		"iat":     time.Now().Unix(),
 	}
 

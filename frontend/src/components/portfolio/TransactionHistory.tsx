@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Transaction } from './types';
 import { formatMoney, formatQuantity } from './helpers';
 
@@ -13,28 +13,94 @@ interface TransactionHistoryProps {
 export default function TransactionHistory({
   transactions, filterTxTicker, setFilterTxTicker, handleEditTransaction, handleDeleteTransaction
 }: TransactionHistoryProps) {
-  const filteredTransactions = transactions.filter(tx => filterTxTicker === '' || tx.ticker === filterTxTicker);
+  const [filterTxYear, setFilterTxYear] = useState<string>('Todos');
+  const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
+
+  const cumulativeQuantities: Record<string, number> = {};
+  const transactionsWithBalance = [...transactions].reverse().map(tx => {
+    let currentBalance = cumulativeQuantities[tx.ticker] || 0;
+    
+    if (tx.type === 'BUY' || tx.type === 'BONUS') {
+      currentBalance += tx.quantity;
+    } else if (tx.type === 'SELL') {
+      currentBalance -= tx.quantity;
+    } else if (tx.type === 'SPLIT') {
+      currentBalance = currentBalance * tx.quantity;
+    } else if (tx.type === 'REVERSE_SPLIT') {
+      currentBalance = currentBalance / tx.quantity;
+    }
+    
+    cumulativeQuantities[tx.ticker] = currentBalance;
+    return { ...tx, resulting_quantity: currentBalance };
+  }).reverse();
+
+  const filteredTransactions = transactionsWithBalance.filter(tx => {
+    if (filterTxTicker !== '' && tx.ticker !== filterTxTicker) return false;
+    
+    const year = tx.executed_at ? tx.executed_at.substring(0, 4) : '';
+    const month = tx.executed_at ? tx.executed_at.substring(5, 7) : '';
+    
+    if (filterTxYear !== 'Todos' && year !== filterTxYear) return false;
+    if (filterTxMonth !== 'Todos' && month !== filterTxMonth) return false;
+    
+    return true;
+  });
+
   const tickers = Array.from(new Set(transactions.map(tx => tx.ticker))).sort();
+  const availableYears = Array.from(new Set(transactions.map(tx => tx.executed_at ? tx.executed_at.substring(0, 4) : ''))).filter(y => y !== '').sort((a, b) => b.localeCompare(a));
 
   return (
-    <div className="card flex-col gap-md" style={{ flex: '1 1 350px', minHeight: '380px' }}>
+    <div className="card flex-col gap-md" style={{ flex: '1 1 350px', minHeight: '800px' }}>
       <div className="flex-row justify-between items-center mb-lg">
-        <h3 className="card-title">📜 Últimas Operações</h3>
+        <h3 className="card-title">📜 Histórico de Transações</h3>
         {transactions.length > 0 && (
-          <select
-            value={filterTxTicker}
-            onChange={(e) => setFilterTxTicker(e.target.value)}
-            style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
-          >
-            <option value="">Todos os Ativos</option>
-            {tickers.map(ticker => (
-              <option key={ticker!} value={ticker}>{ticker}</option>
-            ))}
-          </select>
+          <div className="flex-row gap-sm flex-wrap">
+            <select
+              value={filterTxYear}
+              onChange={(e) => setFilterTxYear(e.target.value)}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="Todos" style={{ background: '#1c1f24' }}>Ano: Todos</option>
+              {availableYears.map(year => (
+                <option key={year} value={year} style={{ background: '#1c1f24' }}>{year}</option>
+              ))}
+            </select>
+            
+            <select
+              value={filterTxMonth}
+              onChange={(e) => setFilterTxMonth(e.target.value)}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="Todos" style={{ background: '#1c1f24' }}>Mês: Todos</option>
+              <option value="01" style={{ background: '#1c1f24' }}>Janeiro</option>
+              <option value="02" style={{ background: '#1c1f24' }}>Fevereiro</option>
+              <option value="03" style={{ background: '#1c1f24' }}>Março</option>
+              <option value="04" style={{ background: '#1c1f24' }}>Abril</option>
+              <option value="05" style={{ background: '#1c1f24' }}>Maio</option>
+              <option value="06" style={{ background: '#1c1f24' }}>Junho</option>
+              <option value="07" style={{ background: '#1c1f24' }}>Julho</option>
+              <option value="08" style={{ background: '#1c1f24' }}>Agosto</option>
+              <option value="09" style={{ background: '#1c1f24' }}>Setembro</option>
+              <option value="10" style={{ background: '#1c1f24' }}>Outubro</option>
+              <option value="11" style={{ background: '#1c1f24' }}>Novembro</option>
+              <option value="12" style={{ background: '#1c1f24' }}>Dezembro</option>
+            </select>
+
+            <select
+              value={filterTxTicker}
+              onChange={(e) => setFilterTxTicker(e.target.value)}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="" style={{ background: '#1c1f24' }}>Todos os Ativos</option>
+              {tickers.map(ticker => (
+                <option key={ticker!} value={ticker} style={{ background: '#1c1f24' }}>{ticker}</option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 
-      <div className="flex-col gap-sm" style={{ overflowY: 'auto', flex: 1, maxHeight: '550px' }}>
+      <div className="flex-col gap-sm" style={{ overflowY: 'auto', flex: 1, maxHeight: '800px' }}>
         {filteredTransactions.length > 0 ? (
           filteredTransactions.map((tx) => {
             const isBuy = tx.type === 'BUY' || tx.type === 'BONUS';
@@ -51,7 +117,7 @@ export default function TransactionHistory({
                   <span className="font-bold text-primary">{tx.ticker}</span>
                   
                   <span className="text-secondary text-xs" style={{ borderRight: '1px solid var(--panel-border)', paddingRight: '0.5rem' }}>
-                    {new Date(tx.executed_at).toISOString().split('T')[0].replace(/-/g, '/')}
+                    {tx.executed_at ? new Date(tx.executed_at).toISOString().split('T')[0].replace(/-/g, '/') : 'N/A'}
                   </span>
                   
                   <div className="flex-row items-center gap-sm text-xs">
@@ -62,8 +128,12 @@ export default function TransactionHistory({
                         <span className="font-bold">{formatMoney(tx.quantity * tx.unit_price, tx.currency || 'BRL')}</span>
                       </>
                     ) : (
-                      <span className="font-bold">Fator: {isReverse ? `1 para ${formatQuantity(tx.quantity)}` : `${formatQuantity(tx.quantity)} para 1`}</span>
+                      <span className="font-bold">Fator: {isReverse ? `${formatQuantity(tx.quantity)} para 1` : `1 para ${formatQuantity(tx.quantity)}`}</span>
                     )}
+
+                    <span className="text-secondary" style={{ marginLeft: '1rem', borderLeft: '1px solid var(--panel-border)', paddingLeft: '1rem', fontSize: '0.75rem' }}>
+                      Saldo após: <span className="font-bold text-primary" style={{ color: '#00f2fe' }}>{formatQuantity(tx.resulting_quantity)} un.</span>
+                    </span>
                   </div>
                 </div>
 

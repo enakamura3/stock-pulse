@@ -89,6 +89,7 @@ func main() {
 		marketProvider = market.NewMockProvider()
 		fmt.Println("Aviso: Inicializando Market Data usando MockProvider (MOCK_EXTERNAL_APIS=true)")
 	} else {
+		fmt.Println("Aviso: Inicializando Yahoo Finance Provider (MOCK_EXTERNAL_APIS=false)")
 		marketProvider = market.NewYahooFinanceProvider()
 	}
 	marketService := market.NewService(marketProvider, rdb)

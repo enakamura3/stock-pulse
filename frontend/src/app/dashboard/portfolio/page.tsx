@@ -31,9 +31,10 @@ export default function PortfolioPage() {
   const [dividends, setDividends] = useState<CalculatedDividend[]>([]);
   
   const [filterTxTicker, setFilterTxTicker] = useState<string>('');
+  const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
   const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
   const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'ativos' | 'proventos'>('ativos');
+  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
@@ -126,8 +127,13 @@ export default function PortfolioPage() {
       targetTickers = filtered.map(p => p.ticker);
       if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
     }
+
+    if (filterChartTicker !== 'Todos') {
+      targetTickers = [filterChartTicker];
+    }
+
     loadPerformance(activePortfolioId, period, targetTickers);
-  }, [activePortfolioId, period, activeCategoryFilter, positions, loadPerformance]);
+  }, [activePortfolioId, period, activeCategoryFilter, filterChartTicker, positions, loadPerformance]);
 
   useEffect(() => {
     if (!searchQuery.trim() || searchQuery === txTicker) {
@@ -328,6 +334,18 @@ export default function PortfolioPage() {
                   <p className="text-xs text-secondary mt-sm">Valores ponderados na moeda base ({kpiCurrency})</p>
                 </div>
                 <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                  <select 
+                    value={filterChartTicker} 
+                    onChange={(e) => setFilterChartTicker(e.target.value)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.5rem', fontWeight: 600 }}
+                  >
+                    <option value="Todos" style={{ background: '#1c1f24', color: '#fff' }}>Todos os Tickers</option>
+                    {Array.from(new Set(positions.map(p => p.ticker))).sort().map(t => (
+                      <option key={t} value={t} style={{ background: '#1c1f24', color: '#fff' }}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
                   {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
                     <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? '#000' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
                       {p}
@@ -353,7 +371,10 @@ export default function PortfolioPage() {
 
           <div className="flex-row gap-md mt-xl mb-lg" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <button onClick={() => setActiveTab('ativos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'ativos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'ativos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'ativos' ? 700 : 500, fontSize: '0.9rem' }}>
-              📊 Ativos e Transações
+              📊 Ativos
+            </button>
+            <button onClick={() => setActiveTab('operacoes')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'operacoes' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'operacoes' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'operacoes' ? 700 : 500, fontSize: '0.9rem' }}>
+              📜 Histórico de Transações
             </button>
             <button onClick={() => setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}>
               💰 Proventos
@@ -363,6 +384,11 @@ export default function PortfolioPage() {
           {activeTab === 'ativos' && (
             <div className="flex-col gap-xl w-full">
               <AssetList positions={filteredPositions} kpiCurrency={kpiCurrency} onImportCsv={handleFileUpload} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} />
+            </div>
+          )}
+
+          {activeTab === 'operacoes' && (
+            <div className="flex-col gap-xl w-full">
               <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} />
             </div>
           )}
