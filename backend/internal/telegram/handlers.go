@@ -136,7 +136,14 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📊 *Resumo da sua Carteira*\n\n")
 	msg += p.Sprintf("💰 Valor Total: *%.2f BRL*\n", totalValue)
-	msg += p.Sprintf("📈 Variação Total Diária: *%.2f BRL*\n", totalDailyChange)
+	
+	var variacaoDiaria string
+	if totalDailyChange >= 0 {
+		variacaoDiaria = p.Sprintf("🟢 +%.2f BRL", totalDailyChange)
+	} else {
+		variacaoDiaria = p.Sprintf("🔴 %.2f BRL", totalDailyChange)
+	}
+	msg += p.Sprintf("📈 Variação Diária: *%s*\n", variacaoDiaria)
 	
 	var lucroPrejuizo string
 	if totalProfitLoss >= 0 {
