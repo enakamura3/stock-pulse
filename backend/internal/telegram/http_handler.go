@@ -9,11 +9,12 @@ import (
 )
 
 type HTTPHandler struct {
-	svc Service
+	svc         Service
+	botUsername string
 }
 
-func NewHTTPHandler(svc Service) *HTTPHandler {
-	return &HTTPHandler{svc: svc}
+func NewHTTPHandler(svc Service, botUsername string) *HTTPHandler {
+	return &HTTPHandler{svc: svc, botUsername: botUsername}
 }
 
 func (h *HTTPHandler) GenerateLinkToken(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +36,10 @@ func (h *HTTPHandler) GenerateLinkToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response := map[string]string{"token": token}
+	response := map[string]string{
+		"token":        token,
+		"bot_username": h.botUsername,
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

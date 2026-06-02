@@ -171,9 +171,8 @@ export default function PortfolioPage() {
       const res = await fetch(`${API_URL}/telegram/link`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        // Assume Telegram bot username is known, or return it from the API. Let's use a placeholder bot name for now or better, ask user to configure. 
-        // We'll open t.me link
-        window.open(`https://t.me/StockPulseDevBot?start=${data.token}`, '_blank');
+        const botUsername = data.bot_username || 'StockPulseBot';
+        window.open(`https://t.me/${botUsername}?start=${data.token}`, '_blank');
       } else {
         alert('Erro ao gerar link do Telegram.');
       }

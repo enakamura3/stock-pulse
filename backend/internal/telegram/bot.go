@@ -51,3 +51,10 @@ func (r *BotRunner) Stop() {
 	slog.Info("Parando Bot do Telegram...")
 	r.bot.Stop()
 }
+
+func (r *BotRunner) GetUsername() string {
+	if r == nil || r.bot == nil || r.bot.Me == nil {
+		return ""
+	}
+	return r.bot.Me.Username
+}
