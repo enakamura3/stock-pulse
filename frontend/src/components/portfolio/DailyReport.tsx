@@ -67,6 +67,7 @@ export default function DailyReport({ positions }: DailyReportProps) {
               <thead>
                 <tr>
                   <th>Ativo</th>
+                  <th className="text-right">Preço Médio</th>
                   <th className="text-right">Fechamento Anterior</th>
                   <th className="text-right">Cotação Atual</th>
                   <th className="text-right">Variação ($)</th>
@@ -87,6 +88,9 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   return (
                     <tr key={pos.asset_id}>
                       <td><span className="font-bold">{pos.ticker}</span></td>
+                      <td className="text-right" style={{ fontFamily: 'monospace' }}>
+                        {formatMoney(pos.average_price || 0, pos.currency)}
+                      </td>
                       <td className="text-right text-secondary" style={{ fontFamily: 'monospace' }}>
                         {formatMoney(previousClose, pos.currency)}
                       </td>
