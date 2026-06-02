@@ -571,9 +571,33 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 
+	pageStr := c.Data()
+	page := 0
+	if pageStr != "" {
+		fmt.Sscanf(pageStr, "%d", &page)
+	}
+
+	pageSize := 3
+	start := page * pageSize
+	if start >= len(keys) {
+		start = len(keys)
+	}
+	end := start + pageSize
+	if end > len(keys) {
+		end = len(keys)
+	}
+
+	if len(keys) == 0 {
+		c.Respond()
+		return c.Send("📆 Nenhum provento encontrado.")
+	}
+
+	pageKeys := keys[start:end]
+
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📆 *Proventos por Mês*\n\n")
-	for _, k := range keys {
+	msg := p.Sprintf("📆 *Proventos por Mês*\n_Página %d_\n\n", page+1)
+	
+	for _, k := range pageKeys {
 		// Format back to MM/YYYY for display
 		parts := strings.Split(k, "-")
 		display := fmt.Sprintf("%s/%s", parts[1], parts[0])
@@ -598,8 +622,25 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 		msg += "\n"
 	}
 
+	menu := &telebot.ReplyMarkup{}
+	var btns []telebot.Btn
+	
+	if start > 0 {
+		btns = append(btns, menu.Data("⬅️ Anterior", "btn_divs_month", fmt.Sprintf("%d", page-1)))
+	}
+	if end < len(keys) {
+		btns = append(btns, menu.Data("Próxima ➡️", "btn_divs_month", fmt.Sprintf("%d", page+1)))
+	}
+
+	if len(btns) > 0 {
+		menu.Inline(menu.Row(btns...))
+	}
+
 	c.Respond()
-	return c.Send(msg, telebot.ModeMarkdown)
+	if pageStr != "" && c.Message() != nil && c.Message().Text != "" {
+		return c.Edit(msg, telebot.ModeMarkdown, menu)
+	}
+	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleHistory(c telebot.Context) error {
