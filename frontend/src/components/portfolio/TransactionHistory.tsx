@@ -64,17 +64,11 @@ export default function TransactionHistory({
   return (
     <div className="card flex-col gap-md" style={{ flex: '1 1 350px', minHeight: '800px' }}>
       <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
-        <div className="flex-row items-center gap-md">
-          <h3 className="card-title" style={{ margin: 0 }}>📜 Histórico de Operações</h3>
-          {onLaunchOperation && (
-            <button onClick={onLaunchOperation} className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-              + Lançar Operação
-            </button>
-          )}
-        </div>
-        {transactions.length > 0 && (
-          <div className="flex-row gap-sm flex-wrap">
-            <select
+        <h3 className="card-title" style={{ margin: 0 }}>📜 Histórico de Operações</h3>
+        <div className="flex-row gap-sm flex-wrap items-center">
+          {transactions.length > 0 && (
+            <>
+              <select
               value={filterTxYear}
               onChange={(e) => setFilterTxYear(e.target.value)}
               style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
@@ -115,8 +109,14 @@ export default function TransactionHistory({
                 <option key={ticker!} value={ticker} style={{ background: '#1c1f24' }}>{ticker}</option>
               ))}
             </select>
-          </div>
-        )}
+            </>
+          )}
+          {onLaunchOperation && (
+            <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
+              + Lançar Operação
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-col gap-sm" style={{ overflowY: 'auto', flex: 1, maxHeight: '800px' }}>
