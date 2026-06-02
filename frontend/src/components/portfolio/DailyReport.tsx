@@ -70,12 +70,15 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   <th className="text-right">Variação (%)</th>
                   <th className="text-right">Variação ($)</th>
                   <th className="text-right">Cotação Atual</th>
+                  <th className="text-right">Fechamento Anterior</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedByPercent.map((pos) => {
                   const percent = pos.daily_change_percent || 0;
                   const absChange = pos.daily_change || 0;
+                  const currentPrice = pos.current_price || 0;
+                  const previousClose = currentPrice - absChange;
                   const isUp = percent > 0;
                   const isDown = percent < 0;
                   const colorClass = isUp ? 'text-success' : isDown ? 'text-danger' : 'text-secondary';
@@ -91,7 +94,10 @@ export default function DailyReport({ positions }: DailyReportProps) {
                         {prefix}{formatMoney(absChange, pos.currency)}
                       </td>
                       <td className="text-right" style={{ fontFamily: 'monospace' }}>
-                        {formatMoney(pos.current_price || 0, pos.currency)}
+                        {formatMoney(currentPrice, pos.currency)}
+                      </td>
+                      <td className="text-right text-secondary" style={{ fontFamily: 'monospace' }}>
+                        {formatMoney(previousClose, pos.currency)}
                       </td>
                     </tr>
                   );
