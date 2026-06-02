@@ -7,6 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.1.2
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/pashagolub/pgxmock/v4 v4.9.0
@@ -15,6 +16,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.41.0
 	golang.org/x/text v0.28.0
+	gopkg.in/telebot.v3 v3.3.8
 )
 
 require (
