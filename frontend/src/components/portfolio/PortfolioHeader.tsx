@@ -4,9 +4,10 @@ import Link from 'next/link';
 interface PortfolioHeaderProps {
   userName: string;
   onLogout: () => void;
+  onLinkTelegram: () => void;
 }
 
-export default function PortfolioHeader({ userName, onLogout }: PortfolioHeaderProps) {
+export default function PortfolioHeader({ userName, onLogout, onLinkTelegram }: PortfolioHeaderProps) {
   return (
     <div className="flex-row justify-between items-center mb-xl card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
       <div>
@@ -24,6 +25,13 @@ export default function PortfolioHeader({ userName, onLogout }: PortfolioHeaderP
       </div>
       
       <div className="flex-row items-center gap-lg">
+        <button 
+          className="btn-secondary" 
+          onClick={onLinkTelegram} 
+          style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', background: '#0088cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+        >
+          📱 Vincular Telegram
+        </button>
         <div className="text-right text-xs">
           <span className="font-semibold" style={{ display: 'block' }}>{userName}</span>
           <span className="text-secondary" style={{ fontSize: '0.7rem' }}>Sessão Segura</span>

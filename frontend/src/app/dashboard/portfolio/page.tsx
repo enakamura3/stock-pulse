@@ -166,6 +166,22 @@ export default function PortfolioPage() {
     } catch (e) { setSelectedAssetCurrency('BRL'); setTxExchangeRate(1.0); }
   };
 
+  const handleLinkTelegram = async () => {
+    try {
+      const res = await fetch(`${API_URL}/telegram/link`, { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        const botUsername = data.bot_username || 'StockPulseBot';
+        window.open(`https://t.me/${botUsername}?start=${data.token}`, '_blank');
+      } else {
+        alert('Erro ao gerar link do Telegram.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao comunicar com o servidor.');
+    }
+  };
+
   const handleCreatePortfolio = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPortfolioName.trim()) return;
@@ -299,7 +315,7 @@ export default function PortfolioPage() {
 
   return (
     <main className="container" style={{ maxWidth: 1400 }}>
-      <PortfolioHeader userName={user.name} onLogout={logout} />
+      <PortfolioHeader userName={user?.name || 'Investidor'} onLogout={logout} onLinkTelegram={handleLinkTelegram} />
 
       <PortfolioTabs 
         portfolios={portfolios} 

@@ -1,0 +1,5 @@
+CREATE TABLE user_telegram_link (
+    user_id UUID PRIMARY KEY REFERENCES "user" (id) ON DELETE CASCADE,
+    telegram_chat_id BIGINT UNIQUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);

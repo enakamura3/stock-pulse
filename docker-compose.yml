@@ -65,6 +65,7 @@ services:
       - LOG_LEVEL=warn
       - JWT_SECRET=${JWT_SECRET}
       - MOCK_EXTERNAL_APIS=${MOCK_EXTERNAL_APIS:-false}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     volumes:
       - ./backend:/app
     depends_on:

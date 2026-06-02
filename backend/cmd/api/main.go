@@ -22,6 +22,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
+	"github.com/onigiri/stock-pulse/backend/internal/telegram"
 	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
 	"github.com/onigiri/stock-pulse/backend/internal/websocket"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -118,6 +119,16 @@ func main() {
 	alertHandler := alert.NewHandler(alertService)
 	alertWorker := alert.NewAlertWorker(alertRepo, marketService, mailService)
 
+	// Telegram Bot
+	telegramRepo := telegram.NewRepository(dbPool)
+	telegramService := telegram.NewService(telegramRepo, rdb)
+	telegramHandlers := telegram.NewHandlers(telegramService, portfolioService)
+	telegramBot, err := telegram.NewBotRunner(os.Getenv("TELEGRAM_BOT_TOKEN"), telegramHandlers)
+	if err != nil {
+		slog.Error("Failed to start telegram bot", "err", err)
+	}
+	telegramHttpHandler := telegram.NewHTTPHandler(telegramService, telegramBot.GetUsername())
+
 	// Inicialização da Documentação API Swagger (Fase 4)
 	docsHandler := docs.NewHandler("docs/openapi.yaml")
 
@@ -128,6 +139,9 @@ func main() {
 	go dividendWorker.Start(workerCtx)
 	go wsHub.Start(workerCtx)
 	go alertWorker.Start(workerCtx)
+	if telegramBot != nil {
+		go telegramBot.Start()
+	}
 
 	// Configuração das Rotas (Chi)
 	r := chi.NewRouter()
@@ -201,6 +215,11 @@ func main() {
 			r.Post("/alerts", alertHandler.CreateAlert)
 			r.Delete("/alerts/{id}", alertHandler.DeleteAlert)
 			r.Put("/alerts/{id}/toggle", alertHandler.ToggleAlert)
+
+			// Integração Telegram
+			r.Route("/telegram", func(r chi.Router) {
+				r.Post("/link", telegramHttpHandler.GenerateLinkToken)
+			})
 		})
 	})
 
