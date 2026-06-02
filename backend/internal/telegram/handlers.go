@@ -599,24 +599,46 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 		parts := strings.Split(k, "-")
 		display := fmt.Sprintf("%s/%s", parts[1], parts[0])
 		
+		type tSummary struct {
+			amount float64
+			dates  []string
+		}
+		summaryMap := make(map[string]*tSummary)
+		
 		var totalMonth float64
 		for _, d := range grouped[k] {
 			totalMonth += d.NetAmount
+			if _, exists := summaryMap[d.Ticker]; !exists {
+				summaryMap[d.Ticker] = &tSummary{}
+			}
+			summaryMap[d.Ticker].amount += d.NetAmount
+			
+			dateStr := d.PaymentDate.Format("02/01")
+			foundDate := false
+			for _, existing := range summaryMap[d.Ticker].dates {
+				if existing == dateStr {
+					foundDate = true
+					break
+				}
+			}
+			if !foundDate {
+				summaryMap[d.Ticker].dates = append(summaryMap[d.Ticker].dates, dateStr)
+			}
 		}
 		
 		msg += p.Sprintf("• *%s*: %.2f BRL\n", display, totalMonth)
 		
-		// Sort the dividends inside the month to be deterministic
-		divsMonth := grouped[k]
-		sort.Slice(divsMonth, func(i, j int) bool {
-			if divsMonth[i].Ticker == divsMonth[j].Ticker {
-				return divsMonth[i].PaymentDate.Before(divsMonth[j].PaymentDate)
-			}
-			return divsMonth[i].Ticker < divsMonth[j].Ticker
-		})
+		// Sort tickers alphabetically
+		tickers := make([]string, 0, len(summaryMap))
+		for t := range summaryMap {
+			tickers = append(tickers, t)
+		}
+		sort.Strings(tickers)
 		
-		for _, d := range divsMonth {
-			msg += p.Sprintf("   ↳ `%s`: %.2f BRL (%s)\n", d.Ticker, d.NetAmount, d.PaymentDate.Format("02/01"))
+		for _, t := range tickers {
+			sum := summaryMap[t]
+			datesStr := strings.Join(sum.dates, ", ")
+			msg += p.Sprintf("   ↳ `%s`: %.2f BRL (%s)\n", t, sum.amount, datesStr)
 		}
 		msg += "\n"
 	}
