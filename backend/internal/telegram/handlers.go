@@ -9,6 +9,8 @@ import (
 
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
 )
 
@@ -131,17 +133,18 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		totalReturnPercent = (totalProfitLoss / totalCost) * 100
 	}
 
-	msg := fmt.Sprintf("📊 *Resumo da sua Carteira*\n\n")
-	msg += fmt.Sprintf("💰 Valor Total: *%.2f BRL*\n", totalValue)
-	msg += fmt.Sprintf("📈 Variação Total Diária: *%.2f BRL*\n", totalDailyChange)
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("📊 *Resumo da sua Carteira*\n\n")
+	msg += p.Sprintf("💰 Valor Total: *%.2f BRL*\n", totalValue)
+	msg += p.Sprintf("📈 Variação Total Diária: *%.2f BRL*\n", totalDailyChange)
 	
 	var lucroPrejuizo string
 	if totalProfitLoss >= 0 {
-		lucroPrejuizo = fmt.Sprintf("🟢 +%.2f BRL (%.2f%%)", totalProfitLoss, totalReturnPercent)
+		lucroPrejuizo = p.Sprintf("🟢 +%.2f BRL (%.2f%%)", totalProfitLoss, totalReturnPercent)
 	} else {
-		lucroPrejuizo = fmt.Sprintf("🔴 %.2f BRL (%.2f%%)", totalProfitLoss, totalReturnPercent)
+		lucroPrejuizo = p.Sprintf("🔴 %.2f BRL (%.2f%%)", totalProfitLoss, totalReturnPercent)
 	}
-	msg += fmt.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
+	msg += p.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
 
 	// Acknowledge the callback to remove the loading state on the button
 	c.Respond()
@@ -328,7 +331,9 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		if state.Type == "SELL" {
 			tipoStr = "VENDA"
 		}
-		successMsg := fmt.Sprintf("✅ *Operação Lançada com Sucesso!*\n\nAtivo: %s\nTipo: %s\nQuantidade: %.4f\nPreço Unitário: %.2f\nTotal: %.2f",
+		
+		p := message.NewPrinter(language.BrazilianPortuguese)
+		successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\nAtivo: %s\nTipo: %s\nQuantidade: %.4f\nPreço Unitário: %.2f\nTotal: %.2f",
 			state.Ticker, tipoStr, state.Quantity, price, tx.TotalCost)
 
 		return c.Send(successMsg, telebot.ModeMarkdown)
