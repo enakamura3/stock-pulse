@@ -67,10 +67,10 @@ export default function DailyReport({ positions }: DailyReportProps) {
               <thead>
                 <tr>
                   <th>Ativo</th>
-                  <th className="text-right">Variação (%)</th>
-                  <th className="text-right">Variação ($)</th>
-                  <th className="text-right">Cotação Atual</th>
                   <th className="text-right">Fechamento Anterior</th>
+                  <th className="text-right">Cotação Atual</th>
+                  <th className="text-right">Variação ($)</th>
+                  <th className="text-right">Variação (%)</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,17 +87,17 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   return (
                     <tr key={pos.asset_id}>
                       <td><span className="font-bold">{pos.ticker}</span></td>
-                      <td className={`text-right font-bold ${colorClass}`}>
-                        {prefix}{formatPercentage(percent)}
-                      </td>
-                      <td className={`text-right ${colorClass}`}>
-                        {prefix}{formatMoney(absChange, pos.currency)}
+                      <td className="text-right text-secondary" style={{ fontFamily: 'monospace' }}>
+                        {formatMoney(previousClose, pos.currency)}
                       </td>
                       <td className="text-right" style={{ fontFamily: 'monospace' }}>
                         {formatMoney(currentPrice, pos.currency)}
                       </td>
-                      <td className="text-right text-secondary" style={{ fontFamily: 'monospace' }}>
-                        {formatMoney(previousClose, pos.currency)}
+                      <td className={`text-right ${colorClass}`}>
+                        {prefix}{formatMoney(absChange, pos.currency)}
+                      </td>
+                      <td className={`text-right font-bold ${colorClass}`}>
+                        {prefix}{formatPercentage(percent)}
                       </td>
                     </tr>
                   );
