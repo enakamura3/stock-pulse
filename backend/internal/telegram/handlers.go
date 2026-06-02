@@ -47,6 +47,8 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	// Callback dos Inline Keyboards estáticos
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
+	bot.Handle("\fbtn_divs_year", h.HandleDividendsByYear)
+	bot.Handle("\fbtn_divs_month", h.HandleDividendsByMonth)
 	bot.Handle("\fbtn_operacao", h.HandleLaunchOperation)
 
 	bot.Handle("\fbtn_new_asset", h.HandleNewAsset)
@@ -481,6 +483,94 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 		}
 	} else {
 		msg += "\nNenhum provento registrado na sua carteira ainda."
+	}
+
+	menu := &telebot.ReplyMarkup{}
+	btnAno := menu.Data("📅 Agrupar por Ano", "btn_divs_year")
+	btnMes := menu.Data("📆 Agrupar por Mês", "btn_divs_month")
+	if len(divs) > 0 {
+		menu.Inline(menu.Row(btnAno, btnMes))
+	}
+
+	c.Respond()
+	if len(divs) > 0 {
+		return c.Send(msg, telebot.ModeMarkdown, menu)
+	}
+	return c.Send(msg, telebot.ModeMarkdown)
+}
+
+func (h *Handlers) fetchDividends(c telebot.Context) ([]portfolio.CalculatedDividend, error) {
+	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+	if err != nil {
+		return nil, fmt.Errorf("conta não vinculada")
+	}
+
+	userIDStr := userID.String()
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return nil, fmt.Errorf("nenhuma carteira")
+	}
+
+	portfolioID := portfolios[0].ID
+	divs, err := h.portfolioSvc.GetPortfolioDividends(context.Background(), portfolioID, userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao buscar")
+	}
+	return divs, nil
+}
+
+func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
+	divs, err := h.fetchDividends(c)
+	if err != nil {
+		return c.Send("❌ Erro ao buscar proventos.")
+	}
+
+	grouped := make(map[int]float64)
+	for _, d := range divs {
+		grouped[d.PaymentDate.Year()] += d.NetAmount
+	}
+
+	years := make([]int, 0, len(grouped))
+	for y := range grouped {
+		years = append(years, y)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(years)))
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("📅 *Proventos por Ano*\n\n")
+	for _, y := range years {
+		msg += p.Sprintf("• *%d*: %.2f BRL\n", y, grouped[y])
+	}
+
+	c.Respond()
+	return c.Send(msg, telebot.ModeMarkdown)
+}
+
+func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
+	divs, err := h.fetchDividends(c)
+	if err != nil {
+		return c.Send("❌ Erro ao buscar proventos.")
+	}
+
+	grouped := make(map[string]float64)
+	for _, d := range divs {
+		key := d.PaymentDate.Format("2006-01") // Sortable key YYYY-MM
+		grouped[key] += d.NetAmount
+	}
+
+	keys := make([]string, 0, len(grouped))
+	for k := range grouped {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("📆 *Proventos por Mês*\n\n")
+	for _, k := range keys {
+		// Format back to MM/YYYY for display
+		parts := strings.Split(k, "-")
+		display := fmt.Sprintf("%s/%s", parts[1], parts[0])
+		msg += p.Sprintf("• *%s*: %.2f BRL\n", display, grouped[k])
 	}
 
 	c.Respond()
