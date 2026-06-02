@@ -122,7 +122,7 @@ func main() {
 	// Telegram Bot
 	telegramRepo := telegram.NewRepository(dbPool)
 	telegramService := telegram.NewService(telegramRepo, rdb)
-	telegramHandlers := telegram.NewHandlers(telegramService, portfolioService)
+	telegramHandlers := telegram.NewHandlers(telegramService, portfolioService, marketService)
 	telegramBot, err := telegram.NewBotRunner(os.Getenv("TELEGRAM_BOT_TOKEN"), telegramHandlers)
 	if err != nil {
 		slog.Error("Failed to start telegram bot", "err", err)
