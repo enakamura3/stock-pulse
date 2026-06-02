@@ -187,7 +187,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			limit = len(risers)
 		}
 		for i := 0; i < limit; i++ {
-			msg += p.Sprintf("• %s: +%.2f%%\n", risers[i].Ticker, risers[i].DailyChangePercent)
+			msg += p.Sprintf("• `%s`: +%.2f%%\n", risers[i].Ticker, risers[i].DailyChangePercent)
 		}
 	}
 
@@ -198,7 +198,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			limit = len(fallers)
 		}
 		for i := 0; i < limit; i++ {
-			msg += p.Sprintf("• %s: %.2f%%\n", fallers[i].Ticker, fallers[i].DailyChangePercent)
+			msg += p.Sprintf("• `%s`: %.2f%%\n", fallers[i].Ticker, fallers[i].DailyChangePercent)
 		}
 	}
 
@@ -219,7 +219,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			}
 			varBRL := pos.DailyChange * pos.Quantity * rate
 
-			msg += p.Sprintf("%s *%s*: %+.2f%% (%+.2f BRL)\n", symbol, pos.Ticker, pos.DailyChangePercent, varBRL)
+			msg += p.Sprintf("%s `%s`: %+.2f%% (%+.2f BRL)\n", symbol, pos.Ticker, pos.DailyChangePercent, varBRL)
 		}
 	}
 
