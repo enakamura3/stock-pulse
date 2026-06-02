@@ -410,6 +410,8 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 
 				pos.CurrentPrice = quote.Price
 				pos.CurrentValue = pos.Quantity * quote.Price * rate
+				pos.DailyChange = quote.Change
+				pos.DailyChangePercent = quote.ChangePercent
 				pos.ProfitLoss = pos.CurrentValue - pos.TotalCost
 				if pos.TotalCost > 0 {
 					pos.ReturnPercent = (pos.ProfitLoss / pos.TotalCost) * 100

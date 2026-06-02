@@ -19,6 +19,8 @@ export interface Position {
   current_value?: number;
   profit_loss?: number;
   return_percent?: number;
+  daily_change?: number;
+  daily_change_percent?: number;
   graham_value?: number;
   bazin_value?: number;
   pvp?: number;
