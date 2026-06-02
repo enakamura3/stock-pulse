@@ -84,6 +84,9 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   const isDown = percent < 0;
                   const colorClass = isUp ? 'text-success' : isDown ? 'text-danger' : 'text-secondary';
                   const prefix = isUp ? '+' : '';
+                  const avgPrice = pos.average_price || 0;
+                  const prevCloseColor = previousClose >= avgPrice ? 'text-success' : 'text-danger';
+                  const currentPriceColor = currentPrice >= avgPrice ? 'text-success' : 'text-danger';
                   
                   return (
                     <tr key={pos.asset_id}>
@@ -91,10 +94,10 @@ export default function DailyReport({ positions }: DailyReportProps) {
                       <td className="text-right" style={{ fontFamily: 'monospace' }}>
                         {formatMoney(pos.average_price || 0, pos.currency)}
                       </td>
-                      <td className="text-right text-secondary" style={{ fontFamily: 'monospace' }}>
+                      <td className={`text-right ${prevCloseColor}`} style={{ fontFamily: 'monospace' }}>
                         {formatMoney(previousClose, pos.currency)}
                       </td>
-                      <td className="text-right" style={{ fontFamily: 'monospace' }}>
+                      <td className={`text-right ${currentPriceColor}`} style={{ fontFamily: 'monospace' }}>
                         {formatMoney(currentPrice, pos.currency)}
                       </td>
                       <td className={`text-right ${colorClass}`}>
