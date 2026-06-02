@@ -8,10 +8,11 @@ interface TransactionHistoryProps {
   setFilterTxTicker: (t: string) => void;
   handleEditTransaction: (tx: Transaction) => void;
   handleDeleteTransaction: (id: string) => void;
+  onLaunchOperation?: () => void;
 }
 
 export default function TransactionHistory({
-  transactions, filterTxTicker, setFilterTxTicker, handleEditTransaction, handleDeleteTransaction
+  transactions, filterTxTicker, setFilterTxTicker, handleEditTransaction, handleDeleteTransaction, onLaunchOperation
 }: TransactionHistoryProps) {
   const [filterTxYear, setFilterTxYear] = useState<string>('Todos');
   const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
@@ -62,8 +63,15 @@ export default function TransactionHistory({
 
   return (
     <div className="card flex-col gap-md" style={{ flex: '1 1 350px', minHeight: '800px' }}>
-      <div className="flex-row justify-between items-center mb-lg">
-        <h3 className="card-title">📜 Histórico de Transações</h3>
+      <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
+        <div className="flex-row items-center gap-md">
+          <h3 className="card-title" style={{ margin: 0 }}>📜 Histórico de Operações</h3>
+          {onLaunchOperation && (
+            <button onClick={onLaunchOperation} className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+              + Lançar Operação
+            </button>
+          )}
+        </div>
         {transactions.length > 0 && (
           <div className="flex-row gap-sm flex-wrap">
             <select

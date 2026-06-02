@@ -374,7 +374,7 @@ export default function PortfolioPage() {
               📊 Ativos
             </button>
             <button onClick={() => setActiveTab('operacoes')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'operacoes' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'operacoes' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'operacoes' ? 700 : 500, fontSize: '0.9rem' }}>
-              📜 Histórico de Transações
+              📜 Histórico de Operações
             </button>
             <button onClick={() => setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}>
               💰 Proventos
@@ -389,7 +389,7 @@ export default function PortfolioPage() {
 
           {activeTab === 'operacoes' && (
             <div className="flex-col gap-xl w-full">
-              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} />
+              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} />
             </div>
           )}
 
