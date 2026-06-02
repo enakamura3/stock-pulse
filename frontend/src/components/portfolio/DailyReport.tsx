@@ -27,7 +27,7 @@ export default function DailyReport({ positions }: DailyReportProps) {
                 <div key={pos.asset_id} className="flex-row justify-between items-center" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
                   <span className="font-bold">{pos.ticker}</span>
                   <div className="flex-col items-end">
-                    <span className="text-success font-bold">+{formatPercentage(pos.daily_change_percent!)}</span>
+                    <span className="text-success font-bold">{formatPercentage(pos.daily_change_percent!)}</span>
                     <span className="text-xs text-secondary">+{formatMoney(pos.daily_change || 0, pos.currency)}</span>
                   </div>
                 </div>
@@ -104,7 +104,7 @@ export default function DailyReport({ positions }: DailyReportProps) {
                         {prefix}{formatMoney(absChange, pos.currency)}
                       </td>
                       <td className={`text-right font-bold ${colorClass}`}>
-                        {prefix}{formatPercentage(percent)}
+                        {formatPercentage(percent)}
                       </td>
                     </tr>
                   );
