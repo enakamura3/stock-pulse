@@ -182,8 +182,8 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 
 	if len(risers) > 0 {
 		msg += p.Sprintf("\n🚀 *Maiores Altas do Dia*\n")
-		limit := 3
-		if len(risers) < 3 {
+		limit := 5
+		if len(risers) < 5 {
 			limit = len(risers)
 		}
 		for i := 0; i < limit; i++ {
@@ -193,8 +193,8 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 
 	if len(fallers) > 0 {
 		msg += p.Sprintf("\n📉 *Maiores Baixas do Dia*\n")
-		limit := 3
-		if len(fallers) < 3 {
+		limit := 5
+		if len(fallers) < 5 {
 			limit = len(fallers)
 		}
 		for i := 0; i < limit; i++ {
