@@ -202,6 +202,21 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		}
 	}
 
+	if len(sortedPos) > 0 {
+		msg += p.Sprintf("\n📋 *Resumo Completo (Ativos)*\n")
+		for _, pos := range sortedPos {
+			var symbol string
+			if pos.DailyChangePercent > 0 {
+				symbol = "🟢"
+			} else if pos.DailyChangePercent < 0 {
+				symbol = "🔴"
+			} else {
+				symbol = "⚪"
+			}
+			msg += p.Sprintf("%s *%s*: %.2f %s | Var: %+.2f%%\n", symbol, pos.Ticker, pos.CurrentValue, pos.Currency, pos.DailyChangePercent)
+		}
+	}
+
 	// Acknowledge the callback to remove the loading state on the button
 	c.Respond()
 	
