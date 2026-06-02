@@ -305,13 +305,14 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 		// Executar Transação
 		tx := &portfolio.Transaction{
-			PortfolioID: state.PortfolioID,
-			Ticker:      state.Ticker,
-			Type:        state.Type,
-			Quantity:    state.Quantity,
-			UnitPrice:   price,
-			TotalCost:   state.Quantity * price,
-			ExecutedAt:  time.Now(),
+			PortfolioID:  state.PortfolioID,
+			Ticker:       state.Ticker,
+			Type:         state.Type,
+			Quantity:     state.Quantity,
+			UnitPrice:    price,
+			TotalCost:    state.Quantity * price,
+			ExchangeRate: 1.0,
+			ExecutedAt:   time.Now(),
 		}
 
 		_, err = h.portfolioSvc.AddTransaction(context.Background(), userID.String(), tx)
