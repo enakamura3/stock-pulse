@@ -19,6 +19,7 @@ type PortfolioService interface {
 	GetPortfolios(ctx context.Context, userID string) ([]portfolio.Portfolio, error)
 	GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*portfolio.Portfolio, []portfolio.Position, error)
 	AddTransaction(ctx context.Context, userID string, tx *portfolio.Transaction) (*portfolio.Transaction, error)
+	GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]portfolio.CalculatedDividend, error)
 }
 
 type MarketService interface {
@@ -45,6 +46,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	
 	// Callback dos Inline Keyboards estáticos
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
+	bot.Handle("\fbtn_proventos", h.HandleDividends)
 	bot.Handle("\fbtn_operacao", h.HandleLaunchOperation)
 
 	bot.Handle("\fbtn_new_asset", h.HandleNewAsset)
@@ -85,10 +87,12 @@ func (h *Handlers) HandleMenu(c telebot.Context) error {
 
 	menu := &telebot.ReplyMarkup{}
 	btnResumo := menu.Data("📊 Resumo da Carteira", "btn_resumo")
+	btnProventos := menu.Data("💸 Ver Proventos", "btn_proventos")
 	btnOperacao := menu.Data("💵 Lançar Operação", "btn_operacao")
 
 	menu.Inline(
 		menu.Row(btnResumo),
+		menu.Row(btnProventos),
 		menu.Row(btnOperacao),
 	)
 
@@ -417,4 +421,68 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 	}
 
 	return nil
+}
+
+func (h *Handlers) HandleDividends(c telebot.Context) error {
+	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+	if err != nil {
+		return c.Send("⚠️ Sua conta não está vinculada.")
+	}
+
+	userIDStr := userID.String()
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Send("⚠️ Nenhuma carteira encontrada na sua conta.")
+	}
+
+	portfolioID := portfolios[0].ID
+	divs, err := h.portfolioSvc.GetPortfolioDividends(context.Background(), portfolioID, userIDStr)
+	if err != nil {
+		slog.Error("Failed to fetch dividends for telegram bot", "error", err, "user_id", userIDStr)
+		return c.Send("❌ Ocorreu um erro ao buscar os proventos da sua carteira.")
+	}
+
+	var totalPaid, totalFuture float64
+	now := time.Now()
+	
+	for _, d := range divs {
+		if d.PaymentDate.After(now) {
+			totalFuture += d.NetAmount
+		} else {
+			totalPaid += d.NetAmount
+		}
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("💸 *Resumo de Proventos*\n\n")
+	msg += p.Sprintf("✅ *Recebidos:* %.2f BRL\n", totalPaid)
+	msg += p.Sprintf("⏳ *A Receber:* %.2f BRL\n", totalFuture)
+	
+	if len(divs) > 0 {
+		msg += "\n📋 *Últimos Pagamentos*\n"
+		
+		// Ordernar divs por data de pagamento decrescente
+		sort.Slice(divs, func(i, j int) bool {
+			return divs[i].PaymentDate.After(divs[j].PaymentDate)
+		})
+		
+		limit := 5
+		if len(divs) < 5 {
+			limit = len(divs)
+		}
+		
+		for i := 0; i < limit; i++ {
+			d := divs[i]
+			status := "✅"
+			if d.PaymentDate.After(now) {
+				status = "⏳"
+			}
+			msg += p.Sprintf("%s `%s`: %.2f BRL (%s)\n", status, d.Ticker, d.NetAmount, d.PaymentDate.Format("02/01/2006"))
+		}
+	} else {
+		msg += "\nNenhum provento registrado na sua carteira ainda."
+	}
+
+	c.Respond()
+	return c.Send(msg, telebot.ModeMarkdown)
 }
