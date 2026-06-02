@@ -48,15 +48,17 @@ type Position struct {
 	TotalCost     float64 `json:"total_cost"`
 	
 	// Preenchidos dinamicamente no serviço
-	CurrentPrice  float64 `json:"current_price,omitempty"`
-	CurrentValue  float64 `json:"current_value,omitempty"`
-	ProfitLoss    float64 `json:"profit_loss,omitempty"`
-	ReturnPercent float64 `json:"return_percent,omitempty"`
-	GrahamValue   float64 `json:"graham_value,omitempty"`
-	BazinValue    float64 `json:"bazin_value,omitempty"`
-	PVP           float64 `json:"pvp,omitempty"`
-	PE            float64 `json:"pe,omitempty"`
-	DividendYield float64 `json:"dividend_yield,omitempty"`
+	CurrentPrice       float64 `json:"current_price,omitempty"`
+	CurrentValue       float64 `json:"current_value,omitempty"`
+	ProfitLoss         float64 `json:"profit_loss,omitempty"`
+	ReturnPercent      float64 `json:"return_percent,omitempty"`
+	DailyChange        float64 `json:"daily_change,omitempty"`
+	DailyChangePercent float64 `json:"daily_change_percent,omitempty"`
+	GrahamValue        float64 `json:"graham_value,omitempty"`
+	BazinValue         float64 `json:"bazin_value,omitempty"`
+	PVP                float64 `json:"pvp,omitempty"`
+	PE                 float64 `json:"pe,omitempty"`
+	DividendYield      float64 `json:"dividend_yield,omitempty"`
 }
 
 // DailyPrice representa a cotação histórica diária de um ativo.

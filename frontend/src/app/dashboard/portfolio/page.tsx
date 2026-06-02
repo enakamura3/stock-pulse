@@ -13,6 +13,7 @@ import PortfolioSummaryCards from '@/components/portfolio/PortfolioSummaryCards'
 import AssetList from '@/components/portfolio/AssetList';
 import TransactionHistory from '@/components/portfolio/TransactionHistory';
 import DividendsHistory from '@/components/portfolio/DividendsHistory';
+import DailyReport from '@/components/portfolio/DailyReport';
 import Modals from '@/components/portfolio/Modals';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -34,7 +35,7 @@ export default function PortfolioPage() {
   const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
   const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
   const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos'>('ativos');
+  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'diario'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
@@ -374,10 +375,13 @@ export default function PortfolioPage() {
               📊 Ativos
             </button>
             <button onClick={() => setActiveTab('operacoes')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'operacoes' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'operacoes' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'operacoes' ? 700 : 500, fontSize: '0.9rem' }}>
-              📜 Histórico de Transações
+              📜 Histórico de Operações
             </button>
             <button onClick={() => setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}>
               💰 Proventos
+            </button>
+            <button onClick={() => setActiveTab('diario')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'diario' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'diario' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'diario' ? 700 : 500, fontSize: '0.9rem' }}>
+              📈 Resumo Diário
             </button>
           </div>
 
@@ -389,12 +393,16 @@ export default function PortfolioPage() {
 
           {activeTab === 'operacoes' && (
             <div className="flex-col gap-xl w-full">
-              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} />
+              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} />
             </div>
           )}
 
           {activeTab === 'proventos' && (
             <DividendsHistory dividends={filteredDividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
+          )}
+
+          {activeTab === 'diario' && (
+            <DailyReport positions={filteredPositions} />
           )}
         </div>
       )}
