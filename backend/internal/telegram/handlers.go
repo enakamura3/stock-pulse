@@ -263,8 +263,8 @@ func (h *Handlers) handleSetType(c telebot.Context, txType string) error {
 func (h *Handlers) HandleText(c telebot.Context) error {
 	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
 	if err != nil || state == nil {
-		// Ignora textos se não estiver no meio de um wizard
-		return nil
+		// Se não estiver no meio de um wizard, responde com o menu principal para facilitar a usabilidade
+		return h.HandleMenu(c)
 	}
 
 	text := strings.TrimSpace(c.Text())

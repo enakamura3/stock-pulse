@@ -30,6 +30,11 @@ func NewBotRunner(token string, handlers *Handlers) (*BotRunner, error) {
 
 	handlers.Register(b)
 
+	// Adiciona o Menu dinâmico nativo do Telegram (Botão "Menu" ao lado da caixa de texto)
+	_ = b.SetCommands([]telebot.Command{
+		{Text: "menu", Description: "Abrir o menu principal"},
+	})
+
 	return &BotRunner{
 		bot:      b,
 		handlers: handlers,
