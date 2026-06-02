@@ -552,10 +552,13 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 		return c.Send("❌ Erro ao buscar proventos.")
 	}
 
-	grouped := make(map[string]float64)
+	grouped := make(map[string]map[string]float64)
 	for _, d := range divs {
 		key := d.PaymentDate.Format("2006-01") // Sortable key YYYY-MM
-		grouped[key] += d.NetAmount
+		if grouped[key] == nil {
+			grouped[key] = make(map[string]float64)
+		}
+		grouped[key][d.Ticker] += d.NetAmount
 	}
 
 	keys := make([]string, 0, len(grouped))
@@ -570,7 +573,25 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 		// Format back to MM/YYYY for display
 		parts := strings.Split(k, "-")
 		display := fmt.Sprintf("%s/%s", parts[1], parts[0])
-		msg += p.Sprintf("• *%s*: %.2f BRL\n", display, grouped[k])
+		
+		var totalMonth float64
+		for _, amt := range grouped[k] {
+			totalMonth += amt
+		}
+		
+		msg += p.Sprintf("• *%s*: %.2f BRL\n", display, totalMonth)
+		
+		// Sort the tickers inside the month to be deterministic
+		tickers := make([]string, 0, len(grouped[k]))
+		for t := range grouped[k] {
+			tickers = append(tickers, t)
+		}
+		sort.Strings(tickers)
+		
+		for _, t := range tickers {
+			msg += p.Sprintf("   ↳ `%s`: %.2f BRL\n", t, grouped[k][t])
+		}
+		msg += "\n"
 	}
 
 	c.Respond()
