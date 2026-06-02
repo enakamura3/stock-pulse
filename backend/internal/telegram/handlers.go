@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -152,6 +153,54 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		lucroPrejuizo = p.Sprintf("🔴 %.2f BRL (%.2f%%)", totalProfitLoss, totalReturnPercent)
 	}
 	msg += p.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
+
+	// Clonar posições para ordenar sem afetar a original
+	sortedPos := make([]portfolio.Position, 0, len(positions))
+	for _, pos := range positions {
+		if pos.DailyChangePercent != 0 {
+			sortedPos = append(sortedPos, pos)
+		}
+	}
+
+	sort.Slice(sortedPos, func(i, j int) bool {
+		return sortedPos[i].DailyChangePercent > sortedPos[j].DailyChangePercent
+	})
+
+	var risers []portfolio.Position
+	var fallers []portfolio.Position
+
+	for _, pos := range sortedPos {
+		if pos.DailyChangePercent > 0 {
+			risers = append(risers, pos)
+		}
+	}
+	for i := len(sortedPos) - 1; i >= 0; i-- {
+		if sortedPos[i].DailyChangePercent < 0 {
+			fallers = append(fallers, sortedPos[i])
+		}
+	}
+
+	if len(risers) > 0 {
+		msg += p.Sprintf("\n🚀 *Maiores Altas do Dia*\n")
+		limit := 3
+		if len(risers) < 3 {
+			limit = len(risers)
+		}
+		for i := 0; i < limit; i++ {
+			msg += p.Sprintf("• %s: +%.2f%%\n", risers[i].Ticker, risers[i].DailyChangePercent)
+		}
+	}
+
+	if len(fallers) > 0 {
+		msg += p.Sprintf("\n📉 *Maiores Baixas do Dia*\n")
+		limit := 3
+		if len(fallers) < 3 {
+			limit = len(fallers)
+		}
+		for i := 0; i < limit; i++ {
+			msg += p.Sprintf("• %s: %.2f%%\n", fallers[i].Ticker, fallers[i].DailyChangePercent)
+		}
+	}
 
 	// Acknowledge the callback to remove the loading state on the button
 	c.Respond()
