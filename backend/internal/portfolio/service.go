@@ -528,7 +528,7 @@ func (s *Service) DeleteTransaction(ctx context.Context, txID, portfolioID, user
 	return s.repo.DeleteTransaction(ctx, txID, portfolioID, userID)
 }
 
-func (s *Service) repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
+func (s *Service) GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
 	return s.repo.GetTransactionsByPortfolioID(ctx, portfolioID, userID)
 }
 

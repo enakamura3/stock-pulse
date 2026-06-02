@@ -328,13 +328,13 @@ func TestService_DeleteMethods(t *testing.T) {
 	assert.NoError(t, s.DeleteTransaction(context.Background(), "tx1", "p1", "u1"))
 }
 
-func TestService_repoGetTransactionsByPortfolioID(t *testing.T) {
+func TestService_GetPortfolioTransactions(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		txs := []Transaction{{ID: "tx1"}}
 		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
 
-		res, err := s.repoGetTransactionsByPortfolioID(context.Background(), "p1", "u1")
+		res, err := s.GetPortfolioTransactions(context.Background(), "p1", "u1")
 		assert.NoError(t, err)
 		assert.Equal(t, txs, res)
 		repo.AssertExpectations(t)

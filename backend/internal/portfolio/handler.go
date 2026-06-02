@@ -27,7 +27,7 @@ type PortfolioService interface {
 	GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]CalculatedDividend, error)
 
 	// Utilizado especificamente pelo Handler para recuperar transações puras
-	repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
+	GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
 }
 
 // Removido do handler.go
@@ -158,7 +158,7 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txs, err := h.service.repoGetTransactionsByPortfolioID(r.Context(), portfolioID, userID)
+	txs, err := h.service.GetPortfolioTransactions(r.Context(), portfolioID, userID)
 	if err != nil {
 		h.respondWithError(w, http.StatusInternalServerError, "Erro ao recuperar transações")
 		return

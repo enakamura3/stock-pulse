@@ -20,6 +20,7 @@ type PortfolioService interface {
 	GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*portfolio.Portfolio, []portfolio.Position, error)
 	AddTransaction(ctx context.Context, userID string, tx *portfolio.Transaction) (*portfolio.Transaction, error)
 	GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]portfolio.CalculatedDividend, error)
+	GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]portfolio.Transaction, error)
 }
 
 type MarketService interface {
@@ -47,6 +48,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	// Callback dos Inline Keyboards estáticos
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
+	bot.Handle("\fbtn_history", h.HandleHistory)
 	bot.Handle("\fbtn_divs_year", h.HandleDividendsByYear)
 	bot.Handle("\fbtn_divs_month", h.HandleDividendsByMonth)
 	bot.Handle("\fbtn_operacao", h.HandleLaunchOperation)
@@ -90,11 +92,13 @@ func (h *Handlers) HandleMenu(c telebot.Context) error {
 	menu := &telebot.ReplyMarkup{}
 	btnResumo := menu.Data("📊 Resumo da Carteira", "btn_resumo")
 	btnProventos := menu.Data("💸 Ver Proventos", "btn_proventos")
+	btnHistory := menu.Data("📜 Histórico", "btn_history")
 	btnOperacao := menu.Data("💵 Lançar Operação", "btn_operacao")
 
 	menu.Inline(
 		menu.Row(btnResumo),
 		menu.Row(btnProventos),
+		menu.Row(btnHistory),
 		menu.Row(btnOperacao),
 	)
 
@@ -596,4 +600,84 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 
 	c.Respond()
 	return c.Send(msg, telebot.ModeMarkdown)
+}
+
+func (h *Handlers) HandleHistory(c telebot.Context) error {
+	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+	if err != nil {
+		return c.Send("⚠️ Sua conta não está vinculada.")
+	}
+
+	userIDStr := userID.String()
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Send("⚠️ Nenhuma carteira encontrada.")
+	}
+	portfolioID := portfolios[0].ID
+
+	txs, err := h.portfolioSvc.GetPortfolioTransactions(context.Background(), portfolioID, userIDStr)
+	if err != nil {
+		slog.Error("Failed to fetch transactions for telegram bot", "error", err, "user_id", userIDStr)
+		return c.Send("❌ Ocorreu um erro ao buscar o histórico.")
+	}
+
+	pageStr := c.Data()
+	page := 0
+	if pageStr != "" {
+		fmt.Sscanf(pageStr, "%d", &page)
+	}
+
+	pageSize := 10
+	start := page * pageSize
+	if start >= len(txs) {
+		start = len(txs)
+	}
+	end := start + pageSize
+	if end > len(txs) {
+		end = len(txs)
+	}
+
+	if len(txs) == 0 {
+		c.Respond()
+		return c.Send("📜 Nenhuma operação encontrada na sua carteira.")
+	}
+
+	pageTxs := txs[start:end]
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("📜 *Histórico de Operações*\n_Página %d_\n\n", page+1)
+
+	for _, tx := range pageTxs {
+		tipoStr := "🟢 C"
+		if tx.Type == "SELL" {
+			tipoStr = "🔴 V"
+		}
+		
+		msg += p.Sprintf("%s | `%s`\n", tipoStr, tx.Ticker)
+		msg += p.Sprintf("Data: %s\n", tx.ExecutedAt.Format("02/01/2006"))
+		msg += p.Sprintf("Qtd: %.4f | Preço: %.2f | Total: %.2f\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost)
+	}
+
+	menu := &telebot.ReplyMarkup{}
+	var btns []telebot.Btn
+	
+	if start > 0 {
+		btns = append(btns, menu.Data("⬅️ Anterior", "btn_history", fmt.Sprintf("%d", page-1)))
+	}
+	if end < len(txs) {
+		btns = append(btns, menu.Data("Próxima ➡️", "btn_history", fmt.Sprintf("%d", page+1)))
+	}
+
+	if len(btns) > 0 {
+		menu.Inline(menu.Row(btns...))
+	}
+
+	c.Respond()
+	
+	if pageStr != "" && c.Message() != nil && c.Message().Text != "" {
+		// It's a pagination click, update the existing message
+		return c.Edit(msg, telebot.ModeMarkdown, menu)
+	}
+	
+	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
