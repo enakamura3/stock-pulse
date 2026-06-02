@@ -213,7 +213,13 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			} else {
 				symbol = "⚪"
 			}
-			msg += p.Sprintf("%s *%s*: %.2f %s | Var: %+.2f%%\n", symbol, pos.Ticker, pos.CurrentValue, pos.Currency, pos.DailyChangePercent)
+			rate := 1.0
+			if pos.CurrentPrice > 0 && pos.Quantity > 0 {
+				rate = pos.CurrentValue / (pos.CurrentPrice * pos.Quantity)
+			}
+			varBRL := pos.DailyChange * pos.Quantity * rate
+
+			msg += p.Sprintf("%s *%s*: %+.2f%% (%+.2f BRL)\n", symbol, pos.Ticker, pos.DailyChangePercent, varBRL)
 		}
 	}
 
