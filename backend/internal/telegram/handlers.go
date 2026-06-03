@@ -146,21 +146,21 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📊 *Resumo da sua Carteira*\n\n")
-	msg += p.Sprintf("💰 Valor Total: *%.2f BRL*\n", totalValue)
+	msg += p.Sprintf("💰 Valor Total: *R$ %.2f*\n", totalValue)
 	
 	var variacaoDiaria string
 	if totalDailyChange >= 0 {
-		variacaoDiaria = p.Sprintf("🟢 +%.2f BRL", totalDailyChange)
+		variacaoDiaria = p.Sprintf("🟢 +R$ %.2f", totalDailyChange)
 	} else {
-		variacaoDiaria = p.Sprintf("🔴 %.2f BRL", totalDailyChange)
+		variacaoDiaria = p.Sprintf("🔴 R$ %.2f", totalDailyChange)
 	}
 	msg += p.Sprintf("📈 Variação Diária: *%s*\n", variacaoDiaria)
 	
 	var lucroPrejuizo string
 	if totalProfitLoss >= 0 {
-		lucroPrejuizo = p.Sprintf("🟢 +%.2f BRL (%.2f%%)", totalProfitLoss, totalReturnPercent)
+		lucroPrejuizo = p.Sprintf("🟢 +R$ %.2f (%.2f%%)", totalProfitLoss, totalReturnPercent)
 	} else {
-		lucroPrejuizo = p.Sprintf("🔴 %.2f BRL (%.2f%%)", totalProfitLoss, totalReturnPercent)
+		lucroPrejuizo = p.Sprintf("🔴 R$ %.2f (%.2f%%)", totalProfitLoss, totalReturnPercent)
 	}
 	msg += p.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
 
@@ -229,7 +229,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			}
 			varBRL := pos.DailyChange * pos.Quantity * rate
 
-			msg += p.Sprintf("%s `%s`: %+.2f%% (%+.2f BRL)\n", symbol, pos.Ticker, pos.DailyChangePercent, varBRL)
+			msg += p.Sprintf("%s `%s`: %+.2f%% (R$ %+.2f)\n", symbol, pos.Ticker, pos.DailyChangePercent, varBRL)
 		}
 	}
 
@@ -465,8 +465,8 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("💸 *Resumo de Proventos*\n\n")
-	msg += p.Sprintf("✅ *Recebidos (Mês Atual):* %.2f BRL\n", totalPaidMonth)
-	msg += p.Sprintf("⏳ *A Receber (Mês Atual):* %.2f BRL\n", totalFutureMonth)
+	msg += p.Sprintf("✅ *Recebidos (Mês Atual):* R$ %.2f\n", totalPaidMonth)
+	msg += p.Sprintf("⏳ *A Receber (Mês Atual):* R$ %.2f\n", totalFutureMonth)
 	
 	if len(divs) > 0 {
 		var pastDivs []portfolio.CalculatedDividend
@@ -495,7 +495,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				if d.Type != "" {
 					tipoStr = d.Type
 				}
-				msg += p.Sprintf("✅ `%s`: %.2f BRL (%s) - %s\n", d.Ticker, d.NetAmount, d.PaymentDate.Format("2006-01-02"), tipoStr)
+				msg += p.Sprintf("✅ `%s`: R$ %.2f (%s) - %s\n", d.Ticker, d.NetAmount, d.PaymentDate.Format("2006-01-02"), tipoStr)
 			}
 		}
 	} else {
@@ -557,9 +557,9 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	msg := p.Sprintf("📅 *Proventos por Ano*\n\n")
 	for _, y := range years {
 		if y <= 1 {
-			msg += p.Sprintf("• *A Definir*: %.2f BRL\n", grouped[y])
+			msg += p.Sprintf("• *A Definir*: R$ %.2f\n", grouped[y])
 		} else {
-			msg += p.Sprintf("• *%s*: %.2f BRL\n", fmt.Sprint(y), grouped[y])
+			msg += p.Sprintf("• *%s*: R$ %.2f\n", fmt.Sprint(y), grouped[y])
 		}
 	}
 
@@ -662,7 +662,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			}
 		}
 		
-		msg += p.Sprintf("• *%s*: %.2f BRL\n", display, totalMonth)
+		msg += p.Sprintf("• *%s*: R$ %.2f\n", display, totalMonth)
 		
 		// Sort mapKeys alphabetically
 		mapKeys := make([]string, 0, len(summaryMap))
@@ -675,7 +675,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			sum := summaryMap[mk]
 			ticker := strings.Split(mk, "|")[0]
 			datesStr := strings.Join(sum.dates, ", ")
-			msg += p.Sprintf("   ↳ `%s`: %.2f BRL (%s) - %s\n", ticker, sum.amount, datesStr, sum.dType)
+			msg += p.Sprintf("   ↳ `%s`: R$ %.2f (%s) - %s\n", ticker, sum.amount, datesStr, sum.dType)
 		}
 		msg += "\n"
 	}
