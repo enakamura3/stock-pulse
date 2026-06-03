@@ -491,7 +491,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 			if d.Type != "" {
 				tipoStr = d.Type
 			}
-			msg += p.Sprintf("%s `%s`: %.2f BRL (%s) - %s\n", status, d.Ticker, d.NetAmount, d.PaymentDate.Format("02/01/2006"), tipoStr)
+			msg += p.Sprintf("%s `%s`: %.2f BRL (%s) - %s\n", status, d.Ticker, d.NetAmount, d.PaymentDate.Format("2006-01-02"), tipoStr)
 		}
 	} else {
 		msg += "\nNenhum provento registrado na sua carteira ainda."
@@ -621,7 +621,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			}
 			summaryMap[d.Ticker].amount += d.NetAmount
 			
-			dateStr := d.PaymentDate.Format("02/01")
+			dateStr := d.PaymentDate.Format("2006-01-02")
 			foundDate := false
 			for _, existing := range summaryMap[d.Ticker].dates {
 				if existing == dateStr {
@@ -724,7 +724,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 		}
 		
 		msg += p.Sprintf("%s | `%s`\n", tipoStr, tx.Ticker)
-		msg += p.Sprintf("Data: %s\n", tx.ExecutedAt.Format("02/01/2006"))
+		msg += p.Sprintf("Data: %s\n", tx.ExecutedAt.Format("2006-01-02"))
 		msg += p.Sprintf("Qtd: %.4f | Preço: %.2f | Total: %.2f\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost)
 	}
 
