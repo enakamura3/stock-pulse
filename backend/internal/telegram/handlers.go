@@ -556,7 +556,7 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📅 *Proventos por Ano*\n\n")
 	for _, y := range years {
-		msg += p.Sprintf("• *%d*: %.2f BRL\n", y, grouped[y])
+		msg += p.Sprintf("• *%s*: %.2f BRL\n", fmt.Sprint(y), grouped[y])
 	}
 
 	c.Respond()
