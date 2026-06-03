@@ -501,9 +501,12 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	
 	if len(divs) > 0 {
 		var pastDivs []portfolio.CalculatedDividend
+		var futureDivs []portfolio.CalculatedDividend
 		for _, d := range divs {
 			if !d.PaymentDate.After(now) {
 				pastDivs = append(pastDivs, d)
+			} else {
+				futureDivs = append(futureDivs, d)
 			}
 		}
 
@@ -515,8 +518,8 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				return pastDivs[i].PaymentDate.After(pastDivs[j].PaymentDate)
 			})
 			
-			limit := 5
-			if len(pastDivs) < 5 {
+			limit := 3
+			if len(pastDivs) < 3 {
 				limit = len(pastDivs)
 			}
 			
@@ -528,6 +531,30 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 					tipoStr = d.Type
 				}
 				msg += p.Sprintf("✅ `%s`: %s %.2f • %s • %s\n", d.Ticker, sym, d.NetAmount, d.PaymentDate.Format("2006-01-02"), abbreviateDividendType(tipoStr))
+			}
+		}
+
+		if len(futureDivs) > 0 {
+			msg += "\n📅 *Próximos Pagamentos*\n"
+			
+			// Ordernar futureDivs por data de pagamento crescente (mais próximos primeiro)
+			sort.Slice(futureDivs, func(i, j int) bool {
+				return futureDivs[i].PaymentDate.Before(futureDivs[j].PaymentDate)
+			})
+			
+			limit := 3
+			if len(futureDivs) < 3 {
+				limit = len(futureDivs)
+			}
+			
+			sym := getCurrencySymbol("BRL")
+			for i := 0; i < limit; i++ {
+				d := futureDivs[i]
+				tipoStr := "Div"
+				if d.Type != "" {
+					tipoStr = d.Type
+				}
+				msg += p.Sprintf("⏳ `%s`: %s %.2f • %s • %s\n", d.Ticker, sym, d.NetAmount, d.PaymentDate.Format("2006-01-02"), abbreviateDividendType(tipoStr))
 			}
 		}
 	} else {
