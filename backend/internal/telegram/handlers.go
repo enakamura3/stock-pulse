@@ -239,6 +239,37 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	return c.Send(msg, telebot.ModeMarkdown)
 }
 
+func getCurrencySymbol(code string) string {
+	switch code {
+	case "USD":
+		return "US$"
+	case "EUR":
+		return "€"
+	case "BRL":
+		return "R$"
+	default:
+		return "R$"
+	}
+}
+
+func abbreviateDividendType(t string) string {
+	switch strings.ToUpper(t) {
+	case "DIVIDENDO", "DIVIDENDOS", "DIV":
+		return "DIV"
+	case "JUROS SOBRE CAPITAL PRÓPRIO", "JUROS SOBRE CAPITAL PROPRIO", "JCP":
+		return "JCP"
+	case "RENDIMENTO", "RENDIMENTOS", "REND":
+		return "REND"
+	case "AMORTIZAÇÃO", "AMORTIZACAO":
+		return "AMORT"
+	default:
+		if len(t) > 4 {
+			return strings.ToUpper(t[:4])
+		}
+		return strings.ToUpper(t)
+	}
+}
+
 func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
 	if err != nil {
@@ -489,13 +520,14 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				limit = len(pastDivs)
 			}
 			
+			sym := getCurrencySymbol("BRL")
 			for i := 0; i < limit; i++ {
 				d := pastDivs[i]
 				tipoStr := "Div"
 				if d.Type != "" {
 					tipoStr = d.Type
 				}
-				msg += p.Sprintf("✅ `%s`: R$ %.2f (%s) - %s\n", d.Ticker, d.NetAmount, d.PaymentDate.Format("2006-01-02"), tipoStr)
+				msg += p.Sprintf("✅ `%s`: %s %.2f • %s • %s\n", d.Ticker, sym, d.NetAmount, d.PaymentDate.Format("2006-01-02"), abbreviateDividendType(tipoStr))
 			}
 		}
 	} else {
@@ -614,6 +646,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📆 *Proventos por Mês*\n_Página %d_\n\n", page+1)
 	
+	sym := getCurrencySymbol("BRL")
 	for _, k := range pageKeys {
 		// Format back to YYYY/MM for display
 		display := ""
@@ -675,7 +708,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			sum := summaryMap[mk]
 			ticker := strings.Split(mk, "|")[0]
 			datesStr := strings.Join(sum.dates, ", ")
-			msg += p.Sprintf("   ↳ `%s`: R$ %.2f (%s) - %s\n", ticker, sum.amount, datesStr, sum.dType)
+			msg += p.Sprintf("   ↳ `%s`: %s %.2f • %s • %s\n", ticker, sym, sum.amount, datesStr, abbreviateDividendType(sum.dType))
 		}
 		msg += "\n"
 	}
