@@ -469,29 +469,34 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	msg += p.Sprintf("⏳ *A Receber (Mês Atual):* %.2f BRL\n", totalFutureMonth)
 	
 	if len(divs) > 0 {
-		msg += "\n📋 *Últimos Pagamentos*\n"
-		
-		// Ordernar divs por data de pagamento decrescente
-		sort.Slice(divs, func(i, j int) bool {
-			return divs[i].PaymentDate.After(divs[j].PaymentDate)
-		})
-		
-		limit := 5
-		if len(divs) < 5 {
-			limit = len(divs)
+		var pastDivs []portfolio.CalculatedDividend
+		for _, d := range divs {
+			if !d.PaymentDate.After(now) {
+				pastDivs = append(pastDivs, d)
+			}
 		}
-		
-		for i := 0; i < limit; i++ {
-			d := divs[i]
-			status := "✅"
-			if d.PaymentDate.After(now) {
-				status = "⏳"
+
+		if len(pastDivs) > 0 {
+			msg += "\n📋 *Últimos Pagamentos*\n"
+			
+			// Ordernar pastDivs por data de pagamento decrescente
+			sort.Slice(pastDivs, func(i, j int) bool {
+				return pastDivs[i].PaymentDate.After(pastDivs[j].PaymentDate)
+			})
+			
+			limit := 5
+			if len(pastDivs) < 5 {
+				limit = len(pastDivs)
 			}
-			tipoStr := "Div"
-			if d.Type != "" {
-				tipoStr = d.Type
+			
+			for i := 0; i < limit; i++ {
+				d := pastDivs[i]
+				tipoStr := "Div"
+				if d.Type != "" {
+					tipoStr = d.Type
+				}
+				msg += p.Sprintf("✅ `%s`: %.2f BRL (%s) - %s\n", d.Ticker, d.NetAmount, d.PaymentDate.Format("2006-01-02"), tipoStr)
 			}
-			msg += p.Sprintf("%s `%s`: %.2f BRL (%s) - %s\n", status, d.Ticker, d.NetAmount, d.PaymentDate.Format("2006-01-02"), tipoStr)
 		}
 	} else {
 		msg += "\nNenhum provento registrado na sua carteira ainda."
