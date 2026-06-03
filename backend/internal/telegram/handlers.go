@@ -627,46 +627,55 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 		type tSummary struct {
 			amount float64
 			dates  []string
+			dType  string
 		}
 		summaryMap := make(map[string]*tSummary)
 		
 		var totalMonth float64
 		for _, d := range grouped[k] {
 			totalMonth += d.NetAmount
-			if _, exists := summaryMap[d.Ticker]; !exists {
-				summaryMap[d.Ticker] = &tSummary{}
+			
+			dType := "Div"
+			if d.Type != "" {
+				dType = d.Type
 			}
-			summaryMap[d.Ticker].amount += d.NetAmount
+			
+			mapKey := d.Ticker + "|" + dType
+			if _, exists := summaryMap[mapKey]; !exists {
+				summaryMap[mapKey] = &tSummary{dType: dType}
+			}
+			summaryMap[mapKey].amount += d.NetAmount
 			
 			dateStr := d.PaymentDate.Format("2006-01-02")
 			if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
 				dateStr = "-"
 			}
 			foundDate := false
-			for _, existing := range summaryMap[d.Ticker].dates {
+			for _, existing := range summaryMap[mapKey].dates {
 				if existing == dateStr {
 					foundDate = true
 					break
 				}
 			}
 			if !foundDate {
-				summaryMap[d.Ticker].dates = append(summaryMap[d.Ticker].dates, dateStr)
+				summaryMap[mapKey].dates = append(summaryMap[mapKey].dates, dateStr)
 			}
 		}
 		
 		msg += p.Sprintf("• *%s*: %.2f BRL\n", display, totalMonth)
 		
-		// Sort tickers alphabetically
-		tickers := make([]string, 0, len(summaryMap))
-		for t := range summaryMap {
-			tickers = append(tickers, t)
+		// Sort mapKeys alphabetically
+		mapKeys := make([]string, 0, len(summaryMap))
+		for mk := range summaryMap {
+			mapKeys = append(mapKeys, mk)
 		}
-		sort.Strings(tickers)
+		sort.Strings(mapKeys)
 		
-		for _, t := range tickers {
-			sum := summaryMap[t]
+		for _, mk := range mapKeys {
+			sum := summaryMap[mk]
+			ticker := strings.Split(mk, "|")[0]
 			datesStr := strings.Join(sum.dates, ", ")
-			msg += p.Sprintf("   ↳ `%s`: %.2f BRL (%s)\n", t, sum.amount, datesStr)
+			msg += p.Sprintf("   ↳ `%s`: %.2f BRL (%s) - %s\n", ticker, sum.amount, datesStr, sum.dType)
 		}
 		msg += "\n"
 	}
