@@ -556,7 +556,11 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📅 *Proventos por Ano*\n\n")
 	for _, y := range years {
-		msg += p.Sprintf("• *%s*: %.2f BRL\n", fmt.Sprint(y), grouped[y])
+		if y <= 1 {
+			msg += p.Sprintf("• *A Definir*: %.2f BRL\n", grouped[y])
+		} else {
+			msg += p.Sprintf("• *%s*: %.2f BRL\n", fmt.Sprint(y), grouped[y])
+		}
 	}
 
 	c.Respond()
@@ -572,6 +576,9 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	grouped := make(map[string][]portfolio.CalculatedDividend)
 	for _, d := range divs {
 		key := d.PaymentDate.Format("2006-01") // Sortable key YYYY-MM
+		if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
+			key = "0000-00"
+		}
 		grouped[key] = append(grouped[key], d)
 	}
 
@@ -609,8 +616,13 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	
 	for _, k := range pageKeys {
 		// Format back to MM/YYYY for display
-		parts := strings.Split(k, "-")
-		display := fmt.Sprintf("%s/%s", parts[1], parts[0])
+		display := ""
+		if k == "0000-00" {
+			display = "A Definir"
+		} else {
+			parts := strings.Split(k, "-")
+			display = fmt.Sprintf("%s/%s", parts[1], parts[0])
+		}
 		
 		type tSummary struct {
 			amount float64
@@ -627,6 +639,9 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			summaryMap[d.Ticker].amount += d.NetAmount
 			
 			dateStr := d.PaymentDate.Format("2006-01-02")
+			if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
+				dateStr = "-"
+			}
 			foundDate := false
 			for _, existing := range summaryMap[d.Ticker].dates {
 				if existing == dateStr {
