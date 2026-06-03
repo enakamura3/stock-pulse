@@ -448,21 +448,25 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 		return c.Send("❌ Ocorreu um erro ao buscar os proventos da sua carteira.")
 	}
 
-	var totalPaid, totalFuture float64
+	var totalPaidMonth, totalFutureMonth float64
 	now := time.Now()
+	currentMonth := now.Month()
+	currentYear := now.Year()
 	
 	for _, d := range divs {
-		if d.PaymentDate.After(now) {
-			totalFuture += d.NetAmount
-		} else {
-			totalPaid += d.NetAmount
+		if d.PaymentDate.Year() == currentYear && d.PaymentDate.Month() == currentMonth {
+			if d.PaymentDate.After(now) {
+				totalFutureMonth += d.NetAmount
+			} else {
+				totalPaidMonth += d.NetAmount
+			}
 		}
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("💸 *Resumo de Proventos*\n\n")
-	msg += p.Sprintf("✅ *Recebidos:* %.2f BRL\n", totalPaid)
-	msg += p.Sprintf("⏳ *A Receber:* %.2f BRL\n", totalFuture)
+	msg += p.Sprintf("✅ *Recebidos (Mês Atual):* %.2f BRL\n", totalPaidMonth)
+	msg += p.Sprintf("⏳ *A Receber (Mês Atual):* %.2f BRL\n", totalFutureMonth)
 	
 	if len(divs) > 0 {
 		msg += "\n📋 *Últimos Pagamentos*\n"
@@ -483,7 +487,11 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 			if d.PaymentDate.After(now) {
 				status = "⏳"
 			}
-			msg += p.Sprintf("%s `%s`: %.2f BRL (%s)\n", status, d.Ticker, d.NetAmount, d.PaymentDate.Format("02/01/2006"))
+			tipoStr := "Div"
+			if d.Type != "" {
+				tipoStr = d.Type
+			}
+			msg += p.Sprintf("%s `%s`: %.2f BRL (%s) - %s\n", status, d.Ticker, d.NetAmount, d.PaymentDate.Format("02/01/2006"), tipoStr)
 		}
 	} else {
 		msg += "\nNenhum provento registrado na sua carteira ainda."
