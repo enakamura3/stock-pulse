@@ -527,7 +527,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				if d.Type != "" {
 					tipoStr = d.Type
 				}
-				msg += p.Sprintf("✅ `%s`: %s %.2f | %s | %s\n", d.Ticker, sym, d.NetAmount, d.PaymentDate.Format("2006-01-02"), abbreviateDividendType(tipoStr))
+				msg += p.Sprintf("✅ `%s`: %s %.2f • %s • %s\n", d.Ticker, sym, d.NetAmount, d.PaymentDate.Format("2006-01-02"), abbreviateDividendType(tipoStr))
 			}
 		}
 	} else {
@@ -708,7 +708,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			sum := summaryMap[mk]
 			ticker := strings.Split(mk, "|")[0]
 			datesStr := strings.Join(sum.dates, ", ")
-			msg += p.Sprintf("   ↳ `%s`: %s %.2f | %s | %s\n", ticker, sym, sum.amount, datesStr, abbreviateDividendType(sum.dType))
+			msg += p.Sprintf("   ↳ `%s`: %s %.2f • %s • %s\n", ticker, sym, sum.amount, datesStr, abbreviateDividendType(sum.dType))
 		}
 		msg += "\n"
 	}
