@@ -95,6 +95,7 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   <th className="text-right">Cotação Atual</th>
                   <th className="text-right">Variação ($)</th>
                   <th className="text-right">Variação (%)</th>
+                  <th className="text-right">Impacto Diário</th>
                 </tr>
               </thead>
               <tbody>
@@ -111,6 +112,13 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   const prevCloseColor = previousClose >= avgPrice ? 'text-success' : 'text-danger';
                   const currentPriceColor = currentPrice >= avgPrice ? 'text-success' : 'text-danger';
                   
+                  const qty = pos.quantity || 0;
+                  let rate = 1.0;
+                  if (currentPrice > 0 && qty > 0) {
+                    rate = (pos.current_value || 0) / (currentPrice * qty);
+                  }
+                  const impactAmount = absChange * qty * rate;
+
                   return (
                     <tr key={pos.asset_id}>
                       <td><span className="font-bold">{pos.ticker}</span></td>
@@ -128,6 +136,9 @@ export default function DailyReport({ positions }: DailyReportProps) {
                       </td>
                       <td className={`text-right font-bold ${colorClass}`}>
                         {formatPercentage(percent)}
+                      </td>
+                      <td className={`text-right font-bold ${colorClass}`}>
+                        {prefix}{formatMoney(impactAmount, baseCurrency)}
                       </td>
                     </tr>
                   );
