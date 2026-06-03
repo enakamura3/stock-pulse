@@ -615,13 +615,13 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	msg := p.Sprintf("📆 *Proventos por Mês*\n_Página %d_\n\n", page+1)
 	
 	for _, k := range pageKeys {
-		// Format back to MM/YYYY for display
+		// Format back to YYYY/MM for display
 		display := ""
 		if k == "0000-00" {
 			display = "A Definir"
 		} else {
 			parts := strings.Split(k, "-")
-			display = fmt.Sprintf("%s/%s", parts[1], parts[0])
+			display = fmt.Sprintf("%s/%s", parts[0], parts[1])
 		}
 		
 		type tSummary struct {
