@@ -15,8 +15,31 @@ export default function DailyReport({ positions }: DailyReportProps) {
   const topRisers = sortedByPercent.slice(0, 5);
   const topFallers = [...sortedByPercent].reverse().slice(0, 5);
 
+  let totalDailyChange = 0;
+  let baseCurrency = positions.length > 0 ? 'BRL' : 'BRL'; // Defaulting to BRL
+  positions.forEach(pos => {
+    let rate = 1.0;
+    if ((pos.current_price || 0) > 0 && (pos.quantity || 0) > 0) {
+      rate = (pos.current_value || 0) / ((pos.current_price || 0) * (pos.quantity || 0));
+    }
+    totalDailyChange += (pos.daily_change || 0) * (pos.quantity || 0) * rate;
+  });
+
+  const isDailyPos = totalDailyChange >= 0;
+
   return (
     <div className="flex-col gap-xl w-full">
+      {positions.length > 0 && (
+        <div className="card flex-col justify-center text-center w-full" style={{ padding: '1.5rem' }}>
+          <span className="text-secondary text-sm font-semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Variação Total Diária da Carteira
+          </span>
+          <span className="text-3xl font-bold mt-sm" style={{ color: isDailyPos ? '#00e676' : '#ff3d00', letterSpacing: '-0.02em' }}>
+            {isDailyPos ? '🟢 +' : '🔴 '}{formatMoney(totalDailyChange, baseCurrency)}
+          </span>
+        </div>
+      )}
+
       <div className="flex-row gap-lg flex-wrap">
         {/* Maiores Altas */}
         <div className="card flex-col gap-md" style={{ flex: '1 1 300px' }}>
@@ -72,6 +95,7 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   <th className="text-right">Cotação Atual</th>
                   <th className="text-right">Variação ($)</th>
                   <th className="text-right">Variação (%)</th>
+                  <th className="text-right">Impacto Diário</th>
                 </tr>
               </thead>
               <tbody>
@@ -88,6 +112,13 @@ export default function DailyReport({ positions }: DailyReportProps) {
                   const prevCloseColor = previousClose >= avgPrice ? 'text-success' : 'text-danger';
                   const currentPriceColor = currentPrice >= avgPrice ? 'text-success' : 'text-danger';
                   
+                  const qty = pos.quantity || 0;
+                  let rate = 1.0;
+                  if (currentPrice > 0 && qty > 0) {
+                    rate = (pos.current_value || 0) / (currentPrice * qty);
+                  }
+                  const impactAmount = absChange * qty * rate;
+
                   return (
                     <tr key={pos.asset_id}>
                       <td><span className="font-bold">{pos.ticker}</span></td>
@@ -105,6 +136,9 @@ export default function DailyReport({ positions }: DailyReportProps) {
                       </td>
                       <td className={`text-right font-bold ${colorClass}`}>
                         {formatPercentage(percent)}
+                      </td>
+                      <td className={`text-right font-bold ${colorClass}`}>
+                        {prefix}{formatMoney(impactAmount, baseCurrency)}
                       </td>
                     </tr>
                   );

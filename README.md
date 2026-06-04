@@ -8,9 +8,10 @@ stock-pulse é uma plataforma moderna e completa para acompanhamento de portfól
 - **Gestão de Portfólio Modular:** Acompanhe rentabilidade, histórico de transações e custo médio dos seus ativos globais ou da B3. A interface do portfólio é organizada em abas (Visão Geral, Transações, Proventos) garantindo uma experiência de usuário limpa e fluida. Suporta edição de transações, Desdobramentos/Agrupamentos (Splits), Bonificações e Importação em Lote (Bulk Import via CSV).
 - **Precisão Matemática e Backtesting:** Motor de rentabilidade inteligente com "Olhar do Futuro". Desdobramentos e agrupamentos futuros são retroativamente calculados nas suas quantidades históricas, garantindo que o seu gráfico de Evolução Patrimonial empate perfeitamente com as cotações "Split-Adjusted" do Yahoo Finance, prevenindo falsos picos de lucros ou perdas.
 - **Watchlists Múltiplas:** Crie listas de favoritos customizadas para separar ativos por estratégia.
+- **Bot Integrado do Telegram:** Interaja com a sua carteira e receba relatórios financeiros completos diretamente pelo chat do Telegram, com interface rica (menus inline paginados, agrupamentos anuais e mensais de proventos, e filtros dinâmicos de próximos pagamentos), sem poluição visual.
 - **Valuation e Indicadores (P/VP, P/L, Yield):** Calcule o Preço Justo de ações segundo as metodologias de Benjamin Graham e Décio Bazin. Acompanhe em tempo real na sua tabela de posições ativas os múltiplos P/VP, P/L e Dividend Yield atualizados via scraping (suporte inteligente a Ações e FIIs da B3 via Fundamentus, e ativos globais via Finviz). Receba alertas visuais diretamente na tabela identificando oportunidades (ex: P/VP < 1.0 ou preços descontados ficam destacados em verde).
-- **Visualização Avançada de Histórico:** Histórico de transações em layout fluido (single-line), com filtros inteligentes por Ticker para auditar operações e custos passados com facilidade.
-- **Alertas de Preço (E-mail):** Configure alertas disparados automaticamente em background quando um preço atinge uma meta, recebendo um e-mail HTML estilizado.
+- **Visualização Avançada de Histórico:** Histórico de transações em layout fluido (single-line), com filtros inteligentes por Ticker para auditar operações e custos passados com facilidade. Além de uma exclusiva coluna de **Impacto Diário em Reais** na tela inicial para medir rapidamente o real ganho/perda de cada ativo na carteira no dia corrente.
+- **Alertas de Preço (E-mail e Telegram):** Configure alertas disparados automaticamente em background quando um preço atinge uma meta, recebendo notificações em tempo real.
 - **Segurança Sólida:** Autenticação usando JWT armazenado exclusivamente em cookies `HttpOnly` com criptografia e regras de CORS restritas.
 - **Observabilidade Total:** Telemetria integrada com Prometheus, Grafana e Loki para métricas e logs em tempo real.
 
@@ -259,6 +260,23 @@ sequenceDiagram
 ├── Makefile          # Atalhos para comandos comuns
 └── Caddyfile         # Configuração de rotas para proxy reverso
 ```
+
+---
+
+## 🤖 Configuração do Telegram Bot
+
+Para que a integração com o Telegram funcione, você precisa criar um bot e obter um token de acesso oficial. O processo leva menos de dois minutos:
+
+1. Abra o seu aplicativo do Telegram e busque pelo usuário oficial **@BotFather**.
+2. Envie o comando `/newbot` e siga as instruções para escolher um nome e um username para o seu bot (obrigatoriamente precisa terminar com `_bot`).
+3. Ao finalizar, o BotFather te entregará um **Token HTTP API** (uma string longa parecida com `123456789:ABCdefGHIjklmNOPqrsTUVwxyz`).
+4. Na raiz do projeto, abra (ou crie) o seu arquivo `.env` baseado no `.env.example`.
+5. Cole o token na variável `TELEGRAM_BOT_TOKEN`, por exemplo:
+   ```env
+   TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklmNOPqrsTUVwxyz
+   ```
+
+Pronto! Com o Token preenchido, assim que você subir a aplicação, o módulo de conversação do Telegram será ativado automaticamente. Ao iniciar um chat enviando `/start`, o bot entregará um link seguro para você vincular sua conta da plataforma Web com o celular.
 
 ---
 

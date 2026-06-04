@@ -72,7 +72,7 @@ func (m *MockPortfolioService) BackfillHistoricalPrices(ctx context.Context, ass
 	return m.Called(ctx, assetID, ticker).Error(0)
 }
 
-func (m *MockPortfolioService) repoGetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
+func (m *MockPortfolioService) GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
 	args := m.Called(ctx, portfolioID, userID)
 	if args.Get(0) != nil {
 		return args.Get(0).([]Transaction), args.Error(1)
@@ -246,7 +246,7 @@ func TestHandler_GetTransactions(t *testing.T) {
 
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("repoGetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
+		s.On("GetPortfolioTransactions", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
 		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/transactions", nil), "u1", map[string]string{"id": "p1"})
 		rec := httptest.NewRecorder()
 		h.GetTransactions(rec, req)
@@ -255,7 +255,7 @@ func TestHandler_GetTransactions(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("repoGetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{{ID: "tx1"}}, nil)
+		s.On("GetPortfolioTransactions", mock.Anything, "p1", "u1").Return([]Transaction{{ID: "tx1"}}, nil)
 		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/transactions", nil), "u1", map[string]string{"id": "p1"})
 		rec := httptest.NewRecorder()
 		h.GetTransactions(rec, req)
