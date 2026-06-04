@@ -263,6 +263,24 @@ sequenceDiagram
 
 ---
 
+## 🤖 Configuração do Telegram Bot
+
+Para que a integração com o Telegram funcione, você precisa criar um bot e obter um token de acesso oficial. O processo leva menos de dois minutos:
+
+1. Abra o seu aplicativo do Telegram e busque pelo usuário oficial **@BotFather**.
+2. Envie o comando `/newbot` e siga as instruções para escolher um nome e um username para o seu bot (obrigatoriamente precisa terminar com `_bot`).
+3. Ao finalizar, o BotFather te entregará um **Token HTTP API** (uma string longa parecida com `123456789:ABCdefGHIjklmNOPqrsTUVwxyz`).
+4. Na raiz do projeto, abra (ou crie) o seu arquivo `.env` baseado no `.env.example`.
+5. Cole o token na variável `TELEGRAM_BOT_TOKEN`, por exemplo:
+   ```env
+   TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklmNOPqrsTUVwxyz
+   ```
+6. Opcional: Se desejar que o botão "Vincular Telegram" da interface web redirecione corretamente, defina a variável pública no `.env` do frontend (ex: `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=SeuBotName_bot`).
+
+Pronto! Com o Token preenchido, assim que você subir a aplicação, o módulo de conversação do Telegram será ativado automaticamente. Ao iniciar um chat enviando `/start`, o bot entregará um link seguro para você vincular sua conta da plataforma Web com o celular.
+
+---
+
 ## ⚙️ Como Executar Localmente
 
 ### Pré-requisitos
