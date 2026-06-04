@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SearchResult } from './types';
 
 interface ModalsProps {
@@ -39,9 +39,49 @@ interface ModalsProps {
   selectedAssetCurrency: string;
   kpiCurrency: string;
   handleAddTransaction: (e: React.FormEvent) => void;
+
+  // Fixed Income Modal
+  showFIModal?: boolean;
+  setShowFIModal?: (s: boolean) => void;
+  fiInstitution?: string;
+  setFiInstitution?: (s: string) => void;
+  fiType?: string;
+  setFiType?: (s: string) => void;
+  fiDebtType?: string;
+  setFiDebtType?: (s: string) => void;
+  fiIndexer?: string;
+  setFiIndexer?: (s: string) => void;
+  fiRate?: string | number;
+  setFiRate?: (s: string | number) => void;
+  fiAmount?: string | number;
+  setFiAmount?: (s: string | number) => void;
+  fiApplicationDate?: string;
+  setFiApplicationDate?: (s: string) => void;
+  fiMaturityDate?: string;
+  setFiMaturityDate?: (s: string) => void;
+  isAddingFI?: boolean;
+  handleAddFixedIncome?: (e: React.FormEvent) => void;
 }
 
 export default function Modals(props: ModalsProps) {
+  const [banks, setBanks] = useState<{name: string, ispb: string}[]>([]);
+
+  useEffect(() => {
+    // Only fetch banks if the FI modal is opened to save resources
+    if (props.showFIModal && banks.length === 0) {
+      fetch('https://brasilapi.com.br/api/banks/v1')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            // Sort alphabetically and filter out null names
+            const validBanks = data.filter(b => b.name).sort((a, b) => a.name.localeCompare(b.name));
+            setBanks(validBanks);
+          }
+        })
+        .catch(e => console.error("Error fetching banks:", e));
+    }
+  }, [props.showFIModal, banks.length]);
+
   return (
     <>
       {props.showPortfolioModal && (
@@ -248,6 +288,138 @@ export default function Modals(props: ModalsProps) {
                 </button>
                 <button type="submit" disabled={props.isAddingTx} className="primary-button w-full" style={{ padding: '0.8rem', fontSize: '0.9rem' }}>
                   {props.isAddingTx ? 'Registrando...' : (props.editingTxId ? 'Salvar Alterações' : 'Lançar')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {props.showFIModal && props.setShowFIModal && props.handleAddFixedIncome && props.setFiInstitution && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h2 className="modal-title" style={{ margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                🏛️ Nova Aplicação (Renda Fixa)
+              </h2>
+              <button onClick={() => props.setShowFIModal!(false)} className="btn-close">✕</button>
+            </div>
+            
+            <form onSubmit={props.handleAddFixedIncome} className="flex-col gap-md">
+              <div className="form-group">
+                <label className="form-label">Instituição (Banco/Corretora)</label>
+                <input
+                  className="form-input" type="text" value={props.fiInstitution}
+                  onChange={(e) => props.setFiInstitution!(e.target.value)}
+                  placeholder="Ex: Banco Itaú, XP Investimentos..."
+                  required disabled={props.isAddingFI}
+                  list="banks-list"
+                  autoComplete="off"
+                />
+                <datalist id="banks-list">
+                  {banks.map(b => (
+                    <option key={b.ispb} value={b.name} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="flex-row gap-md">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Tipo de Produto</label>
+                  <select
+                    className="form-input" value={props.fiType} onChange={(e) => props.setFiType!(e.target.value)} disabled={props.isAddingFI}
+                  >
+                    <option value="CDB" style={{ background: '#1c1f24' }}>CDB</option>
+                    <option value="LCI" style={{ background: '#1c1f24' }}>LCI</option>
+                    <option value="LCA" style={{ background: '#1c1f24' }}>LCA</option>
+                    <option value="LC" style={{ background: '#1c1f24' }}>LC</option>
+                    <option value="TESOURO" style={{ background: '#1c1f24' }}>Tesouro Direto</option>
+                    <option value="CRI" style={{ background: '#1c1f24' }}>CRI</option>
+                    <option value="CRA" style={{ background: '#1c1f24' }}>CRA</option>
+                    <option value="DEBENTURE" style={{ background: '#1c1f24' }}>Debênture</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Rentabilidade</label>
+                  <select
+                    className="form-input" value={props.fiDebtType} onChange={(e) => props.setFiDebtType!(e.target.value)} disabled={props.isAddingFI}
+                  >
+                    <option value="POS" style={{ background: '#1c1f24' }}>Pós-Fixado</option>
+                    <option value="PRE" style={{ background: '#1c1f24' }}>Prefixado</option>
+                    <option value="HIBRIDO" style={{ background: '#1c1f24' }}>Híbrido (IPCA+)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex-row gap-md">
+                {(props.fiDebtType === 'POS' || props.fiDebtType === 'HIBRIDO') && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">Indexador</label>
+                    <select
+                      className="form-input" value={props.fiIndexer} onChange={(e) => props.setFiIndexer!(e.target.value)} disabled={props.isAddingFI}
+                    >
+                      {props.fiDebtType === 'POS' && (
+                        <>
+                          <option value="CDI" style={{ background: '#1c1f24' }}>CDI</option>
+                          <option value="SELIC" style={{ background: '#1c1f24' }}>Selic</option>
+                        </>
+                      )}
+                      {props.fiDebtType === 'HIBRIDO' && <option value="IPCA" style={{ background: '#1c1f24' }}>IPCA</option>}
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">
+                    {props.fiDebtType === 'POS' ? '% do Indexador' : 'Taxa ao Ano (%)'}
+                  </label>
+                  <input
+                    className="form-input" type="number" step="any"
+                    value={props.fiRate} onChange={(e) => props.setFiRate!(e.target.value)}
+                    placeholder={props.fiDebtType === 'POS' ? "Ex: 110" : "Ex: 12.5"}
+                    required disabled={props.isAddingFI}
+                  />
+                </div>
+              </div>
+
+              <div className="flex-row gap-md">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Valor Aplicado (R$)</label>
+                  <input
+                    className="form-input" type="number" step="any"
+                    value={props.fiAmount} onChange={(e) => props.setFiAmount!(e.target.value)}
+                    placeholder="Ex: 5000.00" required disabled={props.isAddingFI}
+                  />
+                </div>
+              </div>
+
+              <div className="flex-row gap-md">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Data de Aplicação</label>
+                  <input
+                    className="form-input" type="date"
+                    value={props.fiApplicationDate} onChange={(e) => props.setFiApplicationDate!(e.target.value)}
+                    required disabled={props.isAddingFI}
+                  />
+                </div>
+
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Data de Vencimento</label>
+                  <input
+                    className="form-input" type="date"
+                    value={props.fiMaturityDate} onChange={(e) => props.setFiMaturityDate!(e.target.value)}
+                    required disabled={props.isAddingFI}
+                  />
+                </div>
+              </div>
+
+              <div className="flex-row gap-md mt-sm">
+                <button type="button" onClick={() => props.setShowFIModal!(false)} className="btn-secondary w-full" style={{ padding: '0.75rem' }}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={props.isAddingFI} className="primary-button w-full" style={{ padding: '0.8rem', fontSize: '0.9rem' }}>
+                  {props.isAddingFI ? 'Cadastrando...' : 'Aplicar'}
                 </button>
               </div>
             </form>

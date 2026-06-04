@@ -15,6 +15,7 @@ import (
 	"time"
 
 
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
@@ -96,15 +97,17 @@ type Service struct {
 	repo           PortfolioRepository
 	marketService  MarketService
 	marketProvider market.QuoteProvider
+	fiService      fixedincome.Service
 	httpClient     *http.Client
 }
 
 // NewService cria uma nova instância de Service.
-func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider) *Service {
+func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider, fiService fixedincome.Service) *Service {
 	return &Service{
 		repo:           repo,
 		marketService:  marketService,
 		marketProvider: marketProvider,
+		fiService:      fiService,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
@@ -743,10 +746,25 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			}
 		}
 
+		// Calcula a posição da renda fixa neste dia
+		var dailyFIValue float64
+		var dailyFITotalInvested float64
+		if s.fiService != nil {
+			// Não é o mais eficiente chamar no loop, mas para a v1 garantimos precisão.
+			// Em produção seria melhor fazer batch ou cache dos dias.
+			fiPositions, err := s.fiService.GetPortfolioPositions(ctx, portfolioID)
+			if err == nil {
+				for _, fi := range fiPositions {
+					dailyFIValue += fi.NetValue
+					dailyFITotalInvested += fi.TotalInvested
+				}
+			}
+		}
+
 		points = append(points, PerformancePoint{
 			Date:          dayStr,
-			Value:         totalMarketValue,
-			TotalInvested: totalInvested,
+			Value:         totalMarketValue + dailyFIValue,
+			TotalInvested: totalInvested + dailyFITotalInvested,
 		})
 
 		currDate = currDate.AddDate(0, 0, 1)

@@ -13,6 +13,8 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
+	
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 )
 
 type PortfolioService interface {
@@ -27,17 +29,23 @@ type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
 }
 
+type FixedIncomeService interface {
+	GetPortfolioPositions(ctx context.Context, portfolioID string) ([]fixedincome.Position, error)
+}
+
 type Handlers struct {
 	svc          Service
 	portfolioSvc PortfolioService
 	marketSvc    MarketService
+	fiSvc        FixedIncomeService
 }
 
-func NewHandlers(svc Service, pSvc PortfolioService, mSvc MarketService) *Handlers {
+func NewHandlers(svc Service, pSvc PortfolioService, mSvc MarketService, fiSvc FixedIncomeService) *Handlers {
 	return &Handlers{
 		svc:          svc,
 		portfolioSvc: pSvc,
 		marketSvc:    mSvc,
+		fiSvc:        fiSvc,
 	}
 }
 
@@ -49,6 +57,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
 	bot.Handle("\fbtn_history", h.HandleHistory)
+	bot.Handle("\fbtn_renda_fixa", h.HandleFixedIncome)
 	bot.Handle("\fbtn_divs_year", h.HandleDividendsByYear)
 	bot.Handle("\fbtn_divs_month", h.HandleDividendsByMonth)
 	bot.Handle("\fbtn_operacao", h.HandleLaunchOperation)
@@ -93,12 +102,14 @@ func (h *Handlers) HandleMenu(c telebot.Context) error {
 	btnResumo := menu.Data("📊 Resumo da Carteira", "btn_resumo")
 	btnProventos := menu.Data("💸 Ver Proventos", "btn_proventos")
 	btnHistory := menu.Data("📜 Histórico", "btn_history")
+	btnRendaFixa := menu.Data("🏛️ Renda Fixa", "btn_renda_fixa")
 	btnOperacao := menu.Data("💵 Lançar Operação", "btn_operacao")
 
 	menu.Inline(
 		menu.Row(btnResumo),
 		menu.Row(btnProventos),
 		menu.Row(btnHistory),
+		menu.Row(btnRendaFixa),
 		menu.Row(btnOperacao),
 	)
 
@@ -138,6 +149,24 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		totalDailyChange += pos.DailyChange * pos.Quantity * rate
 	}
 
+	// Integra Renda Fixa no Resumo
+	var totalFIValue float64
+	var nearMaturity []fixedincome.Position
+	if h.fiSvc != nil {
+		fiPos, err := h.fiSvc.GetPortfolioPositions(context.Background(), portfolioID)
+		if err == nil {
+			for _, pos := range fiPos {
+				totalFIValue += pos.NetValue
+				totalValue += pos.NetValue
+				totalCost += pos.TotalInvested
+				
+				if pos.DaysToMaturity <= 30 && !pos.IsMatured {
+					nearMaturity = append(nearMaturity, pos)
+				}
+			}
+		}
+	}
+
 	totalProfitLoss := totalValue - totalCost
 	totalReturnPercent := 0.0
 	if totalCost > 0 {
@@ -163,6 +192,13 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		lucroPrejuizo = p.Sprintf("🔴 R$ %.2f (%.2f%%)", totalProfitLoss, totalReturnPercent)
 	}
 	msg += p.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
+	
+	if len(nearMaturity) > 0 {
+		msg += "\n⚠️ *Vencimentos Próximos (Renda Fixa)*\n"
+		for _, pos := range nearMaturity {
+			msg += p.Sprintf("• `%s` (%s): Vence em %d dias\n", pos.Asset.Institution, pos.Asset.Type, pos.DaysToMaturity)
+		}
+	}
 
 	// Clonar posições para ordenar sem afetar a original
 	sortedPos := make([]portfolio.Position, 0, len(positions))
@@ -839,4 +875,74 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	}
 	
 	return c.Send(msg, telebot.ModeMarkdown, menu)
+}
+
+func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
+	if h.fiSvc == nil {
+		return c.Send("⚠️ Módulo de Renda Fixa não está ativo.")
+	}
+
+	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+	if err != nil {
+		return c.Send("⚠️ Sua conta não está vinculada.")
+	}
+
+	userIDStr := userID.String()
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Send("⚠️ Nenhuma carteira encontrada.")
+	}
+
+	portfolioID := portfolios[0].ID
+	positions, err := h.fiSvc.GetPortfolioPositions(context.Background(), portfolioID)
+	if err != nil {
+		return c.Send("❌ Erro ao buscar posições de Renda Fixa.")
+	}
+
+	if len(positions) == 0 {
+		c.Respond()
+		return c.Send("🏛️ Você ainda não possui ativos de Renda Fixa cadastrados.")
+	}
+
+	var totalBruto, totalLiquido, totalCusto float64
+	for _, pos := range positions {
+		totalBruto += pos.GrossValue
+		totalLiquido += pos.NetValue
+		totalCusto += pos.TotalInvested
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("🏛️ *Sua Renda Fixa*\n\n")
+	msg += p.Sprintf("💰 Valor Líquido: *R$ %.2f*\n", totalLiquido)
+	msg += p.Sprintf("📈 Valor Bruto: R$ %.2f\n", totalBruto)
+	
+	lucro := totalLiquido - totalCusto
+	lucroPct := 0.0
+	if totalCusto > 0 {
+		lucroPct = (lucro / totalCusto) * 100
+	}
+	msg += p.Sprintf("⚖️ Lucro Líquido: R$ %.2f (%.2f%%)\n\n", lucro, lucroPct)
+	
+	msg += "*Minhas Posições:*\n"
+	for _, pos := range positions {
+		status := ""
+		if pos.IsMatured {
+			status = " *(VENCIDO)*"
+		} else if pos.DaysToMaturity <= 30 {
+			status = " *(Vence logo!)*"
+		}
+		
+		taxa := ""
+		if pos.Asset.DebtType == "POS" {
+			taxa = fmt.Sprintf("%.2f%% %s", pos.Asset.Rate, pos.Asset.Indexer)
+		} else {
+			taxa = fmt.Sprintf("%.2f%% a.a.", pos.Asset.Rate)
+		}
+		
+		msg += p.Sprintf("• `%s %s` - %s\n", pos.Asset.Institution, pos.Asset.Type, taxa)
+		msg += p.Sprintf("  Líquido: R$ %.2f (+%.2f%%)%s\n", pos.NetValue, pos.NetReturnPercent, status)
+	}
+
+	c.Respond()
+	return c.Send(msg, telebot.ModeMarkdown)
 }

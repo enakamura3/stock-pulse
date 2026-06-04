@@ -14,6 +14,7 @@ import AssetList from '@/components/portfolio/AssetList';
 import TransactionHistory from '@/components/portfolio/TransactionHistory';
 import DividendsHistory from '@/components/portfolio/DividendsHistory';
 import DailyReport from '@/components/portfolio/DailyReport';
+import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import Modals from '@/components/portfolio/Modals';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -35,11 +36,12 @@ export default function PortfolioPage() {
   const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
   const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
   const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'diario'>('ativos');
+  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'diario' | 'renda-fixa'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showTxModal, setShowTxModal] = useState(false);
+  const [showFIModal, setShowFIModal] = useState(false);
   
   const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -64,6 +66,17 @@ export default function PortfolioPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedAssetCurrency, setSelectedAssetCurrency] = useState('BRL');
+
+  // Fixed Income State
+  const [fiInstitution, setFiInstitution] = useState('');
+  const [fiType, setFiType] = useState('CDB');
+  const [fiDebtType, setFiDebtType] = useState('POS');
+  const [fiIndexer, setFiIndexer] = useState('CDI');
+  const [fiRate, setFiRate] = useState<string | number>('');
+  const [fiAmount, setFiAmount] = useState<string | number>('');
+  const [fiApplicationDate, setFiApplicationDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [fiMaturityDate, setFiMaturityDate] = useState<string>('');
+  const [isAddingFI, setIsAddingFI] = useState(false);
 
   const loadPortfolios = useCallback(async (selectId?: string) => {
     setIsLoadingPortfolios(true);
@@ -254,6 +267,50 @@ export default function PortfolioPage() {
     } catch (e) { console.error(e); }
   };
 
+  const handleAddFixedIncome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fiInstitution || !fiRate || !fiAmount) return alert('Preencha os campos obrigatórios');
+    setIsAddingFI(true);
+
+    try {
+      const assetPayload: any = {
+        institution: fiInstitution, type: fiType, debt_type: fiDebtType, indexer: fiIndexer,
+        rate: parseFloat(fiRate.toString())
+      };
+      if (fiMaturityDate) {
+        assetPayload.maturity_date = new Date(fiMaturityDate).toISOString();
+      }
+
+      const assetRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assetPayload), credentials: 'include', cache: 'no-store'
+      });
+
+      if (!assetRes.ok) throw new Error("Erro ao criar ativo");
+      const asset = await assetRes.json();
+
+      const txRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets/${asset.id}/transactions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString()), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
+        }), credentials: 'include', cache: 'no-store'
+      });
+
+      if (!txRes.ok) throw new Error("Erro ao criar transação");
+      
+      setShowFIModal(false);
+      setFiInstitution(''); setFiRate(''); setFiAmount(''); setFiMaturityDate(''); setFiApplicationDate(new Date().toISOString().split('T')[0]);
+      
+      // Reload page state to see changes
+      window.location.reload();
+    } catch (e) {
+      alert("Erro ao salvar aplicação de Renda Fixa.");
+      console.error(e);
+    } finally {
+      setIsAddingFI(false);
+    }
+  };
+
   const handleEditTransaction = (tx: Transaction) => {
     setEditingTxId(tx.id); setTxTicker(tx.ticker!); setTxType(tx.type as any);
     setTxQuantity(tx.quantity); setTxUnitPrice(tx.unit_price); setTxExchangeRate(tx.exchange_rate);
@@ -396,6 +453,9 @@ export default function PortfolioPage() {
             <button onClick={() => setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}>
               💰 Proventos
             </button>
+            <button onClick={() => setActiveTab('renda-fixa')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'renda-fixa' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'renda-fixa' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'renda-fixa' ? 700 : 500, fontSize: '0.9rem' }}>
+              🏛️ Renda Fixa
+            </button>
             <button onClick={() => setActiveTab('diario')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'diario' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'diario' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'diario' ? 700 : 500, fontSize: '0.9rem' }}>
               📈 Resumo Diário
             </button>
@@ -420,6 +480,10 @@ export default function PortfolioPage() {
           {activeTab === 'diario' && (
             <DailyReport positions={filteredPositions} />
           )}
+
+          {activeTab === 'renda-fixa' && (
+            <FixedIncomeTab portfolioId={activePortfolioId} onLaunchOperation={() => setShowFIModal(true)} />
+          )}
         </div>
       )}
 
@@ -435,6 +499,17 @@ export default function PortfolioPage() {
         txUnitPrice={txUnitPrice} setTxUnitPrice={setTxUnitPrice} txExchangeRate={txExchangeRate} setTxExchangeRate={setTxExchangeRate}
         txExecutedAt={txExecutedAt} setTxExecutedAt={setTxExecutedAt} selectedAssetCurrency={selectedAssetCurrency} kpiCurrency={kpiCurrency}
         handleAddTransaction={handleAddTransaction}
+        
+        showFIModal={showFIModal} setShowFIModal={setShowFIModal}
+        fiInstitution={fiInstitution} setFiInstitution={setFiInstitution}
+        fiType={fiType} setFiType={setFiType}
+        fiDebtType={fiDebtType} setFiDebtType={setFiDebtType}
+        fiIndexer={fiIndexer} setFiIndexer={setFiIndexer}
+        fiRate={fiRate} setFiRate={setFiRate}
+        fiAmount={fiAmount} setFiAmount={setFiAmount}
+        fiApplicationDate={fiApplicationDate} setFiApplicationDate={setFiApplicationDate}
+        fiMaturityDate={fiMaturityDate} setFiMaturityDate={setFiMaturityDate}
+        isAddingFI={isAddingFI} handleAddFixedIncome={handleAddFixedIncome}
       />
     </main>
   );
