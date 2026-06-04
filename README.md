@@ -275,7 +275,6 @@ Para que a integração com o Telegram funcione, você precisa criar um bot e ob
    ```env
    TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklmNOPqrsTUVwxyz
    ```
-6. Opcional: Se desejar que o botão "Vincular Telegram" da interface web redirecione corretamente, defina a variável pública no `.env` do frontend (ex: `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=SeuBotName_bot`).
 
 Pronto! Com o Token preenchido, assim que você subir a aplicação, o módulo de conversação do Telegram será ativado automaticamente. Ao iniciar um chat enviando `/start`, o bot entregará um link seguro para você vincular sua conta da plataforma Web com o celular.
 
