@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import dynamic from 'next/dynamic';
 
-import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult, FixedIncomePosition } from '@/components/portfolio/types';
+import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult, FixedIncomePosition, UnifiedTransaction } from '@/components/portfolio/types';
 import { getAssetCategory } from '@/components/portfolio/helpers';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
@@ -29,7 +29,7 @@ export default function PortfolioPage() {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('Todas');
   const [positions, setPositions] = useState<Position[]>([]);
   const [fiPositions, setFiPositions] = useState<FixedIncomePosition[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<UnifiedTransaction[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
   const [dividends, setDividends] = useState<CalculatedDividend[]>([]);
   
@@ -100,7 +100,7 @@ export default function PortfolioPage() {
     try {
       const resDetails = await fetch(`${API_URL}/portfolios/${id}`, { credentials: 'include', cache: 'no-store' });
       if (resDetails.ok) setPositions((await resDetails.json()).positions || []);
-      const resTxs = await fetch(`${API_URL}/portfolios/${id}/transactions`, { credentials: 'include', cache: 'no-store' });
+      const resTxs = await fetch(`${API_URL}/portfolios/${id}/history`, { credentials: 'include', cache: 'no-store' });
       if (resTxs.ok) setTransactions(await resTxs.json() || []);
       
       const resFI = await fetch(`${API_URL}/portfolios/${id}/fixed-income/positions`, { credentials: 'include', cache: 'no-store' });
@@ -320,10 +320,15 @@ export default function PortfolioPage() {
     }
   };
 
-  const handleEditTransaction = (tx: Transaction) => {
-    setEditingTxId(tx.id); setTxTicker(tx.ticker!); setTxType(tx.type as any);
-    setTxQuantity(tx.quantity); setTxUnitPrice(tx.unit_price); setTxExchangeRate(tx.exchange_rate);
-    setTxExecutedAt(tx.executed_at.split('T')[0]); setShowTxModal(true);
+  const handleEditTransaction = (tx: UnifiedTransaction) => {
+    if (tx.module === 'RF') {
+      alert("A edição de operações de Renda Fixa estará disponível na próxima atualização do sistema.");
+      return;
+    }
+    
+    setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxType(tx.type as any);
+    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 1);
+    setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,9 +342,24 @@ export default function PortfolioPage() {
         if (data.errors?.length > 0) alert(`Importados com sucesso: ${data.success}\nFalhas:\n- ${data.errors.join("\n- ")}`);
         else alert(`Importação concluída com sucesso! ${data.success} registros importados.`);
         await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period);
-      } else { alert(`Erro na importação: ${(await res.json()).error}`); }
-    } catch (e) { alert("Erro ao conectar com o servidor."); }
-    e.target.value = "";
+      } else alert("Erro ao enviar arquivo.");
+    } catch (err) { alert("Erro de conexão."); }
+    e.target.value = '';
+  };
+
+  const handleDeleteTransaction = async (txId: string) => {
+    if (!confirm('Deseja realmente excluir esta transação?')) return;
+    try {
+      // Find the transaction module
+      const tx = transactions.find(t => t.id === txId);
+      if (tx?.module === 'RF') {
+        alert("A exclusão de transações de Renda Fixa pela aba unificada requer a implementação do novo endpoint no backend.");
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
+      if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
+    } catch (e) { console.error(e); }
   };
 
   if (authLoading || isLoadingPortfolios) {

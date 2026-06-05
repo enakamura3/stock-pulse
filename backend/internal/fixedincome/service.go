@@ -2,13 +2,17 @@ package fixedincome
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/history"
 )
 
 type Service interface {
+	GetUnifiedTransactions(ctx context.Context, portfolioID, userID string) ([]history.UnifiedTransaction, error)
 	CreateAsset(ctx context.Context, asset *Asset) (*Asset, error)
 	GetPortfolioPositions(ctx context.Context, portfolioID string) ([]Position, error)
 	GetPortfolioPerformance(ctx context.Context, portfolioID string, period string) ([]PerformancePoint, error)
@@ -351,4 +355,55 @@ func (s *service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 	}
 
 	return points, nil
+}
+
+func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userID string) ([]history.UnifiedTransaction, error) {
+	// Need to fetch transactions AND their assets to get the asset name.
+	txs, err := s.repo.GetTransactionsByPortfolio(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+
+	assets, err := s.repo.GetAssetsByPortfolio(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	
+	assetMap := make(map[string]Asset)
+	for _, a := range assets {
+		assetMap[a.ID] = a
+	}
+
+	var unified []history.UnifiedTransaction
+	for _, tx := range txs {
+		asset, ok := assetMap[tx.AssetID]
+		if !ok {
+			continue // Should not happen with foreign keys, but just in case
+		}
+		
+		rateStr := fmt.Sprintf("%.2f%% %s", asset.Rate, asset.Indexer)
+		if asset.DebtType == "PREFIXADO" {
+			rateStr = fmt.Sprintf("%.2f%% a.a.", asset.Rate)
+		} else if asset.DebtType == "HIBRIDO" {
+			rateStr = fmt.Sprintf("%s + %.2f%%", asset.Indexer, asset.Rate)
+		}
+
+		assetName := fmt.Sprintf("%s %s - %s", asset.Type, rateStr, asset.Institution)
+
+		unified = append(unified, history.UnifiedTransaction{
+			ID:           tx.ID,
+			PortfolioID:  portfolioID,
+			Module:       "RF",
+			Date:         tx.Date,
+			AssetName:    assetName,
+			AssetType:    asset.Type,
+			Type:         tx.Type,
+			Quantity:     nil,
+			UnitPrice:    nil,
+			ExchangeRate: nil,
+			TotalValue:   tx.Amount,
+			Currency:     "BRL",
+		})
+	}
+	return unified, nil
 }

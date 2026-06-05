@@ -113,3 +113,21 @@ export interface FixedIncomePosition {
   days_to_maturity: number;
   is_matured: boolean;
 }
+
+export interface UnifiedTransaction {
+  id: string;
+  portfolio_id: string;
+  module: string;
+  date: string;
+  asset_name: string;
+  asset_type: string;
+  type: string;
+  quantity: number | null;
+  unit_price: number | null;
+  exchange_rate: number | null;
+  total_value: number;
+  currency: string;
+  resulting_quantity?: number;
+  resulting_invested?: number;
+}
+

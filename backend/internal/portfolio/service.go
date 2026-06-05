@@ -16,6 +16,7 @@ import (
 
 
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
+	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
@@ -904,4 +905,42 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 	}
 
 	return nil
+}
+
+func (s *Service) GetUnifiedTransactions(ctx context.Context, portfolioID, userID string) ([]history.UnifiedTransaction, error) {
+	txs, err := s.repo.GetTransactionsByPortfolioID(ctx, portfolioID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var unified []history.UnifiedTransaction
+	for _, tx := range txs {
+		assetName := tx.Ticker
+		assetType := tx.AssetType
+
+		qty := tx.Quantity
+		price := tx.UnitPrice
+		exch := tx.ExchangeRate
+
+		total := qty * price
+		if tx.Type == "BONUS" || tx.Type == "SPLIT" || tx.Type == "REVERSE_SPLIT" {
+			total = 0
+		}
+
+		unified = append(unified, history.UnifiedTransaction{
+			ID:           tx.ID,
+			PortfolioID:  tx.PortfolioID,
+			Module:       "RV",
+			Date:         tx.ExecutedAt,
+			AssetName:    assetName,
+			AssetType:    assetType,
+			Type:         tx.Type,
+			Quantity:     &qty,
+			UnitPrice:    &price,
+			ExchangeRate: &exch,
+			TotalValue:   total,
+			Currency:     "BRL", // simplificação, a interface atual da RV não tem moeda nativa persistida em transação
+		})
+	}
+	return unified, nil
 }
