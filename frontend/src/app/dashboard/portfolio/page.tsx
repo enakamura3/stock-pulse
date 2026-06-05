@@ -268,13 +268,6 @@ export default function PortfolioPage() {
     } catch (e) { console.error(e); } finally { setIsAddingTx(false); }
   };
 
-  const handleDeleteTransaction = async (txId: string) => {
-    if (!confirm('Deseja realmente excluir esta transação?')) return;
-    try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
-      if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
-    } catch (e) { console.error(e); }
-  };
 
   const handleAddFixedIncome = async (e: React.FormEvent) => {
     e.preventDefault();
