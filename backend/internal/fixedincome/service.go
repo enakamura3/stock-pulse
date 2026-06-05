@@ -4,12 +4,14 @@ import (
 	"context"
 	"math"
 	"sort"
+	"strings"
 	"time"
 )
 
 type Service interface {
 	CreateAsset(ctx context.Context, asset *Asset) (*Asset, error)
 	GetPortfolioPositions(ctx context.Context, portfolioID string) ([]Position, error)
+	GetPortfolioPerformance(ctx context.Context, portfolioID string, period string) ([]PerformancePoint, error)
 	GetAssetPosition(ctx context.Context, assetID string) (*Position, error)
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
 	TriggerBackfill(ctx context.Context, indexer string, startDate time.Time)
@@ -112,18 +114,23 @@ func (s *service) GetPortfolioPositions(ctx context.Context, portfolioID string)
 }
 
 func (s *service) GetAssetPosition(ctx context.Context, assetID string) (*Position, error) {
+	pos, _, _, err := s.getAssetPositionWithHistory(ctx, assetID)
+	return pos, err
+}
+
+func (s *service) getAssetPositionWithHistory(ctx context.Context, assetID string) (*Position, map[string]float64, map[string]float64, error) {
 	asset, err := s.repo.GetAssetByID(ctx, assetID)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	txs, err := s.repo.GetTransactionsByAsset(ctx, assetID)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	if len(txs) == 0 {
-		return nil, nil
+		return nil, nil, nil, nil
 	}
 
 	// Ordena txs cronologicamente
@@ -137,6 +144,8 @@ func (s *service) GetAssetPosition(ctx context.Context, assetID string) (*Positi
 
 	startDate := txs[0].Date
 	today := time.Now()
+	dailyNet := make(map[string]float64)
+	dailyInv := make(map[string]float64)
 
 	// Se o titulo venceu, a rentabilidade para na maturity date
 	limitDate := today
@@ -226,6 +235,10 @@ func (s *service) GetAssetPosition(ctx context.Context, assetID string) (*Positi
 			}
 		}
 
+		dateStr := currDate.Format("2006-01-02")
+		dailyInv[dateStr] = totalInvested
+		dailyNet[dateStr] = grossValue // using gross value in history for simplicity, taxes calculated at the end.
+
 		currDate = currDate.AddDate(0, 0, 1)
 	}
 
@@ -263,5 +276,79 @@ func (s *service) GetAssetPosition(ctx context.Context, assetID string) (*Positi
 		IsMatured:        isMatured,
 		DaysToMaturity:   daysToMaturity,
 		TaxesCalculated:  taxes,
-	}, nil
+	}, dailyNet, dailyInv, nil
+}
+
+// GetPortfolioPerformance constrói a série histórica consolidada de todos os ativos de Renda Fixa.
+func (s *service) GetPortfolioPerformance(ctx context.Context, portfolioID string, period string) ([]PerformancePoint, error) {
+	assets, err := s.repo.GetAssetsByPortfolio(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	if len(assets) == 0 {
+		return []PerformancePoint{}, nil
+	}
+
+	dailyValues := make(map[string]float64)
+	dailyInvested := make(map[string]float64)
+	
+	earliestDate := time.Now()
+	for _, a := range assets {
+		txs, _ := s.repo.GetTransactionsByAsset(ctx, a.ID)
+		if len(txs) > 0 && txs[0].Date.Before(earliestDate) {
+			earliestDate = txs[0].Date
+		}
+	}
+
+	endDate := time.Now()
+	var startDate time.Time
+	switch strings.ToUpper(period) {
+	case "1M":
+		startDate = endDate.AddDate(0, -1, 0)
+	case "3M":
+		startDate = endDate.AddDate(0, -3, 0)
+	case "6M":
+		startDate = endDate.AddDate(0, -6, 0)
+	case "1Y":
+		startDate = endDate.AddDate(-1, 0, 0)
+	default:
+		startDate = earliestDate
+	}
+
+	if startDate.After(earliestDate) {
+		startDate = earliestDate
+	}
+
+	for _, a := range assets {
+		pos, histNet, histInv, err := s.getAssetPositionWithHistory(ctx, a.ID)
+		if err == nil && pos != nil {
+			for dateStr, netVal := range histNet {
+				dailyValues[dateStr] += netVal
+				dailyInvested[dateStr] += histInv[dateStr]
+			}
+		}
+	}
+
+	var points []PerformancePoint
+	currDate := startDate
+	
+	for !currDate.After(endDate) {
+		dateStr := currDate.Format("2006-01-02")
+		val := dailyValues[dateStr]
+		inv := dailyInvested[dateStr]
+		
+		if val == 0 && inv == 0 && len(points) > 0 {
+			val = points[len(points)-1].Value
+			inv = points[len(points)-1].TotalInvested
+		}
+
+		points = append(points, PerformancePoint{
+			Date:          dateStr,
+			Value:         val,
+			TotalInvested: inv,
+		})
+		currDate = currDate.AddDate(0, 0, 1)
+	}
+
+	return points, nil
 }

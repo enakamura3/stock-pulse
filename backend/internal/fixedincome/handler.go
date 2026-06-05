@@ -21,6 +21,7 @@ func NewHandler(service Service, repo Repository) *Handler {
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Route("/portfolios/{portfolioID}/fixed-income", func(r chi.Router) {
 		r.Get("/positions", h.getPositions)
+		r.Get("/performance", h.getPerformance)
 		r.Post("/assets", h.createAsset)
 		r.Delete("/assets/{assetID}", h.deleteAsset)
 		r.Post("/assets/{assetID}/transactions", h.createTransaction)
@@ -45,6 +46,31 @@ func (h *Handler) getPositions(w http.ResponseWriter, r *http.Request) {
 		positions = []Position{}
 	}
 	json.NewEncoder(w).Encode(positions)
+}
+
+func (h *Handler) getPerformance(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		return
+	}
+
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		period = "ALL"
+	}
+
+	performance, err := h.service.GetPortfolioPerformance(r.Context(), portfolioID, period)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if performance == nil {
+		performance = []PerformancePoint{}
+	}
+	json.NewEncoder(w).Encode(performance)
 }
 
 func (h *Handler) createAsset(w http.ResponseWriter, r *http.Request) {

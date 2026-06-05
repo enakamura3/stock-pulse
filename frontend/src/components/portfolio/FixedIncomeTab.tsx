@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FixedIncomePosition } from './types';
+import dynamic from 'next/dynamic';
+
+const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
+import { FixedIncomePosition, PerformancePoint } from './types';
 import { formatMoney, formatPercentage } from './helpers';
 
 interface FixedIncomeTabProps {
@@ -12,6 +15,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1
 export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: FixedIncomeTabProps) {
   const [positions, setPositions] = useState<FixedIncomePosition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
+  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+  const [period, setPeriod] = useState<string>('ALL');
 
   // Estados para o modal de resgate
   const [redeemTarget, setRedeemTarget] = useState<FixedIncomePosition | null>(null);
@@ -44,6 +50,27 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
 
     fetchPositions();
   }, [portfolioId]);
+
+  useEffect(() => {
+    if (!portfolioId) return;
+    const fetchPerformance = async () => {
+      setIsLoadingPerformance(true);
+      try {
+        const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/performance?period=${period}`, {
+          credentials: 'include',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPerformanceData(data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching fixed income performance:", err);
+      } finally {
+        setIsLoadingPerformance(false);
+      }
+    };
+    fetchPerformance();
+  }, [portfolioId, period]);
 
   const confirmRedeem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,23 +125,53 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
   }
 
   return (
-    <div className="card flex-col gap-md" style={{ flex: '2 1 600px', minHeight: '380px' }}>
-      <div className="flex-row justify-between items-center mb-lg">
-        <h3 className="card-title">🏛️ Posições de Renda Fixa</h3>
-        <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
-          + Nova Aplicação
-        </button>
-      </div>
+    <div className="flex-col gap-md" style={{ width: '100%' }}>
       
-      <div className="table-container flex-col" style={{ flex: 1 }}>
+      <div className="card flex-col mb-lg" style={{ padding: '1.75rem 2rem', border: '1px solid var(--panel-border)' }}>
+        <div className="flex-row justify-between items-center mb-md flex-wrap gap-md">
+          <div>
+            <h4 className="m-0" style={{ fontSize: '1.1rem' }}>📈 Evolução da Renda Fixa</h4>
+            <p className="text-xs text-secondary mt-xs">Curva de juros compostos acumulada</p>
+          </div>
+          <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+            {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
+              <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? '#000' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isLoadingPerformance ? (
+          <div className="flex-row items-center justify-center w-full" style={{ height: '300px' }}>
+            <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 30, height: 30 }}></span>
+          </div>
+        ) : performanceData.length > 0 ? (
+          <PortfolioChart data={performanceData} />
+        ) : (
+          <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
+            <span className="text-2xl mb-sm">🏛️</span>
+            <p className="text-sm m-0">Nenhum dado histórico de Renda Fixa no período selecionado.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="card flex-col gap-md" style={{ flex: '2 1 600px', minHeight: '380px' }}>
+        <div className="flex-row justify-between items-center mb-lg">
+          <h3 className="card-title">🏛️ Posições de Renda Fixa</h3>
+          <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
+            + Nova Aplicação
+          </button>
+        </div>
+        <div className="table-container flex-col" style={{ flex: 1 }}>
         {positions.length > 0 ? (
-          <table className="data-table">
+          <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
                 <th>Instituição / Produto</th>
-                <th>Taxa</th>
-                <th>Aplicação</th>
-                <th>Vencimento</th>
+                <th className="text-right">Taxa</th>
+                <th className="text-right">Aplicação</th>
+                <th className="text-right">Vencimento</th>
                 <th className="text-right">Valor Aplicado</th>
                 <th className="text-right">Valor Bruto</th>
                 <th className="text-right">Valor Líquido</th>
@@ -159,11 +216,11 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
                         </div>
                       </div>
                     </td>
-                    <td><span className="font-semibold text-primary">{rateStr}</span></td>
-                    <td style={{ fontFamily: 'monospace' }}>
+                    <td className="text-right"><span className="font-semibold text-primary" style={{ fontFamily: 'monospace' }}>{rateStr}</span></td>
+                    <td className="text-right" style={{ fontFamily: 'monospace' }}>
                       {pos.start_date ? new Date(pos.start_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : '--'}
                     </td>
-                    <td style={{ fontFamily: 'monospace' }}>
+                    <td className="text-right" style={{ fontFamily: 'monospace' }}>
                       {pos.asset.maturity_date && !pos.asset.maturity_date.startsWith('0001') ? new Date(pos.asset.maturity_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : '--'}
                     </td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{formatMoney(pos.total_invested, 'BRL')}</td>
@@ -195,6 +252,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
             <p className="text-sm">Nenhuma aplicação de Renda Fixa encontrada.</p>
           </div>
         )}
+        </div>
       </div>
 
       {redeemTarget && (

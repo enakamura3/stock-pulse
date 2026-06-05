@@ -47,3 +47,10 @@ type IndexRate struct {
 	Date    time.Time `json:"date"`
 	Rate    float64   `json:"rate"`
 }
+
+// PerformancePoint represents a daily historical value for the fixed income portfolio.
+type PerformancePoint struct {
+	Date          string  `json:"date"`
+	Value         float64 `json:"value"`
+	TotalInvested float64 `json:"total_invested"`
+}

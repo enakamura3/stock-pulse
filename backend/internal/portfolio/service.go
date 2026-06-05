@@ -746,25 +746,10 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			}
 		}
 
-		// Calcula a posição da renda fixa neste dia
-		var dailyFIValue float64
-		var dailyFITotalInvested float64
-		if s.fiService != nil {
-			// Não é o mais eficiente chamar no loop, mas para a v1 garantimos precisão.
-			// Em produção seria melhor fazer batch ou cache dos dias.
-			fiPositions, err := s.fiService.GetPortfolioPositions(ctx, portfolioID)
-			if err == nil {
-				for _, fi := range fiPositions {
-					dailyFIValue += fi.NetValue
-					dailyFITotalInvested += fi.TotalInvested
-				}
-			}
-		}
-
 		points = append(points, PerformancePoint{
 			Date:          dayStr,
-			Value:         totalMarketValue + dailyFIValue,
-			TotalInvested: totalInvested + dailyFITotalInvested,
+			Value:         totalMarketValue,
+			TotalInvested: totalInvested,
 		})
 
 		currDate = currDate.AddDate(0, 0, 1)
