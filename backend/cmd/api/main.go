@@ -21,6 +21,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/mail"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"github.com/onigiri/stock-pulse/backend/internal/telegram"
 	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
@@ -101,9 +102,16 @@ func main() {
 	watchlistService := watchlist.NewService(watchlistRepo, marketService, marketProvider)
 	watchlistHandler := watchlist.NewHandler(watchlistService)
 
+	// Inicialização de Camadas de Renda Fixa (Fase 5)
+	fiRepo := fixedincome.NewRepository(dbPool)
+	fiBcbClient := fixedincome.NewBCBClient()
+	fiService := fixedincome.NewService(fiRepo, fiBcbClient)
+	fiHandler := fixedincome.NewHandler(fiService, fiRepo)
+	fiWorker := fixedincome.NewWorker(fiRepo, fiBcbClient)
+
 	// Inicialização de Camadas de Portfólio & Daily Worker
 	portfolioRepo := portfolio.NewRepository(dbPool)
-	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider)
+	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider, fiService)
 	portfolioHandler := portfolio.NewHandler(portfolioService)
 	portfolioWorker := portfolio.NewDailyWorker(portfolioRepo, marketProvider)
 	dividendWorker := portfolio.NewDividendWorker(portfolioRepo, marketService)
@@ -122,7 +130,7 @@ func main() {
 	// Telegram Bot
 	telegramRepo := telegram.NewRepository(dbPool)
 	telegramService := telegram.NewService(telegramRepo, rdb)
-	telegramHandlers := telegram.NewHandlers(telegramService, portfolioService, marketService)
+	telegramHandlers := telegram.NewHandlers(telegramService, portfolioService, marketService, fiService)
 	telegramBot, err := telegram.NewBotRunner(os.Getenv("TELEGRAM_BOT_TOKEN"), telegramHandlers)
 	if err != nil {
 		slog.Error("Failed to start telegram bot", "err", err)
@@ -137,6 +145,7 @@ func main() {
 
 	go portfolioWorker.Start(workerCtx)
 	go dividendWorker.Start(workerCtx)
+	go fiWorker.Start(workerCtx)
 	go wsHub.Start(workerCtx)
 	go alertWorker.Start(workerCtx)
 	if telegramBot != nil {
@@ -206,6 +215,9 @@ func main() {
 			r.Delete("/portfolios/{id}/transactions/{txId}", portfolioHandler.DeleteTransaction)
 			r.Get("/portfolios/{id}/performance", portfolioHandler.GetPerformance)
 			r.Get("/portfolios/{id}/dividends", portfolioHandler.GetDividends)
+
+			// Renda Fixa
+			fiHandler.RegisterRoutes(r)
 
 			// Conexão WebSocket em Tempo Real (Fase 3)
 			r.Get("/ws", wsHandler.ServeWS)

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import dynamic from 'next/dynamic';
 
-import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult } from '@/components/portfolio/types';
+import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult, FixedIncomePosition } from '@/components/portfolio/types';
 import { getAssetCategory } from '@/components/portfolio/helpers';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
@@ -14,6 +14,7 @@ import AssetList from '@/components/portfolio/AssetList';
 import TransactionHistory from '@/components/portfolio/TransactionHistory';
 import DividendsHistory from '@/components/portfolio/DividendsHistory';
 import DailyReport from '@/components/portfolio/DailyReport';
+import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import Modals from '@/components/portfolio/Modals';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -27,6 +28,7 @@ export default function PortfolioPage() {
   const [activePortfolioId, setActivePortfolioId] = useState<string>('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('Todas');
   const [positions, setPositions] = useState<Position[]>([]);
+  const [fiPositions, setFiPositions] = useState<FixedIncomePosition[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
   const [dividends, setDividends] = useState<CalculatedDividend[]>([]);
@@ -35,11 +37,12 @@ export default function PortfolioPage() {
   const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
   const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
   const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'diario'>('ativos');
+  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'diario' | 'renda-fixa'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showTxModal, setShowTxModal] = useState(false);
+  const [showFIModal, setShowFIModal] = useState(false);
   
   const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -65,6 +68,17 @@ export default function PortfolioPage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedAssetCurrency, setSelectedAssetCurrency] = useState('BRL');
 
+  // Fixed Income State
+  const [fiInstitution, setFiInstitution] = useState('');
+  const [fiType, setFiType] = useState('CDB');
+  const [fiDebtType, setFiDebtType] = useState('POS');
+  const [fiIndexer, setFiIndexer] = useState('CDI');
+  const [fiRate, setFiRate] = useState<string | number>('');
+  const [fiAmount, setFiAmount] = useState<string | number>('');
+  const [fiApplicationDate, setFiApplicationDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [fiMaturityDate, setFiMaturityDate] = useState<string>('');
+  const [isAddingFI, setIsAddingFI] = useState(false);
+
   const loadPortfolios = useCallback(async (selectId?: string) => {
     setIsLoadingPortfolios(true);
     try {
@@ -88,6 +102,9 @@ export default function PortfolioPage() {
       if (resDetails.ok) setPositions((await resDetails.json()).positions || []);
       const resTxs = await fetch(`${API_URL}/portfolios/${id}/transactions`, { credentials: 'include', cache: 'no-store' });
       if (resTxs.ok) setTransactions(await resTxs.json() || []);
+      
+      const resFI = await fetch(`${API_URL}/portfolios/${id}/fixed-income/positions`, { credentials: 'include', cache: 'no-store' });
+      if (resFI.ok) setFiPositions(await resFI.json() || []);
     } catch (e) { console.error('Erro ao buscar detalhes:', e); } finally { setIsLoadingDetails(false); }
   }, []);
 
@@ -120,13 +137,18 @@ export default function PortfolioPage() {
     }
   }, [activePortfolioId, loadPortfolioDetails, loadDividends]);
 
+  // Reset chart filter if category changes
+  useEffect(() => { setFilterChartTicker('Todos'); }, [activeCategoryFilter]);
+
   useEffect(() => {
     if (!activePortfolioId) return;
     let targetTickers: string[] = [];
-    if (activeCategoryFilter !== 'Todas') {
+    if (activeCategoryFilter !== 'Todas' && activeCategoryFilter !== 'Renda Fixa') {
       const filtered = positions.filter(pos => getAssetCategory(pos.type) === activeCategoryFilter);
       targetTickers = filtered.map(p => p.ticker);
       if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
+    } else if (activeCategoryFilter === 'Renda Fixa') {
+      targetTickers = ['NONE_FOUND'];
     }
 
     if (filterChartTicker !== 'Todos') {
@@ -254,6 +276,50 @@ export default function PortfolioPage() {
     } catch (e) { console.error(e); }
   };
 
+  const handleAddFixedIncome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fiInstitution || !fiRate || !fiAmount) return alert('Preencha os campos obrigatórios');
+    setIsAddingFI(true);
+
+    try {
+      const assetPayload: any = {
+        institution: fiInstitution, type: fiType, debt_type: fiDebtType, indexer: fiIndexer,
+        rate: parseFloat(fiRate.toString())
+      };
+      if (fiMaturityDate) {
+        assetPayload.maturity_date = new Date(fiMaturityDate).toISOString();
+      }
+
+      const assetRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assetPayload), credentials: 'include', cache: 'no-store'
+      });
+
+      if (!assetRes.ok) throw new Error("Erro ao criar ativo");
+      const asset = await assetRes.json();
+
+      const txRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets/${asset.id}/transactions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString()), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
+        }), credentials: 'include', cache: 'no-store'
+      });
+
+      if (!txRes.ok) throw new Error("Erro ao criar transação");
+      
+      setShowFIModal(false);
+      setFiInstitution(''); setFiRate(''); setFiAmount(''); setFiMaturityDate(''); setFiApplicationDate(new Date().toISOString().split('T')[0]);
+      
+      // Reload page state to see changes
+      window.location.reload();
+    } catch (e) {
+      alert("Erro ao salvar aplicação de Renda Fixa.");
+      console.error(e);
+    } finally {
+      setIsAddingFI(false);
+    }
+  };
+
   const handleEditTransaction = (tx: Transaction) => {
     setEditingTxId(tx.id); setTxTicker(tx.ticker!); setTxType(tx.type as any);
     setTxQuantity(tx.quantity); setTxUnitPrice(tx.unit_price); setTxExchangeRate(tx.exchange_rate);
@@ -305,13 +371,27 @@ export default function PortfolioPage() {
 
   const availableYears = Array.from(new Set(dividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.ex_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
 
-  const totalCost = filteredPositions.reduce((acc, pos) => acc + pos.total_cost, 0);
-  const currentValue = filteredPositions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
+  // Se a categoria for Renda Fixa ou Todas, precisamos somar a renda fixa
+  const includeFI = activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Fixa';
+  const filteredFI = includeFI ? fiPositions : [];
+
+  const eqCost = filteredPositions.reduce((acc, pos) => acc + pos.total_cost, 0);
+  const eqValue = filteredPositions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
+  
+  const fiCost = filteredFI.reduce((acc, pos) => acc + pos.total_invested, 0);
+  const fiValue = filteredFI.reduce((acc, pos) => acc + pos.net_value, 0);
+
+  // Se o filtro for APENAS Renda Fixa, eqCost e eqValue serão 0 (porque filteredPositions estará vazio).
+  const totalCost = eqCost + fiCost;
+  const currentValue = eqValue + fiValue;
   const profitLoss = currentValue - totalCost;
   const returnPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0.0;
 
   const availableCategories = Array.from(new Set(positions.map(pos => getAssetCategory(pos.type)))).sort();
   const filterCategories = ['Todas', ...availableCategories];
+  if (fiPositions.length > 0) {
+    filterCategories.push('Renda Fixa');
+  }
 
   return (
     <main className="container" style={{ maxWidth: 1400 }}>
@@ -343,52 +423,14 @@ export default function PortfolioPage() {
         <div className="flex-col gap-xl">
           <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} kpiCurrency={kpiCurrency} />
 
-          {activeTab === 'ativos' && (
-            <div className="card flex-col" style={{ padding: '1.75rem 2rem', minHeight: '380px' }}>
-              <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
-                <div>
-                  <h3 className="card-title">📈 Evolução da Carteira</h3>
-                  <p className="text-xs text-secondary mt-sm">Valores ponderados na moeda base ({kpiCurrency})</p>
-                </div>
-                <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
-                  <select 
-                    value={filterChartTicker} 
-                    onChange={(e) => setFilterChartTicker(e.target.value)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.5rem', fontWeight: 600 }}
-                  >
-                    <option value="Todos" style={{ background: '#1c1f24', color: '#fff' }}>Todos os Tickers</option>
-                    {Array.from(new Set(positions.map(p => p.ticker))).sort().map(t => (
-                      <option key={t} value={t} style={{ background: '#1c1f24', color: '#fff' }}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
-                  {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-                    <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? '#000' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              {isLoadingPerformance ? (
-                <div className="flex-row items-center justify-center w-full" style={{ height: '300px' }}>
-                  <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 30, height: 30 }}></span>
-                </div>
-              ) : performanceData.length > 0 ? (
-                <PortfolioChart data={performanceData} />
-              ) : (
-                <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
-                  <span className="text-2xl mb-sm">💼</span>
-                  <p className="text-sm m-0">Cadastre a sua primeira transação abaixo para começar a visualizar o histórico de rentabilidade.</p>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="flex-row gap-md mt-xl mb-lg" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <button onClick={() => setActiveTab('ativos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'ativos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'ativos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'ativos' ? 700 : 500, fontSize: '0.9rem' }}>
-              📊 Ativos
+              📊 Renda Variável
+            </button>
+            <button onClick={() => setActiveTab('renda-fixa')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'renda-fixa' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'renda-fixa' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'renda-fixa' ? 700 : 500, fontSize: '0.9rem' }}>
+              🏛️ Renda Fixa
             </button>
             <button onClick={() => setActiveTab('operacoes')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'operacoes' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'operacoes' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'operacoes' ? 700 : 500, fontSize: '0.9rem' }}>
               📜 Histórico de Operações
@@ -403,6 +445,51 @@ export default function PortfolioPage() {
 
           {activeTab === 'ativos' && (
             <div className="flex-col gap-xl w-full">
+              <div className="card flex-col" style={{ padding: '1.75rem 2rem', minHeight: '380px' }}>
+                <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
+                  <div>
+                    <h3 className="card-title">📈 Evolução da Renda Variável</h3>
+                    <p className="text-xs text-secondary mt-sm">Valores ponderados na moeda base ({kpiCurrency})</p>
+                  </div>
+                  {activeCategoryFilter !== 'Renda Fixa' && (
+                    <>
+                    <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                      <select 
+                        value={filterChartTicker} 
+                      onChange={(e) => setFilterChartTicker(e.target.value)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.5rem', fontWeight: 600 }}
+                    >
+                      <option value="Todos" style={{ background: '#1c1f24', color: '#fff' }}>Todos os Tickers</option>
+                      {Array.from(new Set(filteredPositions.map(p => p.ticker))).sort().map(t => (
+                        <option key={t} value={t} style={{ background: '#1c1f24', color: '#fff' }}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                    {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
+                      <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? '#000' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  </>
+                  )}
+                </div>
+
+                {isLoadingPerformance ? (
+                  <div className="flex-row items-center justify-center w-full" style={{ height: '300px' }}>
+                    <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 30, height: 30 }}></span>
+                  </div>
+                ) : performanceData.length > 0 ? (
+                  <PortfolioChart data={performanceData} />
+                ) : (
+                  <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
+                    <span className="text-2xl mb-sm">💼</span>
+                    <p className="text-sm m-0">Cadastre a sua primeira transação abaixo para começar a visualizar o histórico de rentabilidade.</p>
+                  </div>
+                )}
+              </div>
+
               <AssetList positions={filteredPositions} kpiCurrency={kpiCurrency} onImportCsv={handleFileUpload} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} />
             </div>
           )}
@@ -420,6 +507,10 @@ export default function PortfolioPage() {
           {activeTab === 'diario' && (
             <DailyReport positions={filteredPositions} />
           )}
+
+          {activeTab === 'renda-fixa' && (
+            <FixedIncomeTab portfolioId={activePortfolioId} onLaunchOperation={() => setShowFIModal(true)} />
+          )}
         </div>
       )}
 
@@ -435,6 +526,17 @@ export default function PortfolioPage() {
         txUnitPrice={txUnitPrice} setTxUnitPrice={setTxUnitPrice} txExchangeRate={txExchangeRate} setTxExchangeRate={setTxExchangeRate}
         txExecutedAt={txExecutedAt} setTxExecutedAt={setTxExecutedAt} selectedAssetCurrency={selectedAssetCurrency} kpiCurrency={kpiCurrency}
         handleAddTransaction={handleAddTransaction}
+        
+        showFIModal={showFIModal} setShowFIModal={setShowFIModal}
+        fiInstitution={fiInstitution} setFiInstitution={setFiInstitution}
+        fiType={fiType} setFiType={setFiType}
+        fiDebtType={fiDebtType} setFiDebtType={setFiDebtType}
+        fiIndexer={fiIndexer} setFiIndexer={setFiIndexer}
+        fiRate={fiRate} setFiRate={setFiRate}
+        fiAmount={fiAmount} setFiAmount={setFiAmount}
+        fiApplicationDate={fiApplicationDate} setFiApplicationDate={setFiApplicationDate}
+        fiMaturityDate={fiMaturityDate} setFiMaturityDate={setFiMaturityDate}
+        isAddingFI={isAddingFI} handleAddFixedIncome={handleAddFixedIncome}
       />
     </main>
   );

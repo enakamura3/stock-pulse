@@ -74,3 +74,42 @@ export interface SearchResult {
   exchange: string;
   type: string;
 }
+
+export interface FixedIncomeAsset {
+  id: string;
+  portfolio_id: string;
+  institution: string;
+  type: string; // CDB, LCI, LCA, TESOURO
+  debt_type: string; // PRE, POS, HIBRIDO
+  indexer: string; // CDI, SELIC, IPCA, PREFIXADO
+  rate: number;
+  maturity_date: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FixedIncomeTransaction {
+  id: string;
+  asset_id: string;
+  type: string; // BUY, SELL, MATURITY
+  amount: number;
+  date: string;
+  created_at?: string;
+}
+
+export interface FixedIncomePosition {
+  asset: FixedIncomeAsset;
+  start_date: string;
+  total_invested: number;
+  gross_value: number;
+  net_value: number;
+  net_return_percent: number;
+  gross_return_percent: number;
+  iof_amount: number;
+  ir_amount: number;
+  ir_rate: number;
+  iof_rate: number;
+  days_in_portfolio: number;
+  days_to_maturity: number;
+  is_matured: boolean;
+}

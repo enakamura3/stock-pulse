@@ -15,6 +15,7 @@ import (
 	"time"
 
 
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
@@ -96,15 +97,17 @@ type Service struct {
 	repo           PortfolioRepository
 	marketService  MarketService
 	marketProvider market.QuoteProvider
+	fiService      fixedincome.Service
 	httpClient     *http.Client
 }
 
 // NewService cria uma nova instância de Service.
-func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider) *Service {
+func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider, fiService fixedincome.Service) *Service {
 	return &Service{
 		repo:           repo,
 		marketService:  marketService,
 		marketProvider: marketProvider,
+		fiService:      fiService,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
