@@ -23,12 +23,33 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Route("/portfolios/{portfolioID}/fixed-income", func(r chi.Router) {
 		r.Get("/positions", h.getPositions)
 		r.Get("/performance", h.getPerformance)
+		r.Get("/monthly-yields", h.getMonthlyYields)
 		r.Post("/assets", h.createAsset)
 		r.Delete("/assets/{assetID}", h.deleteAsset)
 		r.Post("/assets/{assetID}/transactions", h.createTransaction)
 		r.Put("/transactions/{txID}", h.updateTransaction)
 		r.Delete("/transactions/{txID}", h.deleteTransaction)
 	})
+}
+
+func (h *Handler) getMonthlyYields(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		return
+	}
+
+	yields, err := h.service.CalculateMonthlyYields(r.Context(), portfolioID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if yields == nil {
+		yields = []MonthlyYield{}
+	}
+	json.NewEncoder(w).Encode(yields)
 }
 
 func (h *Handler) getPositions(w http.ResponseWriter, r *http.Request) {

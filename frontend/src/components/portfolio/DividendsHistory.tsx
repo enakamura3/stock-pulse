@@ -19,6 +19,9 @@ export default function DividendsHistory({
   dividends, filterDivYear, setFilterDivYear, filterDivMonth, setFilterDivMonth, availableYears, isLoadingDividends
 }: DividendsHistoryProps) {
 
+  const totalRV = dividends.filter(d => !d.is_accrued).reduce((acc, curr) => acc + curr.net_amount, 0);
+  const totalRF = dividends.filter(d => d.is_accrued).reduce((acc, curr) => acc + curr.net_amount, 0);
+
   return (
     <div className="flex-col gap-lg">
       <div className="card">
@@ -52,6 +55,21 @@ export default function DividendsHistory({
           <div className="text-center text-secondary p-xl">Carregando proventos...</div>
         ) : dividends.length > 0 ? (
           <>
+            <div className="flex-row gap-md mb-lg flex-wrap">
+              <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
+                <div className="text-secondary text-xs mb-xs">Proventos RV (Caixa Livre)</div>
+                <div className="font-bold text-xl" style={{ color: '#00e676' }}>{formatMoney(totalRV, 'BRL')}</div>
+              </div>
+              <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
+                <div className="text-secondary text-xs mb-xs">Rendimento RF (Juros Retidos)</div>
+                <div className="font-bold text-xl" style={{ color: '#FFB300' }}>{formatMoney(totalRF, 'BRL')}</div>
+              </div>
+              <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
+                <div className="text-secondary text-xs mb-xs">Geração de Valor Total</div>
+                <div className="font-bold text-xl">{formatMoney(totalRV + totalRF, 'BRL')}</div>
+              </div>
+            </div>
+
             <div style={{ height: '350px', marginBottom: '2rem' }}>
               <DividendsChart data={dividends} />
             </div>
@@ -75,27 +93,29 @@ export default function DividendsHistory({
                   {dividends.map((div, i) => (
                     <tr key={i}>
                       <td className="text-center font-semibold">{div.ticker}</td>
-                      <td className="text-center text-secondary text-xs">{getAssetCategory(div.asset_type)}</td>
+                      <td className="text-center text-secondary text-xs">{div.is_accrued ? 'Renda Fixa' : getAssetCategory(div.asset_type)}</td>
                       <td className="text-center">
                         <span className="badge" style={{
-                          backgroundColor: !div.type ? 'rgba(255,255,255,0.1)' : 
+                          backgroundColor: div.is_accrued ? 'rgba(255, 179, 0, 0.15)' :
+                                          !div.type ? 'rgba(255,255,255,0.1)' : 
                                           div.type.toLowerCase().includes('jcp') ? 'rgba(255, 152, 0, 0.15)' :
                                           div.type.toLowerCase().includes('rendimento') ? 'rgba(156, 39, 176, 0.15)' :
                                           div.type.toLowerCase().includes('amorti') ? 'rgba(244, 67, 54, 0.15)' :
                                           'rgba(33, 150, 243, 0.15)',
-                          color: !div.type ? '#aaa' : 
+                          color: div.is_accrued ? '#FFB300' :
+                                 !div.type ? '#aaa' : 
                                  div.type.toLowerCase().includes('jcp') ? '#ff9800' :
                                  div.type.toLowerCase().includes('rendimento') ? '#e040fb' :
                                  div.type.toLowerCase().includes('amorti') ? '#ff5252' :
                                  '#64b5f6'
                         }}>
-                          {div.type || 'DIVIDENDO'}
+                          {div.is_accrued ? '🏦 JUROS ACUMULADOS' : (div.type || 'DIVIDENDO')}
                         </span>
                       </td>
                       <td className="text-center text-secondary text-xs">{new Date(div.ex_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
                       <td className="text-center text-secondary text-xs">{(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
-                      <td className="text-center font-semibold">{div.quantity}</td>
-                      <td className="text-right font-semibold">{formatMoney(div.per_share_amount, div.currency)}</td>
+                      <td className="text-center font-semibold">{div.is_accrued ? '--' : div.quantity}</td>
+                      <td className="text-right font-semibold">{div.is_accrued ? '--' : formatMoney(div.per_share_amount, div.currency)}</td>
                       <td className="text-right">
                         {formatMoney(div.gross_amount, div.currency)}
                         {div.currency === 'BRL' && div.original_gross_amount && (

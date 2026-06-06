@@ -126,9 +126,50 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingDividends(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${id}/dividends`, { credentials: 'include', cache: 'no-store' });
-      if (res.ok) setDividends(await res.json() || []);
-    } catch (e) { console.error('Erro ao buscar dividendos:', e); } finally { setIsLoadingDividends(false); }
+      const [resDivs, resFI] = await Promise.all([
+        fetch(`${API_URL}/portfolios/${id}/dividends`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${API_URL}/portfolios/${id}/fixed-income/monthly-yields`, { credentials: 'include', cache: 'no-store' })
+      ]);
+      
+      let allDividends: CalculatedDividend[] = [];
+      if (resDivs.ok) {
+        allDividends = await resDivs.json() || [];
+      }
+      
+      if (resFI.ok) {
+        const fiYields = await resFI.json() || [];
+        const mappedFI = fiYields.map((fy: any) => {
+          // Fake dates for FI yields to be at the end of the month
+          const [yearStr, monthStr] = fy.month.split('-');
+          // Last day of the month
+          const date = new Date(parseInt(yearStr), parseInt(monthStr), 0).toISOString().split('T')[0];
+          return {
+            asset_id: fy.asset_id,
+            ticker: fy.asset_name,
+            asset_name: fy.asset_name,
+            asset_type: fy.asset_type,
+            ex_date: date,
+            payment_date: date,
+            gross_amount: fy.gross_amount,
+            net_amount: fy.net_amount,
+            currency: 'BRL',
+            type: 'YIELD',
+            quantity: 1,
+            per_share_amount: fy.net_amount,
+            is_accrued: true
+          } as CalculatedDividend;
+        });
+        allDividends = [...allDividends, ...mappedFI];
+      }
+      
+      allDividends.sort((a, b) => {
+        const dateA = new Date(a.payment_date || a.ex_date).getTime();
+        const dateB = new Date(b.payment_date || b.ex_date).getTime();
+        return dateB - dateA; // Descending
+      });
+      
+      setDividends(allDividends);
+    } catch (e) { console.error('Erro ao buscar proventos:', e); } finally { setIsLoadingDividends(false); }
   }, []);
 
   useEffect(() => { if (user) loadPortfolios(); }, [user, loadPortfolios]);
@@ -412,7 +453,10 @@ export default function PortfolioPage() {
   const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || getAssetCategory(pos.type) === activeCategoryFilter);
   const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter);
   const filteredDividends = dividends.filter(div => {
-    if (activeCategoryFilter !== 'Todas' && getAssetCategory(div.asset_type) !== activeCategoryFilter) return false;
+    if (activeCategoryFilter !== 'Todas') {
+      if (activeCategoryFilter === 'Renda Fixa' && !div.is_accrued) return false;
+      if (activeCategoryFilter !== 'Renda Fixa' && (div.is_accrued || getAssetCategory(div.asset_type) !== activeCategoryFilter)) return false;
+    }
     const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
     if (!dateStr) return true;
     const year = dateStr.substring(0, 4);
