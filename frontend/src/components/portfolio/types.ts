@@ -66,6 +66,7 @@ export interface CalculatedDividend {
   per_share_amount: number;
   asset_type: string;
   asset_name: string;
+  is_accrued?: boolean;
 }
 
 export interface SearchResult {

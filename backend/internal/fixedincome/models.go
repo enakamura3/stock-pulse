@@ -54,3 +54,14 @@ type PerformancePoint struct {
 	Value         float64 `json:"value"`
 	TotalInvested float64 `json:"total_invested"`
 }
+
+// MonthlyYield represents the accrued interest for a fixed income asset in a specific month.
+type MonthlyYield struct {
+	AssetID     string  `json:"asset_id"`
+	AssetName   string  `json:"asset_name"`
+	AssetType   string  `json:"asset_type"`
+	Month       string  `json:"month"` // YYYY-MM
+	GrossAmount float64 `json:"gross_amount"`
+	NetAmount   float64 `json:"net_amount"`
+	IsAccrued   bool    `json:"is_accrued"` // Always true for fixed income yields
+}

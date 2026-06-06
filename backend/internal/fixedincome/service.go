@@ -21,6 +21,7 @@ type Service interface {
 	UpdateTransaction(ctx context.Context, portfolioID, txID string, tx *Transaction, maturityDate *time.Time) error
 	DeleteTransaction(ctx context.Context, portfolioID, txID string) error
 	TriggerBackfill(ctx context.Context, indexer string, startDate time.Time)
+	CalculateMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error)
 }
 
 type service struct {
@@ -466,4 +467,153 @@ func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userI
 		})
 	}
 	return unified, nil
+}
+
+func (s *service) CalculateMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error) {
+	assets, err := s.repo.GetAssetsByPortfolio(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+
+	var allYields []MonthlyYield
+
+	for _, asset := range assets {
+		yields, err := s.calculateAssetMonthlyYields(ctx, asset)
+		if err == nil {
+			allYields = append(allYields, yields...)
+		}
+	}
+
+	return allYields, nil
+}
+
+func (s *service) calculateAssetMonthlyYields(ctx context.Context, asset Asset) ([]MonthlyYield, error) {
+	txs, err := s.repo.GetTransactionsByAsset(ctx, asset.ID)
+	if err != nil || len(txs) == 0 {
+		return nil, err
+	}
+
+	sort.Slice(txs, func(i, j int) bool {
+		return txs[i].Date.Before(txs[j].Date)
+	})
+
+	startDate := txs[0].Date
+	today := time.Now()
+	limitDate := today
+	if !asset.MaturityDate.IsZero() && today.After(asset.MaturityDate) {
+		limitDate = asset.MaturityDate
+	}
+
+	var indexRates map[string]float64
+	if asset.DebtType == "POS" || asset.DebtType == "HIBRIDO" {
+		indexRates = make(map[string]float64)
+		rates, _ := s.repo.GetIndexRates(ctx, asset.Indexer, startDate, limitDate)
+		for _, r := range rates {
+			indexRates[r.Date.Format("2006-01-02")] = r.Rate
+		}
+	}
+
+	currDate := startDate
+	txIndex := 0
+
+	var totalInvested float64
+	var grossValue float64
+	var currentQty float64
+
+	monthlyGrossYields := make(map[string]float64)
+	monthlyLastDay := make(map[string]time.Time)
+
+	for !currDate.After(limitDate) {
+		for txIndex < len(txs) && (txs[txIndex].Date.Before(currDate) || txs[txIndex].Date.Equal(currDate)) {
+			tx := txs[txIndex]
+			if tx.Type == "SUBSCRIPTION" {
+				totalInvested += tx.Amount
+				grossValue += tx.Amount
+				currentQty += tx.Amount
+			} else if tx.Type == "REDEMPTION" {
+				if grossValue > 0 {
+					withdrawalRatio := tx.Amount / grossValue
+					if withdrawalRatio > 1 {
+						withdrawalRatio = 1
+					}
+					totalInvested -= totalInvested * withdrawalRatio
+					grossValue -= tx.Amount
+					currentQty -= tx.Amount
+				}
+			}
+			txIndex++
+		}
+
+		if currentQty > 0 {
+			monthStr := currDate.Format("2006-01")
+			monthlyLastDay[monthStr] = currDate
+
+			if currDate.Weekday() != time.Saturday && currDate.Weekday() != time.Sunday {
+				var dailyFactor float64 = 1.0
+				if asset.DebtType == "PRE" || asset.DebtType == "PREFIXADO" {
+					dailyFactor = math.Pow(1+(asset.Rate/100), 1.0/252.0)
+				} else if asset.DebtType == "POS" {
+					rate, ok := indexRates[currDate.Format("2006-01-02")]
+					if !ok {
+						rate = 0.04
+					}
+					dailyFactor = 1 + (rate/100)*(asset.Rate/100)
+				} else if asset.DebtType == "HIBRIDO" {
+					preFactor := math.Pow(1+(asset.Rate/100), 1.0/252.0)
+					rate, ok := indexRates[currDate.Format("2006-01-02")]
+					if !ok {
+						rate = 0.015
+					}
+					ipcaFactor := 1 + (rate / 100)
+					dailyFactor = preFactor * ipcaFactor
+				}
+
+				dailyProfit := grossValue * (dailyFactor - 1)
+				monthlyGrossYields[monthStr] += dailyProfit
+				grossValue = grossValue * dailyFactor
+			}
+		}
+		currDate = currDate.AddDate(0, 0, 1)
+	}
+
+	var yields []MonthlyYield
+	rateStr := fmt.Sprintf("%.2f%% %s", asset.Rate, asset.Indexer)
+	if asset.DebtType == "PREFIXADO" || asset.DebtType == "PRE" {
+		rateStr = fmt.Sprintf("%.2f%% a.a.", asset.Rate)
+	} else if asset.DebtType == "HIBRIDO" {
+		rateStr = fmt.Sprintf("%s + %.2f%%", asset.Indexer, asset.Rate)
+	}
+	assetName := fmt.Sprintf("%s %s - %s", asset.Type, rateStr, asset.Institution)
+
+	isTaxExempt := asset.Type == "LCI" || asset.Type == "LCA"
+
+	for monthStr, grossYield := range monthlyGrossYields {
+		if grossYield <= 0 {
+			continue
+		}
+
+		lastDay := monthlyLastDay[monthStr]
+		daysHeld := int(lastDay.Sub(startDate).Hours() / 24)
+		if daysHeld < 0 {
+			daysHeld = 0
+		}
+
+		netYield := grossYield
+		if !isTaxExempt {
+			irRate := calculateIRRate(daysHeld)
+			netYield = grossYield * (1 - irRate)
+		}
+
+		yields = append(yields, MonthlyYield{
+			AssetID:     asset.ID,
+			AssetName:   assetName,
+			AssetType:   asset.Type,
+			Month:       monthStr,
+			GrossAmount: grossYield,
+			NetAmount:   netYield,
+			IsAccrued:   true,
+		})
+	}
+
+	return yields, nil
 }

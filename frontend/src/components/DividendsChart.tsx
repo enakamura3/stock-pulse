@@ -20,6 +20,7 @@ interface CalculatedDividend {
   currency: string;
   original_gross_amount?: number;
   original_net_amount?: number;
+  is_accrued?: boolean;
 }
 
 interface DividendsChartProps {
@@ -33,17 +34,19 @@ export default function DividendsChart({ data }: DividendsChartProps) {
       const month = div.payment_date ? div.payment_date.substring(0, 7) : div.ex_date.substring(0, 7); // Pega YYYY-MM
       if (!acc[month]) {
         const [yearStr, monthStr] = month.split('-');
-        acc[month] = { name: month, rawDate: new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1), BRL: 0, USD: 0 };
+        acc[month] = { name: month, rawDate: new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1), BRL: 0, USD: 0, RF: 0 };
       }
       
-      if (div.original_net_amount !== undefined && div.original_net_amount > 0) {
+      if (div.is_accrued) {
+        acc[month].RF += div.net_amount;
+      } else if (div.original_net_amount !== undefined && div.original_net_amount > 0) {
         // Mostra o valor convertido em BRL, mas agrupa logicamente
         acc[month].USD += div.net_amount;
       } else {
         acc[month].BRL += div.net_amount;
       }
       return acc;
-    }, {} as Record<string, { name: string; rawDate: Date; BRL: number; USD: number }>);
+    }, {} as Record<string, { name: string; rawDate: Date; BRL: number; USD: number; RF: number }>);
 
     // Converte para array e ordena cronologicamente
     return Object.values(grouped)
@@ -52,6 +55,7 @@ export default function DividendsChart({ data }: DividendsChartProps) {
         name: item.rawDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).toUpperCase(),
         'Nacionais (R$)': Number(item.BRL.toFixed(2)),
         'Internacionais (R$)': Number(item.USD.toFixed(2)),
+        'Renda Fixa (R$)': Number(item.RF.toFixed(2)),
       }));
   }, [data]);
 
@@ -117,7 +121,8 @@ export default function DividendsChart({ data }: DividendsChartProps) {
         <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
         <Legend wrapperStyle={{ paddingTop: '20px' }} />
         <Bar dataKey="Nacionais (R$)" stackId="a" fill="#00e676" radius={[0, 0, 4, 4]} barSize={40} />
-        <Bar dataKey="Internacionais (R$)" stackId="a" fill="#00f2fe" radius={[4, 4, 0, 0]} barSize={40} />
+        <Bar dataKey="Internacionais (R$)" stackId="a" fill="#00f2fe" radius={[0, 0, 0, 0]} barSize={40} />
+        <Bar dataKey="Renda Fixa (R$)" stackId="a" fill="#FFB300" radius={[4, 4, 0, 0]} barSize={40} />
       </BarChart>
     </ResponsiveContainer>
   );
