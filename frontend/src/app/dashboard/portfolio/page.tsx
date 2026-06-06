@@ -297,7 +297,7 @@ export default function PortfolioPage() {
       const txRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets/${asset.id}/transactions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString()), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
+          type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
         }), credentials: 'include', cache: 'no-store'
       });
 
@@ -321,7 +321,7 @@ export default function PortfolioPage() {
       setEditingTxId(tx.id);
       setFiEditTxAssetName(tx.asset_name);
       setFiTxType(tx.type);
-      setFiAmount(tx.total_value);
+      setFiAmount(Number(tx.total_value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
       setFiApplicationDate(tx.date ? tx.date.split('T')[0] : '');
       setShowFIEditModal(true);
       return;
@@ -341,7 +341,7 @@ export default function PortfolioPage() {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: fiTxType,
-          amount: parseFloat(fiAmount.toString()),
+          amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')),
           date: new Date(fiApplicationDate).toISOString()
         }),
         credentials: 'include', cache: 'no-store'

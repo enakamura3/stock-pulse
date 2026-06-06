@@ -394,9 +394,19 @@ export default function Modals(props: ModalsProps) {
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label">Valor Aplicado (R$)</label>
                   <input
-                    className="form-input" type="number" step="any"
-                    value={props.fiAmount} onChange={(e) => props.setFiAmount!(e.target.value)}
-                    placeholder="Ex: 5000.00" required disabled={props.isAddingFI}
+                    className="form-input" type="text"
+                    value={props.fiAmount} 
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, "");
+                      if (!val) {
+                        props.setFiAmount!('');
+                        return;
+                      }
+                      const num = Number(val) / 100;
+                      const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      props.setFiAmount!(formatted);
+                    }}
+                    placeholder="Ex: 5.000,00" required disabled={props.isAddingFI}
                   />
                 </div>
               </div>
@@ -476,8 +486,18 @@ export default function Modals(props: ModalsProps) {
               <div className="form-group">
                 <label className="form-label">Valor (R$)</label>
                 <input
-                  className="form-input" type="number" step="any"
-                  value={props.fiAmount} onChange={(e) => props.setFiAmount!(e.target.value)}
+                  className="form-input" type="text"
+                  value={props.fiAmount} 
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, "");
+                    if (!val) {
+                      props.setFiAmount!('');
+                      return;
+                    }
+                    const num = Number(val) / 100;
+                    const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    props.setFiAmount!(formatted);
+                  }}
                   placeholder="Ex: 1000.00" required disabled={props.isAddingFI}
                 />
               </div>
