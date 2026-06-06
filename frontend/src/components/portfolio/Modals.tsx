@@ -451,22 +451,24 @@ export default function Modals(props: ModalsProps) {
 
               <div className="form-group">
                 <label className="form-label">Tipo de Operação</label>
-                <div className="flex-row gap-sm">
+                <div className="flex-row flex-wrap gap-sm">
                   <button
                     type="button"
-                    className={`btn-toggle ${props.fiTxType === 'SUBSCRIPTION' ? 'active badge-success' : ''}`}
                     onClick={() => props.setFiTxType!('SUBSCRIPTION')}
-                    style={{ flex: 1, padding: '0.6rem', fontSize: '0.85rem' }}
+                    disabled={props.isAddingFI}
+                    className="flex-row justify-center items-center font-bold text-sm"
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', border: props.fiTxType === 'SUBSCRIPTION' ? '1px solid #00e676' : '1px solid var(--panel-border)', background: props.fiTxType === 'SUBSCRIPTION' ? 'rgba(0, 230, 118, 0.08)' : 'transparent', color: props.fiTxType === 'SUBSCRIPTION' ? '#00e676' : 'var(--text-secondary)' }}
                   >
-                    Aplicação
+                    🟢 APLICAÇÃO
                   </button>
                   <button
                     type="button"
-                    className={`btn-toggle ${props.fiTxType === 'REDEMPTION' ? 'active badge-danger' : ''}`}
                     onClick={() => props.setFiTxType!('REDEMPTION')}
-                    style={{ flex: 1, padding: '0.6rem', fontSize: '0.85rem' }}
+                    disabled={props.isAddingFI}
+                    className="flex-row justify-center items-center font-bold text-sm"
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', border: props.fiTxType === 'REDEMPTION' ? '1px solid #ff3d00' : '1px solid var(--panel-border)', background: props.fiTxType === 'REDEMPTION' ? 'rgba(255, 61, 0, 0.08)' : 'transparent', color: props.fiTxType === 'REDEMPTION' ? '#ff3d00' : 'var(--text-secondary)' }}
                   >
-                    Resgate
+                    🔴 RESGATE
                   </button>
                 </div>
               </div>
