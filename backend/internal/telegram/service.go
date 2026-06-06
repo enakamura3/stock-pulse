@@ -28,6 +28,9 @@ type Service interface {
 	SetConversationState(ctx context.Context, chatID int64, state ConversationState) error
 	GetConversationState(ctx context.Context, chatID int64) (*ConversationState, error)
 	ClearConversationState(ctx context.Context, chatID int64) error
+
+	SetActivePortfolio(ctx context.Context, chatID int64, portfolioID string) error
+	GetActivePortfolio(ctx context.Context, chatID int64) (string, error)
 }
 
 type service struct {
@@ -117,4 +120,26 @@ func (s *service) GetConversationState(ctx context.Context, chatID int64) (*Conv
 func (s *service) ClearConversationState(ctx context.Context, chatID int64) error {
 	key := fmt.Sprintf("telegram_state:%d", chatID)
 	return s.redis.Del(ctx, key).Err()
+}
+
+func (s *service) SetActivePortfolio(ctx context.Context, chatID int64, portfolioID string) error {
+	key := fmt.Sprintf("telegram_active_portfolio:%d", chatID)
+	// Persiste por 365 dias
+	err := s.redis.Set(ctx, key, portfolioID, 365*24*time.Hour).Err()
+	if err != nil {
+		return fmt.Errorf("failed to save active portfolio in redis: %w", err)
+	}
+	return nil
+}
+
+func (s *service) GetActivePortfolio(ctx context.Context, chatID int64) (string, error) {
+	key := fmt.Sprintf("telegram_active_portfolio:%d", chatID)
+	val, err := s.redis.Get(ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return "", nil // Not found
+		}
+		return "", fmt.Errorf("failed to get active portfolio from redis: %w", err)
+	}
+	return val, nil
 }
