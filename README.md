@@ -240,6 +240,34 @@ sequenceDiagram
     Note over User: Exibe Gráfico de Barras e Tabela Filtrável
 ```
 
+### 6. Fluxo de Simulação de Rendimentos Mensais (Renda Fixa)
+Diferente da Renda Variável, cujos pagamentos são eventos estáticos declarados pelas empresas, a rentabilidade da Renda Fixa precisa ser simulada no tempo com base no indexador do contrato. O backend possui um motor que varre o histórico da carteira e aplica fatores diários de rentabilidade, agrupando os ganhos no último dia útil do mês e deduzindo impostos para gerar eventos sintéticos de juros.
+
+```mermaid
+flowchart TD
+    Start[Requisição GET /monthly-yields] --> FetchTX[Busca Todas Aplicações e Resgates]
+    FetchTX --> Sort[Ordena Transações Cronologicamente]
+    Sort --> LoopDays[Itera Dia a Dia:<br>Do Aporte até Hoje]
+    LoopDays --> IsWeekend{É Fim de Semana<br>ou Feriado?}
+    
+    IsWeekend -- Sim --> LoopDays
+    IsWeekend -- Não --> CalcPrincipal[Calcula Saldo Principal<br>Ativo no Dia]
+    
+    CalcPrincipal --> ApplyRate[Aplica Fator de Juros Diário<br>PRE / POS / HÍBRIDO]
+    ApplyRate --> AccrueInterest[Acumula Rendimento Bruto<br>para o Mês Corrente]
+    AccrueInterest --> EndOfMonth{É o Último Dia<br>do Mês?}
+    
+    EndOfMonth -- Não --> LoopDays
+    EndOfMonth -- Sim --> CalcTaxes[Avalia Prazo de Permanência<br>para Tabela Regressiva IR]
+    CalcTaxes --> Deduct[Deduz Impostos do<br>Rendimento Mensal Bruto]
+    Deduct --> GenYield[Gera Evento Sintético<br>de Juros Acumulados]
+    GenYield --> ResetMonth[Zera Acumulador e Inicia<br>Mês Seguinte]
+    ResetMonth --> LoopDays
+    
+    LoopDays -- "Atingiu Dia Atual" --> Return[Retorna Lista de Yields]
+    Return --> Frontend[Frontend: Mescla Cronologicamente<br>com Dividendos de RV na Interface]
+```
+
 ---
 
 ## 📂 Arquitetura do Repositório (Monorepo)
