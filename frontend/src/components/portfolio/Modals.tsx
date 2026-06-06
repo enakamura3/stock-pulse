@@ -43,6 +43,11 @@ interface ModalsProps {
   // Fixed Income Modal
   showFIModal?: boolean;
   setShowFIModal?: (s: boolean) => void;
+  showFIEditModal?: boolean;
+  setShowFIEditModal?: (s: boolean) => void;
+  fiEditTxAssetName?: string;
+  setFiEditTxAssetName?: (s: string) => void;
+  handleUpdateFITransaction?: (e: React.FormEvent) => void;
   fiInstitution?: string;
   setFiInstitution?: (s: string) => void;
   fiType?: string;
@@ -53,6 +58,8 @@ interface ModalsProps {
   setFiIndexer?: (s: string) => void;
   fiRate?: string | number;
   setFiRate?: (s: string | number) => void;
+  fiTxType?: string;
+  setFiTxType?: (s: string) => void;
   fiAmount?: string | number;
   setFiAmount?: (s: string | number) => void;
   fiApplicationDate?: string;
@@ -420,6 +427,74 @@ export default function Modals(props: ModalsProps) {
                 </button>
                 <button type="submit" disabled={props.isAddingFI} className="primary-button w-full" style={{ padding: '0.8rem', fontSize: '0.9rem' }}>
                   {props.isAddingFI ? 'Cadastrando...' : 'Aplicar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Fixed Income Transaction Modal */}
+      {props.showFIEditModal && props.setShowFIEditModal && props.handleUpdateFITransaction && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <h2 className="modal-title mb-lg">Editar Operação RF</h2>
+            <form onSubmit={props.handleUpdateFITransaction} className="flex-col gap-md">
+              <div className="form-group">
+                <label className="form-label">Ativo (Somente Leitura)</label>
+                <input
+                  className="form-input" type="text"
+                  value={props.fiEditTxAssetName} disabled
+                  style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Tipo de Operação</label>
+                <div className="flex-row gap-sm">
+                  <button
+                    type="button"
+                    className={`btn-toggle ${props.fiTxType === 'SUBSCRIPTION' ? 'active badge-success' : ''}`}
+                    onClick={() => props.setFiTxType!('SUBSCRIPTION')}
+                    style={{ flex: 1, padding: '0.6rem', fontSize: '0.85rem' }}
+                  >
+                    Aplicação
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-toggle ${props.fiTxType === 'REDEMPTION' ? 'active badge-danger' : ''}`}
+                    onClick={() => props.setFiTxType!('REDEMPTION')}
+                    style={{ flex: 1, padding: '0.6rem', fontSize: '0.85rem' }}
+                  >
+                    Resgate
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Valor (R$)</label>
+                <input
+                  className="form-input" type="number" step="any"
+                  value={props.fiAmount} onChange={(e) => props.setFiAmount!(e.target.value)}
+                  placeholder="Ex: 1000.00" required disabled={props.isAddingFI}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Data da Operação</label>
+                <input
+                  className="form-input" type="date"
+                  value={props.fiApplicationDate} onChange={(e) => props.setFiApplicationDate!(e.target.value)}
+                  required disabled={props.isAddingFI}
+                />
+              </div>
+
+              <div className="flex-row gap-md mt-sm">
+                <button type="button" onClick={() => props.setShowFIEditModal!(false)} className="btn-secondary w-full" style={{ padding: '0.75rem' }}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={props.isAddingFI} className="primary-button w-full" style={{ padding: '0.8rem', fontSize: '0.9rem' }}>
+                  {props.isAddingFI ? 'Salvando...' : 'Salvar Operação'}
                 </button>
               </div>
             </form>

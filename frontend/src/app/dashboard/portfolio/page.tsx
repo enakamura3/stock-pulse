@@ -43,6 +43,8 @@ export default function PortfolioPage() {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showTxModal, setShowTxModal] = useState(false);
   const [showFIModal, setShowFIModal] = useState(false);
+  const [showFIEditModal, setShowFIEditModal] = useState(false);
+  const [fiEditTxAssetName, setFiEditTxAssetName] = useState('');
   
   const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -77,6 +79,7 @@ export default function PortfolioPage() {
   const [fiAmount, setFiAmount] = useState<string | number>('');
   const [fiApplicationDate, setFiApplicationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [fiMaturityDate, setFiMaturityDate] = useState<string>('');
+  const [fiTxType, setFiTxType] = useState<string>('SUBSCRIPTION');
   const [isAddingFI, setIsAddingFI] = useState(false);
 
   const loadPortfolios = useCallback(async (selectId?: string) => {
@@ -315,13 +318,47 @@ export default function PortfolioPage() {
 
   const handleEditTransaction = (tx: UnifiedTransaction) => {
     if (tx.module === 'RF') {
-      alert("A edição de operações de Renda Fixa estará disponível na próxima atualização do sistema.");
+      setEditingTxId(tx.id);
+      setFiEditTxAssetName(tx.asset_name);
+      setFiTxType(tx.type);
+      setFiAmount(tx.total_value);
+      setFiApplicationDate(tx.date ? tx.date.split('T')[0] : '');
+      setShowFIEditModal(true);
       return;
     }
     
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxType(tx.type as any);
     setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 1);
     setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
+  };
+
+  const handleUpdateFITransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTxId || !fiAmount || !fiApplicationDate) return alert('Preencha os campos obrigatórios');
+    setIsAddingFI(true);
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${editingTxId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: fiTxType,
+          amount: parseFloat(fiAmount.toString()),
+          date: new Date(fiApplicationDate).toISOString()
+        }),
+        credentials: 'include', cache: 'no-store'
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar transação");
+      
+      setShowFIEditModal(false);
+      setEditingTxId(null);
+      setFiAmount('');
+      await loadPortfolioDetails(activePortfolioId);
+      await loadPerformance(activePortfolioId, period);
+    } catch (e) {
+      alert("Erro ao salvar transação de Renda Fixa.");
+      console.error(e);
+    } finally {
+      setIsAddingFI(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -343,14 +380,13 @@ export default function PortfolioPage() {
   const handleDeleteTransaction = async (txId: string) => {
     if (!confirm('Deseja realmente excluir esta transação?')) return;
     try {
-      // Find the transaction module
       const tx = transactions.find(t => t.id === txId);
+      let endpoint = `${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`;
       if (tx?.module === 'RF') {
-        alert("A exclusão de transações de Renda Fixa pela aba unificada requer a implementação do novo endpoint no backend.");
-        return;
+        endpoint = `${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
       }
 
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
+      const res = await fetch(endpoint, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
       if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
     } catch (e) { console.error(e); }
   };
@@ -541,11 +577,15 @@ export default function PortfolioPage() {
         handleAddTransaction={handleAddTransaction}
         
         showFIModal={showFIModal} setShowFIModal={setShowFIModal}
+        showFIEditModal={showFIEditModal} setShowFIEditModal={setShowFIEditModal}
+        fiEditTxAssetName={fiEditTxAssetName} setFiEditTxAssetName={setFiEditTxAssetName}
+        handleUpdateFITransaction={handleUpdateFITransaction}
         fiInstitution={fiInstitution} setFiInstitution={setFiInstitution}
         fiType={fiType} setFiType={setFiType}
         fiDebtType={fiDebtType} setFiDebtType={setFiDebtType}
         fiIndexer={fiIndexer} setFiIndexer={setFiIndexer}
         fiRate={fiRate} setFiRate={setFiRate}
+        fiTxType={fiTxType} setFiTxType={setFiTxType}
         fiAmount={fiAmount} setFiAmount={setFiAmount}
         fiApplicationDate={fiApplicationDate} setFiApplicationDate={setFiApplicationDate}
         fiMaturityDate={fiMaturityDate} setFiMaturityDate={setFiMaturityDate}
