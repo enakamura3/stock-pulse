@@ -61,12 +61,13 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_divs_year", h.HandleDividendsByYear)
 	bot.Handle("\fbtn_divs_month", h.HandleDividendsByMonth)
 	bot.Handle("\fbtn_operacao", h.HandleLaunchOperation)
+	bot.Handle("\fbtn_change_portfolio", h.HandleChangePortfolio)
 
 	bot.Handle("\fbtn_new_asset", h.HandleNewAsset)
 	bot.Handle("\fbtn_buy", h.HandleSetTypeBuy)
 	bot.Handle("\fbtn_sell", h.HandleSetTypeSell)
 
-	// Intercepta todos os callbacks para capturar a seleção dinâmica de ticker
+	// Intercepta todos os callbacks para capturar a seleção dinâmica de ticker e portfólio
 	bot.Handle(telebot.OnCallback, h.HandleDynamicCallback)
 
 	// Intercepta todas as mensagens de texto para a máquina de estados
@@ -93,9 +94,14 @@ func (h *Handlers) HandleStart(c telebot.Context) error {
 
 func (h *Handlers) HandleMenu(c telebot.Context) error {
 	// Verifica se a conta está vinculada
-	_, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
 	if err != nil {
 		return c.Send("⚠️ Sua conta não está vinculada. Gere um link no painel do Stock Pulse.")
+	}
+	userIDStr := userID.String()
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Send("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
 	menu := &telebot.ReplyMarkup{}
@@ -105,15 +111,39 @@ func (h *Handlers) HandleMenu(c telebot.Context) error {
 	btnRendaFixa := menu.Data("🏛️ Renda Fixa", "btn_renda_fixa")
 	btnOperacao := menu.Data("💵 Lançar Operação", "btn_operacao")
 
-	menu.Inline(
+	rows := []telebot.Row{
 		menu.Row(btnResumo),
 		menu.Row(btnProventos),
 		menu.Row(btnHistory),
 		menu.Row(btnRendaFixa),
 		menu.Row(btnOperacao),
-	)
+	}
+
+	if len(portfolios) > 1 {
+		btnTrocarCarteira := menu.Data("🔄 Trocar Carteira", "btn_change_portfolio")
+		rows = append(rows, menu.Row(btnTrocarCarteira))
+	}
+
+	menu.Inline(rows...)
 
 	return c.Send("Escolha uma opção:", menu)
+}
+
+func (h *Handlers) resolveActivePortfolio(ctx context.Context, chatID int64, portfolios []portfolio.Portfolio) (string, string) {
+	if len(portfolios) == 0 {
+		return "", ""
+	}
+	
+	activeID, err := h.svc.GetActivePortfolio(ctx, chatID)
+	if err == nil && activeID != "" {
+		for _, p := range portfolios {
+			if p.ID == activeID {
+				return p.ID, p.Name
+			}
+		}
+	}
+	// Fallback para a primeira
+	return portfolios[0].ID, portfolios[0].Name
 }
 
 func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
@@ -128,7 +158,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		return c.Send("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
-	portfolioID := portfolios[0].ID
+	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(context.Background(), portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
@@ -140,8 +170,6 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		totalValue += pos.CurrentValue
 		totalCost += pos.TotalCost
 		// Simplificação: Assumimos que o CurrentValue embute a taxa de câmbio. 
-		// O DailyChange é na moeda original. Pra simplificar, vamos assumir que pos.DailyChange * pos.Quantity * taxa não temos a taxa exposta aqui na struct Position facilmente, mas podemos inferir ou apenas não somar.
-		// Vamos estimar baseando em CurrentValue / CurrentPrice para a taxa
 		rate := 1.0
 		if pos.CurrentPrice > 0 && pos.Quantity > 0 {
 			rate = pos.CurrentValue / (pos.CurrentPrice * pos.Quantity)
@@ -174,7 +202,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📊 *Resumo da sua Carteira*\n\n")
+	msg := p.Sprintf("📊 *Resumo: %s*\n\n", portfolioName)
 	msg += p.Sprintf("💰 Valor Total: *R$ %.2f*\n", totalValue)
 	
 	var variacaoDiaria string
@@ -317,7 +345,7 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	if err != nil || len(portfolios) == 0 {
 		return c.Send("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
-	portfolioID := portfolios[0].ID
+	portfolioID, _ := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(context.Background(), portfolioID, userIDStr)
 	if err != nil {
@@ -353,7 +381,6 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 
 func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 	data := c.Callback().Data
-	// data vem no formato "\fbtn_ticker_AAPL"
 	data = strings.TrimPrefix(data, "\f")
 	
 	if strings.HasPrefix(data, "btn_ticker_") {
@@ -361,9 +388,71 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 		return h.handleSelectedTicker(c, ticker)
 	}
 
-	// Como a gente registrou OnCallback globalmente, temos que dar Fallback
-	// mas os botões estáticos têm preferência de rota do telebot, então não caem aqui a menos que falhe
+	if strings.HasPrefix(data, "btn_sel_port_") {
+		portfolioID := strings.TrimPrefix(data, "btn_sel_port_")
+		return h.handleSelectedPortfolio(c, portfolioID)
+	}
+
 	return nil
+}
+
+func (h *Handlers) HandleChangePortfolio(c telebot.Context) error {
+	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+	if err != nil {
+		return c.Send("⚠️ Sua conta não está vinculada.")
+	}
+
+	userIDStr := userID.String()
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Send("⚠️ Nenhuma carteira encontrada na sua conta.")
+	}
+
+	menu := &telebot.ReplyMarkup{}
+	var rows []telebot.Row
+
+	for _, p := range portfolios {
+		btn := menu.Data(fmt.Sprintf("📂 %s", p.Name), "btn_sel_port_"+p.ID)
+		rows = append(rows, menu.Row(btn))
+	}
+
+	menu.Inline(rows...)
+	c.Respond()
+	return c.Send("Qual carteira você deseja definir como Ativa?", menu)
+}
+
+func (h *Handlers) handleSelectedPortfolio(c telebot.Context, portfolioID string) error {
+	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+	if err != nil {
+		return c.Send("⚠️ Sua conta não está vinculada.")
+	}
+
+	userIDStr := userID.String()
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil {
+		return c.Send("❌ Erro ao buscar carteiras.")
+	}
+
+	var pName string
+	for _, p := range portfolios {
+		if p.ID == portfolioID {
+			pName = p.Name
+			break
+		}
+	}
+
+	if pName == "" {
+		return c.Send("❌ Carteira inválida.")
+	}
+
+	err = h.svc.SetActivePortfolio(context.Background(), c.Chat().ID, portfolioID)
+	if err != nil {
+		slog.Error("Failed to set active portfolio", "error", err)
+		return c.Send("❌ Erro interno ao salvar carteira ativa.")
+	}
+
+	c.Respond()
+	return c.Send(fmt.Sprintf("✅ Carteira *%s* selecionada como ativa!\n\nEnvie /menu para continuar.", pName), telebot.ModeMarkdown)
 }
 
 func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error {
@@ -508,7 +597,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 		return c.Send("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
-	portfolioID := portfolios[0].ID
+	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 	divs, err := h.portfolioSvc.GetPortfolioDividends(context.Background(), portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch dividends for telegram bot", "error", err, "user_id", userIDStr)
@@ -531,7 +620,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("💸 *Resumo de Proventos*\n\n")
+	msg := p.Sprintf("💸 *Proventos: %s*\n\n", portfolioName)
 	msg += p.Sprintf("✅ *Recebidos (Mês Atual):* R$ %.2f\n", totalPaidMonth)
 	msg += p.Sprintf("⏳ *A Receber (Mês Atual):* R$ %.2f\n", totalFutureMonth)
 	
@@ -808,7 +897,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	if err != nil || len(portfolios) == 0 {
 		return c.Send("⚠️ Nenhuma carteira encontrada.")
 	}
-	portfolioID := portfolios[0].ID
+	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 
 	txs, err := h.portfolioSvc.GetPortfolioTransactions(context.Background(), portfolioID, userIDStr)
 	if err != nil {
@@ -840,7 +929,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	pageTxs := txs[start:end]
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📜 *Histórico de Operações*\n_Página %d_\n\n", page+1)
+	msg := p.Sprintf("📜 *Histórico: %s*\n_Página %d_\n\n", portfolioName, page+1)
 
 	for _, tx := range pageTxs {
 		tipoStr := "🟢 C"
@@ -893,7 +982,7 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 		return c.Send("⚠️ Nenhuma carteira encontrada.")
 	}
 
-	portfolioID := portfolios[0].ID
+	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 	positions, err := h.fiSvc.GetPortfolioPositions(context.Background(), portfolioID)
 	if err != nil {
 		return c.Send("❌ Erro ao buscar posições de Renda Fixa.")
@@ -912,7 +1001,7 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("🏛️ *Sua Renda Fixa*\n\n")
+	msg := p.Sprintf("🏛️ *Renda Fixa: %s*\n\n", portfolioName)
 	msg += p.Sprintf("💰 Valor Líquido: *R$ %.2f*\n", totalLiquido)
 	msg += p.Sprintf("📈 Valor Bruto: R$ %.2f\n", totalBruto)
 	
