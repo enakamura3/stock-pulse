@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import dynamic from 'next/dynamic';
 
-import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult, FixedIncomePosition } from '@/components/portfolio/types';
+import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult, FixedIncomePosition, UnifiedTransaction } from '@/components/portfolio/types';
 import { getAssetCategory } from '@/components/portfolio/helpers';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
@@ -29,7 +29,7 @@ export default function PortfolioPage() {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('Todas');
   const [positions, setPositions] = useState<Position[]>([]);
   const [fiPositions, setFiPositions] = useState<FixedIncomePosition[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<UnifiedTransaction[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
   const [dividends, setDividends] = useState<CalculatedDividend[]>([]);
   
@@ -43,6 +43,8 @@ export default function PortfolioPage() {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showTxModal, setShowTxModal] = useState(false);
   const [showFIModal, setShowFIModal] = useState(false);
+  const [showFIEditModal, setShowFIEditModal] = useState(false);
+  const [fiEditTxAssetName, setFiEditTxAssetName] = useState('');
   
   const [isLoadingPortfolios, setIsLoadingPortfolios] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -77,6 +79,7 @@ export default function PortfolioPage() {
   const [fiAmount, setFiAmount] = useState<string | number>('');
   const [fiApplicationDate, setFiApplicationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [fiMaturityDate, setFiMaturityDate] = useState<string>('');
+  const [fiTxType, setFiTxType] = useState<string>('SUBSCRIPTION');
   const [isAddingFI, setIsAddingFI] = useState(false);
 
   const loadPortfolios = useCallback(async (selectId?: string) => {
@@ -100,7 +103,7 @@ export default function PortfolioPage() {
     try {
       const resDetails = await fetch(`${API_URL}/portfolios/${id}`, { credentials: 'include', cache: 'no-store' });
       if (resDetails.ok) setPositions((await resDetails.json()).positions || []);
-      const resTxs = await fetch(`${API_URL}/portfolios/${id}/transactions`, { credentials: 'include', cache: 'no-store' });
+      const resTxs = await fetch(`${API_URL}/portfolios/${id}/history`, { credentials: 'include', cache: 'no-store' });
       if (resTxs.ok) setTransactions(await resTxs.json() || []);
       
       const resFI = await fetch(`${API_URL}/portfolios/${id}/fixed-income/positions`, { credentials: 'include', cache: 'no-store' });
@@ -268,13 +271,6 @@ export default function PortfolioPage() {
     } catch (e) { console.error(e); } finally { setIsAddingTx(false); }
   };
 
-  const handleDeleteTransaction = async (txId: string) => {
-    if (!confirm('Deseja realmente excluir esta transação?')) return;
-    try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
-      if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
-    } catch (e) { console.error(e); }
-  };
 
   const handleAddFixedIncome = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -301,7 +297,7 @@ export default function PortfolioPage() {
       const txRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets/${asset.id}/transactions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString()), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
+          type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
         }), credentials: 'include', cache: 'no-store'
       });
 
@@ -320,10 +316,51 @@ export default function PortfolioPage() {
     }
   };
 
-  const handleEditTransaction = (tx: Transaction) => {
-    setEditingTxId(tx.id); setTxTicker(tx.ticker!); setTxType(tx.type as any);
-    setTxQuantity(tx.quantity); setTxUnitPrice(tx.unit_price); setTxExchangeRate(tx.exchange_rate);
-    setTxExecutedAt(tx.executed_at.split('T')[0]); setShowTxModal(true);
+  const handleEditTransaction = (tx: UnifiedTransaction) => {
+    if (tx.module === 'RF') {
+      setEditingTxId(tx.id);
+      setFiEditTxAssetName(tx.asset_name);
+      setFiTxType(tx.type);
+      setFiAmount(Number(tx.total_value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      setFiApplicationDate(tx.date ? tx.date.split('T')[0] : '');
+      setFiMaturityDate(tx.maturity_date ? tx.maturity_date.split('T')[0] : '');
+      setShowFIEditModal(true);
+      return;
+    }
+    
+    setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxType(tx.type as any);
+    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 1);
+    setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
+  };
+
+  const handleUpdateFITransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTxId || !fiAmount || !fiApplicationDate) return alert('Preencha os campos obrigatórios');
+    setIsAddingFI(true);
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${editingTxId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: fiTxType,
+          amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')),
+          date: new Date(fiApplicationDate).toISOString(),
+          maturity_date: fiMaturityDate ? new Date(fiMaturityDate).toISOString() : undefined
+        }),
+        credentials: 'include', cache: 'no-store'
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar transação");
+      
+      setShowFIEditModal(false);
+      setEditingTxId(null);
+      setFiAmount('');
+      await loadPortfolioDetails(activePortfolioId);
+      await loadPerformance(activePortfolioId, period);
+    } catch (e) {
+      alert("Erro ao salvar transação de Renda Fixa.");
+      console.error(e);
+    } finally {
+      setIsAddingFI(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,9 +374,23 @@ export default function PortfolioPage() {
         if (data.errors?.length > 0) alert(`Importados com sucesso: ${data.success}\nFalhas:\n- ${data.errors.join("\n- ")}`);
         else alert(`Importação concluída com sucesso! ${data.success} registros importados.`);
         await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period);
-      } else { alert(`Erro na importação: ${(await res.json()).error}`); }
-    } catch (e) { alert("Erro ao conectar com o servidor."); }
-    e.target.value = "";
+      } else alert("Erro ao enviar arquivo.");
+    } catch (err) { alert("Erro de conexão."); }
+    e.target.value = '';
+  };
+
+  const handleDeleteTransaction = async (txId: string) => {
+    if (!confirm('Deseja realmente excluir esta transação?')) return;
+    try {
+      const tx = transactions.find(t => t.id === txId);
+      let endpoint = `${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`;
+      if (tx?.module === 'RF') {
+        endpoint = `${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
+      }
+
+      const res = await fetch(endpoint, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
+      if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
+    } catch (e) { console.error(e); }
   };
 
   if (authLoading || isLoadingPortfolios) {
@@ -528,11 +579,15 @@ export default function PortfolioPage() {
         handleAddTransaction={handleAddTransaction}
         
         showFIModal={showFIModal} setShowFIModal={setShowFIModal}
+        showFIEditModal={showFIEditModal} setShowFIEditModal={setShowFIEditModal}
+        fiEditTxAssetName={fiEditTxAssetName} setFiEditTxAssetName={setFiEditTxAssetName}
+        handleUpdateFITransaction={handleUpdateFITransaction}
         fiInstitution={fiInstitution} setFiInstitution={setFiInstitution}
         fiType={fiType} setFiType={setFiType}
         fiDebtType={fiDebtType} setFiDebtType={setFiDebtType}
         fiIndexer={fiIndexer} setFiIndexer={setFiIndexer}
         fiRate={fiRate} setFiRate={setFiRate}
+        fiTxType={fiTxType} setFiTxType={setFiTxType}
         fiAmount={fiAmount} setFiAmount={setFiAmount}
         fiApplicationDate={fiApplicationDate} setFiApplicationDate={setFiApplicationDate}
         fiMaturityDate={fiMaturityDate} setFiMaturityDate={setFiMaturityDate}

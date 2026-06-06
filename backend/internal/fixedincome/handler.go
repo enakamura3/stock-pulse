@@ -3,6 +3,7 @@ package fixedincome
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -25,6 +26,8 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Post("/assets", h.createAsset)
 		r.Delete("/assets/{assetID}", h.deleteAsset)
 		r.Post("/assets/{assetID}/transactions", h.createTransaction)
+		r.Put("/transactions/{txID}", h.updateTransaction)
+		r.Delete("/transactions/{txID}", h.deleteTransaction)
 	})
 }
 
@@ -125,4 +128,56 @@ func (h *Handler) createTransaction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
+}
+
+func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	txID := chi.URLParam(r, "txID")
+	
+	var payload struct {
+		Type         string     `json:"type"`
+		Amount       float64    `json:"amount"`
+		Date         time.Time  `json:"date"`
+		MaturityDate *time.Time `json:"maturity_date"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	tx := Transaction{
+		Type:   payload.Type,
+		Amount: payload.Amount,
+		Date:   payload.Date,
+	}
+
+	err := h.service.UpdateTransaction(r.Context(), portfolioID, txID, &tx, payload.MaturityDate)
+	if err != nil {
+		if err.Error() == "unauthorized: transaction does not belong to the portfolio" {
+			http.Error(w, err.Error(), http.StatusForbidden)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) deleteTransaction(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	txID := chi.URLParam(r, "txID")
+	
+	err := h.service.DeleteTransaction(r.Context(), portfolioID, txID)
+	if err != nil {
+		if err.Error() == "unauthorized: transaction does not belong to the portfolio" {
+			http.Error(w, err.Error(), http.StatusForbidden)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

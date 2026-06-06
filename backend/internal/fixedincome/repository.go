@@ -13,11 +13,15 @@ type Repository interface {
 	CreateAsset(ctx context.Context, asset *Asset) (*Asset, error)
 	GetAssetsByPortfolio(ctx context.Context, portfolioID string) ([]Asset, error)
 	GetAssetByID(ctx context.Context, assetID string) (*Asset, error)
+	UpdateAsset(ctx context.Context, asset *Asset) error
 	DeleteAsset(ctx context.Context, assetID string) error
 
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
 	GetTransactionsByAsset(ctx context.Context, assetID string) ([]Transaction, error)
 	GetTransactionsByPortfolio(ctx context.Context, portfolioID string) ([]Transaction, error)
+	GetTransactionByID(ctx context.Context, txID string) (*Transaction, error)
+	UpdateTransaction(ctx context.Context, txID string, tx *Transaction) error
+	DeleteTransaction(ctx context.Context, txID string) error
 
 	SaveIndexRates(ctx context.Context, rates []IndexRate) error
 	GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error)
@@ -82,6 +86,16 @@ func (r *repository) GetAssetByID(ctx context.Context, assetID string) (*Asset, 
 		return nil, err
 	}
 	return &a, nil
+}
+
+func (r *repository) UpdateAsset(ctx context.Context, a *Asset) error {
+	query := `
+		UPDATE fixed_income_assets
+		SET institution = $1, type = $2, debt_type = $3, indexer = $4, rate = $5, maturity_date = $6, updated_at = NOW()
+		WHERE id = $7
+	`
+	_, err := r.db.Exec(ctx, query, a.Institution, a.Type, a.DebtType, a.Indexer, a.Rate, a.MaturityDate, a.ID)
+	return err
 }
 
 func (r *repository) DeleteAsset(ctx context.Context, assetID string) error {
@@ -150,6 +164,36 @@ func (r *repository) GetTransactionsByPortfolio(ctx context.Context, portfolioID
 		txs = append(txs, tx)
 	}
 	return txs, nil
+}
+
+func (r *repository) GetTransactionByID(ctx context.Context, txID string) (*Transaction, error) {
+	query := `
+		SELECT id, asset_id, type, amount, date, created_at
+		FROM fixed_income_transactions
+		WHERE id = $1
+	`
+	var tx Transaction
+	err := r.db.QueryRow(ctx, query, txID).Scan(&tx.ID, &tx.AssetID, &tx.Type, &tx.Amount, &tx.Date, &tx.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &tx, nil
+}
+
+func (r *repository) UpdateTransaction(ctx context.Context, txID string, tx *Transaction) error {
+	query := `
+		UPDATE fixed_income_transactions
+		SET type = $1, amount = $2, date = $3
+		WHERE id = $4
+	`
+	_, err := r.db.Exec(ctx, query, tx.Type, tx.Amount, tx.Date, txID)
+	return err
+}
+
+func (r *repository) DeleteTransaction(ctx context.Context, txID string) error {
+	query := `DELETE FROM fixed_income_transactions WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, txID)
+	return err
 }
 
 func (r *repository) SaveIndexRates(ctx context.Context, rates []IndexRate) error {

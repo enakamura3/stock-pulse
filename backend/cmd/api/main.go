@@ -19,6 +19,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/docs"
 	"github.com/onigiri/stock-pulse/backend/internal/mail"
+	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
@@ -125,6 +126,9 @@ func main() {
 	alertRepo := alert.NewRepository(dbPool)
 	alertService := alert.NewService(alertRepo, marketProvider)
 	alertHandler := alert.NewHandler(alertService)
+	
+	historyService := history.NewService(portfolioService, fiService)
+	historyHandler := history.NewHandler(historyService)
 	alertWorker := alert.NewAlertWorker(alertRepo, marketService, mailService)
 
 	// Telegram Bot
@@ -218,6 +222,7 @@ func main() {
 
 			// Renda Fixa
 			fiHandler.RegisterRoutes(r)
+			historyHandler.RegisterRoutes(r)
 
 			// Conexão WebSocket em Tempo Real (Fase 3)
 			r.Get("/ws", wsHandler.ServeWS)

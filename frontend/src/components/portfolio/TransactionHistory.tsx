@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Transaction } from './types';
+import { UnifiedTransaction } from './types';
 import { formatMoney, formatQuantity } from './helpers';
 
 interface TransactionHistoryProps {
-  transactions: Transaction[];
+  transactions: UnifiedTransaction[];
   filterTxTicker: string;
   setFilterTxTicker: (t: string) => void;
-  handleEditTransaction: (tx: Transaction) => void;
+  handleEditTransaction: (tx: UnifiedTransaction) => void;
   handleDeleteTransaction: (id: string) => void;
   onLaunchOperation?: () => void;
 }
@@ -16,41 +16,52 @@ export default function TransactionHistory({
 }: TransactionHistoryProps) {
   const [filterTxYear, setFilterTxYear] = useState<string>('Todos');
   const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
+  const [filterTxModule, setFilterTxModule] = useState<string>('Todos'); // 'Todos', 'RV', 'RF'
 
   const cumulativeQuantities: Record<string, number> = {};
   const cumulativeInvested: Record<string, number> = {};
+  
+  // Calculate running balances only for RV transactions (iterating oldest to newest)
   const transactionsWithBalance = [...transactions].reverse().map(tx => {
-    let currentBalance = cumulativeQuantities[tx.ticker] || 0;
-    let currentInvested = cumulativeInvested[tx.ticker] || 0;
+    if (tx.module === 'RF') {
+      return { ...tx };
+    }
+
+    // RV specific balance calculation
+    let currentBalance = cumulativeQuantities[tx.asset_name] || 0;
+    let currentInvested = cumulativeInvested[tx.asset_name] || 0;
+    const qty = tx.quantity || 0;
+    const price = tx.unit_price || 0;
     
     if (tx.type === 'BUY') {
-      currentBalance += tx.quantity;
-      currentInvested += tx.quantity * tx.unit_price;
+      currentBalance += qty;
+      currentInvested += qty * price;
     } else if (tx.type === 'BONUS') {
-      currentBalance += tx.quantity;
+      currentBalance += qty;
     } else if (tx.type === 'SELL') {
       const prevBalance = currentBalance;
-      currentBalance -= tx.quantity;
+      currentBalance -= qty;
       if (prevBalance > 0) {
         const avgCost = currentInvested / prevBalance;
         currentInvested = currentBalance > 0 ? currentBalance * avgCost : 0;
       }
     } else if (tx.type === 'SPLIT') {
-      currentBalance = currentBalance * tx.quantity;
+      currentBalance = currentBalance * qty;
     } else if (tx.type === 'REVERSE_SPLIT') {
-      currentBalance = currentBalance / tx.quantity;
+      currentBalance = currentBalance / qty;
     }
     
-    cumulativeQuantities[tx.ticker] = currentBalance;
-    cumulativeInvested[tx.ticker] = currentInvested;
+    cumulativeQuantities[tx.asset_name] = currentBalance;
+    cumulativeInvested[tx.asset_name] = currentInvested;
     return { ...tx, resulting_quantity: currentBalance, resulting_invested: currentInvested };
-  }).reverse();
+  }).reverse(); // Revert back to newest first
 
   const filteredTransactions = transactionsWithBalance.filter(tx => {
-    if (filterTxTicker !== '' && tx.ticker !== filterTxTicker) return false;
+    if (filterTxModule !== 'Todos' && tx.module !== filterTxModule) return false;
+    if (filterTxTicker !== '' && tx.asset_name !== filterTxTicker) return false;
     
-    const year = tx.executed_at ? tx.executed_at.substring(0, 4) : '';
-    const month = tx.executed_at ? tx.executed_at.substring(5, 7) : '';
+    const year = tx.date ? tx.date.substring(0, 4) : '';
+    const month = tx.date ? tx.date.substring(5, 7) : '';
     
     if (filterTxYear !== 'Todos' && year !== filterTxYear) return false;
     if (filterTxMonth !== 'Todos' && month !== filterTxMonth) return false;
@@ -58,8 +69,8 @@ export default function TransactionHistory({
     return true;
   });
 
-  const tickers = Array.from(new Set(transactions.map(tx => tx.ticker))).sort();
-  const availableYears = Array.from(new Set(transactions.map(tx => tx.executed_at ? tx.executed_at.substring(0, 4) : ''))).filter(y => y !== '').sort((a, b) => b.localeCompare(a));
+  const tickers = Array.from(new Set(transactions.map(tx => tx.asset_name))).sort();
+  const availableYears = Array.from(new Set(transactions.map(tx => tx.date ? tx.date.substring(0, 4) : ''))).filter(y => y !== '').sort((a, b) => b.localeCompare(a));
 
   return (
     <div className="card flex-col gap-md" style={{ flex: '1 1 350px', minHeight: '800px' }}>
@@ -69,46 +80,56 @@ export default function TransactionHistory({
           {transactions.length > 0 && (
             <>
               <select
-              value={filterTxYear}
-              onChange={(e) => setFilterTxYear(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
-            >
-              <option value="Todos" style={{ background: '#1c1f24' }}>Ano: Todos</option>
-              {availableYears.map(year => (
-                <option key={year} value={year} style={{ background: '#1c1f24' }}>{year}</option>
-              ))}
-            </select>
-            
-            <select
-              value={filterTxMonth}
-              onChange={(e) => setFilterTxMonth(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
-            >
-              <option value="Todos" style={{ background: '#1c1f24' }}>Mês: Todos</option>
-              <option value="01" style={{ background: '#1c1f24' }}>Janeiro</option>
-              <option value="02" style={{ background: '#1c1f24' }}>Fevereiro</option>
-              <option value="03" style={{ background: '#1c1f24' }}>Março</option>
-              <option value="04" style={{ background: '#1c1f24' }}>Abril</option>
-              <option value="05" style={{ background: '#1c1f24' }}>Maio</option>
-              <option value="06" style={{ background: '#1c1f24' }}>Junho</option>
-              <option value="07" style={{ background: '#1c1f24' }}>Julho</option>
-              <option value="08" style={{ background: '#1c1f24' }}>Agosto</option>
-              <option value="09" style={{ background: '#1c1f24' }}>Setembro</option>
-              <option value="10" style={{ background: '#1c1f24' }}>Outubro</option>
-              <option value="11" style={{ background: '#1c1f24' }}>Novembro</option>
-              <option value="12" style={{ background: '#1c1f24' }}>Dezembro</option>
-            </select>
+                value={filterTxModule}
+                onChange={(e) => setFilterTxModule(e.target.value)}
+                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="Todos" style={{ background: '#1c1f24' }}>Todos Módulos</option>
+                <option value="RV" style={{ background: '#1c1f24' }}>Renda Variável</option>
+                <option value="RF" style={{ background: '#1c1f24' }}>Renda Fixa</option>
+              </select>
 
-            <select
-              value={filterTxTicker}
-              onChange={(e) => setFilterTxTicker(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
-            >
-              <option value="" style={{ background: '#1c1f24' }}>Todos os Ativos</option>
-              {tickers.map(ticker => (
-                <option key={ticker!} value={ticker} style={{ background: '#1c1f24' }}>{ticker}</option>
-              ))}
-            </select>
+              <select
+                value={filterTxYear}
+                onChange={(e) => setFilterTxYear(e.target.value)}
+                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="Todos" style={{ background: '#1c1f24' }}>Ano: Todos</option>
+                {availableYears.map(year => (
+                  <option key={year} value={year} style={{ background: '#1c1f24' }}>{year}</option>
+                ))}
+              </select>
+            
+              <select
+                value={filterTxMonth}
+                onChange={(e) => setFilterTxMonth(e.target.value)}
+                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="Todos" style={{ background: '#1c1f24' }}>Mês: Todos</option>
+                <option value="01" style={{ background: '#1c1f24' }}>Janeiro</option>
+                <option value="02" style={{ background: '#1c1f24' }}>Fevereiro</option>
+                <option value="03" style={{ background: '#1c1f24' }}>Março</option>
+                <option value="04" style={{ background: '#1c1f24' }}>Abril</option>
+                <option value="05" style={{ background: '#1c1f24' }}>Maio</option>
+                <option value="06" style={{ background: '#1c1f24' }}>Junho</option>
+                <option value="07" style={{ background: '#1c1f24' }}>Julho</option>
+                <option value="08" style={{ background: '#1c1f24' }}>Agosto</option>
+                <option value="09" style={{ background: '#1c1f24' }}>Setembro</option>
+                <option value="10" style={{ background: '#1c1f24' }}>Outubro</option>
+                <option value="11" style={{ background: '#1c1f24' }}>Novembro</option>
+                <option value="12" style={{ background: '#1c1f24' }}>Dezembro</option>
+              </select>
+
+              <select
+                value={filterTxTicker}
+                onChange={(e) => setFilterTxTicker(e.target.value)}
+                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="" style={{ background: '#1c1f24' }}>Todos os Ativos</option>
+                {tickers.map(ticker => (
+                  <option key={ticker!} value={ticker} style={{ background: '#1c1f24' }}>{ticker}</option>
+                ))}
+              </select>
             </>
           )}
           {onLaunchOperation && (
@@ -122,39 +143,66 @@ export default function TransactionHistory({
       <div className="flex-col gap-sm" style={{ overflowY: 'auto', flex: 1, maxHeight: '800px' }}>
         {filteredTransactions.length > 0 ? (
           filteredTransactions.map((tx) => {
-            const isBuy = tx.type === 'BUY' || tx.type === 'BONUS';
+            const isRF = tx.module === 'RF';
+            const isBuy = tx.type === 'BUY' || tx.type === 'BONUS' || tx.type === 'SUBSCRIPTION';
             const isSplit = tx.type === 'SPLIT' || tx.type === 'REVERSE_SPLIT';
             const isReverse = tx.type === 'REVERSE_SPLIT';
+            
+            // Badge styles
+            let badgeText = '';
+            let badgeColor = '';
+            let badgeBg = '';
+            
+            if (isRF) {
+              badgeText = tx.type === 'SUBSCRIPTION' ? 'APLICAÇÃO' : 'RESGATE';
+              badgeColor = tx.type === 'SUBSCRIPTION' ? '#2196F3' : '#FF9800'; // Blue for App, Orange for Resgate
+              badgeBg = tx.type === 'SUBSCRIPTION' ? 'rgba(33, 150, 243, 0.08)' : 'rgba(255, 152, 0, 0.08)';
+            } else {
+              if (tx.type === 'BONUS') { badgeText = 'BÔNUS'; badgeColor = '#00e676'; badgeBg = 'rgba(0, 230, 118, 0.08)'; }
+              else if (tx.type === 'BUY') { badgeText = 'COMPRA'; badgeColor = '#00e676'; badgeBg = 'rgba(0, 230, 118, 0.08)'; }
+              else if (tx.type === 'SELL') { badgeText = 'VENDA'; badgeColor = '#ff3d00'; badgeBg = 'rgba(255, 61, 0, 0.08)'; }
+              else if (tx.type === 'SPLIT') { badgeText = 'SPLIT'; badgeColor = '#00f2fe'; badgeBg = 'rgba(0, 242, 254, 0.08)'; }
+              else if (tx.type === 'REVERSE_SPLIT') { badgeText = 'AGRUPAMENTO'; badgeColor = '#e040fb'; badgeBg = 'rgba(156, 39, 176, 0.08)'; }
+            }
             
             return (
               <div key={tx.id} className="flex-row justify-between items-center p-sm" style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.015)', border: '1px solid var(--panel-border)', borderRadius: '8px', fontSize: '0.8rem' }}>
                 <div className="flex-row items-center gap-sm flex-wrap" style={{ flex: 1 }}>
-                  <span className={`badge ${isBuy ? 'badge-success' : tx.type === 'SPLIT' ? 'badge-neutral' : tx.type === 'REVERSE_SPLIT' ? 'badge-neutral' : 'badge-danger'}`} style={{ color: isBuy ? '#00e676' : tx.type === 'SPLIT' ? '#00f2fe' : tx.type === 'REVERSE_SPLIT' ? '#e040fb' : '#ff3d00', background: isBuy ? 'rgba(0, 230, 118, 0.08)' : tx.type === 'SPLIT' ? 'rgba(0, 242, 254, 0.08)' : tx.type === 'REVERSE_SPLIT' ? 'rgba(156, 39, 176, 0.08)' : 'rgba(255, 61, 0, 0.08)' }}>
-                    {isBuy ? (tx.type === 'BONUS' ? 'BÔNUS' : 'COMPRA') : tx.type === 'SPLIT' ? 'SPLIT' : tx.type === 'REVERSE_SPLIT' ? 'AGRUPAMENTO' : 'VENDA'}
+                  
+                  <span title={isRF ? "Renda Fixa" : "Renda Variável"} style={{ fontSize: '1.2rem', cursor: 'help' }}>
+                    {isRF ? '🏦' : '📈'}
+                  </span>
+
+                  <span className="badge" style={{ color: badgeColor, background: badgeBg }}>
+                    {badgeText}
                   </span>
                   
-                  <span className="font-bold text-primary">{tx.ticker}</span>
+                  <span className="font-bold text-primary">{tx.asset_name}</span>
                   
                   <span className="text-secondary text-xs" style={{ borderRight: '1px solid var(--panel-border)', paddingRight: '0.5rem' }}>
-                    {tx.executed_at ? new Date(tx.executed_at).toISOString().split('T')[0].replace(/-/g, '/') : 'N/A'}
+                    {tx.date ? new Date(tx.date).toISOString().split('T')[0].replace(/-/g, '/') : 'N/A'}
                   </span>
                   
                   <div className="flex-row items-center gap-sm text-xs">
-                    {!isSplit ? (
+                    {isRF ? (
+                      <span className="font-bold">{formatMoney(tx.total_value, tx.currency || 'BRL')}</span>
+                    ) : !isSplit ? (
                       <>
-                        <span className="text-secondary">{formatQuantity(tx.quantity)} un. x {formatMoney(tx.unit_price, tx.currency || 'BRL')}</span>
+                        <span className="text-secondary">{formatQuantity(tx.quantity || 0)} un. x {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}</span>
                         <span className="text-secondary">=</span>
-                        <span className="font-bold">{formatMoney(tx.quantity * tx.unit_price, tx.currency || 'BRL')}</span>
+                        <span className="font-bold">{formatMoney(tx.total_value, tx.currency || 'BRL')}</span>
                       </>
                     ) : (
-                      <span className="font-bold">Fator: {isReverse ? `${formatQuantity(tx.quantity)} para 1` : `1 para ${formatQuantity(tx.quantity)}`}</span>
+                      <span className="font-bold">Fator: {isReverse ? `${formatQuantity(tx.quantity || 0)} para 1` : `1 para ${formatQuantity(tx.quantity || 0)}`}</span>
                     )}
 
-                    <span className="text-secondary" style={{ marginLeft: '1rem', borderLeft: '1px solid var(--panel-border)', paddingLeft: '1rem', fontSize: '0.75rem' }}>
-                      Saldo após: <span className="font-bold text-primary" style={{ color: '#00f2fe' }}>{formatQuantity(tx.resulting_quantity)} un.</span>
-                      <span className="text-secondary" style={{ marginLeft: '0.5rem', marginRight: '0.5rem' }}>|</span>
-                      Investido: <span className="font-bold text-primary" style={{ color: '#00e676' }}>{formatMoney(tx.resulting_invested, tx.currency || 'BRL')}</span>
-                    </span>
+                    {!isRF && (
+                      <span className="text-secondary" style={{ marginLeft: '1rem', borderLeft: '1px solid var(--panel-border)', paddingLeft: '1rem', fontSize: '0.75rem' }}>
+                        Saldo após: <span className="font-bold text-primary" style={{ color: '#00f2fe' }}>{formatQuantity(tx.resulting_quantity || 0)} un.</span>
+                        <span className="text-secondary" style={{ marginLeft: '0.5rem', marginRight: '0.5rem' }}>|</span>
+                        Investido: <span className="font-bold text-primary" style={{ color: '#00e676' }}>{formatMoney(tx.resulting_invested || 0, tx.currency || 'BRL')}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 

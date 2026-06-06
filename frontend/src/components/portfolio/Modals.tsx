@@ -43,6 +43,11 @@ interface ModalsProps {
   // Fixed Income Modal
   showFIModal?: boolean;
   setShowFIModal?: (s: boolean) => void;
+  showFIEditModal?: boolean;
+  setShowFIEditModal?: (s: boolean) => void;
+  fiEditTxAssetName?: string;
+  setFiEditTxAssetName?: (s: string) => void;
+  handleUpdateFITransaction?: (e: React.FormEvent) => void;
   fiInstitution?: string;
   setFiInstitution?: (s: string) => void;
   fiType?: string;
@@ -53,6 +58,8 @@ interface ModalsProps {
   setFiIndexer?: (s: string) => void;
   fiRate?: string | number;
   setFiRate?: (s: string | number) => void;
+  fiTxType?: string;
+  setFiTxType?: (s: string) => void;
   fiAmount?: string | number;
   setFiAmount?: (s: string | number) => void;
   fiApplicationDate?: string;
@@ -387,9 +394,19 @@ export default function Modals(props: ModalsProps) {
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label">Valor Aplicado (R$)</label>
                   <input
-                    className="form-input" type="number" step="any"
-                    value={props.fiAmount} onChange={(e) => props.setFiAmount!(e.target.value)}
-                    placeholder="Ex: 5000.00" required disabled={props.isAddingFI}
+                    className="form-input" type="text"
+                    value={props.fiAmount} 
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, "");
+                      if (!val) {
+                        props.setFiAmount!('');
+                        return;
+                      }
+                      const num = Number(val) / 100;
+                      const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      props.setFiAmount!(formatted);
+                    }}
+                    placeholder="Ex: 5.000,00" required disabled={props.isAddingFI}
                   />
                 </div>
               </div>
@@ -420,6 +437,97 @@ export default function Modals(props: ModalsProps) {
                 </button>
                 <button type="submit" disabled={props.isAddingFI} className="primary-button w-full" style={{ padding: '0.8rem', fontSize: '0.9rem' }}>
                   {props.isAddingFI ? 'Cadastrando...' : 'Aplicar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Fixed Income Transaction Modal */}
+      {props.showFIEditModal && props.setShowFIEditModal && props.handleUpdateFITransaction && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <h2 className="modal-title mb-lg">Editar Operação RF</h2>
+            <form onSubmit={props.handleUpdateFITransaction} className="flex-col gap-md">
+              <div className="form-group">
+                <label className="form-label">Ativo (Somente Leitura)</label>
+                <input
+                  className="form-input" type="text"
+                  value={props.fiEditTxAssetName} disabled
+                  style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Tipo de Operação</label>
+                <div className="flex-row flex-wrap gap-sm">
+                  <button
+                    type="button"
+                    onClick={() => props.setFiTxType!('SUBSCRIPTION')}
+                    disabled={props.isAddingFI}
+                    className="flex-row justify-center items-center font-bold text-sm"
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', border: props.fiTxType === 'SUBSCRIPTION' ? '1px solid #00e676' : '1px solid var(--panel-border)', background: props.fiTxType === 'SUBSCRIPTION' ? 'rgba(0, 230, 118, 0.08)' : 'transparent', color: props.fiTxType === 'SUBSCRIPTION' ? '#00e676' : 'var(--text-secondary)' }}
+                  >
+                    🟢 APLICAÇÃO
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => props.setFiTxType!('REDEMPTION')}
+                    disabled={props.isAddingFI}
+                    className="flex-row justify-center items-center font-bold text-sm"
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', border: props.fiTxType === 'REDEMPTION' ? '1px solid #ff3d00' : '1px solid var(--panel-border)', background: props.fiTxType === 'REDEMPTION' ? 'rgba(255, 61, 0, 0.08)' : 'transparent', color: props.fiTxType === 'REDEMPTION' ? '#ff3d00' : 'var(--text-secondary)' }}
+                  >
+                    🔴 RESGATE
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Valor (R$)</label>
+                <input
+                  className="form-input" type="text"
+                  value={props.fiAmount} 
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, "");
+                    if (!val) {
+                      props.setFiAmount!('');
+                      return;
+                    }
+                    const num = Number(val) / 100;
+                    const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    props.setFiAmount!(formatted);
+                  }}
+                  placeholder="Ex: 1000.00" required disabled={props.isAddingFI}
+                />
+              </div>
+
+              <div className="flex-row gap-md">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Data da Operação</label>
+                  <input
+                    className="form-input" type="date"
+                    value={props.fiApplicationDate} onChange={(e) => props.setFiApplicationDate!(e.target.value)}
+                    required disabled={props.isAddingFI}
+                  />
+                </div>
+
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Data de Vencimento</label>
+                  <input
+                    className="form-input" type="date"
+                    value={props.fiMaturityDate} onChange={(e) => props.setFiMaturityDate!(e.target.value)}
+                    disabled={props.isAddingFI}
+                  />
+                </div>
+              </div>
+
+              <div className="flex-row gap-md mt-sm">
+                <button type="button" onClick={() => props.setShowFIEditModal!(false)} className="btn-secondary w-full" style={{ padding: '0.75rem' }}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={props.isAddingFI} className="primary-button w-full" style={{ padding: '0.8rem', fontSize: '0.9rem' }}>
+                  {props.isAddingFI ? 'Salvando...' : 'Salvar Operação'}
                 </button>
               </div>
             </form>
