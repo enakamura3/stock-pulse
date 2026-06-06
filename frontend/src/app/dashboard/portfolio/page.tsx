@@ -323,6 +323,7 @@ export default function PortfolioPage() {
       setFiTxType(tx.type);
       setFiAmount(Number(tx.total_value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
       setFiApplicationDate(tx.date ? tx.date.split('T')[0] : '');
+      setFiMaturityDate(tx.maturity_date ? tx.maturity_date.split('T')[0] : '');
       setShowFIEditModal(true);
       return;
     }
@@ -342,7 +343,8 @@ export default function PortfolioPage() {
         body: JSON.stringify({
           type: fiTxType,
           amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')),
-          date: new Date(fiApplicationDate).toISOString()
+          date: new Date(fiApplicationDate).toISOString(),
+          maturity_date: fiMaturityDate ? new Date(fiMaturityDate).toISOString() : undefined
         }),
         credentials: 'include', cache: 'no-store'
       });

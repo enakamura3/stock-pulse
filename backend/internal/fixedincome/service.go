@@ -18,7 +18,7 @@ type Service interface {
 	GetPortfolioPerformance(ctx context.Context, portfolioID string, period string) ([]PerformancePoint, error)
 	GetAssetPosition(ctx context.Context, assetID string) (*Position, error)
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
-	UpdateTransaction(ctx context.Context, portfolioID, txID string, tx *Transaction) error
+	UpdateTransaction(ctx context.Context, portfolioID, txID string, tx *Transaction, maturityDate *time.Time) error
 	DeleteTransaction(ctx context.Context, portfolioID, txID string) error
 	TriggerBackfill(ctx context.Context, indexer string, startDate time.Time)
 }
@@ -60,7 +60,7 @@ func (s *service) CreateTransaction(ctx context.Context, tx *Transaction) (*Tran
 	return created, nil
 }
 
-func (s *service) UpdateTransaction(ctx context.Context, portfolioID, txID string, tx *Transaction) error {
+func (s *service) UpdateTransaction(ctx context.Context, portfolioID, txID string, tx *Transaction, maturityDate *time.Time) error {
 	// 1. Obter a transação
 	existingTx, err := s.repo.GetTransactionByID(ctx, txID)
 	if err != nil {
@@ -81,7 +81,20 @@ func (s *service) UpdateTransaction(ctx context.Context, portfolioID, txID strin
 	existingTx.Amount = tx.Amount
 	existingTx.Date = tx.Date
 
-	return s.repo.UpdateTransaction(ctx, txID, existingTx)
+	err = s.repo.UpdateTransaction(ctx, txID, existingTx)
+	if err != nil {
+		return err
+	}
+
+	if maturityDate != nil && !maturityDate.Equal(asset.MaturityDate) {
+		asset.MaturityDate = *maturityDate
+		err = s.repo.UpdateAsset(ctx, asset)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *service) DeleteTransaction(ctx context.Context, portfolioID, txID string) error {
@@ -449,6 +462,7 @@ func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userI
 			ExchangeRate: nil,
 			TotalValue:   tx.Amount,
 			Currency:     "BRL",
+			MaturityDate: &asset.MaturityDate,
 		})
 	}
 	return unified, nil

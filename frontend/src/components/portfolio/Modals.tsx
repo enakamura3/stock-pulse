@@ -502,13 +502,24 @@ export default function Modals(props: ModalsProps) {
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Data da Operação</label>
-                <input
-                  className="form-input" type="date"
-                  value={props.fiApplicationDate} onChange={(e) => props.setFiApplicationDate!(e.target.value)}
-                  required disabled={props.isAddingFI}
-                />
+              <div className="flex-row gap-md">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Data da Operação</label>
+                  <input
+                    className="form-input" type="date"
+                    value={props.fiApplicationDate} onChange={(e) => props.setFiApplicationDate!(e.target.value)}
+                    required disabled={props.isAddingFI}
+                  />
+                </div>
+
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Data de Vencimento</label>
+                  <input
+                    className="form-input" type="date"
+                    value={props.fiMaturityDate} onChange={(e) => props.setFiMaturityDate!(e.target.value)}
+                    disabled={props.isAddingFI}
+                  />
+                </div>
               </div>
 
               <div className="flex-row gap-md mt-sm">

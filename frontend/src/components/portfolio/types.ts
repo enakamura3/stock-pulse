@@ -127,6 +127,7 @@ export interface UnifiedTransaction {
   exchange_rate: number | null;
   total_value: number;
   currency: string;
+  maturity_date?: string;
   resulting_quantity?: number;
   resulting_invested?: number;
 }

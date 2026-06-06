@@ -13,6 +13,7 @@ type Repository interface {
 	CreateAsset(ctx context.Context, asset *Asset) (*Asset, error)
 	GetAssetsByPortfolio(ctx context.Context, portfolioID string) ([]Asset, error)
 	GetAssetByID(ctx context.Context, assetID string) (*Asset, error)
+	UpdateAsset(ctx context.Context, asset *Asset) error
 	DeleteAsset(ctx context.Context, assetID string) error
 
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
@@ -85,6 +86,16 @@ func (r *repository) GetAssetByID(ctx context.Context, assetID string) (*Asset, 
 		return nil, err
 	}
 	return &a, nil
+}
+
+func (r *repository) UpdateAsset(ctx context.Context, a *Asset) error {
+	query := `
+		UPDATE fixed_income_assets
+		SET institution = $1, type = $2, debt_type = $3, indexer = $4, rate = $5, maturity_date = $6, updated_at = NOW()
+		WHERE id = $7
+	`
+	_, err := r.db.Exec(ctx, query, a.Institution, a.Type, a.DebtType, a.Indexer, a.Rate, a.MaturityDate, a.ID)
+	return err
 }
 
 func (r *repository) DeleteAsset(ctx context.Context, assetID string) error {

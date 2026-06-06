@@ -19,6 +19,7 @@ type UnifiedTransaction struct {
 	ExchangeRate *float64  `json:"exchange_rate"` // nil for RF
 	TotalValue   float64   `json:"total_value"`
 	Currency     string    `json:"currency"`
+	MaturityDate *time.Time `json:"maturity_date,omitempty"` // For RF
 }
 
 // TransactionSource is the interface that specialized modules (RV, RF) must implement

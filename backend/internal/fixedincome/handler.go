@@ -3,6 +3,7 @@ package fixedincome
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -133,13 +134,25 @@ func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	txID := chi.URLParam(r, "txID")
 	
-	var tx Transaction
-	if err := json.NewDecoder(r.Body).Decode(&tx); err != nil {
+	var payload struct {
+		Type         string     `json:"type"`
+		Amount       float64    `json:"amount"`
+		Date         time.Time  `json:"date"`
+		MaturityDate *time.Time `json:"maturity_date"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err := h.service.UpdateTransaction(r.Context(), portfolioID, txID, &tx)
+	tx := Transaction{
+		Type:   payload.Type,
+		Amount: payload.Amount,
+		Date:   payload.Date,
+	}
+
+	err := h.service.UpdateTransaction(r.Context(), portfolioID, txID, &tx, payload.MaturityDate)
 	if err != nil {
 		if err.Error() == "unauthorized: transaction does not belong to the portfolio" {
 			http.Error(w, err.Error(), http.StatusForbidden)
