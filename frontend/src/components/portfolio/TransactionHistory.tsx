@@ -185,11 +185,7 @@ export default function TransactionHistory({
                   
                   <div className="flex-row items-center gap-sm text-xs">
                     {isRF ? (
-                      <>
-                        <span className="text-secondary">-- un. x --</span>
-                        <span className="text-secondary">=</span>
-                        <span className="font-bold">{formatMoney(tx.total_value, tx.currency || 'BRL')}</span>
-                      </>
+                      <span className="font-bold">{formatMoney(tx.total_value, tx.currency || 'BRL')}</span>
                     ) : !isSplit ? (
                       <>
                         <span className="text-secondary">{formatQuantity(tx.quantity || 0)} un. x {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}</span>
