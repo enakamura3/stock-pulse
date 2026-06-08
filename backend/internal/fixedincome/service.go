@@ -22,6 +22,8 @@ type Service interface {
 	DeleteTransaction(ctx context.Context, portfolioID, txID string) error
 	TriggerBackfill(ctx context.Context, indexer string, startDate time.Time)
 	CalculateMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error)
+	GetRawTransactions(ctx context.Context, portfolioID string) ([]Transaction, error)
+	GetAssetsByPortfolio(ctx context.Context, portfolioID string) ([]Asset, error)
 }
 
 type service struct {
@@ -415,6 +417,14 @@ func (s *service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 	}
 
 	return points, nil
+}
+
+func (s *service) GetRawTransactions(ctx context.Context, portfolioID string) ([]Transaction, error) {
+	return s.repo.GetTransactionsByPortfolio(ctx, portfolioID)
+}
+
+func (s *service) GetAssetsByPortfolio(ctx context.Context, portfolioID string) ([]Asset, error) {
+	return s.repo.GetAssetsByPortfolio(ctx, portfolioID)
 }
 
 func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userID string) ([]history.UnifiedTransaction, error) {

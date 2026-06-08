@@ -219,6 +219,7 @@ func main() {
 			r.Delete("/portfolios/{id}/transactions/{txId}", portfolioHandler.DeleteTransaction)
 			r.Get("/portfolios/{id}/performance", portfolioHandler.GetPerformance)
 			r.Get("/portfolios/{id}/dividends", portfolioHandler.GetDividends)
+			r.Get("/portfolios/{id}/export", portfolioHandler.ExportPortfolio)
 
 			// Renda Fixa
 			fiHandler.RegisterRoutes(r)

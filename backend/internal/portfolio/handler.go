@@ -1,16 +1,16 @@
 package portfolio
 
 import (
-	"mime/multipart"
-
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 )
 
 // PortfolioService define as operações que o Handler espera.
@@ -28,6 +28,7 @@ type PortfolioService interface {
 
 	// Utilizado especificamente pelo Handler para recuperar transações puras
 	GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
+	GetFixedIncomeService() fixedincome.Service
 }
 
 // Removido do handler.go
@@ -207,11 +208,8 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Configura taxa de câmbio padrão se nula ou vazia
+	// A taxa de câmbio agora pode ser 0 ou nula para que o service a busque automaticamente
 	rate := payload.ExchangeRate
-	if rate <= 0 {
-		rate = 1.0
-	}
 
 	tx := &Transaction{
 		PortfolioID:  portfolioID,

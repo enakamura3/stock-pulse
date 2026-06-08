@@ -434,6 +434,43 @@ export default function PortfolioPage() {
     } catch (e) { console.error(e); }
   };
 
+  const handleExportPortfolio = async () => {
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/export`, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Obter nome do arquivo do header se disponível, ou fallback
+        const disposition = res.headers.get('Content-Disposition');
+        let filename = `backup-carteira.zip`;
+        if (disposition && disposition.indexOf('filename=') !== -1) {
+          const matches = /filename="([^"]*)"/.exec(disposition);
+          if (matches != null && matches[1]) { 
+            filename = matches[1];
+          }
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("Erro ao exportar backup.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Erro de conexão ao exportar backup.");
+    }
+  };
+
   if (authLoading || isLoadingPortfolios) {
     return (
       <main className="container">
@@ -496,6 +533,7 @@ export default function PortfolioPage() {
         portfolios={portfolios} 
         activePortfolioId={activePortfolioId} setActivePortfolioId={setActivePortfolioId} 
         setShowPortfolioModal={setShowPortfolioModal} handleDeletePortfolio={handleDeletePortfolio} 
+        handleExportPortfolio={handleExportPortfolio}
       />
 
       <div className="flex-row gap-sm mb-lg flex-wrap">

@@ -115,6 +115,10 @@ func NewService(repo PortfolioRepository, marketService MarketService, marketPro
 	}
 }
 
+func (s *Service) GetFixedIncomeService() fixedincome.Service {
+	return s.fiService
+}
+
 // CreatePortfolio cria uma nova carteira de investimentos para o usuário.
 func (s *Service) CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error) {
 	name = strings.TrimSpace(name)
@@ -484,9 +488,25 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	}
 
 	tx.AssetID = assetID
-	tx.TotalCost = tx.Quantity * tx.UnitPrice
 
-	// Executa inserção no banco
+	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
+	if tx.ExchangeRate <= 0 {
+		if currency != p.BaseCurrency {
+			log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s...", tx.Ticker, tx.ExecutedAt)
+			rate, err := s.marketService.GetHistoricalExchangeRate(ctx, tx.ExecutedAt)
+			if err == nil && rate > 0 {
+				tx.ExchangeRate = rate
+				log.Printf("[Portfolio] Câmbio encontrado: %.4f", rate)
+			} else {
+				log.Printf("[Portfolio] Falha ao buscar câmbio histórico, usando 1.0 como fallback: %v", err)
+				tx.ExchangeRate = 1.0
+			}
+		} else {
+			tx.ExchangeRate = 1.0
+		}
+	}
+
+	tx.TotalCost = tx.Quantity * tx.UnitPrice
 	savedTx, err := s.repo.CreateTransaction(ctx, tx)
 	if err != nil {
 		return nil, err
