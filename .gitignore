@@ -11,6 +11,7 @@ coverage/
 
 # Go / Air (Backend)
 tmp/
+api
 *.exe
 *.exe~
 *.dll

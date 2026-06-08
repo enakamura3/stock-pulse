@@ -7,10 +7,11 @@ interface PortfolioTabsProps {
   setActivePortfolioId: (id: string) => void;
   setShowPortfolioModal: (show: boolean) => void;
   handleDeletePortfolio: () => void;
+  handleExportPortfolio: () => void;
 }
 
 export default function PortfolioTabs({ 
-  portfolios, activePortfolioId, setActivePortfolioId, setShowPortfolioModal, handleDeletePortfolio 
+  portfolios, activePortfolioId, setActivePortfolioId, setShowPortfolioModal, handleDeletePortfolio, handleExportPortfolio
 }: PortfolioTabsProps) {
   const activeP = portfolios.find(p => p.id === activePortfolioId);
 
@@ -36,15 +37,28 @@ export default function PortfolioTabs({
         </button>
       </div>
 
-      {activeP && portfolios.length > 1 && (
-        <button
-          onClick={handleDeletePortfolio}
-          className="btn-danger"
-          style={{ background: 'none', border: 'none', padding: '0.5rem' }}
-          title="Excluir carteira atual"
-        >
-          🗑️ Excluir Carteira
-        </button>
+      {activeP && (
+        <div className="flex-row gap-sm items-center">
+          <button
+            onClick={handleExportPortfolio}
+            className="btn-secondary"
+            style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', background: 'var(--panel-bg)', color: 'var(--text-secondary)' }}
+            title="Exportar Carteira (CSV)"
+          >
+            📥 Exportar Backup
+          </button>
+          
+          {portfolios.length > 1 && (
+            <button
+              onClick={handleDeletePortfolio}
+              className="btn-danger"
+              style={{ background: 'none', border: 'none', padding: '0.5rem' }}
+              title="Excluir carteira atual"
+            >
+              🗑️ Excluir Carteira
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

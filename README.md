@@ -78,6 +78,19 @@ Utilizado primariamente para recuperar o histórico de dividendos de ativos glob
 
 ---
 
+### Mecânica de Cálculos Internos e Câmbio
+
+Para suportar múltiplas moedas nativamente (ex: uma carteira dolarizada comprando ativos na B3, ou vice-versa), o Stock Pulse utiliza uma equação universal baseada no **Exchange Rate** (Taxa de Câmbio). A taxa de câmbio atua como um multiplicador neutro ou conversor:
+
+`Custo Total da Transação = Quantidade × Preço Unitário × Taxa de Câmbio`
+
+- **Ativos Nacionais (Mesma moeda da carteira):** A taxa de câmbio é sempre preenchida como `1.0`. Por exemplo, comprando PETR4 a R$ 30,00: `100 * 30.00 * 1.0 = R$ 3.000,00`. Esse comportamento evita o uso de valores nulos (Null) no banco de dados, o que quebraria a matemática das consultas SQL.
+- **Ativos Internacionais (Moeda diferente da carteira):** O sistema busca automaticamente a cotação histórica no momento da compra (ou utiliza o valor fornecido manualmente). Por exemplo, comprando IVV a US$ 100,00 com o dólar a R$ 5,00: `10 * 100.00 * 5.00 = R$ 5.000,00`.
+
+Isso assegura que o **Custo Total** de cada posição seja sempre ancorado e congelado na moeda base da carteira no exato momento da operação, blindando o seu preço médio de oscilações cambiais futuras.
+
+---
+
 ### Importação de Transações em Lote (CSV)
 O stock-pulse permite a importação massiva de histórico de operações através de um arquivo `.csv` ou `.txt`. 
 O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primeira linha é ignorado):
@@ -92,6 +105,17 @@ O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primei
   - **`BONUS` (Bonificação):** Quantidade (ações recebidas) > 0. O preço deve ser o **Custo Atribuído** (declarado pela empresa no Fato Relevante). O sistema usará este valor para aumentar o seu custo total e recalcular o Preço Médio (se preferir não alterar o custo, informe `0.00`).
   - **`SPLIT` (Desdobramento):** Quantidade representa o fator de multiplicação (ex: `2` para 1 virar 2). O sistema ignora o preço (pode informar `0.00`).
   - **`REVERSE_SPLIT` (Agrupamento):** Quantidade representa o fator de divisão (ex: `10` para 10 virar 1). O sistema ignora o preço (pode informar `0.00`).
+
+#### Mecânica Interna de Desdobramentos e Agrupamentos (Por baixo dos panos)
+O sistema processa esses eventos corporativos matematicamente de duas formas para não distorcer o seu lucro/prejuízo reportado:
+
+1. **Ajuste do Preço Médio (Posição Atual):**
+   - No caso de um **`SPLIT`** (ex: fator 4), o sistema multiplica a quantidade de ações que você tinha antes daquela data por 4, e divide o seu Preço Médio de Aquisição por 4. O Custo Total investido permanece matematicamente inalterado.
+   - No caso de um **`REVERSE_SPLIT`** (ex: fator 10), ocorre o inverso: o sistema divide a sua quantidade de ações por 10 e multiplica o seu Preço Médio por 10.
+
+2. **Retroatividade no Gráfico ("Look-Ahead"):**
+   - As APIs financeiras de cotação (como o Yahoo Finance) retornam históricos com preços já reajustados baseados nos splits (*Split-Adjusted Close*). 
+   - Para que a curva do seu Gráfico Patrimonial não mostre "picos ou quedas falsas" ao cruzar a data do split, o motor do Stock Pulse avalia todo o seu histórico. Se ele encontrar um Split em 2024, ele fingirá retroativamente que a sua quantidade de ações em 2023 já estava multiplicada por aquele fator no momento de desenhar o gráfico, garantindo o empate perfeito com o mercado.
 
 **Exemplo Completo de Arquivo CSV:**
 ```csv
