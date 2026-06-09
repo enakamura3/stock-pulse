@@ -89,7 +89,7 @@ func (s *Service) BulkAddTransactions(ctx context.Context, userID, portfolioID s
 			Type:         txType,
 			Quantity:     qty,
 			UnitPrice:    price,
-			ExchangeRate: 1.0, // Simplificação para bulk import
+			ExchangeRate: 0.0, // Simplificação para bulk import (0.0 aciona o auto-fetch para ativos estrangeiros)
 			ExecutedAt:   execTime.UTC(),
 		}
 
