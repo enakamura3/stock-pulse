@@ -370,7 +370,8 @@ export default function PortfolioPage() {
     }
     
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxType(tx.type as any);
-    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 1);
+    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 0);
+    setSelectedAssetCurrency(tx.currency || 'BRL');
     setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
   };
 
@@ -629,7 +630,7 @@ export default function PortfolioPage() {
 
           {activeTab === 'operacoes' && (
             <div className="flex-col gap-xl w-full">
-              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} kpiCurrency={selectedPortfolio?.base_currency} />
+              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} kpiCurrency={kpiCurrency} />
             </div>
           )}
 
