@@ -298,7 +298,7 @@ export default function PortfolioPage() {
         body: JSON.stringify({
           ticker: txTicker, type: txType, quantity: parsedQty,
           unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
-          exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 1.0 : parsedRate,
+          exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 0.0 : parsedRate,
           executed_at: txExecutedAt,
         }),
         credentials: 'include', cache: 'no-store',

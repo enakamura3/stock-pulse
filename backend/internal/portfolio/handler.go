@@ -351,11 +351,9 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rate := payload.ExchangeRate
-	if rate <= 0 {
-		rate = 1.0
-	}
 
 	tx := &Transaction{
+		Ticker:       payload.Ticker,
 		Type:         payload.Type,
 		Quantity:     payload.Quantity,
 		UnitPrice:    payload.UnitPrice,
