@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
-	"github.com/redis/go-redis/v9"
+	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 )
 
 func main() {
@@ -21,26 +21,15 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	// 2. Inicializar Redis
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL == "" {
-		redisURL = "localhost:6379"
-	}
-	rdb := redis.NewClient(&redis.Options{
-		Addr: redisURL,
-	})
-	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("Falha ao conectar no Redis: %v", err)
-	}
-	defer rdb.Close()
-
-	// 3. Inicializar MarketService
+	// 2. Inicializar PortfolioService
+	repo := portfolio.NewRepository(dbPool)
 	provider := market.NewYahooFinanceProvider()
-	marketService := market.NewService(provider, rdb)
+	marketService := market.NewService(provider, nil) // Não precisa mais do Redis
+	portfolioService := portfolio.NewService(repo, marketService, provider, nil)
 
 	log.Println("=== Iniciando varredura de Correção Cambial Retroativa ===")
 
-	// 4. Buscar transações suspeitas
+	// 3. Buscar transações suspeitas
 	query := `
 		SELECT t.id, a.ticker, t.executed_at, p.base_currency, a.currency
 		FROM transaction t
@@ -80,16 +69,27 @@ func main() {
 
 	log.Printf("Encontradas %d transações para corrigir.", len(toFix))
 
-	// 5. Corrigir as transações
+	// 4. Corrigir as transações
 	for _, r := range toFix {
 		log.Printf("Processando TX %s | Ticker: %s | Data: %s", r.ID, r.Ticker, r.ExecutedAt.Format("2006-01-02"))
-		rate, err := marketService.GetHistoricalExchangeRate(ctx, r.ExecutedAt)
+
+		currencyPair := fmt.Sprintf("%s%s=X", r.AssetCurr, r.BaseCurrency)
+
+		// Tenta puxar do banco
+		rate, err := repo.GetExchangeRateByDate(ctx, currencyPair, r.ExecutedAt)
 		if err != nil || rate <= 0 {
-			log.Printf("  [ERRO] Falha ao buscar cotação histórica: %v", err)
-			continue
+			log.Printf("  [Info] Taxa não encontrada na base. Acionando BackfillGap...")
+			portfolioService.BackfillGap(ctx, currencyPair, r.ExecutedAt)
+
+			// Tenta novamente após tapar o buraco
+			rate, err = repo.GetExchangeRateByDate(ctx, currencyPair, r.ExecutedAt)
+			if err != nil || rate <= 0 {
+				log.Printf("  [ERRO] Falha ao buscar cotação histórica mesmo após Backfill: %v", err)
+				continue
+			}
 		}
 
-		updateQuery := `UPDATE transaction SET exchange_rate = $1 WHERE id = $2`
+		updateQuery := `UPDATE transaction SET exchange_rate = $1, total_cost = quantity * unit_price WHERE id = $2`
 		cmdTag, err := dbPool.Exec(ctx, updateQuery, rate, r.ID)
 		if err != nil {
 			log.Printf("  [ERRO] Falha ao atualizar banco de dados: %v", err)
