@@ -364,7 +364,8 @@ func TestService_AddTransaction(t *testing.T) {
 		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
 		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
 
-		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil) // backfill skip
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, nil)
 
 		res, err := s.AddTransaction(context.Background(), "u1", tx)
 		assert.NoError(t, err)

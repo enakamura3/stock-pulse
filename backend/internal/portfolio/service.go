@@ -528,16 +528,24 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 
-		// Verifica se o histórico já existe no banco para evitar bypasss inuteis
+		// Verifica se o histórico já existe no banco
 		existing, err := s.repo.GetDailyPrices(bgCtx, id, time.Now().AddDate(0, 0, -7), time.Now())
 		if err == nil && len(existing) > 0 {
-			log.Printf("[Backfill] Ativo %s já possui histórico recente. Pulando backfill.", ticker)
-			return
-		}
-
-		log.Printf("[Backfill] Iniciando preenchimento histórico máximo (max) para %s...", ticker)
-		if err := s.BackfillHistoricalPrices(bgCtx, id, ticker); err != nil {
-			log.Printf("[Backfill] Falha ao rodar backfill histórico de %s: %v", ticker, err)
+			log.Printf("[Backfill] Ativo %s já possui histórico recente.", ticker)
+			
+			// Se possui histórico recente, vamos verificar se a transação é mais antiga que o nosso buraco
+			oldestDate, err := s.repo.GetOldestPriceDate(bgCtx, id)
+			if err == nil && !oldestDate.IsZero() && tx.ExecutedAt.Before(oldestDate) {
+				log.Printf("[Backfill] Transação antiga detectada. Disparando BackfillGap para o ativo %s tapar o buraco até %s", ticker, oldestDate.Format("2006-01-02"))
+				if err := s.BackfillGap(bgCtx, ticker, tx.ExecutedAt); err != nil {
+					log.Printf("[Backfill] Falha ao rodar BackfillGap de %s: %v", ticker, err)
+				}
+			}
+		} else {
+			log.Printf("[Backfill] Iniciando preenchimento histórico máximo (max) para %s...", ticker)
+			if err := s.BackfillHistoricalPrices(bgCtx, id, ticker); err != nil {
+				log.Printf("[Backfill] Falha ao rodar backfill histórico de %s: %v", ticker, err)
+			}
 		}
 
 		// Se o ativo for em USD e a carteira estiver em BRL, preenche também o histórico cambial de USDBRL=X!
@@ -972,6 +980,20 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 	if err != nil {
 		return fmt.Errorf("falha ao atualizar transação: %w", err)
 	}
+
+	// Dispara verificação de Auto-Backfill de forma assíncrona para não travar o Update
+	go func(id, ticker, curr string) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+
+		oldestDate, err := s.repo.GetOldestPriceDate(bgCtx, id)
+		if err == nil && !oldestDate.IsZero() && tx.ExecutedAt.Before(oldestDate) {
+			log.Printf("[Backfill-Update] Transação antiga detectada. Disparando BackfillGap para o ativo %s", ticker)
+			if err := s.BackfillGap(bgCtx, ticker, tx.ExecutedAt); err != nil {
+				log.Printf("[Backfill-Update] Falha ao rodar BackfillGap de %s: %v", ticker, err)
+			}
+		}
+	}(tx.AssetID, tx.Ticker, currency)
 
 	return nil
 }
