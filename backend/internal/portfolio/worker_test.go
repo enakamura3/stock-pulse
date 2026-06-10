@@ -20,7 +20,7 @@ func TestDailyWorker_StartAndStop(t *testing.T) {
 	repo.On("GetAllAssets", mock.Anything).Return([]AssetCompact{}, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Start in a goroutine
 	done := make(chan struct{})
 	go func() {
@@ -50,7 +50,7 @@ func TestDailyWorker_run(t *testing.T) {
 		worker := NewDailyWorker(repo, mp)
 
 		repo.On("GetAllAssets", mock.Anything).Return(([]AssetCompact)(nil), errors.New("db err"))
-		
+
 		worker.run(context.Background())
 		// should log and return, no panic
 	})
@@ -61,7 +61,7 @@ func TestDailyWorker_run(t *testing.T) {
 		worker := NewDailyWorker(repo, mp)
 
 		repo.On("GetAllAssets", mock.Anything).Return([]AssetCompact{}, nil)
-		
+
 		worker.run(context.Background())
 	})
 
@@ -78,7 +78,7 @@ func TestDailyWorker_run(t *testing.T) {
 		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
 
 		worker.run(context.Background())
-		
+
 		repo.AssertExpectations(t)
 		mp.AssertExpectations(t)
 	})
@@ -114,7 +114,7 @@ func TestDailyWorker_run(t *testing.T) {
 		worker.run(context.Background())
 		// Should log and continue
 	})
-	
+
 	t.Run("Context Cancelled during wait", func(t *testing.T) {
 		repo := new(MockPortfolioRepo)
 		mp := new(MockMarketService)
@@ -127,9 +127,10 @@ func TestDailyWorker_run(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // immediately cancel
-		
+
 		worker.run(ctx)
 		// Should return before calling GetQuote because of the 350ms wait and ctx.Done
 		mp.AssertNotCalled(t, "GetQuote")
 	})
 }
+

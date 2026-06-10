@@ -38,15 +38,15 @@ type Transaction struct {
 
 // Position representa a consolidação de um ativo em uma carteira (Preço Médio).
 type Position struct {
-	AssetID       string  `json:"asset_id"`
-	Ticker        string  `json:"ticker"`
-	Name          string  `json:"name"`
-	Type          string  `json:"type"`
-	Currency      string  `json:"currency"`
-	Quantity      float64 `json:"quantity"`
-	AveragePrice  float64 `json:"average_price"`
-	TotalCost     float64 `json:"total_cost"`
-	
+	AssetID      string  `json:"asset_id"`
+	Ticker       string  `json:"ticker"`
+	Name         string  `json:"name"`
+	Type         string  `json:"type"`
+	Currency     string  `json:"currency"`
+	Quantity     float64 `json:"quantity"`
+	AveragePrice float64 `json:"average_price"`
+	TotalCost    float64 `json:"total_cost"`
+
 	// Preenchidos dinamicamente no serviço
 	CurrentPrice       float64 `json:"current_price,omitempty"`
 	CurrentValue       float64 `json:"current_value,omitempty"`
@@ -390,4 +390,37 @@ func (r *Repository) UpdateTransaction(ctx context.Context, tx Transaction) erro
 		return fmt.Errorf("transação não encontrada ou acesso negado")
 	}
 	return nil
+}
+
+// GetExchangeRateByDate obtém a taxa de câmbio histórica usando LOCF (Last Observation Carried Forward).
+func (r *Repository) GetExchangeRateByDate(ctx context.Context, currencyPairTicker string, date time.Time) (float64, error) {
+	query := `
+		SELECT p.close_price
+		FROM asset_daily_price p
+		JOIN asset a ON p.asset_id = a.id
+		WHERE a.ticker = $1 AND p.price_date <= $2
+		ORDER BY p.price_date DESC
+		LIMIT 1
+	`
+	var rate float64
+	err := r.db.QueryRow(ctx, query, currencyPairTicker, date).Scan(&rate)
+	if err != nil {
+		return 0, err
+	}
+	return rate, nil
+}
+
+// GetOldestPriceDate retorna a data mais antiga registrada para um ativo na tabela asset_daily_price.
+func (r *Repository) GetOldestPriceDate(ctx context.Context, assetID string) (time.Time, error) {
+	query := `
+		SELECT MIN(price_date)
+		FROM asset_daily_price
+		WHERE asset_id = $1
+	`
+	var oldestDate time.Time
+	err := r.db.QueryRow(ctx, query, assetID).Scan(&oldestDate)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return oldestDate, nil
 }
