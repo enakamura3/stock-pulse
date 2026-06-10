@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -384,4 +385,8 @@ func (m *MockPortfolioService) UpdateTransaction(ctx context.Context, userID, po
 
 func (m *MockPortfolioService) BulkAddTransactions(ctx context.Context, userID, portfolioID string, file multipart.File) (*BulkImportResult, error) {
 	return &BulkImportResult{Success: 1, Errors: []string{}}, nil
+}
+
+func (m *MockPortfolioService) GetFixedIncomeService() fixedincome.Service {
+	return nil
 }

@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
@@ -25,7 +24,7 @@ func determineAssetType(ticker, name, currency string) string {
 	if strings.Contains(ticker, "-") {
 		return "CRYPTO"
 	}
-	
+
 	if !strings.HasSuffix(ticker, ".SA") {
 		// Internacional
 		lowerName := strings.ToLower(name)
@@ -34,18 +33,18 @@ func determineAssetType(ticker, name, currency string) string {
 		}
 		return "STOCK_US"
 	}
-	
+
 	// É do Brasil (.SA)
 	if strings.HasSuffix(ticker, "34.SA") || strings.HasSuffix(ticker, "35.SA") || strings.HasSuffix(ticker, "39.SA") {
 		return "BDR"
 	}
-	
+
 	if strings.HasSuffix(ticker, "11.SA") {
 		lowerName := strings.ToLower(name)
 		isEtf := strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "ishares") || strings.Contains(lowerName, "índice") || strings.Contains(lowerName, "indice")
 		isFiagro := strings.Contains(lowerName, "fiagro") || strings.Contains(lowerName, "agro")
 		isFii := strings.Contains(lowerName, "fii") || strings.Contains(lowerName, "fundo") || strings.Contains(lowerName, "fdo") || strings.Contains(lowerName, "imob") || strings.Contains(lowerName, "lajes") || strings.Contains(lowerName, "shopping")
-		
+
 		if isEtf {
 			return "ETF_BR"
 		}
@@ -61,7 +60,7 @@ func determineAssetType(ticker, name, currency string) string {
 			return "ETF_BR"
 		}
 	}
-	
+
 	return "STOCK_BR"
 }
 
@@ -83,6 +82,8 @@ type PortfolioRepository interface {
 	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
 	UpsertAssetEvent(ctx context.Context, event AssetEvent) error
 	GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error)
+	GetExchangeRateByDate(ctx context.Context, currencyPairTicker string, date time.Time) (float64, error)
+	GetOldestPriceDate(ctx context.Context, assetID string) (time.Time, error)
 }
 
 // MarketService define as operações de mercado suportadas.
@@ -154,20 +155,20 @@ func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio
 
 // CalculatedDividend representa o dividendo calculado para o usuário.
 type CalculatedDividend struct {
-	AssetID      string    `json:"asset_id"`
-	Ticker       string    `json:"ticker"`
-	ExDate       time.Time `json:"ex_date"`
-	PaymentDate  time.Time `json:"payment_date"`
-	GrossAmount  float64   `json:"gross_amount"`
-	NetAmount    float64   `json:"net_amount"`
-	Currency     string    `json:"currency"`
-	OriginalGross float64   `json:"original_gross_amount,omitempty"`
-	OriginalNet   float64   `json:"original_net_amount,omitempty"`
-	Type          string    `json:"type"`
-	Quantity      float64   `json:"quantity"`
-	PerShareAmount float64  `json:"per_share_amount"`
-	AssetType     string    `json:"asset_type"`
-	AssetName     string    `json:"asset_name"`
+	AssetID        string    `json:"asset_id"`
+	Ticker         string    `json:"ticker"`
+	ExDate         time.Time `json:"ex_date"`
+	PaymentDate    time.Time `json:"payment_date"`
+	GrossAmount    float64   `json:"gross_amount"`
+	NetAmount      float64   `json:"net_amount"`
+	Currency       string    `json:"currency"`
+	OriginalGross  float64   `json:"original_gross_amount,omitempty"`
+	OriginalNet    float64   `json:"original_net_amount,omitempty"`
+	Type           string    `json:"type"`
+	Quantity       float64   `json:"quantity"`
+	PerShareAmount float64   `json:"per_share_amount"`
+	AssetType      string    `json:"asset_type"`
+	AssetName      string    `json:"asset_name"`
 }
 
 // GetPortfolioDividends calcula todos os dividendos (históricos e futuros) com base na posição da carteira na data ex-dividendo.
@@ -278,7 +279,7 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 					} else {
 						exchangeRate = 5.0 // fallback
 					}
-					
+
 					// Converte Gross e Net para a moeda base do Portfolio (assumindo BRL)
 					grossAmount = grossAmount * exchangeRate
 					netAmount = netAmount * exchangeRate
@@ -286,20 +287,20 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 				}
 
 				results = append(results, CalculatedDividend{
-					AssetID:      txs[0].AssetID,
-					Ticker:       ticker,
-					ExDate:       exDate,
-					PaymentDate:  div.PaymentDate,
-					GrossAmount:  grossAmount,
-					NetAmount:    netAmount,
-					Currency:     divCurrency,
-					OriginalGross: originalGross,
-					OriginalNet:   originalNet,
-					Type:         div.Type,
-					Quantity:     quantity,
+					AssetID:        txs[0].AssetID,
+					Ticker:         ticker,
+					ExDate:         exDate,
+					PaymentDate:    div.PaymentDate,
+					GrossAmount:    grossAmount,
+					NetAmount:      netAmount,
+					Currency:       divCurrency,
+					OriginalGross:  originalGross,
+					OriginalNet:    originalNet,
+					Type:           div.Type,
+					Quantity:       quantity,
 					PerShareAmount: div.GrossAmount * exchangeRate,
-					AssetType:    txs[0].AssetType,
-					AssetName:    txs[0].AssetName,
+					AssetType:      txs[0].AssetType,
+					AssetName:      txs[0].AssetName,
 				})
 			}
 		}
@@ -430,7 +431,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 					pos.GrahamValue = f.GrahamValue
 					pos.BazinValue = f.BazinValue
 					pos.DividendYield = f.DividendYield
-					
+
 					if f.BookValue > 0 {
 						pos.PVP = pos.CurrentPrice / f.BookValue
 					}
@@ -492,13 +493,23 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
 	if tx.ExchangeRate <= 0 {
 		if currency != p.BaseCurrency {
-			log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s...", tx.Ticker, tx.ExecutedAt)
-			rate, err := s.marketService.GetHistoricalExchangeRate(ctx, tx.ExecutedAt)
+			currencyPair := fmt.Sprintf("%s%s=X", currency, p.BaseCurrency)
+			log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, tx.ExecutedAt)
+			
+			rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
+			if err != nil || rate <= 0 {
+				log.Printf("[Portfolio] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
+				s.BackfillGap(ctx, currencyPair, tx.ExecutedAt)
+				
+				// Tenta buscar novamente
+				rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
+			}
+			
 			if err == nil && rate > 0 {
 				tx.ExchangeRate = rate
-				log.Printf("[Portfolio] Câmbio encontrado: %.4f", rate)
+				log.Printf("[Portfolio] Câmbio encontrado na base: %.4f", rate)
 			} else {
-				log.Printf("[Portfolio] Falha ao buscar câmbio histórico, usando 1.0 como fallback: %v", err)
+				log.Printf("[Portfolio] Aviso: Falha ao buscar câmbio histórico após backfill (%v). Usando fallback de 1.0", err)
 				tx.ExchangeRate = 1.0
 			}
 		} else {
@@ -909,9 +920,47 @@ func (s *Service) getCurrencyRate(ctx context.Context, fromCurrency, toCurrency 
 // UpdateTransaction edita uma transação existente de um portfólio.
 func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error {
 	// Anti-IDOR: Valida se a carteira pertence ao usuário logado
-	_, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
+	p, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
 	if err != nil {
 		return errors.New("carteira não encontrada ou acesso não autorizado")
+	}
+
+	tx.Ticker = strings.ToUpper(strings.TrimSpace(tx.Ticker))
+	if tx.Ticker == "" {
+		return errors.New("ticker do ativo inválido")
+	}
+
+	assetID, currency, err := s.repo.GetAssetAndCurrencyByTicker(ctx, tx.Ticker)
+	if err != nil {
+		return errors.New("ativo não encontrado na base")
+	}
+	tx.AssetID = assetID
+
+	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
+	if tx.ExchangeRate <= 0 {
+		if currency != p.BaseCurrency {
+			currencyPair := fmt.Sprintf("%s%s=X", currency, p.BaseCurrency)
+			log.Printf("[Portfolio-Update] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, tx.ExecutedAt)
+			
+			rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
+			if err != nil || rate <= 0 {
+				log.Printf("[Portfolio-Update] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
+				s.BackfillGap(ctx, currencyPair, tx.ExecutedAt)
+				
+				// Tenta buscar novamente
+				rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
+			}
+			
+			if err == nil && rate > 0 {
+				tx.ExchangeRate = rate
+				log.Printf("[Portfolio-Update] Câmbio encontrado na base: %.4f", rate)
+			} else {
+				log.Printf("[Portfolio-Update] Aviso: Falha ao buscar câmbio histórico após backfill (%v). Usando fallback de 1.0", err)
+				tx.ExchangeRate = 1.0
+			}
+		} else {
+			tx.ExchangeRate = 1.0
+		}
 	}
 
 	tx.ID = txID
@@ -959,8 +1008,112 @@ func (s *Service) GetUnifiedTransactions(ctx context.Context, portfolioID, userI
 			UnitPrice:    &price,
 			ExchangeRate: &exch,
 			TotalValue:   total,
-			Currency:     "BRL", // simplificação, a interface atual da RV não tem moeda nativa persistida em transação
+			Currency:     tx.Currency,
 		})
 	}
 	return unified, nil
+}
+
+// BackfillGap realiza uma chamada histórica direcionada ao provedor para preencher buracos no histórico diário.
+// Ele baixa desde missingDate-5 dias até a data mais antiga registrada no banco.
+func (s *Service) BackfillGap(ctx context.Context, ticker string, missingDate time.Time) error {
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	assetID, err := s.repo.GetAssetByTicker(ctx, ticker)
+	if err != nil {
+		// Se a moeda nem existe, criamos como ativo silenciosamente
+		assetID, err = s.repo.CreateAsset(ctx, ticker, ticker, "CURRENCY", "BRL")
+		if err != nil {
+			return fmt.Errorf("falha ao criar ativo cambial para backfill: %w", err)
+		}
+	}
+
+	oldestDate, err := s.repo.GetOldestPriceDate(ctx, assetID)
+	if err != nil || oldestDate.IsZero() {
+		// Se não há histórico, preenchemos de missingDate até hoje
+		oldestDate = time.Now()
+	}
+
+	// Queremos de (missingDate - 5 dias) até oldestDate
+	period1 := missingDate.AddDate(0, 0, -5).Unix()
+	period2 := oldestDate.Unix()
+
+	if period1 >= period2 {
+		return nil // Sem gap para baixar
+	}
+
+	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&period1=%d&period2=%d", url.PathEscape(ticker), period1, period2)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("provedor yahoo retornou status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Chart struct {
+			Result []struct {
+				Timestamp  []int64 `json:"timestamp"`
+				Indicators struct {
+					Quote []struct {
+						Close []*float64 `json:"close"`
+					} `json:"quote"`
+				} `json:"indicators"`
+			} `json:"result"`
+			Error interface{} `json:"error"`
+		} `json:"chart"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return err
+	}
+
+	if data.Chart.Error != nil {
+		return fmt.Errorf("erro no provedor: %v", data.Chart.Error)
+	}
+
+	if len(data.Chart.Result) == 0 {
+		return errors.New("resultado histórico vazio")
+	}
+
+	res := data.Chart.Result[0]
+	if len(res.Timestamp) == 0 || len(res.Indicators.Quote) == 0 {
+		return errors.New("série histórica sem timestamps ou quotes")
+	}
+
+	closes := res.Indicators.Quote[0].Close
+	if len(res.Timestamp) != len(closes) {
+		return errors.New("inconsistência de tamanho nos dados históricos do provedor")
+	}
+
+	var prices []DailyPrice
+	for i := range res.Timestamp {
+		if closes[i] == nil {
+			continue
+		}
+		prices = append(prices, DailyPrice{
+			AssetID:    assetID,
+			PriceDate:  time.Unix(res.Timestamp[i], 0).UTC(),
+			ClosePrice: *closes[i],
+		})
+	}
+
+	if len(prices) > 0 {
+		err = s.repo.SaveDailyPrices(ctx, assetID, prices)
+		if err != nil {
+			return fmt.Errorf("falha ao gravar histórico no banco: %w", err)
+		}
+		log.Printf("[Micro-Backfill] Sincronizados %d preços para cobrir o buraco de %s", len(prices), ticker)
+	}
+
+	return nil
 }

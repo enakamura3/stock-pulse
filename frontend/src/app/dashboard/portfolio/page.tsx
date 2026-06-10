@@ -298,7 +298,7 @@ export default function PortfolioPage() {
         body: JSON.stringify({
           ticker: txTicker, type: txType, quantity: parsedQty,
           unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
-          exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 1.0 : parsedRate,
+          exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 0.0 : parsedRate,
           executed_at: txExecutedAt,
         }),
         credentials: 'include', cache: 'no-store',
@@ -370,7 +370,8 @@ export default function PortfolioPage() {
     }
     
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxType(tx.type as any);
-    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 1);
+    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 0);
+    setSelectedAssetCurrency(tx.currency || 'BRL');
     setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
   };
 
@@ -629,7 +630,7 @@ export default function PortfolioPage() {
 
           {activeTab === 'operacoes' && (
             <div className="flex-col gap-xl w-full">
-              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} />
+              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} kpiCurrency={kpiCurrency} />
             </div>
           )}
 

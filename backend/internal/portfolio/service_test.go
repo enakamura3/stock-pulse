@@ -180,7 +180,7 @@ func setupServiceTest() (*Service, *MockPortfolioRepo, *MockMarketService, *Mock
 	repo := new(MockPortfolioRepo)
 	ms := new(MockMarketService)
 	mp := new(MockMarketProvider)
-	s := NewService(repo, ms, mp)
+	s := NewService(repo, ms, mp, nil)
 	return s, repo, ms, mp
 }
 
@@ -194,7 +194,7 @@ func TestService_CreatePortfolio(t *testing.T) {
 
 	_, err = s.CreatePortfolio(context.Background(), "u1", "  ", "USD")
 	assert.ErrorContains(t, err, "não pode ser vazio")
-	
+
 	repo.On("CreatePortfolio", mock.Anything, "u2", "My Port", "BRL").Return(&Portfolio{ID: "p2"}, nil)
 	p, err = s.CreatePortfolio(context.Background(), "u2", "My Port", "")
 	assert.NoError(t, err)
@@ -261,7 +261,7 @@ func TestService_GetPortfolioDetails(t *testing.T) {
 	t.Run("Success with conversion and missing quote", func(t *testing.T) {
 		s, repo, ms, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
-		
+
 		now := time.Now()
 		txs := []Transaction{
 			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 150, ExchangeRate: 5.0, ExecutedAt: now, CreatedAt: now},
@@ -281,11 +281,11 @@ func TestService_GetPortfolioDetails(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, pos, 2)
 	})
-	
+
 	t.Run("Sell more than holding", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
-		
+
 		now := time.Now()
 		txs := []Transaction{
 			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 5, UnitPrice: 150, ExchangeRate: 5.0, ExecutedAt: now, CreatedAt: now},
@@ -302,13 +302,13 @@ func TestService_GetPortfolioDetails(t *testing.T) {
 func TestService_GetCurrencyRate(t *testing.T) {
 	s, _, ms, _ := setupServiceTest()
 	assert.Equal(t, 1.0, s.getCurrencyRate(context.Background(), "USD", "USD"))
-	
+
 	ms.On("GetQuote", mock.Anything, "USDEUR=X").Return(&market.Quote{Price: 0.85}, nil)
 	assert.Equal(t, 0.85, s.getCurrencyRate(context.Background(), "USD", "EUR"))
-	
+
 	ms.On("GetQuote", mock.Anything, "CADBRL=X").Return(nil, errors.New("err"))
 	assert.Equal(t, 1.0, s.getCurrencyRate(context.Background(), "CAD", "BRL"))
-	
+
 	ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(nil, errors.New("err"))
 	assert.Equal(t, 5.20, s.getCurrencyRate(context.Background(), "USD", "BRL")) // fallback
 }
@@ -360,7 +360,7 @@ func TestService_AddTransaction(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
 		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
-		
+
 		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
 		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
 
@@ -370,7 +370,6 @@ func TestService_AddTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "tx1", res.ID)
 	})
-
 
 	t.Run("New Asset - Provider Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
@@ -392,7 +391,7 @@ func TestService_AddTransaction(t *testing.T) {
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "BTC-USD"})
 		assert.ErrorContains(t, err, "erro ao registrar ativo")
 	})
-	
+
 	t.Run("New US Equity Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
@@ -408,7 +407,7 @@ func TestService_AddTransaction(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
 		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
-		
+
 		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
 		repo.On("CreateTransaction", mock.Anything, tx).Return((*Transaction)(nil), errors.New("db error"))
 
@@ -465,7 +464,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, len(res) > 0)
 	})
-	
+
 	t.Run("Periods", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
@@ -485,7 +484,7 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 			assert.True(t, len(res) >= 0)
 		}
 	})
-	
+
 	t.Run("USD to BRL Conversion", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
@@ -531,16 +530,16 @@ func TestService_BackfillHistoricalPrices(t *testing.T) {
 		defer server.Close()
 
 		s, repo, _, _ := setupServiceTest()
-		
+
 		// To mock the URL call, we intercept transport
 		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-		
+
 		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("HTTP Error", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -553,7 +552,7 @@ func TestService_BackfillHistoricalPrices(t *testing.T) {
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.ErrorContains(t, err, "status 500")
 	})
-	
+
 	t.Run("JSON Error", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -567,7 +566,7 @@ func TestService_BackfillHistoricalPrices(t *testing.T) {
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("Provider Error Message", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -595,7 +594,7 @@ func TestService_BackfillHistoricalPrices(t *testing.T) {
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.ErrorContains(t, err, "vazio")
 	})
-	
+
 	t.Run("Missing Indicators", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -609,7 +608,7 @@ func TestService_BackfillHistoricalPrices(t *testing.T) {
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.ErrorContains(t, err, "sem timestamps")
 	})
-	
+
 	t.Run("Inconsistent Lengths", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -623,7 +622,7 @@ func TestService_BackfillHistoricalPrices(t *testing.T) {
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.ErrorContains(t, err, "inconsistência")
 	})
-	
+
 	t.Run("Save Error", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -633,7 +632,7 @@ func TestService_BackfillHistoricalPrices(t *testing.T) {
 
 		s, repo, _, _ := setupServiceTest()
 		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-		
+
 		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db error"))
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
@@ -657,3 +656,12 @@ func (m *MockMarketService) GetHistoricalExchangeRate(ctx context.Context, date 
 	return args.Get(0).(float64), args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetExchangeRateByDate(ctx context.Context, currencyPairTicker string, date time.Time) (float64, error) {
+	args := m.Called(ctx, currencyPairTicker, date)
+	return args.Get(0).(float64), args.Error(1)
+}
+
+func (m *MockPortfolioRepo) GetOldestPriceDate(ctx context.Context, assetID string) (time.Time, error) {
+	args := m.Called(ctx, assetID)
+	return args.Get(0).(time.Time), args.Error(1)
+}
