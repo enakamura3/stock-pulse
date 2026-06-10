@@ -502,7 +502,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 					log.Printf("[Portfolio] Câmbio encontrado: %.4f", rate)
 				}
 			} else {
-				tx.ExchangeRate = 5.20
+				tx.ExchangeRate = 1.0
 			}
 		} else {
 			tx.ExchangeRate = 1.0
@@ -941,7 +941,7 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 					log.Printf("[Portfolio-Update] Câmbio encontrado: %.4f", rate)
 				}
 			} else {
-				tx.ExchangeRate = 5.20
+				tx.ExchangeRate = 1.0
 			}
 		} else {
 			tx.ExchangeRate = 1.0

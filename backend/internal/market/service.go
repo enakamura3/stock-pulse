@@ -210,7 +210,7 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 func (s *Service) GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error) {
 	rates, err := s.getExchangeRatesMap(ctx)
 	if err != nil {
-		return 5.0, err // fallback to generic 5.0
+		return 1.0, err // fallback to generic 1.0
 	}
 
 	// Try exactly the date
@@ -227,7 +227,7 @@ func (s *Service) GetHistoricalExchangeRate(ctx context.Context, date time.Time)
 		}
 	}
 
-	return 5.0, fmt.Errorf("rate not found for date %s", dateStr)
+	return 1.0, fmt.Errorf("rate not found for date %s", dateStr)
 }
 
 // SearchAssets repassa a busca diretamente para o autocomplete do provedor.
