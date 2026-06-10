@@ -9,10 +9,11 @@ interface TransactionHistoryProps {
   handleEditTransaction: (tx: UnifiedTransaction) => void;
   handleDeleteTransaction: (id: string) => void;
   onLaunchOperation?: () => void;
+  kpiCurrency?: string;
 }
 
 export default function TransactionHistory({
-  transactions, filterTxTicker, setFilterTxTicker, handleEditTransaction, handleDeleteTransaction, onLaunchOperation
+  transactions, filterTxTicker, setFilterTxTicker, handleEditTransaction, handleDeleteTransaction, onLaunchOperation, kpiCurrency
 }: TransactionHistoryProps) {
   const [filterTxYear, setFilterTxYear] = useState<string>('Todos');
   const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
@@ -189,6 +190,9 @@ export default function TransactionHistory({
                     ) : !isSplit ? (
                       <>
                         <span className="text-secondary">{formatQuantity(tx.quantity || 0)} un. x {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}</span>
+                        {kpiCurrency && tx.currency !== kpiCurrency && tx.exchange_rate ? (
+                          <span className="text-secondary text-xs" style={{ marginLeft: '0.4rem', color: 'rgba(255,255,255,0.4)' }}>(Câmbio: {tx.exchange_rate.toFixed(4)})</span>
+                        ) : null}
                         <span className="text-secondary">=</span>
                         <span className="font-bold">{formatMoney(tx.total_value, tx.currency || 'BRL')}</span>
                       </>

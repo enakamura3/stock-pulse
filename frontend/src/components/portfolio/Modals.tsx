@@ -265,17 +265,17 @@ export default function Modals(props: ModalsProps) {
                 )}
               </div>
 
-              {props.selectedAssetCurrency === 'USD' && props.kpiCurrency === 'BRL' && (
+              {props.selectedAssetCurrency && props.kpiCurrency && props.selectedAssetCurrency !== props.kpiCurrency && (
                 <div className="form-group">
-                  <label className="form-label text-warning" style={{ color: '#ffc107' }}>Taxa Cambial USDBRL de Aquisição</label>
+                  <label className="form-label text-warning" style={{ color: '#ffc107' }}>Taxa Cambial {props.selectedAssetCurrency}{props.kpiCurrency}</label>
                   <input
                     className="form-input" type="number" step="any"
                     value={props.txExchangeRate} onChange={(e) => props.setTxExchangeRate(e.target.value)}
-                    placeholder="Ex: 5.2500" required disabled={props.isAddingTx}
+                    placeholder="Ex: 5.2500" disabled={props.isAddingTx}
                     style={{ borderColor: 'rgba(255, 193, 7, 0.4)' }}
                   />
                   <span className="text-xs text-secondary mt-sm block">
-                    Sugerido com base no fechamento cambial recente. Ajuste se comprou com outra taxa cambial.
+                    Se deixado em branco, o sistema buscará a taxa automaticamente.
                   </span>
                 </div>
               )}
