@@ -1,455 +1,376 @@
 # stock-pulse 📈
 
-stock-pulse é uma plataforma moderna e completa para acompanhamento de portfólios de investimentos, listas de favoritos (watchlists) e configuração de alertas de preços em tempo real. O sistema possui arquitetura baseada em micro-serviços orquestrados via Docker, com um backend robusto em Golang e um frontend moderno em Next.js.
+stock-pulse is a comprehensive portfolio management and financial monitoring platform. The system features a microservices architecture orchestrated via Docker, composed of a robust Golang backend and a modern Next.js frontend, providing real-time pricing, watchlist tracking, and automated alert systems.
 
-## 🚀 Funcionalidades
+## 🚀 Core Features
 
-- **Monitoramento em Tempo Real:** Conexões via WebSocket garantem que cotações de ativos pisquem na tela sem necessidade de recarregar a página.
-- **Gestão de Portfólio Modular:** Acompanhe rentabilidade, histórico de transações e custo médio dos seus ativos globais ou da B3. A interface do portfólio é organizada em abas (Visão Geral de Renda Variável, Renda Fixa, Transações, Proventos, Diário) garantindo uma experiência de usuário limpa e fluida. Suporta edição de transações, Desdobramentos/Agrupamentos (Splits), Bonificações e Importação em Lote (Bulk Import via CSV).
-- **Renda Fixa Integrada:** Módulo dedicado para acompanhamento de Renda Fixa (como CDBs, Tesouro, LCIs), com gráfico exclusivo de evolução de juros compostos e tabela padronizada de posições e rentabilidade líquida, totalmente isolado da curva da Renda Variável. Além disso, conta com um poderoso simulador de juros diários que integra o **Rendimento Mensal Acumulado** (descontando tabela regressiva de IR e IOF) diretamente na tela de **Proventos/Dividendos**, exibindo os juros como pagamentos empilhados na cor dourada (`#FFB300`) e KPIs de *Geração de Valor Total* (Juros + Caixa Livre).
-- **Precisão Matemática e Backtesting:** Motor de rentabilidade inteligente com "Olhar do Futuro". Desdobramentos e agrupamentos futuros são retroativamente calculados nas suas quantidades históricas, garantindo que o seu gráfico de Evolução Patrimonial empate perfeitamente com as cotações "Split-Adjusted" do Yahoo Finance, prevenindo falsos picos de lucros ou perdas.
-- **Watchlists Múltiplas:** Crie listas de favoritos customizadas para separar ativos por estratégia.
-- **Bot Integrado do Telegram:** Interaja com a sua carteira e receba relatórios financeiros completos diretamente pelo chat do Telegram, com interface rica (menus inline paginados, agrupamentos anuais e mensais de proventos, filtros dinâmicos) e **suporte avançado a múltiplas carteiras**. O bot permite alternar entre suas diferentes carteiras a qualquer momento através do menu, memorizando permanentemente a sua escolha na sessão (persistida via Redis). As listagens, gráficos textuais e resumos indicam no cabeçalho em qual carteira você está operando, prevenindo lançamentos acidentais.
-- **Valuation e Indicadores (P/VP, P/L, Yield):** Calcule o Preço Justo de ações segundo as metodologias de Benjamin Graham e Décio Bazin. Acompanhe em tempo real na sua tabela de posições ativas os múltiplos P/VP, P/L e Dividend Yield atualizados via scraping (suporte inteligente a Ações e FIIs da B3 via Fundamentus, e ativos globais via Finviz). Receba alertas visuais diretamente na tabela identificando oportunidades (ex: P/VP < 1.0 ou preços descontados ficam destacados em verde).
-- **Histórico Unificado e Gestão Avançada:** Acompanhe todas as operações de **Renda Variável** (Ações, FIIs) e **Renda Fixa** (Aplicações, Resgates) em uma única tela consolidada (Single-Line Layout). O histórico unificado possui filtros inteligentes por módulo, ticker e data, além de oferecer suporte à edição nativa e exclusão para ambos os tipos de operações, com atualização instantânea da carteira. Há também uma exclusiva coluna de **Impacto Diário em Reais** na tela inicial para medir rapidamente o real ganho/perda de cada ativo na carteira no dia corrente.
-- **Alertas de Preço (E-mail e Telegram):** Configure alertas disparados automaticamente em background quando um preço atinge uma meta, recebendo notificações em tempo real.
-- **Segurança Sólida:** Autenticação usando JWT armazenado exclusivamente em cookies `HttpOnly` com criptografia e regras de CORS restritas.
-- **Observabilidade Total:** Telemetria integrada com Prometheus, Grafana e Loki para métricas e logs em tempo real.
+- **Real-Time Data Streaming:** WebSocket connections ensure real-time asset price updates without page reloads.
+- **Modular Portfolio Management:** Track profitability, transaction history, and average costs for global and B3 (Brazilian) assets. The interface is modularized into Variable Income, Fixed Income, Transactions, Dividends, and Journal views. Supports native transaction editing, stock splits, reverse splits, bonuses, and bulk import via CSV.
+- **Dedicated Fixed Income Engine:** An isolated module for Fixed Income tracking (e.g., CDBs, Treasury Bonds) featuring exclusive compound interest evolution charts and standardized net yield tables. Includes a daily yield simulator that integrates **Accumulated Monthly Yields** (discounting progressive tax and IOF) directly into the Dividends view, displaying accrued interest as stacked payments.
+- **Mathematical Precision & Backtesting:** A forward-looking profitability engine retroactively calculates future splits and reverse splits on historical quantities, aligning perfectly with "Split-Adjusted" data from Yahoo Finance to prevent false profit/loss spikes.
+- **Multiple Watchlists:** Create customized watchlists for diverse investment strategies.
+- **Integrated Telegram Bot:** Two-way Telegram interaction allowing users to fetch full financial reports, charts, and filter dynamic views natively within the chat. Supports multi-portfolio management by securely storing session context via Redis.
+- **Valuation & Fundamentals (P/B, P/E, Yield):** Real-time calculation of intrinsic value based on Benjamin Graham and Décio Bazin models. Live fundamental indicators are retrieved via web scraping (Fundamentus for B3, Finviz for Global).
+- **Unified Transaction Ledger:** A single-line layout consolidating Variable Income and Fixed Income operations with advanced filtering by module, ticker, and date. Features a native "Daily Real Impact" column to instantly measure the daily P&L contribution of each asset.
+- **Asynchronous Price Alerts:** Background workers continuously monitor user-defined price targets, triggering instant email and Telegram notifications.
+- **Robust Security:** JWT-based authentication stored exclusively in `HttpOnly` and `Secure` cookies, alongside strict CORS and CSRF configurations.
+- **Full Observability:** Integrated telemetry using Prometheus, Grafana, and Loki for real-time metrics and log aggregation.
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 🛠️ Technology Stack
 
 ### Backend (Golang 1.24)
-- **Roteamento & HTTP:** `go-chi`
-- **Banco de Dados Relacional:** PostgreSQL 16 (driver `pgx/v5` via pool de conexões)
-- **Cache & Sessão:** Redis 7 (`go-redis/v9`)
-- **Autenticação:** JWT (JSON Web Tokens)
-- **Migrações de DB:** `golang-migrate`
-- **Fornecedor de Dados de Mercado:** Yahoo Finance API (Cotações e Busca), Fundamentus & Finviz (Scraping de Fundamentos)
-- **Background Workers:** Goroutines para verificação de alertas e rotinas de portfólio.
+- **Routing & HTTP:** `go-chi`
+- **Relational Database:** PostgreSQL 16 (`pgx/v5` connection pool)
+- **Cache & Session State:** Redis 7 (`go-redis/v9`)
+- **Authentication:** JWT (JSON Web Tokens) & Argon2id Hashing
+- **Migrations:** `golang-migrate`
+- **Market Data Providers:** Yahoo Finance API (Quotes/Search), Fundamentus & Finviz (Scraping)
+- **Concurrency:** Goroutine-based background workers for alerts, dividends, and portfolio backfills.
 
 ### Frontend (Next.js 14)
-- **Framework:** React 18 com TypeScript
-- **Estilização:** CSS puro ("Glassmorphism", interfaces dark mode premium)
-- **Gráficos:** Lightweight Charts (TradingView)
-- **Testes Unitários:** Vitest & React Testing Library (100% de cobertura)
-- **Testes E2E:** Playwright
+- **Framework:** React 18 with TypeScript
+- **Styling:** Vanilla CSS (Glassmorphism, Dark Mode)
+- **Charting:** Lightweight Charts (TradingView)
+- **Unit Testing:** Vitest & React Testing Library (100% Coverage)
+- **E2E Testing:** Playwright
 
-### Infraestrutura & DevOps
-- **Orquestração:** Docker Compose
-- **Proxy Reverso:** Caddy (Roteamento local e compressão gzip/zstd)
-- **Mensageria SMTP:** Mailpit (Para captura de e-mails em desenvolvimento)
-- **Monitoramento:** Prometheus, Grafana, Loki e Promtail.
-
----
-
-## 📡 Fornecedores de Dados (Data Providers)
-
-O stock-pulse não possui uma base de dados interna estática de ativos financeiros. Ele atua de forma dinâmica buscando informações atualizadas (Cotações e Fundamentos) através de integrações com APIs e Web Scraping:
-
-### 1. Yahoo Finance API (Cotações e Busca)
-Responsável por entregar as cotações em tempo real e fornecer a busca (autocomplete) de ativos.
-- **Busca de Tickers (Search):**
-  - `GET https://query1.finance.yahoo.com/v1/finance/search?q={query}`
-- **Cotação Atual e Preço de Fechamento (Chart/Quote):**
-  - `GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d`
-  
-*(Nota: Para evitar bloqueios do Yahoo Finance, o backend injeta rotineiramente cabeçalhos `User-Agent` customizados nas requisições).*
-
-### 2. Fundamentus (Scraping de Fundamentos e Proventos - Brasil)
-Como as APIs gratuitas do Yahoo não fornecem indicadores fundamentalistas estruturados e nem histórico de dividendos 100% confiáveis para o Brasil, o backend faz o web scraping das páginas do Fundamentus para ativos com o sufixo `.SA` (Ações e FIIs da B3).
-- **Fundamentos:** Extração via Regex de VPA, VP/Cota, LPA e Yield (`/detalhes.php`).
-- **Histórico de Proventos:** Extração da tabela de dividendos (`/proventos.php`), utilizando um **Motor de Deduplicação Heurística** que limpa dados sujos da fonte:
-  - **Regra de FIIs:** Garante e agrupa apenas 1 pagamento de rendimento por mês.
-  - **Regra de Ações:** Diferencia e preserva pagamentos múltiplos baseando-se no valor exato do provento.
-
-### 3. Finviz (Scraping de Fundamentos - Global)
-Para ativos americanos ou globais (sem o sufixo `.SA`), o sistema roteia o scraping para o portal Finviz, que possui uma tabela rica de indicadores de mercado internacional.
-- **Endpoint Analisado:**
-  - `GET https://finviz.com/quote.ashx?t={symbol}`
-- **Métricas Extraídas via Regex:** EPS (ttm), Book/sh e Dividend %.
-
-### 4. StockAnalysis (Scraping de Proventos - Fallback Global e ETFs Brasileiros)
-Utilizado primariamente para recuperar o histórico de dividendos de ativos globais, mas estendido como fallback crucial para ETFs brasileiros (ex: `SPYI11.SA` ou `BNDX11.SA`) que não possuem informações no Fundamentus.
-- **Endpoint Global:** `/stock/{symbol}/dividend`
-- **Endpoint B3:** `/quote/bvmf/{symbol}/dividend`
-- **Métricas:** Para ativos brasileiros na B3, priorizamos a coluna **Record Date** (Data Com) no lugar da *Ex-Dividend Date* tradicional americana, refletindo perfeitamente a legislação financeira nacional.
+### Infrastructure & DevOps
+- **Orchestration:** Docker Compose
+- **Reverse Proxy:** Caddy (Local routing, gzip/zstd compression)
+- **SMTP Testing:** Mailpit
+- **Monitoring:** Prometheus, Grafana, Loki, and Promtail
 
 ---
 
-### Mecânica de Cálculos Internos e Câmbio
+## 📡 Data Providers Integration
 
-Para suportar múltiplas moedas nativamente (ex: uma carteira dolarizada comprando ativos na B3, ou vice-versa), o Stock Pulse utiliza uma equação universal baseada no **Exchange Rate** (Taxa de Câmbio). A taxa de câmbio atua como um multiplicador neutro ou conversor:
+stock-pulse operates dynamically, fetching updated market data (Quotes and Fundamentals) via external API integrations and Web Scraping:
 
-`Custo Total da Transação = Quantidade × Preço Unitário × Taxa de Câmbio`
+### 1. Yahoo Finance API (Quotes and Search)
+Provides real-time quotes and asset autocomplete functionality.
+- **Search:** `GET https://query1.finance.yahoo.com/v1/finance/search?q={query}`
+- **Quote/Chart:** `GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d`
 
-- **Ativos Nacionais (Mesma moeda da carteira):** A taxa de câmbio é sempre preenchida como `1.0`. Por exemplo, comprando PETR4 a R$ 30,00: `100 * 30.00 * 1.0 = R$ 3.000,00`. Esse comportamento evita o uso de valores nulos (Null) no banco de dados, o que quebraria a matemática das consultas SQL.
-- **Ativos Internacionais (Moeda diferente da carteira):** O sistema busca automaticamente a cotação histórica no momento da compra (ou utiliza o valor fornecido manualmente). Por exemplo, comprando IVV a US$ 100,00 com o dólar a R$ 5,00: `10 * 100.00 * 5.00 = R$ 5.000,00`.
+### 2. Fundamentus (B3 Fundamentals & Dividends)
+Used to extract structured fundamentals for Brazilian assets (`.SA` suffix).
+- **Fundamentals:** Regex extraction of P/B, EPS, and Yield (`/detalhes.php`).
+- **Dividends History:** Extraction and sanitization via a **Heuristic Deduplication Engine** to clean raw source data.
 
-Isso assegura que o **Custo Total** de cada posição seja sempre ancorado e congelado na moeda base da carteira no exato momento da operação, blindando o seu preço médio de oscilações cambiais futuras.
+### 3. Finviz (Global Fundamentals)
+Routes global assets to Finviz for comprehensive international market indicators.
+- **Endpoint:** `GET https://finviz.com/quote.ashx?t={symbol}`
+
+### 4. StockAnalysis (Fallback for Global & B3 ETFs)
+Primary provider for global dividends and critical fallback for Brazilian ETFs missing from Fundamentus.
+- Prioritizes the **Record Date** over the Ex-Dividend Date for Brazilian assets to comply with national financial legislation.
 
 ---
 
-### Importação de Transações em Lote (CSV)
-O stock-pulse permite a importação massiva de histórico de operações através de um arquivo `.csv` ou `.txt`. 
-O arquivo deve conter as colunas na seguinte ordem exata (o cabeçalho na primeira linha é ignorado):
+## 💱 Multi-Currency Architecture & Exchange Rates
+
+To support native multi-currency portfolios (e.g., a USD portfolio purchasing BRL assets), the system relies on an Exchange Rate multiplier:
+
+`Total Transaction Cost = Quantity × Unit Price × Exchange Rate`
+
+- **Domestic Assets (Same currency as portfolio):** Exchange rate is enforced as `1.0`.
+- **International Assets (Different currency):** The system automatically fetches historical exchange rates at the exact transaction date, permanently anchoring the asset's total cost to the portfolio's base currency and shielding the average price from future FX volatility.
+
+---
+
+## 📦 Bulk CSV Import Specification
+
+stock-pulse supports massive historical data ingestion via `.csv` or `.txt`.
+Required column format (header row is ignored):
 
 `DATE, TICKER, TYPE, QUANTITY, PRICE`
 
-- **DATE**: Formato internacional (`YYYY-MM-DD`) ou brasileiro (`DD/MM/YYYY`).
-- **TICKER**: Código do ativo (ex: `PETR4.SA`, `AAPL`).
-- **TYPE**: Define o comportamento das colunas Quantidade e Preço:
-  - **`BUY` (Compra):** Quantidade e Preço devem ser maiores que zero.
-  - **`SELL` (Venda):** Quantidade e Preço devem ser maiores que zero.
-  - **`BONUS` (Bonificação):** Quantidade (ações recebidas) > 0. O preço deve ser o **Custo Atribuído** (declarado pela empresa no Fato Relevante). O sistema usará este valor para aumentar o seu custo total e recalcular o Preço Médio (se preferir não alterar o custo, informe `0.00`).
-  - **`SPLIT` (Desdobramento):** Quantidade representa o fator de multiplicação (ex: `2` para 1 virar 2). O sistema ignora o preço (pode informar `0.00`).
-  - **`REVERSE_SPLIT` (Agrupamento):** Quantidade representa o fator de divisão (ex: `10` para 10 virar 1). O sistema ignora o preço (pode informar `0.00`).
-
-#### Mecânica Interna de Desdobramentos e Agrupamentos (Por baixo dos panos)
-O sistema processa esses eventos corporativos matematicamente de duas formas para não distorcer o seu lucro/prejuízo reportado:
-
-1. **Ajuste do Preço Médio (Posição Atual):**
-   - No caso de um **`SPLIT`** (ex: fator 4), o sistema multiplica a quantidade de ações que você tinha antes daquela data por 4, e divide o seu Preço Médio de Aquisição por 4. O Custo Total investido permanece matematicamente inalterado.
-   - No caso de um **`REVERSE_SPLIT`** (ex: fator 10), ocorre o inverso: o sistema divide a sua quantidade de ações por 10 e multiplica o seu Preço Médio por 10.
-
-2. **Retroatividade no Gráfico ("Look-Ahead"):**
-   - As APIs financeiras de cotação (como o Yahoo Finance) retornam históricos com preços já reajustados baseados nos splits (*Split-Adjusted Close*). 
-   - Para que a curva do seu Gráfico Patrimonial não mostre "picos ou quedas falsas" ao cruzar a data do split, o motor do Stock Pulse avalia todo o seu histórico. Se ele encontrar um Split em 2024, ele fingirá retroativamente que a sua quantidade de ações em 2023 já estava multiplicada por aquele fator no momento de desenhar o gráfico, garantindo o empate perfeito com o mercado.
-
-**Exemplo Completo de Arquivo CSV:**
-```csv
-DATE, TICKER, TYPE, QUANTITY, PRICE
-2024-01-10, WEGE3, BUY, 100, 32.50
-2024-02-15, WEGE3, SELL, 50, 38.00
-2024-03-01, PETR4, BUY, 200, 35.10
-2024-04-10, PETR4, BONUS, 20, 0.00
-2024-05-20, ITUB4, SPLIT, 2, 0.00
-2024-06-15, COGN3, REVERSE_SPLIT, 10, 0.00
-```
+- **DATE**: `YYYY-MM-DD` or `DD/MM/YYYY`.
+- **TYPE**:
+  - `BUY` / `SELL`: Standard transactions.
+  - `BONUS`: Stock bonuses. Quantity represents shares received; Price defines assigned cost.
+  - `SPLIT` / `REVERSE_SPLIT`: Corporate actions. Quantity defines the multiplier/divisor.
 
 ---
 
-## 📊 Arquitetura e Fluxos de Dados
+## 📊 Architecture & Data Workflows
 
-Para entender melhor como os serviços se comunicam sob o capô, explore nossa documentação arquitetural aprofundada:
+For an in-depth understanding of the internal microservices communication and architectural patterns, refer to the detailed documentation:
 
-- 👉 [🔐 Autenticação e Segurança (Auth, JWT, Cookies HttpOnly)](docs/architecture/auth.md)
-- 👉 [🚑 Portfólio e Auto-Cura Sistêmica (BackfillGap LOCF)](docs/architecture/portfolio_healing.md)
-- 👉 [📦 Importação em Lote Transacional (Bulk Import)](docs/architecture/bulk_import.md)
-- 👉 [🤖 Integração Bidirecional e Estado (Telegram Bot)](docs/architecture/telegram_bot.md)
+- 👉 [🔐 Authentication & Security (Auth, JWT, HttpOnly Cookies)](docs/architecture/auth.md)
+- 👉 [🚑 Portfolio Systemic Auto-Healing (BackfillGap & LOCF)](docs/architecture/portfolio_healing.md)
+- 👉 [📦 Transactional Bulk Import Workflow](docs/architecture/bulk_import.md)
+- 👉 [🤖 Telegram Bot Bidirectional Integration & State Management](docs/architecture/telegram_bot.md)
 
-Abaixo estão os diagramas de fluxos gerais do sistema.
-
-### 1. Diagrama de Blocos (Alto Nível)
-Representa a orquestração via Docker Compose e como o tráfego externo é roteado até os provedores de dados.
+### 1. High-Level Block Diagram
+Illustrates Docker Compose orchestration and external routing.
 
 ```mermaid
 graph TD
-    Client[Navegador do Usuário] -->|HTTPS| Caddy[Caddy Proxy Reverso]
-    Caddy -->|/api/*| GoAPI[Backend Go]
-    Caddy -->|/| NextJS[Frontend Next.js]
+    Client[User Browser] -->|HTTPS| Caddy[Caddy Reverse Proxy]
+    Caddy -->|/api/*| GoAPI[Go Backend API]
+    Caddy -->|/| NextJS[Next.js Frontend]
     
     subgraph Data Layer
-        GoAPI -->|Leitura/Escrita| PG[(PostgreSQL)]
-        GoAPI -->|Cache Rápido| Redis[(Redis)]
+        GoAPI -->|Read/Write| PG[(PostgreSQL)]
+        GoAPI -->|Session/Cache| Redis[(Redis)]
     end
     
-    subgraph Integrações
-        GoAPI -->|Disparo de Alertas| Mailpit[Servidor SMTP Local]
-        GoAPI -->|Cotações e Busca| Yahoo[Yahoo Finance API]
-        GoAPI -->|Fundamentos B3| Fundamentus[Fundamentus]
-        GoAPI -->|Fundamentos Globais| Finviz[Finviz]
+    subgraph External Integrations
+        GoAPI -->|Alerts| Mailpit[Local SMTP]
+        GoAPI -->|Quotes| Yahoo[Yahoo Finance]
+        GoAPI -->|B3 Data| Fundamentus[Fundamentus]
+        GoAPI -->|Global Data| Finviz[Finviz]
     end
 ```
 
-### 2. Fluxo de Cotações em Tempo Real (WebSockets)
-Como o sistema entrega piscadas na tela instantaneamente ao cliente.
+### 2. Real-Time Quotes Flow (WebSockets)
 
 ```mermaid
 sequenceDiagram
     participant User as Frontend (React)
-    participant API as Backend (Go Hub)
+    participant API as Go Hub (Backend)
     participant Redis as Redis Cache
     participant Yahoo as Yahoo Finance
 
-    User->>API: Conecta via WebSocket (/ws)
-    User->>API: Envia "subscribe" para PETR4
-    API->>Redis: Verifica cache de PETR4
-    alt Não está no cache
+    User->>API: Connects via WebSocket (/ws)
+    User->>API: Sends "subscribe" payload for PETR4
+    API->>Redis: Check PETR4 cache TTL
+    alt Cache Miss
         API->>Yahoo: GET /v8/finance/chart/PETR4.SA
-        Yahoo-->>API: Retorna JSON
-        API->>Redis: Salva novo preço no cache (TTL 3m)
+        Yahoo-->>API: JSON Response
+        API->>Redis: Set new price (3m TTL)
     end
-    API-->>User: Dispara BroadCast (Cotação PETR4)
-    Note over User: Gráfico do Dashboard é atualizado!
+    API-->>User: BroadCast (PETR4 Quote)
+    Note over User: Dashboard chart updates instantly
 ```
 
-### 3. Fluxograma de Alertas (Background Workers)
-Goroutines rodando infinitamente em background para checar se o preço atingiu o alvo configurado.
+### 3. Asynchronous Alert Workers
 
 ```mermaid
 flowchart TD
-    Start[Worker Inicializado] --> FetchAlerts[Busca Alertas 'Ativos' no Banco]
-    FetchAlerts --> Loop[Itera sobre cada Alerta]
-    Loop --> CheckCache{Preço Atual no Cache?}
+    Start[Worker Init] --> FetchAlerts[Fetch Active Alerts from DB]
+    FetchAlerts --> Loop[Iterate over Alerts]
+    Loop --> CheckCache{Price in Cache?}
     
-    CheckCache -- Sim --> Compare[Compara Preço Atual vs Preço Alvo]
-    CheckCache -- Não --> FetchAPI[Busca preço na API e Salva no Cache] --> Compare
+    CheckCache -- Yes --> Compare[Compare Current Price vs Target]
+    CheckCache -- No --> FetchAPI[Fetch API & Cache] --> Compare
     
-    Compare -- Atingiu Meta! --> Dispara[Gera Email e Envia ao Mailpit]
-    Compare -- Não Atingiu --> Skip[Ignora]
+    Compare -- Target Hit --> Dispara[Dispatch SMTP Email]
+    Compare -- No Hit --> Skip[Continue]
     
-    Dispara --> MarcaInativo[Atualiza Alerta para 'Disparado' no DB]
+    Dispara --> MarcaInativo[Update Alert Status to 'Fired']
     MarcaInativo --> Loop
     Skip --> Loop
     
-    Loop --> Sleep[Dorme 60s] --> FetchAlerts
+    Loop --> Sleep[Sleep 60s] --> FetchAlerts
 ```
 
-### 4. Fluxo de Scraping de Fundamentos e Valuation
-Como o sistema recupera e exibe em tempo real indicadores pesados (P/VP, P/L, Yield) sem sobrecarregar provedores lentos.
+### 4. Fundamentals Scraping & Valuation Engine
 
 ```mermaid
 sequenceDiagram
     participant User as Frontend (React)
-    participant API as Backend (Go API)
+    participant API as Go API (Backend)
     participant Redis as Redis Cache
     participant Fund as Fundamentus (B3)
     participant Finviz as Finviz (Global)
 
     User->>API: GET /api/portfolio/fundamentals?symbol=MXRF11.SA
-    API->>Redis: Verifica cache 'fundamentals:v2:MXRF11.SA'
-    alt Cache Hit (Válido por 24h)
-        Redis-->>API: Retorna Fundamentos Salvos
+    API->>Redis: Check 'fundamentals:v2:MXRF11.SA'
+    alt Cache Hit (24h TTL)
+        Redis-->>API: Return cached fundamentals
     else Cache Miss
-        alt Ativo é Brasileiro (.SA)
-            API->>Fund: Faz Scraping da página HTML (detalhes.php)
-            Fund-->>API: Retorna HTML
-            Note over API: Executa Regex (VPA, VP/Cota, LPA, Yield)
-        else Ativo é Global
-            API->>Finviz: Faz Scraping da página HTML (quote.ashx)
-            Finviz-->>API: Retorna HTML
-            Note over API: Executa Regex (EPS, Book Value)
+        alt Brazilian Asset (.SA)
+            API->>Fund: Scrape HTML (detalhes.php)
+            Fund-->>API: Return HTML
+            Note over API: Regex Execution (P/B, EPS, Yield)
+        else Global Asset
+            API->>Finviz: Scrape HTML (quote.ashx)
+            Finviz-->>API: Return HTML
+            Note over API: Regex Execution (EPS, Book Value)
         end
-        API->>API: Calcula Fórmulas de Graham e Bazin
-        API->>Redis: Salva resultado no Cache (TTL 24h)
+        API->>API: Calculate Graham & Bazin Formulas
+        API->>Redis: Store payload (24h TTL)
     end
-    API-->>User: Retorna JSON (P/VP, P/L, Graham, etc.)
-    Note over User: Tabela de Posições é atualizada!
+    API-->>User: JSON Response
 ```
-### 5. Fluxo de Processamento de Proventos (Dividendos)
-Para evitar lentidão na interface e limites de API, os eventos de proventos são processados em background e calculados de forma cruzada com a custódia do usuário.
+
+### 5. Dividend Processing Workflow
 
 ```mermaid
 sequenceDiagram
     participant User as Frontend (React)
-    participant API as Backend (Go API)
-    participant Worker as Dividend Worker (Go)
+    participant API as Go API (Backend)
+    participant Worker as Dividend Worker
     participant DB as PostgreSQL (asset_event)
     participant Scrapers as Fundamentus / StockAnalysis
-    participant Yahoo as Yahoo Finance (Fallback)
+    participant Yahoo as Yahoo Finance
 
-    Note over Worker,Scrapers: Rotina Assíncrona (A cada 24h)
-    Worker->>DB: Busca todos os Ativos cadastrados
-    Worker->>Scrapers: Scraping Inteligente (BR via Fundamentus, ETFs BR via StockAnalysis)
-    alt Sucesso no Scraping
-        Scrapers-->>Worker: Retorna Histórico Deduplicado (Data Com, Pagamento, Tipo)
-    else Falha ou Indisponibilidade
-        Worker->>Yahoo: Aciona Fallback
-        Yahoo-->>Worker: Retorna Histórico Básico
+    Note over Worker,Scrapers: Async Cron (Every 24h)
+    Worker->>DB: Fetch all registered assets
+    Worker->>Scrapers: Smart Scraping
+    alt Scraping Success
+        Scrapers-->>Worker: Deduplicated History
+    else Failure
+        Worker->>Yahoo: Trigger Fallback
+        Yahoo-->>Worker: Basic History
     end
-    Worker->>DB: Faz Upsert Seguro na tabela 'asset_event'
-    Note over Worker,DB: UNIQUE (asset_id, type, amount, payment_date) previne clones com Data Com erradas
+    Worker->>DB: Safe Upsert into 'asset_event'
+    Note over Worker,DB: UNIQUE constraint prevents Ex-Date clones
 
-    Note over User,API: Carregamento do Portfólio (Tempo Real)
+    Note over User,API: Real-time Portfolio Load
     User->>API: GET /api/portfolios/{id}/dividends
-    API->>DB: Busca transações do usuário e eventos da 'asset_event'
-    Note over API: Avalia Custódia na Data-Com (Ex-Date)
-    Note over API: Aplica regras de Imposto (EUA: 30%, JCP: 15%) e Câmbio
-    API-->>User: Retorna lista consolidada de recebimentos
-    Note over User: Exibe Gráfico de Barras e Tabela Filtrável
+    API->>DB: Fetch user transactions and events
+    Note over API: Evaluate Custody on Record Date
+    Note over API: Apply Taxes (US: 30%, JCP: 15%) & FX Rate
+    API-->>User: Consolidated Yield Array
 ```
 
-### 6. Fluxo de Simulação de Rendimentos Mensais (Renda Fixa)
-Diferente da Renda Variável, cujos pagamentos são eventos estáticos declarados pelas empresas, a rentabilidade da Renda Fixa precisa ser simulada no tempo com base no indexador do contrato. O backend possui um motor que varre o histórico da carteira e aplica fatores diários de rentabilidade, agrupando os ganhos no último dia útil do mês e deduzindo impostos para gerar eventos sintéticos de juros.
+### 6. Fixed Income Monthly Yield Simulation
 
 ```mermaid
 flowchart TD
-    Start[Requisição GET /monthly-yields] --> FetchTX[Busca Todas Aplicações e Resgates]
-    FetchTX --> Sort[Ordena Transações Cronologicamente]
-    Sort --> LoopDays[Itera Dia a Dia:<br>Do Aporte até Hoje]
-    LoopDays --> IsWeekend{É Fim de Semana<br>ou Feriado?}
+    Start[GET /monthly-yields] --> FetchTX[Fetch Applications/Redemptions]
+    FetchTX --> Sort[Chronological Sort]
+    Sort --> LoopDays[Iterate Daily: T0 to Today]
+    LoopDays --> IsWeekend{Weekend/Holiday?}
     
-    IsWeekend -- Sim --> LoopDays
-    IsWeekend -- Não --> CalcPrincipal[Calcula Saldo Principal<br>Ativo no Dia]
+    IsWeekend -- Yes --> LoopDays
+    IsWeekend -- No --> CalcPrincipal[Calculate Active Principal]
     
-    CalcPrincipal --> ApplyRate[Aplica Fator de Juros Diário<br>PRE / POS / HÍBRIDO]
-    ApplyRate --> AccrueInterest[Acumula Rendimento Bruto<br>para o Mês Corrente]
-    AccrueInterest --> EndOfMonth{É o Último Dia<br>do Mês?}
+    CalcPrincipal --> ApplyRate[Apply Daily Interest Rate Factor]
+    ApplyRate --> AccrueInterest[Accrue Gross Yield for Month]
+    AccrueInterest --> EndOfMonth{Last Day of Month?}
     
-    EndOfMonth -- Não --> LoopDays
-    EndOfMonth -- Sim --> CalcTaxes[Avalia Prazo de Permanência<br>para Tabela Regressiva IR]
-    CalcTaxes --> Deduct[Deduz Impostos do<br>Rendimento Mensal Bruto]
-    Deduct --> GenYield[Gera Evento Sintético<br>de Juros Acumulados]
-    GenYield --> ResetMonth[Zera Acumulador e Inicia<br>Mês Seguinte]
+    EndOfMonth -- No --> LoopDays
+    EndOfMonth -- Yes --> CalcTaxes[Evaluate Retention for Progressive Tax]
+    CalcTaxes --> Deduct[Deduct Taxes from Gross Yield]
+    Deduct --> GenYield[Generate Synthetic Accrued Interest Event]
+    GenYield --> ResetMonth[Reset Accumulator]
     ResetMonth --> LoopDays
     
-    LoopDays -- "Atingiu Dia Atual" --> Return[Retorna Lista de Yields]
-    Return --> Frontend[Frontend: Mescla Cronologicamente<br>com Dividendos de RV na Interface]
+    LoopDays -- "Reached Today" --> Return[Return Yield Array]
 ```
 
 ---
 
-## 📂 Arquitetura do Repositório (Monorepo)
+## 📂 Monorepo Architecture
 
 ```text
 .
-├── backend/          # Backend em Go (Domain-Driven Design)
-│   ├── cmd/api/      # Ponto de entrada (main.go)
-│   ├── internal/     # Regras de negócio (auth, market, portfolio, alert, websocket, etc.)
-│   ├── migrations/   # Scripts SQL de versionamento do banco
-│   └── Dockerfile    # Imagem Go com Air para Live Reload
+├── backend/          # Golang Backend (Domain-Driven Design)
+│   ├── cmd/api/      # Entry point
+│   ├── internal/     # Core logic (auth, market, portfolio, alerts, etc.)
+│   ├── migrations/   # SQL Schema definitions
+│   └── Dockerfile    # Go image with Air (Live Reload)
 │
-├── frontend/         # Interface Web em Next.js
-│   ├── src/app/      # Páginas (Login, Dashboard, Portfólio)
-│   ├── tests/        # Testes End-to-End com Playwright
-│   └── Dockerfile    # Imagem Node.js
+├── frontend/         # Next.js Web Interface
+│   ├── src/app/      # Application Routing
+│   ├── tests/        # Playwright E2E Tests
+│   └── Dockerfile    # Node.js build image
 │
-├── docker-compose.yml # Arquivo principal que sobe 9 containers integrados
-├── Makefile          # Atalhos para comandos comuns
-└── Caddyfile         # Configuração de rotas para proxy reverso
+├── docker-compose.yml # 9-container orchestrated environment
+├── Makefile          # Automation shortcuts
+└── Caddyfile         # Reverse proxy configurations
 ```
 
 ---
 
-## 🤖 Configuração do Telegram Bot
+## 🤖 Telegram Bot Configuration
 
-Para que a integração com o Telegram funcione, você precisa criar um bot e obter um token de acesso oficial. O processo leva menos de dois minutos:
-
-1. Abra o seu aplicativo do Telegram e busque pelo usuário oficial **@BotFather**.
-2. Envie o comando `/newbot` e siga as instruções para escolher um nome e um username para o seu bot (obrigatoriamente precisa terminar com `_bot`).
-3. Ao finalizar, o BotFather te entregará um **Token HTTP API** (uma string longa parecida com `123456789:ABCdefGHIjklmNOPqrsTUVwxyz`).
-4. Na raiz do projeto, abra (ou crie) o seu arquivo `.env` baseado no `.env.example`.
-5. Cole o token na variável `TELEGRAM_BOT_TOKEN`, por exemplo:
-   ```env
-   TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklmNOPqrsTUVwxyz
-   ```
-
-Pronto! Com o Token preenchido, assim que você subir a aplicação, o módulo de conversação do Telegram será ativado automaticamente. Ao iniciar um chat enviando `/start`, o bot entregará um link seguro para você vincular sua conta da plataforma Web com o celular.
+1. Locate **@BotFather** on Telegram.
+2. Send `/newbot` and follow prompts to retrieve an **HTTP API Token**.
+3. Create a `.env` file based on `.env.example`.
+4. Inject the token: `TELEGRAM_BOT_TOKEN=your_token_here`.
+5. Upon application startup, the Telegram module engages automatically. Sending `/start` to the bot will initialize the secure binding process.
 
 ---
 
-## ⚙️ Como Executar Localmente
+## ⚙️ Local Development Setup
 
-### Pré-requisitos
-- Docker e Docker Compose instalados.
-- Make instalado (Opcional, mas recomendado).
+### Prerequisites
+- Docker and Docker Compose.
+- Make (Recommended).
 
-### Subindo o Ambiente
-
-Apenas clone o repositório e utilize o Makefile na raiz do projeto:
+### Deployment
 
 ```bash
-# Para compilar e subir todos os containers (DB, Redis, Go, Next, Grafana, Mailpit...)
+# Build and orchestrate all containers (DB, Redis, Go, Next, Grafana, Mailpit)
 make build
 
-# Para subir sem recompilar:
+# Start environment
 make up
 
-# Para acompanhar os logs de todos os serviços:
+# Tail logs
 make logs
 
-# Para rodar a suíte de testes E2E automatizada (requer ambiente local no ar):
+# Execute E2E automated test suite
 make e2e
 
-# Para derrubar o ambiente:
+# Tear down environment
 make down
 ```
 
-### Acessos Locais Pós-Deploy
-
-O `Caddy` vai expor os serviços de forma elegante:
-
-- **Frontend (Interface do Usuário):** [http://stock-pulse.localhost](http://stock-pulse.localhost) ou [http://localhost:3000](http://localhost:3000)
-- **Backend (API Base):** [http://api.stock-pulse.localhost](http://api.stock-pulse.localhost) ou [http://localhost:8080](http://localhost:8080)
-- **Mailpit (Caixa de Entrada Local para Alertas):** [http://localhost:8025](http://localhost:8025)
-- **Grafana (Dashboards de Monitoramento):** [http://localhost:3001](http://localhost:3001) (Usuário/Senha Padrão: admin / admin)
+### Local Endpoints
+- **Frontend:** [http://stock-pulse.localhost](http://stock-pulse.localhost) or `localhost:3000`
+- **Backend API:** [http://api.stock-pulse.localhost](http://api.stock-pulse.localhost) or `localhost:8080`
+- **Mailpit:** [http://localhost:8025](http://localhost:8025)
+- **Grafana:** [http://localhost:3001](http://localhost:3001) (admin / admin)
 
 ---
 
-## 🏗️ Como Criar Novas Migrações do Banco de Dados
+## 🏗️ Database Migrations
 
-Se você modificar a estrutura do banco de dados, crie uma nova migração utilizando o atalho do Makefile:
-
+Generate new schema migrations via Makefile:
 ```bash
 make migrate-create
 ```
-*O console pedirá o nome da migração (ex: `add_users_table`) e gerará os arquivos `.up.sql` e `.down.sql` na pasta `backend/migrations`.*
+*(Prompts for migration name and generates `.up.sql` / `.down.sql` in `backend/migrations`).*
 
 ---
 
-## 🛡️ Segurança e Boas Práticas Implementadas
-
-- Proteção JWT imune a ataques XSS através de Cookies `HttpOnly`.
-- Validação CSRF com Strict/Lax SameSite modes.
-- Fallback elegante se os provedores externos (Yahoo Finance) aplicarem Rate Limits, utilizando cache em Redis.
-- Graceful Shutdown no Go para desligar os Background Workers e encerrar conexões com o PostgreSQL com segurança.
-
----
-
-## 🧪 Testes e Cobertura (Unit Testing)
-
-A plataforma stock-pulse foca em **alta qualidade de código**, visando 100% de cobertura nos testes unitários tanto no backend quanto no frontend.
+## 🧪 Testing & Coverage
 
 ### Backend (Golang)
-O backend possui um conjunto rigoroso de testes simulando casos de sucesso e tratamento de erros avançados no banco de dados com `pgxmock` (simulação de erros em scan de rows, indisponibilidade, etc).
+Rigorous unit testing covering success and database failure states via `pgxmock`.
 ```bash
-# Rodar todos os testes de backend localmente
 cd backend
 go test -v -coverprofile=coverage.out ./...
-
-# Ou rodar via Docker (sem precisar ter Go instalado localmente)
-make test-backend
+# Or via Docker: make test-backend
 ```
 
 ### Frontend (Next.js)
-O frontend conta com cobertura de testes utilizando `Vitest` em conjunto com a `React Testing Library`. A suíte realiza _smoke testing_, testes de layout, validações de fluxo de formulários (Login e Registro) e _mocking_ de providers e contextos.
+UI component testing and flow validation using `Vitest` and `React Testing Library`.
 ```bash
-# Rodar testes de frontend localmente
 cd frontend
 npm run test:coverage
-
-# Ou rodar via Docker (sem precisar ter Node instalado localmente)
-make test-frontend
+# Or via Docker: make test-frontend
 ```
 
-### Testes End-to-End (E2E)
-A validação de fluxos reais de usuário é garantida através do **Playwright**. Em vez de duplicar a arquitetura criando containers específicos e pesados para E2E, o sistema conta com uma solução de infraestrutura inteligente e limpa:
-- **`scripts/run-e2e.sh`**: Script unificado que gerencia todo o ciclo de vida dos testes E2E.
-- **Isolamento Dinâmico**: O script reaproveita a instância ativa do PostgreSQL, criando e provisionando sob demanda um *schema/database* chamado `stockpulse_test`. Em seguida, reinicia exclusivamente o backend de testes com a injeção da flag `MOCK_EXTERNAL_APIS=true` para garantir testes imunes a oscilações de mercado e bloqueios do Yahoo Finance. Ao final dos testes, o backend original é restaurado e o banco de testes é destruído, mantendo o ambiente de dev intacto.
-
+### End-to-End (E2E)
+Robust validation using **Playwright**.
+- **Dynamic Database Isolation:** `scripts/run-e2e.sh` automatically provisions an ephemeral `stockpulse_test` PostgreSQL schema. It restarts the backend with `MOCK_EXTERNAL_APIS=true` to ensure market data immutability during test cycles, tearing down the environment upon completion.
 ```bash
-# Rodar todos os testes E2E com isolamento automático de banco de dados
 make e2e
 ```
 
-## ☁️ Arquitetura de Deploy (Cloud Gratuita)
+---
 
-O **stock-pulse** foi desenhado para ser facilmente distribuído em serviços de nuvem gratuitos (Free Tiers), permitindo que você hospede seu próprio ambiente de produção com **custo zero**:
+## ☁️ Free-Tier Cloud Deployment Architecture
 
-- **Frontend:** [Vercel](https://vercel.com/) (Hospedagem nativa Next.js, Serverless & CDN Global)
-- **Backend (API/Workers):** [Koyeb](https://koyeb.com/) (Serviço Eco gratuito para containers Docker rodando as rotinas 24/7) ou Google Cloud Platform (VM `e2-micro` Always Free)
-- **Banco de Dados:** [Supabase](https://supabase.com/) (PostgreSQL dedicado gratuito de 500MB, backups diários)
-- **Cache & WebSockets:** [Redis Cloud](https://redis.com/try-free/) (Cluster gerenciado de 30MB gratuito, ideal para cache temporário de cotações)
-
-Com essa distribuição, o sistema evita gargalos de memória e ganha resiliência, separando a persistência (Supabase) da lógica computacional (Go) e da entrega de interface (Vercel).
+Designed for zero-cost deployment across globally distributed free-tier platforms:
+- **Frontend:** [Vercel](https://vercel.com/) (Serverless Next.js, Global CDN)
+- **Backend:** [Koyeb](https://koyeb.com/) (Free Eco Docker container) or GCP `e2-micro`.
+- **Database:** [Supabase](https://supabase.com/) (500MB Dedicated PostgreSQL)
+- **Cache & WebSockets:** [Redis Cloud](https://redis.com/try-free/) (30MB Managed Cluster)
 
 ---
 
-## ⚖️ Licença
+## ⚖️ License
 
-Este projeto está licenciado sob a **AGPLv3 (GNU Affero General Public License v3.0)**.
-Isto significa que o código é aberto e livre, mas qualquer modificação ou obra derivada, caso seja distribuída ou hospedada como um serviço web, obrigatoriamente deve ter seu código-fonte aberto sob os mesmos termos. O uso privado sem abertura de código é proibido para serviços públicos de rede.
+Licensed under the **AGPLv3 (GNU Affero General Public License v3.0)**.
+Source code must remain open. Any modifications or derivative works hosted as web services must strictly open-source their underlying code under identical terms.
 
-Consulte o arquivo [`LICENSE`](LICENSE) para mais detalhes.
+See the [`LICENSE`](LICENSE) file for comprehensive details.
