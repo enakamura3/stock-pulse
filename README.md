@@ -132,7 +132,14 @@ DATE, TICKER, TYPE, QUANTITY, PRICE
 
 ## 📊 Arquitetura e Fluxos de Dados
 
-Para entender melhor como os serviços se comunicam sob o capô, abaixo estão os diagramas de arquitetura e dos fluxos principais.
+Para entender melhor como os serviços se comunicam sob o capô, explore nossa documentação arquitetural aprofundada:
+
+- 👉 [🔐 Autenticação e Segurança (Auth, JWT, Cookies HttpOnly)](docs/architecture/auth.md)
+- 👉 [🚑 Portfólio e Auto-Cura Sistêmica (BackfillGap LOCF)](docs/architecture/portfolio_healing.md)
+- 👉 [📦 Importação em Lote Transacional (Bulk Import)](docs/architecture/bulk_import.md)
+- 👉 [🤖 Integração Bidirecional e Estado (Telegram Bot)](docs/architecture/telegram_bot.md)
+
+Abaixo estão os diagramas de fluxos gerais do sistema.
 
 ### 1. Diagrama de Blocos (Alto Nível)
 Representa a orquestração via Docker Compose e como o tráfego externo é roteado até os provedores de dados.
