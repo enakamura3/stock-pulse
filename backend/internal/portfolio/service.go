@@ -959,7 +959,7 @@ func (s *Service) GetUnifiedTransactions(ctx context.Context, portfolioID, userI
 			UnitPrice:    &price,
 			ExchangeRate: &exch,
 			TotalValue:   total,
-			Currency:     "BRL", // simplificação, a interface atual da RV não tem moeda nativa persistida em transação
+			Currency:     tx.Currency,
 		})
 	}
 	return unified, nil
