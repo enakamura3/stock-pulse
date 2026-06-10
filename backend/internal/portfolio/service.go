@@ -909,9 +909,37 @@ func (s *Service) getCurrencyRate(ctx context.Context, fromCurrency, toCurrency 
 // UpdateTransaction edita uma transação existente de um portfólio.
 func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error {
 	// Anti-IDOR: Valida se a carteira pertence ao usuário logado
-	_, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
+	p, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
 	if err != nil {
 		return errors.New("carteira não encontrada ou acesso não autorizado")
+	}
+
+	tx.Ticker = strings.ToUpper(strings.TrimSpace(tx.Ticker))
+	if tx.Ticker == "" {
+		return errors.New("ticker do ativo inválido")
+	}
+
+	assetID, currency, err := s.repo.GetAssetAndCurrencyByTicker(ctx, tx.Ticker)
+	if err != nil {
+		return errors.New("ativo não encontrado na base")
+	}
+	tx.AssetID = assetID
+
+	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
+	if tx.ExchangeRate <= 0 {
+		if currency != p.BaseCurrency {
+			log.Printf("[Portfolio-Update] Buscando câmbio histórico para %s na data %s...", tx.Ticker, tx.ExecutedAt)
+			rate, err := s.marketService.GetHistoricalExchangeRate(ctx, tx.ExecutedAt)
+			if err == nil && rate > 0 {
+				tx.ExchangeRate = rate
+				log.Printf("[Portfolio-Update] Câmbio encontrado: %.4f", rate)
+			} else {
+				log.Printf("[Portfolio-Update] Falha ao buscar câmbio histórico, usando 1.0 como fallback: %v", err)
+				tx.ExchangeRate = 1.0
+			}
+		} else {
+			tx.ExchangeRate = 1.0
+		}
 	}
 
 	tx.ID = txID
