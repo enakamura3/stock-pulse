@@ -494,12 +494,15 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		if currency != p.BaseCurrency {
 			log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s...", tx.Ticker, tx.ExecutedAt)
 			rate, err := s.marketService.GetHistoricalExchangeRate(ctx, tx.ExecutedAt)
-			if err == nil && rate > 0 {
+			if rate > 0 {
 				tx.ExchangeRate = rate
-				log.Printf("[Portfolio] Câmbio encontrado: %.4f", rate)
+				if err != nil {
+					log.Printf("[Portfolio] Aviso: Falha ao buscar câmbio histórico (%v). Usando fallback de %.4f", err, rate)
+				} else {
+					log.Printf("[Portfolio] Câmbio encontrado: %.4f", rate)
+				}
 			} else {
-				log.Printf("[Portfolio] Falha ao buscar câmbio histórico, usando 1.0 como fallback: %v", err)
-				tx.ExchangeRate = 1.0
+				tx.ExchangeRate = 5.20
 			}
 		} else {
 			tx.ExchangeRate = 1.0
@@ -930,12 +933,15 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 		if currency != p.BaseCurrency {
 			log.Printf("[Portfolio-Update] Buscando câmbio histórico para %s na data %s...", tx.Ticker, tx.ExecutedAt)
 			rate, err := s.marketService.GetHistoricalExchangeRate(ctx, tx.ExecutedAt)
-			if err == nil && rate > 0 {
+			if rate > 0 {
 				tx.ExchangeRate = rate
-				log.Printf("[Portfolio-Update] Câmbio encontrado: %.4f", rate)
+				if err != nil {
+					log.Printf("[Portfolio-Update] Aviso: Falha ao buscar câmbio histórico (%v). Usando fallback de %.4f", err, rate)
+				} else {
+					log.Printf("[Portfolio-Update] Câmbio encontrado: %.4f", rate)
+				}
 			} else {
-				log.Printf("[Portfolio-Update] Falha ao buscar câmbio histórico, usando 1.0 como fallback: %v", err)
-				tx.ExchangeRate = 1.0
+				tx.ExchangeRate = 5.20
 			}
 		} else {
 			tx.ExchangeRate = 1.0
