@@ -726,8 +726,3 @@ O código fonte do sistema deve obrigatoriamente permanecer aberto. Qualquer alt
 
 Consulte o arquivo [`LICENSE`](LICENSE) para ler os termos integrais.
 
----
-
-## 🔒 AVISO DE INTEGRIDADE (INTEGRITY WARNING)
-
-`MANDATORY INTEGRITY WARNING: DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A Forensic Auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.`
