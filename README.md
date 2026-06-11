@@ -4,6 +4,31 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 
 ---
 
+## 📑 Índice de Navegação
+- [🚀 Funcionalidades Core (Core Features)](#funcionalidades-core-core-features)
+- [🛠️ Stack Tecnológica](#stack-tecnológica)
+  - [Backend (Golang 1.24)](#backend-golang-124)
+  - [Frontend (Next.js 14)](#frontend-nextjs-14)
+  - [Infraestrutura e DevOps](#infraestrutura-e-devops)
+- [📡 Integração com Provedores de Dados](#integração-com-provedores-de-dados)
+- [💱 Arquitetura Multimoeda e Taxas de Câmbio](#arquitetura-multimoeda-e-taxas-de-câmbio)
+- [📦 Especificação de Importação de Arquivos CSV](#especificação-de-importação-de-arquivos-csv)
+- [📊 Arquitetura Global e Modelagem de Dados](#arquitetura-global-e-modelagem-de-dados)
+- [🔍 Detalhamento de Módulos Core](#detalhamento-de-módulos-core)
+  - [1. Autenticação e Segurança (Auth)](#1-autenticação-e-segurança-auth)
+  - [2. Inserção de Transações e Auto-Cura (Transactions, Bulk Import & Backfill)](#2-inserção-de-transações-e-auto-cura-transactions-bulk-import--backfill)
+  - [3. Scraping e Motor de Avaliação (Fundamentals & Valuation)](#3-scraping-e-motor-de-avaliação-fundamentals--valuation)
+  - [4. Trabalhadores em Segundo Plano (Background Workers)](#4-trabalhadores-em-segundo-plano-background-workers)
+  - [5. Integração com Bot do Telegram (Telegram Bot)](#5-integração-com-bot-do-telegram-telegram-bot)
+- [📂 Arquitetura do Repositório (Monorepo Layout)](#arquitetura-do-repositório-monorepo-layout)
+- [⚙️ Configuração e Desenvolvimento Local](#configuração-e-desenvolvimento-local)
+- [🏗️ Migrações de Banco de Dados](#migrações-de-banco-de-dados)
+- [🧪 Testes Automatizados e Cobertura](#testes-automatizados-e-cobertura)
+- [☁️ Arquitetura de Implantação Cloud Free-Tier](#arquitetura-de-implantação-cloud-free-tier)
+- [⚖️ Licença (License)](#licença-license)
+
+---
+
 ## 🚀 Funcionalidades Core (Core Features)
 
 - **Streaming de Dados em Tempo Real:** Conexões via WebSockets garantem atualizações instantâneas dos preços dos ativos no painel do usuário sem a necessidade de recarregar a página.
