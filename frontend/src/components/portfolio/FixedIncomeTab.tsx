@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -24,8 +24,6 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
   const [redeemAmount, setRedeemAmount] = useState<number | ''>('');
   const [redeemDate, setRedeemDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isSubmittingRedeem, setIsSubmittingRedeem] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -194,10 +192,14 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
         <div className="flex-row justify-between items-center mb-lg">
           <h3 className="card-title">🏛️ Posições de Renda Fixa</h3>
           <div className="flex-row gap-sm">
-            <input type="file" accept=".csv" ref={fileInputRef} onChange={handleBulkImport} style={{ display: 'none' }} />
-            <button className="secondary-button" onClick={() => fileInputRef.current?.click()} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
-              📥 Importar (CSV)
-            </button>
+            <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+              📥 Importar CSV
+              <input 
+                type="file" accept=".csv" style={{ display: 'none' }}
+                onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
+                onChange={handleBulkImport} 
+              />
+            </label>
             <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
               + Nova Aplicação
             </button>
