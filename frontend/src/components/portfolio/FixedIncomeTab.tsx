@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -24,6 +24,40 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
   const [redeemAmount, setRedeemAmount] = useState<number | ''>('');
   const [redeemDate, setRedeemDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isSubmittingRedeem, setIsSubmittingRedeem] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/bulk`, {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.errors?.length > 0) {
+          alert(`Importados com sucesso: ${data.success}\nFalhas:\n- ${data.errors.join("\n- ")}`);
+        } else {
+          alert(`Importação concluída com sucesso! ${data.success} registros importados.`);
+        }
+        window.location.reload(); // Recarrega para atualizar a carteira inteira
+      } else {
+        alert("Erro ao enviar arquivo.");
+      }
+    } catch (err) {
+      alert("Erro de conexão.");
+    }
+    
+    e.target.value = '';
+  };
 
   useEffect(() => {
     if (!portfolioId) return;
@@ -159,9 +193,15 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
       <div className="card flex-col gap-md" style={{ flex: '2 1 600px', minHeight: '380px' }}>
         <div className="flex-row justify-between items-center mb-lg">
           <h3 className="card-title">🏛️ Posições de Renda Fixa</h3>
-          <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
-            + Nova Aplicação
-          </button>
+          <div className="flex-row gap-sm">
+            <input type="file" accept=".csv" ref={fileInputRef} onChange={handleBulkImport} style={{ display: 'none' }} />
+            <button className="secondary-button" onClick={() => fileInputRef.current?.click()} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
+              📥 Importar (CSV)
+            </button>
+            <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
+              + Nova Aplicação
+            </button>
+          </div>
         </div>
         <div className="table-container flex-col" style={{ flex: 1 }}>
         {positions.length > 0 ? (

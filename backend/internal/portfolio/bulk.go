@@ -23,6 +23,8 @@ func (s *Service) BulkAddTransactions(ctx context.Context, userID, portfolioID s
 	}
 
 	reader := csv.NewReader(file)
+	reader.Comma = ';'
+	reader.FieldsPerRecord = -1
 	records, err := reader.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("erro ao ler arquivo CSV: %w", err)
@@ -42,7 +44,7 @@ func (s *Service) BulkAddTransactions(ctx context.Context, userID, portfolioID s
 	for i, row := range records {
 		lineNum := i + 2 // +1 for 0-index, +1 because we skipped header (usually)
 		if len(row) < 5 {
-			result.Errors = append(result.Errors, fmt.Sprintf("Linha %d: formato inválido, esperado 5 colunas", lineNum))
+			result.Errors = append(result.Errors, fmt.Sprintf("Linha %d: formato inválido, esperado ao menos 5 colunas", lineNum))
 			continue
 		}
 
@@ -83,13 +85,23 @@ func (s *Service) BulkAddTransactions(ctx context.Context, userID, portfolioID s
 			}
 		}
 
+		exchangeRate := 0.0
+		if len(row) >= 6 {
+			erStr := strings.TrimSpace(row[5])
+			if erStr != "" {
+				if parsedER, err := strconv.ParseFloat(erStr, 64); err == nil {
+					exchangeRate = parsedER
+				}
+			}
+		}
+
 		tx := &Transaction{
 			PortfolioID:  portfolioID,
 			Ticker:       ticker,
 			Type:         txType,
 			Quantity:     qty,
 			UnitPrice:    price,
-			ExchangeRate: 0.0, // Simplificação para bulk import (0.0 aciona o auto-fetch para ativos estrangeiros)
+			ExchangeRate: exchangeRate,
 			ExecutedAt:   execTime.UTC(),
 		}
 

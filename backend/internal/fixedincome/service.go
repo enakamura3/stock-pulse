@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"mime/multipart"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type Service interface {
 	DeleteTransaction(ctx context.Context, portfolioID, txID string) error
 	TriggerBackfill(ctx context.Context, indexer string, startDate time.Time)
 	CalculateMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error)
+	BulkAddTransactions(ctx context.Context, portfolioID string, file multipart.File) (*BulkImportResult, error)
 	GetRawTransactions(ctx context.Context, portfolioID string) ([]Transaction, error)
 	GetAssetsByPortfolio(ctx context.Context, portfolioID string) ([]Asset, error)
 }

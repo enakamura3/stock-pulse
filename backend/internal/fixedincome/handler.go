@@ -25,6 +25,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Get("/performance", h.getPerformance)
 		r.Get("/monthly-yields", h.getMonthlyYields)
 		r.Post("/assets", h.createAsset)
+		r.Post("/bulk", h.bulkImportTransactions)
 		r.Delete("/assets/{assetID}", h.deleteAsset)
 		r.Post("/assets/{assetID}/transactions", h.createTransaction)
 		r.Put("/transactions/{txID}", h.updateTransaction)
@@ -201,4 +202,39 @@ func (h *Handler) deleteTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) bulkImportTransactions(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "ID da carteira é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
+	if err != nil {
+		http.Error(w, "Erro ao ler o formulário", http.StatusBadRequest)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Arquivo CSV é obrigatório", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	res, err := h.service.BulkAddTransactions(r.Context(), portfolioID, file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if len(res.Errors) > 0 {
+		w.WriteHeader(http.StatusPartialContent)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	json.NewEncoder(w).Encode(res)
 }
