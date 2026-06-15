@@ -26,6 +26,8 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		log.Printf("[DividendWorker] Erro ao buscar ativos: %v", err)
 		return
 	}
+	
+	log.Printf("[DividendWorker] Encontrados %d ativos ativos no banco de dados.", len(assets))
 
 	for _, asset := range assets {
 		// Use the market service to fetch the dividends (which uses scrapers or Yahoo as fallback)
