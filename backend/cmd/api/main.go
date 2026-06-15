@@ -18,7 +18,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/docs"
-	"github.com/onigiri/stock-pulse/backend/internal/mail"
+
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
@@ -119,7 +119,6 @@ func main() {
 	dividendWorker := portfolio.NewDividendWorker(portfolioRepo, marketService)
 
 	// Inicialização das Camadas da Fase 3 (Alertas & Tempo Real)
-	mailService := mail.NewService()
 
 	wsHub := websocket.NewHub(marketService)
 	wsHandler := websocket.NewHandler(wsHub)
@@ -130,7 +129,6 @@ func main() {
 	
 	historyService := history.NewService(portfolioService, fiService)
 	historyHandler := history.NewHandler(historyService)
-	alertWorker := alert.NewAlertWorker(alertRepo, marketService, mailService)
 
 	// Telegram Bot
 	telegramRepo := telegram.NewRepository(dbPool)
@@ -141,6 +139,8 @@ func main() {
 		slog.Error("Failed to start telegram bot", "err", err)
 	}
 	telegramHttpHandler := telegram.NewHTTPHandler(telegramService, telegramBot.GetUsername())
+
+	alertWorker := alert.NewAlertWorker(alertRepo, marketService, telegramBot)
 
 	// Inicialização da Documentação API Swagger (Fase 4)
 	docsHandler := docs.NewHandler("docs/openapi.yaml")

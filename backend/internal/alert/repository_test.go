@@ -111,8 +111,8 @@ func TestRepository_GetActiveAlerts(t *testing.T) {
 
 	now := time.Now()
 	mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at", "user_name", "user_email"}).
-			AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now, "User", "user@test.com"))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at", "user_name", "telegram_chat_id"}).
+			AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now, "User", func() *int64 { v := int64(123); return &v }()))
 
 	alerts, err := repo.GetActiveAlerts(context.Background())
 	assert.NoError(t, err)
