@@ -155,4 +155,46 @@ func TestAlertWorker_process(t *testing.T) {
 		repo.AssertExpectations(t)
 		tg.AssertNotCalled(t, "SendAlertMessage")
 	})
+
+	t.Run("No Telegram Link", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+		tg := new(MockTelegramService)
+
+		alerts := []*Alert{
+			{ID: "1", Ticker: "AAPL", TargetPrice: 150.0, Condition: "ABOVE", TelegramChatID: nil},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Price: 155.0}, nil)
+		repo.On("MarkAlertTriggered", mock.Anything, "1").Return(nil)
+
+		w := NewAlertWorker(repo, ms, tg)
+		w.CheckActiveAlerts(context.Background())
+		time.Sleep(10 * time.Millisecond)
+
+		repo.AssertExpectations(t)
+		tg.AssertNotCalled(t, "SendAlertMessage")
+	})
+
+	t.Run("Telegram API Error", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+		tg := new(MockTelegramService)
+
+		chatId := int64(123)
+		alerts := []*Alert{
+			{ID: "1", Ticker: "AAPL", TargetPrice: 150.0, Condition: "ABOVE", TelegramChatID: &chatId},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Price: 155.0}, nil)
+		repo.On("MarkAlertTriggered", mock.Anything, "1").Return(nil)
+		tg.On("SendAlertMessage", int64(123), mock.Anything, "AAPL", mock.Anything, 155.0, 150.0, "ABOVE", mock.Anything).Return(errors.New("telegram error"))
+
+		w := NewAlertWorker(repo, ms, tg)
+		w.CheckActiveAlerts(context.Background())
+		time.Sleep(10 * time.Millisecond)
+
+		repo.AssertExpectations(t)
+		tg.AssertExpectations(t)
+	})
 }
