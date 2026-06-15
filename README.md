@@ -506,11 +506,30 @@ sequenceDiagram
 ---
 
 ### 4. Trabalhadores em Segundo Plano (Background Workers)
-O backend da plataforma mantém tarefas secundárias em execução contínua com ciclos de vida controlados por contexto (`workerCtx` cancelável no graceful shutdown):
-- **`DailyWorker` (Sincronização de Cotações):** Executado a cada 24 horas. Identifica todos os ativos cadastrados no sistema e atualiza seus preços de fechamento diários na tabela `asset_daily_price`, aplicando um atraso síncrono de **350ms** entre requisições externas para evitar limitação de taxa (rate limiting).
-- **`DividendWorker` (Histórico de Proventos):** Executado a cada 24 horas. Busca novos dividendos distribuídos no Fundamentus/StockAnalysis e realiza uma operação segura de salvamento (`UPSERT` com constraints de data e tipo) na tabela `asset_event` para evitar dados duplicados.
-- **`fiWorker` (Renda Fixa):** Executado a cada 24 horas. Consome a API do Banco Central do Brasil (BCB) para baixar as taxas diárias de CDI e SELIC. Fragmenta as requisições em blocos de no máximo **5 anos** de histórico, com pausas de **500ms** entre chamadas, persistindo os dados na tabela `index_rates`.
-- **`AlertWorker` (Monitoramento de Preços de Alertas):** Executado a cada 1 minuto. Busca todos os alertas ativos na tabela `alert`. Para evitar o disparo de notificações redundantes em decorrência de concorrência ou atrasos de rede, o trabalhador **atualiza primeiro** o status do alerta para `TRIGGERED` no banco de dados (`MarkAlertTriggered`) através de uma transação. Apenas se essa atualização for bem-sucedida, ele agenda de forma assíncrona o envio de e-mails via `mailService.SendAlertEmail` (SMTP).
+
+A plataforma executa tarefas periódicas cruciais (como cotações e dividendos) em segundo plano através de um `WorkerManager` centralizado (`backend/internal/worker`). 
+
+A estrutura do `Worker` possui os seguintes atributos armazenados **em memória RAM** e controlados via `sync.Mutex` para evitar condições de corrida (Race Conditions):
+```go
+type Worker struct {
+	Name     string        // Nome do worker (ex: "DividendWorker")
+	Interval time.Duration // Intervalo entre as repetições
+	lastRun  time.Time     // Data e hora da última execução 
+	nextRun  time.Time     // Quando rodará automaticamente da próxima vez
+	status   string        // Estado atual ("idle" ou "running")
+}
+```
+*Nota: Sendo armazenado em memória, ao reiniciar a aplicação os timers de agendamento reiniciam suas contagens.*
+
+Você pode interagir e gerenciar os workers de forma dinâmica através dos endpoints da API protegida:
+- `GET /api/v1/workers` - Retorna um array JSON contendo o status, last_run, next_run e nome de todos os robôs da plataforma.
+- `POST /api/v1/workers/{name}/trigger` - Força a execução imediata de um robô específico, interrompendo a espera e resetando seu cronômetro (útil para atualizações forçadas).
+
+**Workers Disponíveis:**
+- **`DailyWorker` (Sincronização de Cotações):** Executado a cada 24 horas. Atualiza preços de fechamento diários na tabela `asset_daily_price`, com atraso síncrono de **350ms** entre requisições.
+- **`DividendWorker` (Histórico de Proventos):** Executado a cada 24 horas. Busca dividendos distribuídos e salva com `UPSERT` na tabela `asset_event` garantindo idempotência.
+- **`FixedIncomeWorker` (Renda Fixa):** Executado a cada 24 horas. Consome a API do Banco Central do Brasil (BCB) populando o histórico CDI/SELIC em `index_rates`.
+- **`AlertWorker` (Monitoramento de Preços de Alertas):** Executado a cada 1 minuto. Busca alertas `ACTIVE`. Ao identificar hit, atualiza o banco para `TRIGGERED` via transação atômica *antes* de enviar o e-mail, evitando envios duplicados.
 
 #### Tabelas de Banco Utilizadas:
 - `asset`, `asset_daily_price`, `asset_event`, `alert`, `index_rates`.
