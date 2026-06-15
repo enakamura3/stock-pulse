@@ -22,29 +22,7 @@ func NewDailyWorker(repo PortfolioRepository, marketProvider market.QuoteProvide
 	}
 }
 
-// Start inicializa o loop periódico do worker (com trigger imediato no startup).
-func (w *DailyWorker) Start(ctx context.Context) {
-	slog.Info("Daily Worker inicializado com sucesso em background.")
-	
-	// Executa uma varredura imediata no startup de dev para garantir dados frescos locais
-	go w.run(ctx)
-	
-	// Executa a cada 24 horas
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("Parando rotina diária em background...")
-			return
-		case <-ticker.C:
-			w.run(ctx)
-		}
-	}
-}
-
-func (w *DailyWorker) run(ctx context.Context) {
+func (w *DailyWorker) Run(ctx context.Context) {
 	slog.Info("Executando varredura agendada de cotações de fechamento...")
 	
 	// Recupera todos os ativos cadastrados

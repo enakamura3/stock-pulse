@@ -18,27 +18,7 @@ func NewDividendWorker(repo PortfolioRepository, ms MarketService) *DividendWork
 	}
 }
 
-func (w *DividendWorker) Start(ctx context.Context) {
-	log.Println("[DividendWorker] Inicializado. Rodando a cada 24 horas.")
-
-	// Executa uma vez imediatamente ao ligar o servidor
-	w.syncAllDividends(ctx)
-
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("[DividendWorker] Encerrando graciosamente...")
-			return
-		case <-ticker.C:
-			w.syncAllDividends(ctx)
-		}
-	}
-}
-
-func (w *DividendWorker) syncAllDividends(ctx context.Context) {
+func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 	log.Println("[DividendWorker] Iniciando sincronização de dividendos de mercado...")
 
 	assets, err := w.repo.GetAllAssets(ctx)

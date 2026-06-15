@@ -41,25 +41,12 @@ func NewAlertWorker(repo AlertRepository, marketService market.QuoteProvider, ma
 	}
 }
 
-// Start inicia o loop em background da Goroutine do worker.
-func (w *AlertWorker) Start(ctx context.Context) {
-	slog.Info("AlertWorker inicializado com sucesso", "interval", w.interval)
-	ticker := time.NewTicker(w.interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			w.checkActiveAlerts(ctx)
-		case <-ctx.Done():
-			slog.Info("Encerrando worker de verificação de alertas...")
-			return
-		}
-	}
+func (w *AlertWorker) Interval() time.Duration {
+	return w.interval
 }
 
-// checkActiveAlerts processa a lista de alertas ativos e avalia as condições de preço de mercado.
-func (w *AlertWorker) checkActiveAlerts(ctx context.Context) {
+// CheckActiveAlerts processa a lista de alertas ativos e avalia as condições de preço de mercado.
+func (w *AlertWorker) CheckActiveAlerts(ctx context.Context) {
 	// 1. Busca todos os alertas ativos globalmente no banco
 	alerts, err := w.repo.GetActiveAlerts(ctx)
 	if err != nil {
