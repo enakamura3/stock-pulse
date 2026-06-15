@@ -21,13 +21,13 @@ func (r *Repository) UpsertAssetEvent(ctx context.Context, event AssetEvent) err
 	query := `
 		INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, ex_date, payment_date)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (asset_id, type, gross_amount, payment_date) 
+		ON CONFLICT (asset_id, ex_date, type, gross_amount) 
 		DO UPDATE SET 
-			ex_date = EXCLUDED.ex_date,
+			payment_date = EXCLUDED.payment_date,
 			net_amount = EXCLUDED.net_amount,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE
-			asset_event.ex_date IS DISTINCT FROM EXCLUDED.ex_date OR
+			asset_event.payment_date IS DISTINCT FROM EXCLUDED.payment_date OR
 			asset_event.net_amount IS DISTINCT FROM EXCLUDED.net_amount
 	`
 	var paymentDate interface{} = event.PaymentDate
