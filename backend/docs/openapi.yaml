@@ -575,6 +575,56 @@ paths:
         '200':
           description: Status alternado com sucesso
 
+  /workers:
+    get:
+      summary: Listar todos os workers (tarefas em segundo plano)
+      tags:
+        - Administração
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Listagem de workers com status e horários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    last_run:
+                      type: string
+                      format: date-time
+                    next_run:
+                      type: string
+                      format: date-time
+                    status:
+                      type: string
+                    interval:
+                      type: string
+
+  /workers/{name}/trigger:
+    post:
+      summary: Executar um worker manualmente
+      tags:
+        - Administração
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            example: DividendWorker
+      responses:
+        '200':
+          description: Worker disparado com sucesso
+        '404':
+          description: Worker não encontrado
+
 components:
   securitySchemes:
     cookieAuth:
