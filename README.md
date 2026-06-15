@@ -39,7 +39,7 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 - **Bot do Telegram Integrado:** Bot interativo bidirecional que permite aos usuários consultar relatórios financeiros, gráficos e lançar operações diretamente pelo chat. A sessão e a FSM de cadastro de transações são gerenciadas no Redis.
 - **Scraping e Motores de Valuation (P/L, P/VP, Yield):** Cálculo em tempo real dos preços teto intrínsecos de Benjamin Graham e Décio Bazin. Os indicadores fundamentais de mercado são obtidos via web scraping (Fundamentus para ativos da B3 e Finviz para o mercado global).
 - **Livro de Registro de Transações Unificado (Ledger):** Consolida operações de Renda Variável e Renda Fixa em um leiaute de linha única, com filtragem avançada por carteira, ativo e data. Possui uma coluna nativa de "Impacto Real Diário" para medir instantaneamente a contribuição diária de P&L de cada ativo.
-- **Alertas de Preços Assíncronos (Asynchronous Alerts):** Trabalhadores em segundo plano monitoram os preços dos ativos configurados pelos usuários a cada 1 minuto, disparando notificações imediatas por e-mail e Telegram quando os limites são atingidos.
+- **Alertas de Preços Assíncronos (Asynchronous Alerts):** Trabalhadores em segundo plano monitoram os preços dos ativos configurados pelos usuários a cada 1 minuto, disparando notificações imediatas via bot do Telegram quando os limites configurados são atingidos.
 - **Segurança Robusta:** Autenticação baseada em Cookies `HttpOnly` e `Secure` contendo tokens JWT de curta duração combinada com verificação no Redis para Refresh Tokens opacos, além de configurações rígidas de CORS e CSRF.
 - **Observabilidade Completa:** Integração com Prometheus, Grafana, Loki e Promtail para exportação de métricas e agregação centralizada de logs em tempo real.
 
@@ -66,7 +66,6 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 ### Infraestrutura e DevOps
 - **Orquestração:** Docker Compose.
 - **Proxy Reverso:** Caddy (com roteamento unificado local, compressão gzip/zstd e tratamento de cabeçalhos).
-- **Servidor de Teste SMTP:** Mailpit para captura e validação de e-mails em desenvolvimento.
 - **Monitoramento:** Coleta de métricas e agregação de logs com Prometheus, Grafana, Loki e Promtail.
 
 ---
@@ -138,7 +137,6 @@ graph TD
     end
     
     subgraph Integrações Externas
-        GoAPI -->|Alertas| Mailpit[Servidor SMTP Mailpit]
         GoAPI -->|Cotações| Yahoo[Yahoo Finance API]
         GoAPI -->|Dados B3| Fundamentus[Fundamentus Scraper]
         GoAPI -->|Dados Globais| Finviz[Finviz Scraper]
@@ -529,7 +527,7 @@ Você pode interagir e gerenciar os workers de forma dinâmica através dos endp
 - **`DailyWorker` (Sincronização de Cotações):** Executado a cada 24 horas. Atualiza preços de fechamento diários na tabela `asset_daily_price`, com atraso síncrono de **350ms** entre requisições.
 - **`DividendWorker` (Histórico de Proventos):** Executado a cada 24 horas. Busca dividendos distribuídos e salva com `UPSERT` na tabela `asset_event` garantindo idempotência.
 - **`FixedIncomeWorker` (Renda Fixa):** Executado a cada 24 horas. Consome a API do Banco Central do Brasil (BCB) populando o histórico CDI/SELIC em `index_rates`.
-- **`AlertWorker` (Monitoramento de Preços de Alertas):** Executado a cada 1 minuto. Busca alertas `ACTIVE`. Ao identificar hit, atualiza o banco para `TRIGGERED` via transação atômica *antes* de enviar o e-mail, evitando envios duplicados.
+- **`AlertWorker` (Monitoramento de Preços de Alertas):** Executado a cada 1 minuto. Busca alertas `ACTIVE`. Ao identificar hit, atualiza o banco para `TRIGGERED` via transação atômica *antes* de enviar a notificação pelo Telegram, evitando envios duplicados.
 
 #### Tabelas de Banco Utilizadas:
 - `asset`, `asset_daily_price`, `asset_event`, `alert`, `index_rates`.
@@ -543,9 +541,9 @@ sequenceDiagram
     participant Worker as alert.AlertWorker
     participant DB as PostgreSQL (alert)
     participant Market as market.Service
-    participant Mail as mail.Service (SMTP)
+    participant Telegram as telegram.BotRunner
 
-    Note over Worker, Mail: Ciclo executado a cada 1 minuto
+    Note over Worker, Telegram: Ciclo executado a cada 1 minuto
     Worker->>DB: SELECT * FROM alert WHERE status = 'ACTIVE'
     DB-->>Worker: Lista de Alertas Ativos
     
@@ -562,12 +560,12 @@ sequenceDiagram
                 Note over Worker: Dispara notificação assíncrona em goroutine
                 rect rgb(230, 245, 230)
                     go-->>Worker: Background
-                    Worker->>Mail: SendAlertEmail(userEmail, targetPrice, currentPrice)
-                    Mail-->>Worker: E-mail entregue ao SMTP (Mailpit/Produção)
+                    Worker->>Telegram: SendAlertMessage(chatID, ticker, currentPrice, targetPrice)
+                    Telegram-->>Worker: Mensagem enviada via API do Telegram
                 end
             else Falha de Concorrência (Já alterado por outro thread)
                 DB-->>Worker: Erro (0 linhas alteradas)
-                Note over Worker: Ignora e continua para evitar e-mail duplicado
+                Note over Worker: Ignora e continua para evitar mensagem duplicada
             end
         end
     end
@@ -582,9 +580,12 @@ O bot do Telegram (`telebot.v3`) atua como uma interface de conversação bidire
   2. A API gera um token hexadecimal randômico curto, salvando-o no Redis sob a chave `telegram_link:{token}` com duração de **10 minutos**.
   3. O cliente web exibe o link direcionando ao Telegram: `https://t.me/NomeDoBot?start={token}`.
   4. Ao clicar no link, o bot recebe o comando `/start {token}` e executa o handler `HandleStart`. Ele busca o token no Redis, mapeia o ID do chat (`telegram_chat_id`) ao `user_id` correspondente na tabela `user_telegram_link` do PostgreSQL e apaga o token do Redis imediatamente (uso único).
-- **Gestão de Sessão no Redis:**
-  - Armazena a carteira selecionada sob a chave `telegram_active_portfolio:{chatID}` (TTL de 365 dias).
+- **Gestão de Sessão no Redis e Contexto Dinâmico:**
+  - Armazena a carteira selecionada sob a chave `telegram_active_portfolio:{chatID}` (TTL de 365 dias). Todos os menus e relatórios exibem de forma clara qual é a carteira ativa no momento, prevenindo inserções de dados errôneas.
   - Mantém o estado da FSM de cadastro de transações em `telegram_state:{chatID}` (TTL de 1 hora).
+- **Relatórios Avançados por Chat:**
+  - **Consultas de Dividendos Agrupados:** Além do fluxo padrão, o usuário pode agrupar e visualizar seus dividendos acumulados categorizados automaticamente por Mês ou por Ano.
+  - **Suporte a Renda Fixa e Alertas:** Exibe um resumo da alocação em renda fixa e é capaz de alertar instantaneamente os usuários sobre rompimentos de alvos de preço configurados no dashboard.
 - **FSM do Fluxo Assistido (Wizard Flow FSM - Sem Comando `/adicionar`):**
   - O fluxo é acionado exclusivamente enviando o comando `/menu` e clicando no botão inline `💵 Lançar Operação` (que dispara callback `btn_operacao`).
   - O bot define o estado no Redis para `EXPECT_TICKER` e envia botões inline para os ativos em carteira, além da opção `➕ Novo Ativo` (callback `btn_new_asset`).
@@ -689,7 +690,7 @@ sequenceDiagram
 - Ferramenta Make (recomendado).
 
 ### Execução do Ambiente
-Para inicializar toda a stack integrada (Banco, Redis, Go, Next, Grafana, Loki, Mailpit):
+Para inicializar toda a stack integrada (Banco, Redis, Go, Next, Grafana, Loki):
 
 ```bash
 # Executa a compilação e orquestração dos containers
@@ -711,7 +712,6 @@ make down
 ### Endpoints Úteis Locais
 - **Interface Web:** [http://stock-pulse.localhost](http://stock-pulse.localhost) ou `localhost:3000`
 - **API Backend:** [http://api.stock-pulse.localhost](http://api.stock-pulse.localhost) ou `localhost:8080`
-- **Mailpit (Captura de E-mails):** [http://localhost:8025](http://localhost:8025)
 - **Painel Grafana:** [http://localhost:3001](http://localhost:3001) (acesso padrão: `admin` / `admin`)
 
 ---
