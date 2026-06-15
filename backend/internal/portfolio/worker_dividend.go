@@ -32,15 +32,19 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		// We use a new background context with timeout for each asset to prevent hanging
 		assetCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		
+		log.Printf("[DividendWorker] Buscando proventos para o ativo %s (Tipo: %s)...", asset.Ticker, asset.AssetType)
+		
 		events, err := w.marketService.GetDividends(assetCtx, asset.Ticker, asset.AssetType)
 		if err != nil {
 			log.Printf("[DividendWorker] Aviso: falha ao buscar proventos para %s: %v", asset.Ticker, err)
 			cancel()
 			continue
 		}
+		
+		log.Printf("[DividendWorker] Ativo %s: Encontrados %d proventos na origem.", asset.Ticker, len(events))
 
 		successCount := 0
-		for _, ev := range events {
+		for i, ev := range events {
 			err = w.repo.UpsertAssetEvent(assetCtx, AssetEvent{
 				AssetID:     asset.ID,
 				Type:        ev.Type,
@@ -50,7 +54,8 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 				PaymentDate: ev.PaymentDate,
 			})
 			if err != nil {
-				log.Printf("[DividendWorker] Erro ao salvar dividendo %s para %s: %v", ev.Date.Format("2006-01-02"), asset.Ticker, err)
+				log.Printf("[DividendWorker] Erro ao salvar dividendo %d/%d (DataCom: %s, Tipo: %s, Valor: %.4f) para %s: %v", 
+					i+1, len(events), ev.Date.Format("2006-01-02"), ev.Type, ev.Amount, asset.Ticker, err)
 			} else {
 				successCount++
 			}
