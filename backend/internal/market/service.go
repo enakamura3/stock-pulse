@@ -89,9 +89,12 @@ func (s *Service) GetDividends(ctx context.Context, symbol string, assetType str
 	if err == nil {
 		var cached []DividendEvent
 		if err := json.Unmarshal([]byte(val), &cached); err == nil {
+			log.Printf("[Redis] CACHE HIT proventos para %s", symbol)
 			return cached, nil
 		}
 	}
+
+	log.Printf("[Redis] CACHE MISS proventos para %s. Consultando provedor...", symbol)
 
 	// Roteamento: tenta buscar com o scraper correto
 	var events []DividendEvent
