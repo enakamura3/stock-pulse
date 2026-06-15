@@ -489,7 +489,7 @@ export default function PortfolioPage() {
   const kpiCurrency = activeP ? activeP.base_currency : 'BRL';
 
   const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || getAssetCategory(pos.type) === activeCategoryFilter);
-  const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter);
+  const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter || (activeCategoryFilter === 'Renda Fixa' && tx.module === 'RF'));
   const filteredDividends = dividends.filter(div => {
     if (activeCategoryFilter !== 'Todas') {
       if (activeCategoryFilter === 'Renda Fixa' && !div.is_accrued) return false;

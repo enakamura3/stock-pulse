@@ -8,6 +8,13 @@ export const getAssetCategory = (dbType: string) => {
     case 'STOCK_US': return 'Ações EUA';
     case 'ETF_US': return 'ETF Internacional';
     case 'CRYPTO': return 'Cripto';
+    case 'CDB':
+    case 'LCI':
+    case 'LCA':
+    case 'TESOURO':
+    case 'DEBENTURE':
+    case 'CRI':
+    case 'CRA': return 'Renda Fixa';
     default: return 'Desconhecido';
   }
 };
