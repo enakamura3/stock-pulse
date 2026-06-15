@@ -6,42 +6,19 @@ import (
 	"time"
 )
 
-type Worker interface {
-	Start(ctx context.Context)
-}
-
-type worker struct {
+type Worker struct {
 	repo      Repository
 	bcbClient BCBClient
 }
 
-func NewWorker(repo Repository, bcbClient BCBClient) Worker {
-	return &worker{
+func NewWorker(repo Repository, bcbClient BCBClient) *Worker {
+	return &Worker{
 		repo:      repo,
 		bcbClient: bcbClient,
 	}
 }
 
-func (w *worker) Start(ctx context.Context) {
-	// Roda imediatamente ao ligar o server
-	w.syncRates(ctx)
-
-	// E depois roda uma vez por dia (meia-noite)
-	ticker := time.NewTicker(24 * time.Hour)
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				w.syncRates(ctx)
-			case <-ctx.Done():
-				ticker.Stop()
-				return
-			}
-		}
-	}()
-}
-
-func (w *worker) syncRates(ctx context.Context) {
+func (w *Worker) SyncRates(ctx context.Context) {
 	indexers := []string{"CDI", "SELIC"}
 	endDate := time.Now()
 

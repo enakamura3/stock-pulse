@@ -27,6 +27,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/telegram"
 	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
 	"github.com/onigiri/stock-pulse/backend/internal/websocket"
+	"github.com/onigiri/stock-pulse/backend/internal/worker"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
@@ -146,12 +147,16 @@ func main() {
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
+	workerManager := worker.NewManager()
+	workerManager.Register(worker.NewWorker("DividendWorker", 24*time.Hour, dividendWorker.SyncAllDividends))
+	workerManager.Register(worker.NewWorker("DailyWorker", 24*time.Hour, portfolioWorker.Run))
+	workerManager.Register(worker.NewWorker("FixedIncomeWorker", 24*time.Hour, fiWorker.SyncRates))
+	workerManager.Register(worker.NewWorker("AlertWorker", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
+	
+	workerManager.StartAll(workerCtx)
+	workerHandler := worker.NewHandler(workerManager)
 
-	go portfolioWorker.Start(workerCtx)
-	go dividendWorker.Start(workerCtx)
-	go fiWorker.Start(workerCtx)
 	go wsHub.Start(workerCtx)
-	go alertWorker.Start(workerCtx)
 	if telegramBot != nil {
 		go telegramBot.Start()
 	}
@@ -237,6 +242,11 @@ func main() {
 			// Integração Telegram
 			r.Route("/telegram", func(r chi.Router) {
 				r.Post("/link", telegramHttpHandler.GenerateLinkToken)
+			})
+
+			// Workers / System Management
+			r.Route("/workers", func(r chi.Router) {
+				workerHandler.RegisterRoutes(r)
 			})
 		})
 	})
