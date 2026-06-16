@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -62,4 +63,27 @@ func (r *BotRunner) GetUsername() string {
 		return ""
 	}
 	return r.bot.Me.Username
+}
+
+func (r *BotRunner) SendAlertMessage(chatID int64, userName, ticker, assetName string, currentVal, targetVal float64, condition, currency string) error {
+	if r == nil || r.bot == nil {
+		return nil // Bot is disabled
+	}
+
+	condStr := "acima de"
+	if condition == "BELOW" {
+		condStr = "abaixo de"
+	}
+
+	msg := "🚨 *ALERTA DE PREÇO DISPARADO* 🚨\n\n"
+	msg += "Olá, *" + userName + "*!\n"
+	msg += "Seu alerta para o ativo *" + ticker + "* (" + assetName + ") foi atingido.\n\n"
+	msg += "📊 *Preço Atual:* " + currency + " " + fmt.Sprintf("%.2f", currentVal) + "\n"
+	msg += "🎯 *Seu Alvo (" + condStr + "):* " + currency + " " + fmt.Sprintf("%.2f", targetVal) + "\n\n"
+	msg += "Acesse o *Stock Pulse* para mais detalhes."
+
+	// telebot doesn't require importing fmt if we just use Sprintf but wait, I didn't import fmt!
+	// Let's fix this in the next replacement to make sure fmt is imported.
+	_, err := r.bot.Send(&telebot.Chat{ID: chatID}, msg, telebot.ModeMarkdown)
+	return err
 }
