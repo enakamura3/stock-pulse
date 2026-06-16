@@ -17,7 +17,6 @@ export default function TransactionHistory({
 }: TransactionHistoryProps) {
   const [filterTxYear, setFilterTxYear] = useState<string>('Todos');
   const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
-  const [filterTxModule, setFilterTxModule] = useState<string>('Todos'); // 'Todos', 'RV', 'RF'
 
   const cumulativeQuantities: Record<string, number> = {};
   const cumulativeInvested: Record<string, number> = {};
@@ -58,7 +57,6 @@ export default function TransactionHistory({
   }).reverse(); // Revert back to newest first
 
   const filteredTransactions = transactionsWithBalance.filter(tx => {
-    if (filterTxModule !== 'Todos' && tx.module !== filterTxModule) return false;
     if (filterTxTicker !== '' && tx.asset_name !== filterTxTicker) return false;
     
     const year = tx.date ? tx.date.substring(0, 4) : '';
@@ -80,15 +78,6 @@ export default function TransactionHistory({
         <div className="flex-row gap-sm flex-wrap items-center">
           {transactions.length > 0 && (
             <>
-              <select
-                value={filterTxModule}
-                onChange={(e) => setFilterTxModule(e.target.value)}
-                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
-              >
-                <option value="Todos" style={{ background: '#1c1f24' }}>Todos Módulos</option>
-                <option value="RV" style={{ background: '#1c1f24' }}>Renda Variável</option>
-                <option value="RF" style={{ background: '#1c1f24' }}>Renda Fixa</option>
-              </select>
 
               <select
                 value={filterTxYear}
