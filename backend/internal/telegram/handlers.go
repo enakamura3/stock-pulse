@@ -712,7 +712,7 @@ func (h *Handlers) fetchDividends(c telebot.Context) ([]portfolio.CalculatedDivi
 		return nil, fmt.Errorf("nenhuma carteira")
 	}
 
-	portfolioID := portfolios[0].ID
+	portfolioID, _ := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 	divs, err := h.portfolioSvc.GetPortfolioDividends(context.Background(), portfolioID, userIDStr)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao buscar")
