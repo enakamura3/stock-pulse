@@ -126,7 +126,8 @@ func (h *Handlers) HandleMenu(c telebot.Context) error {
 
 	menu.Inline(rows...)
 
-	return c.Send("Escolha uma opção:", menu)
+	_, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	return c.Send(fmt.Sprintf("🏢 *Carteira Ativa:* %s\nEscolha uma opção:", portfolioName), telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) resolveActivePortfolio(ctx context.Context, chatID int64, portfolios []portfolio.Portfolio) (string, string) {
@@ -345,7 +346,7 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	if err != nil || len(portfolios) == 0 {
 		return c.Send("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
-	portfolioID, _ := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(context.Background(), portfolioID, userIDStr)
 	if err != nil {
@@ -376,7 +377,7 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	menu.Inline(rows...)
 
 	c.Respond()
-	return c.Send("Para qual ativo deseja lançar a operação?", menu)
+	return c.Send(fmt.Sprintf("🏢 *Carteira Ativa:* %s\nPara qual ativo deseja lançar a operação?", portfolioName), telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
@@ -700,28 +701,28 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	return c.Send(msg, telebot.ModeMarkdown)
 }
 
-func (h *Handlers) fetchDividends(c telebot.Context) ([]portfolio.CalculatedDividend, error) {
+func (h *Handlers) fetchDividends(c telebot.Context) ([]portfolio.CalculatedDividend, string, error) {
 	userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
 	if err != nil {
-		return nil, fmt.Errorf("conta não vinculada")
+		return nil, "", fmt.Errorf("conta não vinculada")
 	}
 
 	userIDStr := userID.String()
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil || len(portfolios) == 0 {
-		return nil, fmt.Errorf("nenhuma carteira")
+		return nil, "", fmt.Errorf("nenhuma carteira")
 	}
 
-	portfolioID, _ := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
 	divs, err := h.portfolioSvc.GetPortfolioDividends(context.Background(), portfolioID, userIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao buscar")
+		return nil, "", fmt.Errorf("erro ao buscar")
 	}
-	return divs, nil
+	return divs, portfolioName, nil
 }
 
 func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
-	divs, err := h.fetchDividends(c)
+	divs, portfolioName, err := h.fetchDividends(c)
 	if err != nil {
 		return c.Send("❌ Erro ao buscar proventos.")
 	}
@@ -738,7 +739,7 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(years)))
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📅 *Proventos por Ano*\n\n")
+	msg := p.Sprintf("📅 *Proventos por Ano: %s*\n\n", portfolioName)
 	for _, y := range years {
 		if y <= 1 {
 			msg += p.Sprintf("• *A Definir*: R$ %.2f\n", grouped[y])
@@ -752,7 +753,7 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 }
 
 func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
-	divs, err := h.fetchDividends(c)
+	divs, portfolioName, err := h.fetchDividends(c)
 	if err != nil {
 		return c.Send("❌ Erro ao buscar proventos.")
 	}
@@ -796,7 +797,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	pageKeys := keys[start:end]
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📆 *Proventos por Mês*\n_Página %d_\n\n", page+1)
+	msg := p.Sprintf("📆 *Proventos por Mês: %s*\n_Página %d_\n\n", portfolioName, page+1)
 	
 	sym := getCurrencySymbol("BRL")
 	for _, k := range pageKeys {
