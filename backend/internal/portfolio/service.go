@@ -82,6 +82,8 @@ type PortfolioRepository interface {
 	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
 	UpsertAssetEvent(ctx context.Context, event AssetEvent) error
 	GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error)
+	GetAssetEventsByDate(ctx context.Context, assetID string, exDate time.Time) ([]AssetEvent, error)
+	UpdateAssetEventValueByID(ctx context.Context, eventID string, newGross, newNet float64, newPayment time.Time) error
 	GetExchangeRateByDate(ctx context.Context, currencyPairTicker string, date time.Time) (float64, error)
 	GetOldestPriceDate(ctx context.Context, assetID string) (time.Time, error)
 }

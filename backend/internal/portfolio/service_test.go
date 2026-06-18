@@ -118,6 +118,16 @@ func (m *MockPortfolioRepo) GetAssetEvents(ctx context.Context, assetID string) 
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetAssetEventsByDate(ctx context.Context, assetID string, exDate time.Time) ([]AssetEvent, error) {
+	args := m.Called(ctx, assetID, exDate)
+	return args.Get(0).([]AssetEvent), args.Error(1)
+}
+
+func (m *MockPortfolioRepo) UpdateAssetEventValueByID(ctx context.Context, eventID string, newGross, newNet float64, newPayment time.Time) error {
+	args := m.Called(ctx, eventID, newGross, newNet, newPayment)
+	return args.Error(0)
+}
+
 type MockMarketService struct {
 	mock.Mock
 }
@@ -144,11 +154,8 @@ func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]m
 }
 
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
-	args := m.Called(ctx, ticker)
-	if args.Get(0) != nil {
-		return args.Get(0).([]market.DividendEvent), args.Error(1)
-	}
-	return nil, args.Error(1)
+	args := m.Called(ctx, ticker, assetType)
+	return args.Get(0).([]market.DividendEvent), args.Error(1)
 }
 
 type MockMarketProvider struct {
