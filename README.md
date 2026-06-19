@@ -80,7 +80,7 @@ O sistema opera dinamicamente realizando consultas em APIs externas e fazendo ra
 
 ### 2. Fundamentus (Fundamentos e Proventos da B3)
 - **Fundamentos:** Extração baseada em expressões regulares (regex) de P/VP, P/L, LPA, VPA e Dividend Yield a partir do endpoint `/detalhes.php`.
-- **Histórico de Proventos:** Captura de proventos (dividendos e JCP) a partir do endpoint `/proventos.php` ou `/fii_proventos.php` com desduplicação heurística refinada para expurgar duplicatas da base de dados.
+- **Histórico de Proventos:** Captura de proventos (dividendos e JCP) a partir do endpoint `/proventos.php` ou `/fii_proventos.php`. Utiliza um algoritmo inteligente de **Fuzzy Matching** na camada de aplicação para identificar e unificar correções de centavos das fontes de dados, garantindo que não ocorram duplicatas indesejadas nem a perda de dividendos extraordinários.
 
 ### 3. Finviz (Fundamentos do Mercado Internacional)
 - **Raspagem de Indicadores:** `GET https://finviz.com/quote.ashx?t={symbol}` para obter LPA (EPS), valor patrimonial (Book/sh) e dividendos de ativos globais usando expressões regulares.
