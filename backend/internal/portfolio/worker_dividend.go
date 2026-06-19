@@ -73,7 +73,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 			}
 
 			if bestMatch != nil {
-				if minDiff == 0 && bestMatch.PaymentDate.Equal(ev.PaymentDate) {
+				if minDiff < 1e-6 && bestMatch.PaymentDate.Equal(ev.PaymentDate) {
 					successCount++
 					continue
 				}
