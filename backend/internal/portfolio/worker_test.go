@@ -24,7 +24,7 @@ func TestDailyWorker_StartAndStop(t *testing.T) {
 	// Start in a goroutine
 	done := make(chan struct{})
 	go func() {
-		worker.Start(ctx)
+		worker.Run(ctx)
 		close(done)
 	}()
 
@@ -43,7 +43,7 @@ func TestDailyWorker_StartAndStop(t *testing.T) {
 	}
 }
 
-func TestDailyWorker_run(t *testing.T) {
+func TestDailyWorker_Run(t *testing.T) {
 	t.Run("GetAllAssets Error", func(t *testing.T) {
 		repo := new(MockPortfolioRepo)
 		mp := new(MockMarketService)
@@ -51,7 +51,7 @@ func TestDailyWorker_run(t *testing.T) {
 
 		repo.On("GetAllAssets", mock.Anything).Return(([]AssetCompact)(nil), errors.New("db err"))
 
-		worker.run(context.Background())
+		worker.Run(context.Background())
 		// should log and return, no panic
 	})
 
@@ -62,7 +62,7 @@ func TestDailyWorker_run(t *testing.T) {
 
 		repo.On("GetAllAssets", mock.Anything).Return([]AssetCompact{}, nil)
 
-		worker.run(context.Background())
+		worker.Run(context.Background())
 	})
 
 	t.Run("Success", func(t *testing.T) {
@@ -77,7 +77,7 @@ func TestDailyWorker_run(t *testing.T) {
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Price: 150.0}, nil)
 		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
 
-		worker.run(context.Background())
+		worker.Run(context.Background())
 
 		repo.AssertExpectations(t)
 		mp.AssertExpectations(t)
@@ -94,7 +94,7 @@ func TestDailyWorker_run(t *testing.T) {
 		repo.On("GetAllAssets", mock.Anything).Return(assets, nil)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return((*market.Quote)(nil), errors.New("api err"))
 
-		worker.run(context.Background())
+		worker.Run(context.Background())
 		// shouldn't call SaveDailyPrices
 		repo.AssertNotCalled(t, "SaveDailyPrices")
 	})
@@ -111,7 +111,7 @@ func TestDailyWorker_run(t *testing.T) {
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Price: 150.0}, nil)
 		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db err"))
 
-		worker.run(context.Background())
+		worker.Run(context.Background())
 		// Should log and continue
 	})
 
@@ -128,7 +128,7 @@ func TestDailyWorker_run(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // immediately cancel
 
-		worker.run(ctx)
+		worker.Run(ctx)
 		// Should return before calling GetQuote because of the 350ms wait and ctx.Done
 		mp.AssertNotCalled(t, "GetQuote")
 	})
