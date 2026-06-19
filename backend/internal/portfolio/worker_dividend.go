@@ -73,6 +73,11 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 			}
 
 			if bestMatch != nil {
+				if minDiff < 1e-6 && bestMatch.PaymentDate.Equal(ev.PaymentDate) {
+					successCount++
+					continue
+				}
+
 				// Update existing
 				err = w.repo.UpdateAssetEventValueByID(assetCtx, bestMatch.ID, ev.Amount, ev.Amount, ev.PaymentDate)
 				if err != nil {
