@@ -111,3 +111,52 @@ func TestDividendWorker_SyncAllDividends_NoMatch(t *testing.T) {
 	repo.AssertNotCalled(t, "UpdateAssetEventValueByID")
 	ms.AssertExpectations(t)
 }
+
+func TestDividendWorker_SyncAllDividends_ExactMatchSkip(t *testing.T) {
+	repo := new(MockPortfolioRepo)
+	ms := new(MockMarketService)
+
+	worker := NewDividendWorker(repo, ms)
+	ctx := context.Background()
+
+	assets := []AssetCompact{
+		{ID: "asset-1", Ticker: "PETR4.SA", AssetType: "STOCK_BR"},
+	}
+
+	repo.On("GetAllAssets", mock.Anything).Return(assets, nil)
+
+	exDate := time.Date(2024, 4, 25, 0, 0, 0, 0, time.UTC)
+	payDate := time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC)
+
+	scrapedEvents := []market.DividendEvent{
+		{
+			Date:        exDate,
+			Type:        "Dividendo",
+			Amount:      1.50,
+			PaymentDate: payDate,
+		},
+	}
+
+	ms.On("GetDividends", mock.Anything, "PETR4.SA", "STOCK_BR").Return(scrapedEvents, nil)
+
+	existingEvents := []AssetEvent{
+		{
+			ID:          "evt-1",
+			AssetID:     "asset-1",
+			Type:        "Dividendo",
+			GrossAmount: 1.50,
+			ExDate:      exDate,
+			PaymentDate: payDate,
+		},
+	}
+
+	repo.On("GetAssetEventsByDate", mock.Anything, "asset-1", exDate).Return(existingEvents, nil)
+
+	// Should not update or upsert
+	worker.SyncAllDividends(ctx)
+
+	repo.AssertExpectations(t)
+	repo.AssertNotCalled(t, "UpdateAssetEventValueByID")
+	repo.AssertNotCalled(t, "UpsertAssetEvent")
+	ms.AssertExpectations(t)
+}
