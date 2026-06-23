@@ -107,9 +107,11 @@ func main() {
 	// Inicialização de Camadas de Renda Fixa (Fase 5)
 	fiRepo := fixedincome.NewRepository(dbPool)
 	fiBcbClient := fixedincome.NewBCBClient()
+	fiAnbimaClient := fixedincome.NewAnbimaClient()
 	fiService := fixedincome.NewService(fiRepo, fiBcbClient)
 	fiHandler := fixedincome.NewHandler(fiService, fiRepo)
 	fiWorker := fixedincome.NewWorker(fiRepo, fiBcbClient)
+	fiAnbimaWorker := fixedincome.NewAnbimaHolidayWorker(fiRepo, fiAnbimaClient)
 
 	// Inicialização de Camadas de Portfólio & Daily Worker
 	portfolioRepo := portfolio.NewRepository(dbPool)
@@ -151,6 +153,7 @@ func main() {
 	workerManager.Register(worker.NewWorker("DividendWorker", 24*time.Hour, dividendWorker.SyncAllDividends))
 	workerManager.Register(worker.NewWorker("DailyWorker", 24*time.Hour, portfolioWorker.Run))
 	workerManager.Register(worker.NewWorker("FixedIncomeWorker", 24*time.Hour, fiWorker.SyncRates))
+	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", 24*time.Hour, fiAnbimaWorker.SyncHolidays))
 	workerManager.Register(worker.NewWorker("AlertWorker", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
 	
 	workerManager.StartAll(workerCtx)

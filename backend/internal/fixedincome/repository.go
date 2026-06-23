@@ -43,6 +43,8 @@ type Repository interface {
 
 	// Holiday & Exemption Queries
 	GetAnbimaHolidays(ctx context.Context) (map[string]bool, error)
+	GetSeededHolidayYears(ctx context.Context) ([]int, error)
+	SaveAnbimaHolidays(ctx context.Context, dates []time.Time) error
 	GetSelicRates(ctx context.Context) (map[string]float64, error)
 	GetTotalSelicInvested(ctx context.Context, tx pgx.Tx, portfolioID string) (float64, error)
 
@@ -455,6 +457,46 @@ func (r *repository) GetAnbimaHolidays(ctx context.Context) (map[string]bool, er
 		holidays[hd.Format("2006-01-02")] = true
 	}
 	return holidays, nil
+}
+
+func (r *repository) GetSeededHolidayYears(ctx context.Context) ([]int, error) {
+	query := "SELECT DISTINCT EXTRACT(YEAR FROM holiday_date)::int FROM anbima_holidays ORDER BY 1"
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var years []int
+	for rows.Next() {
+		var y int
+		if err := rows.Scan(&y); err != nil {
+			return nil, err
+		}
+		years = append(years, y)
+	}
+	return years, nil
+}
+
+func (r *repository) SaveAnbimaHolidays(ctx context.Context, dates []time.Time) error {
+	if len(dates) == 0 {
+		return nil
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	query := `
+		INSERT INTO anbima_holidays (holiday_date, description)
+		VALUES ($1, 'Feriado Nacional')
+		ON CONFLICT (holiday_date) DO NOTHING`
+	for _, d := range dates {
+		if _, err := tx.Exec(ctx, query, d); err != nil {
+			return fmt.Errorf("SaveAnbimaHolidays: failed to insert %s: %w", d.Format("2006-01-02"), err)
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *repository) GetSelicRates(ctx context.Context) (map[string]float64, error) {
