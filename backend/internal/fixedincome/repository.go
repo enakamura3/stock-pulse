@@ -26,6 +26,30 @@ type Repository interface {
 	SaveIndexRates(ctx context.Context, rates []IndexRate) error
 	GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error)
 	GetLatestIndexRate(ctx context.Context, indexer string) (*IndexRate, error)
+
+	ExecuteInTx(ctx context.Context, fn func(tx pgx.Tx) error) error
+
+	// Treasury Asset Operations
+	GetTreasuryAssetByTicker(ctx context.Context, tx pgx.Tx, ticker string) (string, error)
+	CreateTreasuryAsset(ctx context.Context, tx pgx.Tx, ticker string, name string, treasuryType string, maturityDate time.Time, hasCoupons bool) (string, error)
+
+	// Treasury Transaction Operations
+	CreateTreasurySubscription(ctx context.Context, tx pgx.Tx, portfolioID string, assetID string, quantity float64, unitPrice float64, contractedRate float64, transactionDate time.Time) (string, error)
+	CreateTreasuryRedemptionPlaceholder(ctx context.Context, tx pgx.Tx, portfolioID string, assetID string, quantity float64, unitPrice float64, contractedRate float64, transactionDate time.Time) (string, error)
+	GetActiveLotsForAsset(ctx context.Context, tx pgx.Tx, portfolioID string, assetID string) ([]TreasuryTransaction, error)
+	UpdateLotRemainingQuantity(ctx context.Context, tx pgx.Tx, lotID string, remainingQuantity float64) error
+	CreateDepletionLink(ctx context.Context, tx pgx.Tx, subID string, redID string, quantity float64) error
+	UpdateRedemptionFinancials(ctx context.Context, tx pgx.Tx, redemptionID string, grossAmount float64, iofTax float64, irTax float64, b3Fee float64, netAmount float64) error
+
+	// Holiday & Exemption Queries
+	GetAnbimaHolidays(ctx context.Context) (map[string]bool, error)
+	GetSelicRates(ctx context.Context) (map[string]float64, error)
+	GetTotalSelicInvested(ctx context.Context, tx pgx.Tx, portfolioID string) (float64, error)
+
+	// Positions & Performance
+	GetActiveSubscriptionLots(ctx context.Context, portfolioID string) ([]TreasuryTransaction, error)
+	GetTreasuryPerformancePoints(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
+	GetTreasuryAssetDetails(ctx context.Context, assetID string) (ticker string, treasuryType string, maturityDate time.Time, hasCoupons bool, err error)
 }
 
 type repository struct {
@@ -210,7 +234,7 @@ func (r *repository) SaveIndexRates(ctx context.Context, rates []IndexRate) erro
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, rt := range rates {
 		if _, err := tx.Exec(ctx, query, rt.Indexer, rt.Date, rt.Rate); err != nil {
@@ -262,4 +286,269 @@ func (r *repository) GetLatestIndexRate(ctx context.Context, indexer string) (*I
 		return nil, err
 	}
 	return &rt, nil
+}
+
+func (r *repository) ExecuteInTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *repository) GetTreasuryAssetByTicker(ctx context.Context, tx pgx.Tx, ticker string) (string, error) {
+	var id string
+	query := "SELECT id FROM asset WHERE ticker = $1"
+	var err error
+	if tx != nil {
+		err = tx.QueryRow(ctx, query, ticker).Scan(&id)
+	} else {
+		err = r.db.QueryRow(ctx, query, ticker).Scan(&id)
+	}
+	return id, err
+}
+
+func (r *repository) CreateTreasuryAsset(ctx context.Context, tx pgx.Tx, ticker string, name string, treasuryType string, maturityDate time.Time, hasCoupons bool) (string, error) {
+	var id string
+	insertAssetQuery := "INSERT INTO asset (ticker, name, asset_type, currency) VALUES ($1, $2, 'TREASURY', 'BRL') RETURNING id"
+	var err error
+	if tx != nil {
+		err = tx.QueryRow(ctx, insertAssetQuery, ticker, name).Scan(&id)
+	} else {
+		err = r.db.QueryRow(ctx, insertAssetQuery, ticker, name).Scan(&id)
+	}
+	if err != nil {
+		return "", err
+	}
+	insertTreasuryQuery := "INSERT INTO treasury_assets (id, treasury_type, maturity_date, has_coupons) VALUES ($1, $2, $3, $4)"
+	if tx != nil {
+		_, err = tx.Exec(ctx, insertTreasuryQuery, id, treasuryType, maturityDate, hasCoupons)
+	} else {
+		_, err = r.db.Exec(ctx, insertTreasuryQuery, id, treasuryType, maturityDate, hasCoupons)
+	}
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (r *repository) CreateTreasurySubscription(ctx context.Context, tx pgx.Tx, portfolioID string, assetID string, quantity float64, unitPrice float64, contractedRate float64, transactionDate time.Time) (string, error) {
+	var id string
+	query := `
+		INSERT INTO treasury_transactions 
+		(portfolio_id, asset_id, type, quantity, unit_price, contracted_rate, remaining_quantity, transaction_date)
+		VALUES ($1, $2, 'SUBSCRIPTION', $3, $4, $5, $6, $7) RETURNING id`
+	var err error
+	if tx != nil {
+		err = tx.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, quantity, transactionDate).Scan(&id)
+	} else {
+		err = r.db.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, quantity, transactionDate).Scan(&id)
+	}
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (r *repository) CreateTreasuryRedemptionPlaceholder(ctx context.Context, tx pgx.Tx, portfolioID string, assetID string, quantity float64, unitPrice float64, contractedRate float64, transactionDate time.Time) (string, error) {
+	var id string
+	query := `
+		INSERT INTO treasury_transactions 
+		(portfolio_id, asset_id, type, quantity, unit_price, contracted_rate, remaining_quantity, transaction_date)
+		VALUES ($1, $2, 'REDEMPTION', $3, $4, $5, 0.0, $6) RETURNING id`
+	var err error
+	if tx != nil {
+		err = tx.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, transactionDate).Scan(&id)
+	} else {
+		err = r.db.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, transactionDate).Scan(&id)
+	}
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (r *repository) GetActiveLotsForAsset(ctx context.Context, tx pgx.Tx, portfolioID string, assetID string) ([]TreasuryTransaction, error) {
+	query := `
+		SELECT id, portfolio_id, asset_id, type, quantity, unit_price, contracted_rate, remaining_quantity, transaction_date
+		FROM treasury_transactions 
+		WHERE portfolio_id = $1 AND asset_id = $2 AND type = 'SUBSCRIPTION' AND remaining_quantity > 0
+		ORDER BY transaction_date ASC, created_at ASC`
+	var rows pgx.Rows
+	var err error
+	if tx != nil {
+		rows, err = tx.Query(ctx, query, portfolioID, assetID)
+	} else {
+		rows, err = r.db.Query(ctx, query, portfolioID, assetID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var lots []TreasuryTransaction
+	for rows.Next() {
+		var t TreasuryTransaction
+		err = rows.Scan(&t.ID, &t.PortfolioID, &t.AssetID, &t.Type, &t.Quantity, &t.UnitPrice, &t.ContractedRate, &t.RemainingQuantity, &t.TransactionDate)
+		if err != nil {
+			return nil, err
+		}
+		lots = append(lots, t)
+	}
+	return lots, nil
+}
+
+func (r *repository) UpdateLotRemainingQuantity(ctx context.Context, tx pgx.Tx, lotID string, remainingQuantity float64) error {
+	query := "UPDATE treasury_transactions SET remaining_quantity = $1, updated_at = NOW() WHERE id = $2"
+	var err error
+	if tx != nil {
+		_, err = tx.Exec(ctx, query, remainingQuantity, lotID)
+	} else {
+		_, err = r.db.Exec(ctx, query, remainingQuantity, lotID)
+	}
+	return err
+}
+
+func (r *repository) CreateDepletionLink(ctx context.Context, tx pgx.Tx, subID string, redID string, quantity float64) error {
+	query := `
+		INSERT INTO treasury_depletions (subscription_transaction_id, redemption_transaction_id, quantity)
+		VALUES ($1, $2, $3)`
+	var err error
+	if tx != nil {
+		_, err = tx.Exec(ctx, query, subID, redID, quantity)
+	} else {
+		_, err = r.db.Exec(ctx, query, subID, redID, quantity)
+	}
+	return err
+}
+
+func (r *repository) UpdateRedemptionFinancials(ctx context.Context, tx pgx.Tx, redemptionID string, grossAmount float64, iofTax float64, irTax float64, b3Fee float64, netAmount float64) error {
+	query := `
+		UPDATE treasury_transactions 
+		SET gross_amount = $1, iof_tax = $2, ir_tax = $3, b3_fee = $4, net_amount = $5, updated_at = NOW()
+		WHERE id = $6`
+	var err error
+	if tx != nil {
+		_, err = tx.Exec(ctx, query, grossAmount, iofTax, irTax, b3Fee, netAmount, redemptionID)
+	} else {
+		_, err = r.db.Exec(ctx, query, grossAmount, iofTax, irTax, b3Fee, netAmount, redemptionID)
+	}
+	return err
+}
+
+func (r *repository) GetAnbimaHolidays(ctx context.Context) (map[string]bool, error) {
+	query := "SELECT holiday_date FROM anbima_holidays"
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	holidays := make(map[string]bool)
+	for rows.Next() {
+		var hd time.Time
+		if err := rows.Scan(&hd); err != nil {
+			return nil, err
+		}
+		holidays[hd.Format("2006-01-02")] = true
+	}
+	return holidays, nil
+}
+
+func (r *repository) GetSelicRates(ctx context.Context) (map[string]float64, error) {
+	query := "SELECT date, rate FROM index_rates WHERE indexer = 'SELIC'"
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	rates := make(map[string]float64)
+	for rows.Next() {
+		var sd time.Time
+		var sr float64
+		if err := rows.Scan(&sd, &sr); err != nil {
+			return nil, err
+		}
+		rates[sd.Format("2006-01-02")] = sr
+	}
+	return rates, nil
+}
+
+func (r *repository) GetTotalSelicInvested(ctx context.Context, tx pgx.Tx, portfolioID string) (float64, error) {
+	query := `
+		SELECT COALESCE(SUM(remaining_quantity * unit_price), 0)
+		FROM treasury_transactions t
+		JOIN treasury_assets ta ON t.asset_id = ta.id
+		WHERE t.portfolio_id = $1 AND ta.treasury_type = 'SELIC' AND t.type = 'SUBSCRIPTION'`
+	var total float64
+	var err error
+	if tx != nil {
+		err = tx.QueryRow(ctx, query, portfolioID).Scan(&total)
+	} else {
+		err = r.db.QueryRow(ctx, query, portfolioID).Scan(&total)
+	}
+	return total, err
+}
+
+func (r *repository) GetActiveSubscriptionLots(ctx context.Context, portfolioID string) ([]TreasuryTransaction, error) {
+	query := `
+		SELECT id, portfolio_id, asset_id, type, quantity, unit_price, contracted_rate, remaining_quantity, transaction_date
+		FROM treasury_transactions
+		WHERE portfolio_id = $1 AND type = 'SUBSCRIPTION' AND remaining_quantity > 0`
+	rows, err := r.db.Query(ctx, query, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var lots []TreasuryTransaction
+	for rows.Next() {
+		var t TreasuryTransaction
+		err = rows.Scan(&t.ID, &t.PortfolioID, &t.AssetID, &t.Type, &t.Quantity, &t.UnitPrice, &t.ContractedRate, &t.RemainingQuantity, &t.TransactionDate)
+		if err != nil {
+			return nil, err
+		}
+		lots = append(lots, t)
+	}
+	return lots, nil
+}
+
+func (r *repository) GetTreasuryPerformancePoints(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error) {
+	query := `
+		SELECT price_date, SUM(selling_price) as value, SUM(theoretical_price) as theoretical
+		FROM treasury_prices p
+		JOIN treasury_transactions t ON p.asset_id = t.asset_id
+		WHERE t.portfolio_id = $1
+		GROUP BY price_date ORDER BY price_date ASC`
+	rows, err := r.db.Query(ctx, query, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var points []TreasuryPerfPoint
+	for rows.Next() {
+		var date string
+		var val, th float64
+		err = rows.Scan(&date, &val, &th)
+		if err != nil {
+			return nil, err
+		}
+		points = append(points, TreasuryPerfPoint{
+			Date:          date,
+			Value:         val,
+			TotalInvested: th,
+		})
+	}
+	return points, nil
+}
+
+func (r *repository) GetTreasuryAssetDetails(ctx context.Context, assetID string) (ticker string, treasuryType string, maturityDate time.Time, hasCoupons bool, err error) {
+	query := `
+		SELECT a.ticker, ta.treasury_type, ta.maturity_date, ta.has_coupons
+		FROM treasury_assets ta
+		JOIN asset a ON ta.id = a.id
+		WHERE ta.id = $1`
+	err = r.db.QueryRow(ctx, query, assetID).Scan(&ticker, &treasuryType, &maturityDate, &hasCoupons)
+	return
 }

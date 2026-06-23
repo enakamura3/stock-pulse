@@ -133,3 +133,26 @@ export interface UnifiedTransaction {
   resulting_invested?: number;
 }
 
+export interface TreasuryPosition {
+  asset_id: string;
+  ticker: string;
+  treasury_type: string;
+  maturity_date: string;
+  has_coupons: boolean;
+  start_date: string;
+  total_invested: number;
+  gross_value: number;
+  net_value: number;
+  is_matured: boolean;
+  days_to_maturity: number;
+  taxes_calculated: number;
+  b3_fee: number;
+  ir_tax: number;
+  iof_tax: number;
+}
+
+export interface TreasuryPerfPoint {
+  date: string;
+  value: number;
+  total_invested: number;
+}

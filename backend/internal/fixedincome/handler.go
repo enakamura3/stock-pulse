@@ -31,6 +31,12 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Put("/transactions/{txID}", h.updateTransaction)
 		r.Delete("/transactions/{txID}", h.deleteTransaction)
 	})
+
+	r.Route("/portfolios/{portfolioID}/treasury", func(r chi.Router) {
+		r.Get("/positions", h.getTreasuryPositions)
+		r.Post("/transactions", h.createTreasuryTransaction)
+		r.Get("/performance", h.getTreasuryPerformance)
+	})
 }
 
 func (h *Handler) getMonthlyYields(w http.ResponseWriter, r *http.Request) {
@@ -237,4 +243,62 @@ func (h *Handler) bulkImportTransactions(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusOK)
 	}
 	json.NewEncoder(w).Encode(res)
+}
+
+func (h *Handler) getTreasuryPositions(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		return
+	}
+
+	positions, err := h.service.GetTreasuryPositions(r.Context(), portfolioID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(positions)
+}
+
+func (h *Handler) createTreasuryTransaction(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		return
+	}
+
+	var req TreasuryTxRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res, err := h.service.CreateTreasuryTransaction(r.Context(), portfolioID, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(res)
+}
+
+func (h *Handler) getTreasuryPerformance(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		return
+	}
+
+	performance, err := h.service.GetTreasuryPerformance(r.Context(), portfolioID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(performance)
 }
