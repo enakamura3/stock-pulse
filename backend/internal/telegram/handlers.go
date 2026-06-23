@@ -1024,9 +1024,9 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 		
 		taxa := ""
 		if pos.Asset.DebtType == "POS" {
-			taxa = fmt.Sprintf("%.2f%% %s", pos.Asset.Rate, pos.Asset.Indexer)
+			taxa = p.Sprintf("%.2f%% %s", pos.Asset.Rate, pos.Asset.Indexer)
 		} else {
-			taxa = fmt.Sprintf("%.2f%% a.a.", pos.Asset.Rate)
+			taxa = p.Sprintf("%.2f%% a.a.", pos.Asset.Rate)
 		}
 		
 		msg += p.Sprintf("• `%s %s` - %s\n", pos.Asset.Institution, pos.Asset.Type, taxa)

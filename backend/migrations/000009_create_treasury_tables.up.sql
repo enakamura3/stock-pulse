@@ -47,7 +47,12 @@ CREATE TABLE treasury_transactions (
     CONSTRAINT chk_quantity_positive CHECK (quantity > 0),
     CONSTRAINT chk_unit_price_positive CHECK (unit_price > 0),
     CONSTRAINT chk_remaining_qty_non_negative CHECK (remaining_quantity >= 0),
-    CONSTRAINT chk_contracted_rate_non_negative CHECK (contracted_rate >= 0)
+    CONSTRAINT chk_contracted_rate_non_negative CHECK (contracted_rate >= 0),
+    CONSTRAINT chk_gross_amount_non_negative CHECK (gross_amount >= 0),
+    CONSTRAINT chk_iof_tax_non_negative CHECK (iof_tax >= 0),
+    CONSTRAINT chk_ir_tax_non_negative CHECK (ir_tax >= 0),
+    CONSTRAINT chk_b3_fee_non_negative CHECK (b3_fee >= 0),
+    CONSTRAINT chk_net_amount_non_negative CHECK (net_amount >= 0)
 );
 
 COMMENT ON TABLE treasury_transactions IS 'Lot-by-lot treasury transactions linked to portfolios';
@@ -62,7 +67,9 @@ CREATE TABLE treasury_prices (
     redemption_price NUMERIC(15, 6) NOT NULL,      -- Preço Resgate from Tesouro API (for redemptions)
     theoretical_price NUMERIC(15, 6),              -- Theoretical curve price
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (asset_id, price_date)
+    UNIQUE (asset_id, price_date),
+    CONSTRAINT chk_selling_price_positive CHECK (selling_price > 0),
+    CONSTRAINT chk_redemption_price_positive CHECK (redemption_price > 0)
 );
 
 COMMENT ON TABLE treasury_prices IS 'Historical daily prices for treasury bonds including MtM and theoretical curve price';
@@ -79,9 +86,8 @@ CREATE TABLE treasury_depletions (
 
 COMMENT ON TABLE treasury_depletions IS 'FIFO depletion links mapping redemptions to subscription lots';
 
--- 6. Indexes for queries & FIFO sorting
+-- 6. Indexes for queries & FIFO sorting (Redundant index idx_treasury_prices_asset_date removed)
 CREATE INDEX idx_treasury_transactions_portfolio_id ON treasury_transactions(portfolio_id);
 CREATE INDEX idx_treasury_transactions_asset_id_date ON treasury_transactions(asset_id, transaction_date);
-CREATE INDEX idx_treasury_prices_asset_date ON treasury_prices(asset_id, price_date);
 CREATE INDEX idx_treasury_depletions_sub_id ON treasury_depletions(subscription_transaction_id);
 CREATE INDEX idx_treasury_depletions_red_id ON treasury_depletions(redemption_transaction_id);
