@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 )
 
@@ -26,6 +27,10 @@ type Service interface {
 	BulkAddTransactions(ctx context.Context, portfolioID string, file multipart.File) (*BulkImportResult, error)
 	GetRawTransactions(ctx context.Context, portfolioID string) ([]Transaction, error)
 	GetAssetsByPortfolio(ctx context.Context, portfolioID string) ([]Asset, error)
+
+	GetTreasuryPositions(ctx context.Context, portfolioID string) ([]TreasuryPosition, error)
+	CreateTreasuryTransaction(ctx context.Context, portfolioID string, req *TreasuryTxRequest) (interface{}, error)
+	GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
 }
 
 type service struct {
@@ -126,16 +131,16 @@ func (s *service) TriggerBackfill(ctx context.Context, indexer string, startDate
 	// Pega até a data atual
 	endDate := time.Now()
 	
-	// Checa se já temos dados recentes para evitar request desnecessário
 	latest, _ := s.repo.GetLatestIndexRate(ctx, indexer)
 	if latest != nil && latest.Date.After(endDate.AddDate(0, 0, -2)) {
 		// Se já temos dado do penultimo dia, e a startDate for mais recente que o histórico?
 		// Vamos puxar do startDate até endDate pra garantir
+		_ = latest
 	}
 
 	rates, err := s.bcbClient.FetchRates(ctx, indexer, startDate, endDate)
 	if err == nil && len(rates) > 0 {
-		s.repo.SaveIndexRates(ctx, rates)
+		_ = s.repo.SaveIndexRates(ctx, rates)
 	}
 }
 
@@ -561,7 +566,7 @@ func (s *service) calculateAssetMonthlyYields(ctx context.Context, asset Asset) 
 			monthlyLastDay[monthStr] = currDate
 
 			if currDate.Weekday() != time.Saturday && currDate.Weekday() != time.Sunday {
-				var dailyFactor float64 = 1.0
+				dailyFactor := 1.0
 				if asset.DebtType == "PRE" || asset.DebtType == "PREFIXADO" {
 					dailyFactor = math.Pow(1+(asset.Rate/100), 1.0/252.0)
 				} else if asset.DebtType == "POS" {
@@ -628,4 +633,352 @@ func (s *service) calculateAssetMonthlyYields(ctx context.Context, asset Asset) 
 	}
 
 	return yields, nil
+}
+
+func countTreasuryBusinessDays(start, end time.Time, holidays map[string]bool) int {
+	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, time.UTC)
+	end = time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, time.UTC)
+	if !start.Before(end) {
+		return 0
+	}
+	businessDays := 0
+	curr := start
+	for curr.Before(end) {
+		curr = curr.AddDate(0, 0, 1)
+		if curr.Weekday() != time.Saturday && curr.Weekday() != time.Sunday {
+			dateStr := curr.Format("2006-01-02")
+			if !holidays[dateStr] {
+				businessDays++
+			}
+		}
+	}
+	return businessDays
+}
+
+func getTreasuryIOFRate(days int) float64 {
+	iofRates := []float64{
+		96, 93, 90, 86, 83, 80, 76, 73, 70, 66, 63, 60, 56, 53, 50, 46, 43, 40, 36, 33, 30, 26, 23, 20, 16, 13, 10, 6, 3, 0,
+	}
+	if days <= 0 {
+		return 96.0
+	}
+	if days >= 30 {
+		return 0.0
+	}
+	return iofRates[days-1]
+}
+
+func getTreasuryIRRate(days int) float64 {
+	if days <= 180 {
+		return 22.5
+	} else if days <= 360 {
+		return 20.0
+	} else if days <= 720 {
+		return 17.5
+	}
+	return 15.0
+}
+
+func (s *service) GetTreasuryPositions(ctx context.Context, portfolioID string) ([]TreasuryPosition, error) {
+	lots, err := s.repo.GetActiveSubscriptionLots(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+
+	holidays, err := s.repo.GetAnbimaHolidays(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	today := time.Now()
+
+	type tempPos struct {
+		p                TreasuryPosition
+		holdingDays      int
+		busDays          int
+		accruedFeeFactor float64
+		grossYield       float64
+	}
+
+	var tempPositions []tempPos
+	var totalSelicGross float64
+
+	for _, l := range lots {
+		ticker, treasuryType, maturityDate, hasCoupons, err := s.repo.GetTreasuryAssetDetails(ctx, l.AssetID)
+		if err != nil {
+			return nil, err
+		}
+
+		var p TreasuryPosition
+		p.AssetID = l.AssetID
+		p.Ticker = ticker
+		p.TreasuryType = treasuryType
+		p.MaturityDate = maturityDate
+		p.HasCoupons = hasCoupons
+		p.StartDate = l.TransactionDate
+		p.TotalInvested = l.RemainingQuantity * l.UnitPrice
+
+		holdingDays := int(today.Sub(l.TransactionDate).Hours() / 24)
+		busDays := countTreasuryBusinessDays(l.TransactionDate, today, holidays)
+
+		dailyRate := math.Pow(1.0+l.ContractedRate/100.0, 1.0/252.0) - 1.0
+		factor := math.Pow(1.0+dailyRate, float64(busDays))
+		p.GrossValue = p.TotalInvested * factor
+
+		grossYield := p.GrossValue - p.TotalInvested
+		if grossYield < 0 {
+			grossYield = 0
+		}
+
+		if p.TreasuryType == "SELIC" {
+			totalSelicGross += p.GrossValue
+		}
+
+		dailyB3Rate := math.Pow(1.0+0.0020, 1.0/252.0) - 1.0
+		accruedFeeFactor := math.Pow(1.0+dailyB3Rate, float64(busDays)) - 1.0
+
+		tempPositions = append(tempPositions, tempPos{
+			p:                p,
+			holdingDays:      holdingDays,
+			busDays:          busDays,
+			accruedFeeFactor: accruedFeeFactor,
+			grossYield:       grossYield,
+		})
+	}
+
+	var positions []TreasuryPosition
+	for _, tp := range tempPositions {
+		p := tp.p
+
+		if p.TreasuryType == "SELIC" {
+			if totalSelicGross > 10000.00 {
+				p.B3Fee = p.GrossValue * ((totalSelicGross - 10000.00) / totalSelicGross) * tp.accruedFeeFactor
+			} else {
+				p.B3Fee = 0.0
+			}
+		} else {
+			p.B3Fee = p.GrossValue * tp.accruedFeeFactor
+		}
+
+		p.IOFTax = tp.grossYield * (getTreasuryIOFRate(tp.holdingDays) / 100.0)
+		p.IRTax = (tp.grossYield - p.IOFTax) * (getTreasuryIRRate(tp.holdingDays) / 100.0)
+		if p.IRTax < 0 {
+			p.IRTax = 0
+		}
+
+		p.Taxes = p.IOFTax + p.IRTax
+		p.NetValue = p.GrossValue - p.Taxes - p.B3Fee
+		p.IsMatured = today.After(p.MaturityDate) || today.Equal(p.MaturityDate)
+		p.DaysToMaturity = int(p.MaturityDate.Sub(today).Hours() / 24)
+		if p.DaysToMaturity < 0 {
+			p.DaysToMaturity = 0
+		}
+
+		positions = append(positions, p)
+	}
+
+	if positions == nil {
+		positions = []TreasuryPosition{}
+	}
+	return positions, nil
+}
+
+func (s *service) CreateTreasuryTransaction(ctx context.Context, portfolioID string, req *TreasuryTxRequest) (interface{}, error) {
+	maturityDate, err := time.Parse("2006-01-02", req.MaturityDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid maturity date: %w", err)
+	}
+	transactionDate, err := time.Parse("2006-01-02", req.TransactionDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid transaction date: %w", err)
+	}
+
+	var assetID string
+	err = s.repo.ExecuteInTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		assetID, err = s.repo.GetTreasuryAssetByTicker(ctx, tx, req.Ticker)
+		if err == pgx.ErrNoRows {
+			assetID, err = s.repo.CreateTreasuryAsset(ctx, tx, req.Ticker, req.Ticker, req.TreasuryType, maturityDate, req.HasCoupons)
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Type == "SUBSCRIPTION" {
+		var txID string
+		err = s.repo.ExecuteInTx(ctx, func(tx pgx.Tx) error {
+			var err error
+			txID, err = s.repo.CreateTreasurySubscription(ctx, tx, portfolioID, assetID, req.Quantity, req.UnitPrice, req.ContractedRate, transactionDate)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"id": txID, "status": "subscribed"}, nil
+	}
+
+	if req.Type == "REDEMPTION" {
+		var result map[string]interface{}
+		err = s.repo.ExecuteInTx(ctx, func(tx pgx.Tx) error {
+			lots, err := s.repo.GetActiveLotsForAsset(ctx, tx, portfolioID, assetID)
+			if err != nil {
+				return err
+			}
+
+			holidays, err := s.repo.GetAnbimaHolidays(ctx)
+			if err != nil {
+				return err
+			}
+
+			selicRates, err := s.repo.GetSelicRates(ctx)
+			if err != nil {
+				return err
+			}
+
+			totalSelicInvested, err := s.repo.GetTotalSelicInvested(ctx, tx, portfolioID)
+			if err != nil {
+				return err
+			}
+
+			remainingToRedeem := req.Quantity
+			var totalGross, totalIOF, totalIR, totalB3, totalNet float64
+
+			redemptionTxID, err := s.repo.CreateTreasuryRedemptionPlaceholder(ctx, tx, portfolioID, assetID, req.Quantity, req.UnitPrice, req.ContractedRate, transactionDate)
+			if err != nil {
+				return err
+			}
+
+			for _, l := range lots {
+				if remainingToRedeem <= 0 {
+					break
+				}
+				depleteQty := l.RemainingQuantity
+				if depleteQty > remainingToRedeem {
+					depleteQty = remainingToRedeem
+				}
+
+				holdingDays := int(transactionDate.Sub(l.TransactionDate).Hours() / 24)
+				busDays := countTreasuryBusinessDays(l.TransactionDate, transactionDate, holidays)
+
+				var valAtRedemption float64
+				if req.TreasuryType == "SELIC" {
+					factor := 1.0
+					currDate := l.TransactionDate
+					for currDate.Before(transactionDate) {
+						currDate = currDate.AddDate(0, 0, 1)
+						if currDate.Weekday() != time.Saturday && currDate.Weekday() != time.Sunday && !holidays[currDate.Format("2006-01-02")] {
+							rate := 10.75
+							if rVal, exists := selicRates[currDate.Format("2006-01-02")]; exists {
+								rate = rVal
+							}
+							dailyRate := math.Pow(1.0+rate/100.0, 1.0/252.0) - 1.0
+							dailySpread := math.Pow(1.0+l.ContractedRate/100.0, 1.0/252.0) - 1.0
+							factor *= (1.0 + dailyRate + dailySpread)
+						}
+					}
+					valAtRedemption = depleteQty * l.UnitPrice * factor
+				} else {
+					rate := l.ContractedRate
+					dailyRate := math.Pow(1.0+rate/100.0, 1.0/252.0) - 1.0
+					factor := math.Pow(1.0+dailyRate, float64(busDays))
+					valAtRedemption = depleteQty * l.UnitPrice * factor
+				}
+
+				costBasis := depleteQty * l.UnitPrice
+				grossYield := valAtRedemption - costBasis
+				if grossYield < 0 {
+					grossYield = 0
+				}
+
+				var b3Fee float64
+				dailyB3Rate := math.Pow(1.0+0.0020, 1.0/252.0) - 1.0
+
+				if req.TreasuryType == "SELIC" {
+					exemptFraction := 1.0
+					if totalSelicInvested > 10000.0 {
+						exemptFraction = 10000.0 / totalSelicInvested
+					}
+					if exemptFraction > 1.0 {
+						exemptFraction = 1.0
+					}
+					taxablePortion := 1.0 - exemptFraction
+					accruedFeeFactor := math.Pow(1.0+dailyB3Rate*taxablePortion, float64(busDays)) - 1.0
+					b3Fee = valAtRedemption * accruedFeeFactor
+				} else {
+					accruedFeeFactor := math.Pow(1.0+dailyB3Rate, float64(busDays)) - 1.0
+					b3Fee = valAtRedemption * accruedFeeFactor
+				}
+
+				iofRate := getTreasuryIOFRate(holdingDays)
+				iofTax := grossYield * (iofRate / 100.0)
+
+				irRate := getTreasuryIRRate(holdingDays)
+				irTax := (grossYield - iofTax) * (irRate / 100.0)
+				if irTax < 0 {
+					irTax = 0
+				}
+
+				netYield := grossYield - iofTax - irTax - b3Fee
+				netVal := costBasis + netYield
+
+				totalGross += valAtRedemption
+				totalIOF += iofTax
+				totalIR += irTax
+				totalB3 += b3Fee
+				totalNet += netVal
+
+				newRemaining := l.RemainingQuantity - depleteQty
+				err = s.repo.UpdateLotRemainingQuantity(ctx, tx, l.ID, newRemaining)
+				if err != nil {
+					return err
+				}
+
+				err = s.repo.CreateDepletionLink(ctx, tx, l.ID, redemptionTxID, depleteQty)
+				if err != nil {
+					return err
+				}
+
+				remainingToRedeem -= depleteQty
+			}
+
+			err = s.repo.UpdateRedemptionFinancials(ctx, tx, redemptionTxID, totalGross, totalIOF, totalIR, totalB3, totalNet)
+			if err != nil {
+				return err
+			}
+
+			result = map[string]interface{}{
+				"id":           redemptionTxID,
+				"gross_amount": totalGross,
+				"iof_tax":      totalIOF,
+				"ir_tax":       totalIR,
+				"b3_fee":       totalB3,
+				"net_amount":   totalNet,
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("invalid transaction type: %s", req.Type)
+}
+
+func (s *service) GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error) {
+	points, err := s.repo.GetTreasuryPerformancePoints(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	if points == nil {
+		points = []TreasuryPerfPoint{}
+	}
+	return points, nil
 }

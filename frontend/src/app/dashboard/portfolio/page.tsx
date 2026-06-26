@@ -15,6 +15,7 @@ import TransactionHistory from '@/components/portfolio/TransactionHistory';
 import DividendsHistory from '@/components/portfolio/DividendsHistory';
 import DailyReport from '@/components/portfolio/DailyReport';
 import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
+import TreasuryTab from '@/components/portfolio/TreasuryTab';
 import Modals from '@/components/portfolio/Modals';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -37,7 +38,7 @@ export default function PortfolioPage() {
   const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
   const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
   const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'diario' | 'renda-fixa'>('ativos');
+  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'diario' | 'renda-fixa' | 'tesouro'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
@@ -575,6 +576,9 @@ export default function PortfolioPage() {
             <button onClick={() => setActiveTab('diario')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'diario' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'diario' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'diario' ? 700 : 500, fontSize: '0.9rem' }}>
               📈 Resumo Diário
             </button>
+            <button onClick={() => setActiveTab('tesouro')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'tesouro' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'tesouro' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'tesouro' ? 700 : 500, fontSize: '0.9rem' }}>
+              🏛️ Tesouro Direto
+            </button>
           </div>
 
           {activeTab === 'ativos' && (
@@ -644,6 +648,10 @@ export default function PortfolioPage() {
 
           {activeTab === 'renda-fixa' && (
             <FixedIncomeTab portfolioId={activePortfolioId} onLaunchOperation={() => setShowFIModal(true)} />
+          )}
+
+          {activeTab === 'tesouro' && (
+            <TreasuryTab portfolioId={activePortfolioId} />
           )}
         </div>
       )}
