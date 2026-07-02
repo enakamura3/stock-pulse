@@ -639,7 +639,7 @@ export default function PortfolioPage() {
           )}
 
           {activeTab === 'proventos' && (
-            <DividendsHistory dividends={filteredDividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
+            <DividendsHistory dividends={filteredDividends} allDividends={dividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
           )}
 
           {activeTab === 'diario' && (
