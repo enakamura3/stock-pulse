@@ -38,9 +38,11 @@ export default function DividendsMatrix({ data }: DividendsMatrixProps) {
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
   return (
-    <div className="card mb-xl">
-      <h3 className="card-title mb-md">📅 Matriz de Proventos (Ano x Mês)</h3>
-      <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px' }}>
+    <div className="mb-xl">
+      <div className="flex-row justify-between items-center mb-md">
+        <h4 className="font-bold text-secondary">📅 Matriz de Proventos (Ano x Mês)</h4>
+      </div>
+      <div style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflow: 'hidden' }}>
         <table className="data-table">
           <thead>
             <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
