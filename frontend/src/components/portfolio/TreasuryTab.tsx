@@ -273,14 +273,6 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
             <h3 className="card-title">📊 Evolução do Tesouro Direto</h3>
             <p className="text-xs text-secondary mt-sm">Marcação a Mercado (Preço de Resgate)</p>
           </div>
-          <button
-            id="treasury-add-btn"
-            onClick={openModal}
-            className="btn-primary"
-            style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
-          >
-            + Registrar Operação
-          </button>
         </div>
 
         {isLoadingPerf ? (
@@ -302,12 +294,22 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
       </div>
 
       {/* ── Positions Table ── */}
-      <div className="card flex-col" style={{ padding: '1.75rem 2rem' }}>
+      <div className="card flex-col gap-md" style={{ flex: '2 1 600px', minHeight: '380px' }}>
         <div className="flex-row justify-between items-center mb-lg">
-          <h3 className="card-title">📋 Posições Ativas</h3>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            {positions.length} título{positions.length !== 1 ? 's' : ''}
-          </span>
+          <div>
+            <h3 className="card-title">📋 Posições Ativas</h3>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              {positions.length} título{positions.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <button
+            id="treasury-add-btn"
+            onClick={openModal}
+            className="primary-button"
+            style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+          >
+            + Nova Aplicação
+          </button>
         </div>
 
         {isLoading ? (
@@ -329,13 +331,21 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
             </button>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <div className="table-container flex-col" style={{ flex: 1 }}>
+            <table className="data-table" style={{ width: '100%' }}>
               <thead>
-                <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--panel-border)' }}>
-                  {['Título', 'Tipo', 'Vencimento', 'Aplicado', 'Bruto', 'Líquido', 'Retorno Líq.', 'IOF', 'IR', 'Taxa B3', 'Status'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '0.5rem 0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                <tr>
+                  <th>Título</th>
+                  <th>Tipo</th>
+                  <th className="text-right">Vencimento</th>
+                  <th className="text-right">Aplicado</th>
+                  <th className="text-right">Bruto</th>
+                  <th className="text-right">Líquido</th>
+                  <th className="text-right">Retorno Líq.</th>
+                  <th className="text-right">IOF</th>
+                  <th className="text-right">IR</th>
+                  <th className="text-right">Taxa B3</th>
+                  <th className="text-center">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -345,16 +355,8 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
                     : 0;
                   const isPositive = liqReturn >= 0;
                   return (
-                    <tr
-                      key={pos.asset_id}
-                      style={{
-                        borderBottom: i < positions.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <tr key={pos.asset_id}>
+                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                         {pos.ticker}
                         {pos.has_coupons && (
                           <span
@@ -365,7 +367,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
+                      <td>
                         <span style={{
                           padding: '0.2rem 0.55rem',
                           borderRadius: '12px',
@@ -378,23 +380,23 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
                           {pos.treasury_type}
                         </span>
                       </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>
+                      <td className="text-right" style={{ color: 'var(--text-secondary)' }}>
                         {pos.is_matured
                           ? <span style={{ color: '#f44336', fontWeight: 600 }}>Vencido</span>
                           : `${new Date(pos.maturity_date).toLocaleDateString('pt-BR')} (${pos.days_to_maturity}d)`}
                       </td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>{fmt(pos.total_invested)}</td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>{fmt(pos.gross_value)}</td>
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: pos.net_value >= pos.total_invested ? '#4caf50' : '#f44336' }}>
+                      <td className="text-right" style={{ fontFamily: 'monospace' }}>{fmt(pos.total_invested)}</td>
+                      <td className="text-right" style={{ fontFamily: 'monospace' }}>{fmt(pos.gross_value)}</td>
+                      <td className="text-right font-semibold" style={{ fontFamily: 'monospace', color: pos.net_value >= pos.total_invested ? '#4caf50' : '#f44336' }}>
                         {fmt(pos.net_value)}
                       </td>
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: isPositive ? '#4caf50' : '#f44336' }}>
+                      <td className="text-right font-semibold" style={{ fontFamily: 'monospace', color: isPositive ? '#4caf50' : '#f44336' }}>
                         {fmtPct(liqReturn)}
                       </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>{fmt(pos.iof_tax)}</td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>{fmt(pos.ir_tax)}</td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>{fmt(pos.b3_fee)}</td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
+                      <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{fmt(pos.iof_tax)}</td>
+                      <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{fmt(pos.ir_tax)}</td>
+                      <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{fmt(pos.b3_fee)}</td>
+                      <td className="text-center">
                         {pos.is_matured ? (
                           <span style={{ color: '#f44336', fontSize: '0.7rem', fontWeight: 700 }}>● Vencido</span>
                         ) : (
