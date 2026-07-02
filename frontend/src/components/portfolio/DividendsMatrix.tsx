@@ -40,34 +40,34 @@ export default function DividendsMatrix({ data }: DividendsMatrixProps) {
   return (
     <div className="card mb-xl">
       <h3 className="card-title mb-md">📅 Matriz de Proventos (Ano x Mês)</h3>
-      <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflowX: 'auto' }}>
-        <table className="data-table" style={{ width: '100%', minWidth: '800px' }}>
+      <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px' }}>
+        <table className="data-table">
           <thead>
             <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-              <th className="text-center font-bold" style={{ width: '80px', borderRight: '1px solid var(--panel-border)' }}>Ano</th>
+              <th className="text-center">Ano</th>
               {months.map(m => (
-                <th key={m} className="text-right text-secondary">{m}</th>
+                <th key={m} className="text-right">{m}</th>
               ))}
-              <th className="text-right font-bold" style={{ color: '#00e676', borderLeft: '1px solid var(--panel-border)' }}>Total</th>
+              <th className="text-right">Total</th>
             </tr>
           </thead>
           <tbody>
             {years.map(year => (
-              <tr key={year} className="hover:bg-slate-800/50 transition-colors">
-                <td className="text-center font-bold text-secondary" style={{ background: 'rgba(255,255,255,0.01)', borderRight: '1px solid var(--panel-border)' }}>{year}</td>
+              <tr key={year}>
+                <td className="text-center font-bold">{year}</td>
                 {months.map((m, idx) => {
                   const val = matrix[year][idx];
                   return (
-                    <td key={idx} className="text-right text-sm">
+                    <td key={idx} className="text-right text-xs">
                       {val > 0 ? (
-                        <span style={{ color: '#e2e8f0' }}>{formatMoney(val, 'BRL')}</span>
+                        formatMoney(val, 'BRL')
                       ) : (
-                        <span style={{ color: 'rgba(255,255,255,0.15)' }}>-</span>
+                        <span style={{ opacity: 0.3 }}>-</span>
                       )}
                     </td>
                   );
                 })}
-                <td className="text-right font-bold" style={{ color: '#00e676', background: 'rgba(255,255,255,0.01)', borderLeft: '1px solid var(--panel-border)' }}>
+                <td className="text-right text-xs font-bold text-success">
                   {formatMoney(matrix[year][12], 'BRL')}
                 </td>
               </tr>
