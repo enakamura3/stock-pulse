@@ -32,7 +32,7 @@ export default function DividendsHistory({
   };
 
   const formatType = (div: CalculatedDividend) => {
-    if (div.is_accrued) return 'Juros Acumulados';
+    if (div.is_accrued) return 'Juros';
     if (!div.type) return 'Dividendo';
     const lower = div.type.toLowerCase();
     if (lower.includes('jcp')) return 'JCP';
@@ -189,12 +189,12 @@ export default function DividendsHistory({
                         <td className="text-center text-secondary text-xs">{div.is_accrued ? 'Renda Fixa' : getAssetCategory(div.asset_type)}</td>
                         <td className="text-center">
                           <span className="badge" style={{
-                            backgroundColor: div.is_accrued ? 'rgba(255, 179, 0, 0.15)' :
+                            backgroundColor: div.is_accrued ? 'rgba(0, 188, 212, 0.15)' :
                                             typeStr === 'JCP' ? 'rgba(255, 152, 0, 0.15)' :
                                             typeStr === 'Rendimento' ? 'rgba(156, 39, 176, 0.15)' :
                                             typeStr === 'Amortização' ? 'rgba(244, 67, 54, 0.15)' :
                                             'rgba(33, 150, 243, 0.15)',
-                            color: div.is_accrued ? '#FFB300' :
+                            color: div.is_accrued ? '#00bcd4' :
                                    typeStr === 'JCP' ? '#ff9800' :
                                    typeStr === 'Rendimento' ? '#e040fb' :
                                    typeStr === 'Amortização' ? '#ff5252' :
