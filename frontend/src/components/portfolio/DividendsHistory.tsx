@@ -54,7 +54,7 @@ export default function DividendsHistory({
     dividends.forEach(d => {
       const paid = isPaid(d);
       const amt = d.net_amount;
-      const typeStr = formatType(d);
+      const groupStr = d.is_accrued ? 'Renda Fixa' : getAssetCategory(d.asset_type);
 
       if (paid) s.totalPaid += amt; else s.totalPending += amt;
       
@@ -64,8 +64,8 @@ export default function DividendsHistory({
         if (paid) s.rvPaid += amt; else s.rvPending += amt;
       }
 
-      if (s.types[typeStr]) s.types[typeStr] += amt;
-      else s.types[typeStr] = amt;
+      if (s.types[groupStr]) s.types[groupStr] += amt;
+      else s.types[groupStr] = amt;
     });
 
     return s;
