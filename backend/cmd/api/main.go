@@ -150,10 +150,19 @@ func main() {
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	workerManager := worker.NewManager()
-	workerManager.Register(worker.NewWorker("DividendWorker", 24*time.Hour, dividendWorker.SyncAllDividends))
-	workerManager.Register(worker.NewWorker("DailyWorker", 24*time.Hour, portfolioWorker.Run))
-	workerManager.Register(worker.NewWorker("FixedIncomeWorker", 24*time.Hour, fiWorker.SyncRates))
-	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", 24*time.Hour, fiAnbimaWorker.SyncHolidays))
+	getInterval := func(envKey string, defaultInterval time.Duration) time.Duration {
+		if val := os.Getenv(envKey); val != "" {
+			if d, err := time.ParseDuration(val); err == nil {
+				return d
+			}
+		}
+		return defaultInterval
+	}
+
+	workerManager.Register(worker.NewWorker("DividendWorker", getInterval("DIVIDEND_WORKER_INTERVAL", 6*time.Hour), dividendWorker.SyncAllDividends))
+	workerManager.Register(worker.NewWorker("DailyWorker", getInterval("DAILY_WORKER_INTERVAL", 6*time.Hour), portfolioWorker.Run))
+	workerManager.Register(worker.NewWorker("FixedIncomeWorker", getInterval("FI_WORKER_INTERVAL", 6*time.Hour), fiWorker.SyncRates))
+	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", getInterval("ANBIMA_WORKER_INTERVAL", 6*time.Hour), fiAnbimaWorker.SyncHolidays))
 	workerManager.Register(worker.NewWorker("AlertWorker", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
 	
 	workerManager.StartAll(workerCtx)
