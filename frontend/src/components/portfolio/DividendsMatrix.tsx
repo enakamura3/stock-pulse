@@ -42,7 +42,7 @@ export default function DividendsMatrix({ data }: DividendsMatrixProps) {
       <div className="flex-row justify-between items-center mb-md">
         <h4 className="font-bold text-secondary">📅 Matriz de Proventos (Ano x Mês)</h4>
       </div>
-      <div style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflow: 'hidden' }}>
+      <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflowX: 'auto', overflowY: 'hidden' }}>
         <table className="data-table">
           <thead>
             <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
