@@ -32,7 +32,7 @@ export default function DividendsHistory({
   };
 
   const formatType = (div: CalculatedDividend) => {
-    if (div.is_accrued) return 'Rendimento';
+    if (div.is_accrued) return 'Rendimento (RF)';
     if (!div.type) return 'Dividendo';
     const lower = div.type.toLowerCase();
     if (lower.includes('jcp')) return 'JCP';
@@ -200,7 +200,7 @@ export default function DividendsHistory({
                                    typeStr === 'Amortização' ? '#ff5252' :
                                    '#64b5f6'
                           }}>
-                            {typeStr}
+                            {typeStr === 'Rendimento (RF)' ? 'Rendimento' : typeStr}
                           </span>
                         </td>
                         <td className="text-center text-secondary text-xs">{new Date(div.ex_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
