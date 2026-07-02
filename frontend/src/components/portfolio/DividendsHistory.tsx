@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 
 const DividendsChart = dynamic(() => import('@/components/DividendsChart'), { ssr: false });
 const DividendsYearlyChart = dynamic(() => import('@/components/DividendsYearlyChart'), { ssr: false });
+const DividendsMatrix = dynamic(() => import('./DividendsMatrix'), { ssr: false });
 
 interface DividendsHistoryProps {
   dividends: CalculatedDividend[];
@@ -155,6 +156,8 @@ export default function DividendsHistory({
               </div>
             </div>
             
+            <DividendsMatrix data={allDividends.length > 0 ? allDividends : dividends} />
+
             {/* Table */}
             <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px' }}>
               <table className="data-table">
