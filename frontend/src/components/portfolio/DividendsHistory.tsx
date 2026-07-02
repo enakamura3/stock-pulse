@@ -165,7 +165,7 @@ export default function DividendsHistory({
                   <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <th className="text-center">Status</th>
                     <th className="text-center">Ativo</th>
-                    <th className="text-center">Papel</th>
+                    <th className="text-center">Categoria</th>
                     <th className="text-center">Tipo</th>
                     <th className="text-center">Data Com</th>
                     <th className="text-center">Pagamento</th>
