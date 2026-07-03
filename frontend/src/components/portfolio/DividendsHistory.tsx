@@ -205,7 +205,7 @@ export default function DividendsHistory({
                         </td>
                         <td className="text-center text-secondary num-col">{new Date(div.ex_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
                         <td className="text-center text-secondary num-col">{(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
-                        <td className="text-center font-semibold num-col">{div.is_accrued ? '--' : div.quantity}</td>
+                        <td className="text-center font-semibold num-col">{div.is_accrued ? '--' : Number(div.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}</td>
                         <td className="text-right font-semibold num-col">{div.is_accrued ? '--' : formatMoney(div.per_share_amount, div.currency)}</td>
                         <td className="text-right num-col">
                           {formatMoney(div.gross_amount, div.currency)}
