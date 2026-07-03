@@ -53,7 +53,7 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
         }
       `}</style>
       <div className="flex-row justify-between items-center mb-md">
-        <h4 className="font-bold text-secondary">📅 Matriz de Proventos (Ano x Mês)</h4>
+        <h4 className="font-bold text-secondary">📅 Mapa de Proventos (Mensal e Anual)</h4>
       </div>
       <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflowX: 'auto', overflowY: 'hidden' }}>
         <table className="data-table matrix-table">
