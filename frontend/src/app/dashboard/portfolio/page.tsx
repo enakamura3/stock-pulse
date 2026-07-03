@@ -660,7 +660,7 @@ export default function PortfolioPage() {
           )}
 
           {activeTab === 'diario' && (
-            <DailyReport positions={filteredPositions} />
+            <DailyReport positions={filteredPositions} kpiCurrency={kpiCurrency} />
           )}
 
           {activeTab === 'renda-fixa' && (
