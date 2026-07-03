@@ -3,8 +3,6 @@ import { CalculatedDividend } from './types';
 import { getAssetCategory, formatMoney } from './helpers';
 import dynamic from 'next/dynamic';
 
-const DividendsChart = dynamic(() => import('@/components/DividendsChart'), { ssr: false });
-const DividendsYearlyChart = dynamic(() => import('@/components/DividendsYearlyChart'), { ssr: false });
 const DividendsMatrix = dynamic(() => import('./DividendsMatrix'), { ssr: false });
 
 interface DividendsHistoryProps {
@@ -142,20 +140,6 @@ export default function DividendsHistory({
               ))}
             </div>
 
-            {/* Charts Area */}
-            <div className="flex-row gap-md mb-xl flex-wrap" style={{ height: '350px' }}>
-              <div style={{ flex: 2, height: '100%', minWidth: '400px', display: 'flex', flexDirection: 'column' }}>
-                <div className="text-sm font-bold text-secondary mb-sm">Evolução Mensal</div>
-                <DividendsChart data={dividends} />
-              </div>
-              
-              {/* Yearly Chart (uses allDividends) */}
-              <div style={{ flex: 1, height: '100%', minWidth: '300px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '1rem' }}>
-                <div className="text-sm font-bold text-secondary mb-sm">Consolidado Anual</div>
-                <DividendsYearlyChart data={allDividends.length > 0 ? allDividends : dividends} />
-              </div>
-            </div>
-            
             <DividendsMatrix 
               data={allDividends.length > 0 ? allDividends : dividends} 
               onYearClick={(y) => { setFilterDivYear(y); setFilterDivMonth('Todos'); }}
