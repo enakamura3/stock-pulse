@@ -105,7 +105,7 @@ export default function DividendsHistory({
             {/* Main KPIs */}
             <div className="flex-row gap-md mb-md flex-wrap">
               <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
-                <div className="text-secondary text-xs mb-xs font-bold">Proventos RV (Caixa Livre)</div>
+                <div className="text-secondary text-xs mb-xs font-bold">Proventos (Renda Variável)</div>
                 <div className="font-bold text-2xl" style={{ color: '#00e676' }}>{formatMoney(stats.rvPaid + stats.rvPending, 'BRL')}</div>
                 <div className="text-xs text-secondary mt-xs" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Pago: {formatMoney(stats.rvPaid, 'BRL')}</span>
@@ -113,7 +113,7 @@ export default function DividendsHistory({
                 </div>
               </div>
               <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
-                <div className="text-secondary text-xs mb-xs font-bold">Rendimento RF (Juros Retidos)</div>
+                <div className="text-secondary text-xs mb-xs font-bold">Juros Acumulados (Renda Fixa)</div>
                 <div className="font-bold text-2xl" style={{ color: '#FFB300' }}>{formatMoney(stats.rfPaid + stats.rfPending, 'BRL')}</div>
                 <div className="text-xs text-secondary mt-xs" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Pago: {formatMoney(stats.rfPaid, 'BRL')}</span>
@@ -121,7 +121,7 @@ export default function DividendsHistory({
                 </div>
               </div>
               <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
-                <div className="text-secondary text-xs mb-xs font-bold">Geração de Valor Total</div>
+                <div className="text-secondary text-xs mb-xs font-bold">Total Consolidado</div>
                 <div className="font-bold text-2xl" style={{ color: '#fff' }}>{formatMoney(stats.totalPaid + stats.totalPending, 'BRL')}</div>
                 <div className="text-xs text-secondary mt-xs" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'rgba(0, 230, 118, 0.8)' }}>Pago: {formatMoney(stats.totalPaid, 'BRL')}</span>
