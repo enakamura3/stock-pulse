@@ -4,9 +4,13 @@ import { formatMoney } from './helpers';
 
 interface DividendsMatrixProps {
   data: CalculatedDividend[];
+  onYearClick?: (year: string) => void;
+  onMonthClick?: (year: string, month: string) => void;
+  activeYear?: string;
+  activeMonth?: string;
 }
 
-export default function DividendsMatrix({ data }: DividendsMatrixProps) {
+export default function DividendsMatrix({ data, onYearClick, onMonthClick, activeYear, activeMonth }: DividendsMatrixProps) {
   const { matrix, years } = useMemo(() => {
     // Record<Year, Array of 12 months + 1 for Total>
     const grouped: Record<string, number[]> = {};
@@ -42,6 +46,10 @@ export default function DividendsMatrix({ data }: DividendsMatrixProps) {
       <style>{`
         .matrix-table th, .matrix-table td {
           padding: 0.5rem 0.25rem !important;
+          transition: background-color 0.2s ease;
+        }
+        .matrix-cell-clickable:hover {
+          background-color: rgba(255,255,255,0.08) !important;
         }
       `}</style>
       <div className="flex-row justify-between items-center mb-md">
@@ -61,11 +69,34 @@ export default function DividendsMatrix({ data }: DividendsMatrixProps) {
           <tbody>
             {years.map(year => (
               <tr key={year}>
-                <td className="text-center font-bold">{year}</td>
+                <td 
+                  className="text-center font-bold matrix-cell-clickable" 
+                  style={{ 
+                    cursor: 'pointer', 
+                    color: activeYear === year && activeMonth === 'Todos' ? '#00e676' : 'inherit',
+                    background: activeYear === year && activeMonth === 'Todos' ? 'rgba(0, 230, 118, 0.05)' : 'transparent'
+                  }}
+                  onClick={() => onYearClick && onYearClick(year)}
+                  title={`Filtrar apenas o ano de ${year}`}
+                >
+                  {year}
+                </td>
                 {months.map((m, idx) => {
                   const val = matrix[year][idx];
+                  const monthStr = String(idx + 1).padStart(2, '0');
+                  const isActive = activeYear === year && activeMonth === monthStr;
                   return (
-                    <td key={idx} className="text-right text-xs">
+                    <td 
+                      key={idx} 
+                      className={`text-right text-xs ${val > 0 ? 'matrix-cell-clickable' : ''}`}
+                      style={{ 
+                        cursor: val > 0 ? 'pointer' : 'default',
+                        background: isActive ? 'rgba(0, 230, 118, 0.1)' : 'transparent',
+                        color: isActive ? '#00e676' : 'inherit'
+                      }}
+                      onClick={() => val > 0 && onMonthClick && onMonthClick(year, monthStr)}
+                      title={val > 0 ? `Filtrar ${m}/${year}` : undefined}
+                    >
                       {val > 0 ? (
                         formatMoney(val, 'BRL')
                       ) : (
