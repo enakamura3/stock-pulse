@@ -491,11 +491,15 @@ export default function PortfolioPage() {
 
   const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || getAssetCategory(pos.type) === activeCategoryFilter);
   const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter || (activeCategoryFilter === 'Renda Fixa' && tx.module === 'RF'));
-  const filteredDividends = dividends.filter(div => {
+  const categoryFilteredDividends = dividends.filter(div => {
     if (activeCategoryFilter !== 'Todas') {
       if (activeCategoryFilter === 'Renda Fixa' && !div.is_accrued) return false;
       if (activeCategoryFilter !== 'Renda Fixa' && (div.is_accrued || getAssetCategory(div.asset_type) !== activeCategoryFilter)) return false;
     }
+    return true;
+  });
+
+  const filteredDividends = categoryFilteredDividends.filter(div => {
     const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
     if (!dateStr) return true;
     const year = dateStr.substring(0, 4);
@@ -503,7 +507,7 @@ export default function PortfolioPage() {
     return (filterDivYear === 'Todos' || year === filterDivYear) && (filterDivMonth === 'Todos' || month === filterDivMonth);
   });
 
-  const availableYears = Array.from(new Set(dividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.ex_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  const availableYears = Array.from(new Set(categoryFilteredDividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.ex_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
 
   // Se a categoria for Renda Fixa ou Todas, precisamos somar a renda fixa
   const includeFI = activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Fixa';
@@ -639,7 +643,7 @@ export default function PortfolioPage() {
           )}
 
           {activeTab === 'proventos' && (
-            <DividendsHistory dividends={filteredDividends} allDividends={dividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
+            <DividendsHistory dividends={filteredDividends} allDividends={categoryFilteredDividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
           )}
 
           {activeTab === 'diario' && (
