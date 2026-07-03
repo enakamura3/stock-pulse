@@ -76,8 +76,8 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                     color: activeYear === year && activeMonth === 'Todos' ? '#00e676' : 'inherit',
                     background: activeYear === year && activeMonth === 'Todos' ? 'rgba(0, 230, 118, 0.05)' : 'transparent'
                   }}
-                  onClick={() => onYearClick && onYearClick(year)}
-                  title={`Filtrar apenas o ano de ${year}`}
+                  onClick={() => onYearClick && onYearClick(activeYear === year && activeMonth === 'Todos' ? 'Todos' : year)}
+                  title={activeYear === year && activeMonth === 'Todos' ? 'Remover filtro de ano' : `Filtrar apenas o ano de ${year}`}
                 >
                   {year}
                 </td>
@@ -94,8 +94,8 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                         background: isActive ? 'rgba(0, 230, 118, 0.1)' : 'transparent',
                         color: isActive ? '#00e676' : 'inherit'
                       }}
-                      onClick={() => val > 0 && onMonthClick && onMonthClick(year, monthStr)}
-                      title={val > 0 ? `Filtrar ${m}/${year}` : undefined}
+                      onClick={() => val > 0 && onMonthClick && onMonthClick(isActive ? 'Todos' : year, isActive ? 'Todos' : monthStr)}
+                      title={val > 0 ? (isActive ? 'Remover filtro' : `Filtrar ${m}/${year}`) : undefined}
                     >
                       {val > 0 ? (
                         formatMoney(val, 'BRL')
