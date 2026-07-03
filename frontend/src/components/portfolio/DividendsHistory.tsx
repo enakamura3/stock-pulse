@@ -156,7 +156,13 @@ export default function DividendsHistory({
               </div>
             </div>
             
-            <DividendsMatrix data={allDividends.length > 0 ? allDividends : dividends} />
+            <DividendsMatrix 
+              data={allDividends.length > 0 ? allDividends : dividends} 
+              onYearClick={(y) => { setFilterDivYear(y); setFilterDivMonth('Todos'); }}
+              onMonthClick={(y, m) => { setFilterDivYear(y); setFilterDivMonth(m); }}
+              activeYear={filterDivYear}
+              activeMonth={filterDivMonth}
+            />
 
             {/* Table */}
             <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px' }}>
