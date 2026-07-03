@@ -98,7 +98,7 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                       title={val > 0 ? (isActive ? 'Remover filtro' : `Filtrar ${m}/${year}`) : undefined}
                     >
                       {val > 0 ? (
-                        formatMoney(val, 'BRL')
+                        val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       ) : (
                         <span style={{ opacity: 0.3 }}>-</span>
                       )}
@@ -106,7 +106,7 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                   );
                 })}
                 <td className="text-right text-xs font-bold text-success">
-                  {formatMoney(matrix[year][12], 'BRL')}
+                  {matrix[year][12].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>
             ))}
