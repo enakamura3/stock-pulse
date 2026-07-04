@@ -231,12 +231,26 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
         credentials: 'include',
       });
       if (res.ok) {
-        const data = await res.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const data: NewTreasuryTx[] = await res.json();
+        if (!data || data.length === 0) {
+          alert('Não há operações para exportar.');
+          return;
+        }
+
+        const headers = Object.keys(data[0]).join(',');
+        const rows = data.map(op => {
+          return Object.values(op).map(val => {
+            const str = String(val);
+            return str.includes(',') ? `"${str}"` : str;
+          }).join(',');
+        });
+        const csvContent = [headers, ...rows].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `tesouro_direto_${portfolioId}_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `tesouro_direto_${portfolioId}_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -256,11 +270,31 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
 
     try {
       const text = await file.text();
-      const operations: NewTreasuryTx[] = JSON.parse(text);
-
-      if (!Array.isArray(operations)) {
-        alert('Formato inválido. O arquivo deve conter uma lista (array) de operações em JSON.');
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) {
+        alert('Arquivo CSV vazio ou sem dados suficientes.');
         return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim());
+      const operations: NewTreasuryTx[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const op: any = {};
+        for (let j = 0; j < headers.length; j++) {
+          const header = headers[j];
+          let val: any = values[j];
+          if (['quantity', 'unit_price', 'contracted_rate'].includes(header)) {
+            val = Number(val);
+          } else if (header === 'has_coupons') {
+            val = val === 'true';
+          }
+          op[header] = val;
+        }
+        operations.push(op as NewTreasuryTx);
       }
 
       setIsLoading(true);
@@ -289,7 +323,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
       fetchPositions();
       fetchPerformance();
     } catch (err) {
-      alert('Erro ao processar arquivo JSON. Certifique-se de que é um formato válido.');
+      alert('Erro ao processar arquivo CSV. Certifique-se de que é um formato válido.');
     } finally {
       setIsLoading(false);
       e.target.value = ''; // reset
@@ -376,7 +410,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
           <div className="flex-row gap-sm">
             <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
               📥 Importar
-              <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
+              <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
             </label>
             <button
               onClick={handleExport}
