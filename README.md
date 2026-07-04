@@ -13,6 +13,7 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 - [📡 Integração com Provedores de Dados](#integração-com-provedores-de-dados)
 - [💱 Arquitetura Multimoeda e Taxas de Câmbio](#arquitetura-multimoeda-e-taxas-de-câmbio)
 - [📦 Especificação de Importação de Arquivos CSV](#especificação-de-importação-de-arquivos-csv)
+- [🏛️ Especificação de Import/Export CSV — Tesouro Direto](#️-especificação-de-importexport-csv--tesouro-direto)
 - [📊 Arquitetura Global e Modelagem de Dados](#arquitetura-global-e-modelagem-de-dados)
 - [🔍 Detalhamento de Módulos Core](#detalhamento-de-módulos-core)
   - [1. Autenticação e Segurança (Auth)](#1-autenticação-e-segurança-auth)
@@ -33,7 +34,7 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 
 - **Streaming de Dados em Tempo Real:** Conexões via WebSockets garantem atualizações instantâneas dos preços dos ativos no painel do usuário sem a necessidade de recarregar a página.
 - **Gestão de Carteiras Modular:** Acompanhe a rentabilidade, o histórico de transações e o preço médio de ativos nacionais (B3) e internacionais. A interface é modularizada nas seções de Renda Variável, Renda Fixa, Transações, Dividendos e Diário de Bordo. Suporta a edição nativa de transações, desdobramentos (splits), grupamentos (reverse splits), bonificações e importação em lote via arquivo CSV.
-- **Mecanismo de Renda Fixa Dedicado:** Um módulo isolado para acompanhamento de renda fixa (e.g., CDBs, Tesouro Direto, LCI, LCA) com gráficos de evolução de juros compostos e tabelas de rendimento líquido padronizadas. Inclui um simulador de rendimento diário que integra os **Rendimentos Mensais Acumulados** (descontando imposto regressivo e IOF) diretamente na visão de Dividendos, exibindo os juros acumulados como pagamentos em pilhas.
+- **Mecanismo de Renda Fixa Dedicado:** Um módulo isolado para acompanhamento de renda fixa (e.g., CDBs, Tesouro Direto, LCI, LCA) com gráficos de evolução de juros compostos e tabelas de rendimento líquido padronizadas. Inclui um simulador de rendimento diário que integra os **Rendimentos Mensais Acumulados** (descontando imposto regressivo e IOF) diretamente na visão de Dividendos, exibindo os juros acumulados como pagamentos em pilhas. A aba de **Tesouro Direto** suporta exportação e importação de operações em formato `.csv`, permitindo backup e restauração rápida de todo o histórico de aplicações e resgates.
 - **Precisão Matemática e Backtesting:** Um motor de rentabilidade que calcula retroativamente desdobramentos e grupamentos futuros nas quantidades históricas dos ativos. Ele se alinha aos dados ajustados de provedores como o Yahoo Finance para evitar distorções ou falsos picos nos relatórios de lucro/prejuízo.
 - **Múltiplas Watchlists:** Permite criar listas personalizadas para acompanhar diferentes estratégias de investimentos.
 - **Bot do Telegram Integrado:** Bot interativo bidirecional que permite aos usuários consultar relatórios financeiros, gráficos e lançar operações diretamente pelo chat. A sessão e a FSM de cadastro de transações são gerenciadas no Redis.
@@ -117,6 +118,36 @@ Formato de colunas obrigatório (a linha de cabeçalho `DATE, TICKER, TYPE, QUAN
   - `SPLIT` / `REVERSE_SPLIT`: Desdobramentos e grupamentos corporativos. A quantidade especifica a proporção da operação.
 - **QUANTITY:** Quantidade negociada (aceita floats).
 - **PRICE:** Preço unitário (aceita floats, exceto para splits/reverse splits/bonus onde pode ser zero).
+
+---
+
+## 🏛️ Especificação de Import/Export CSV — Tesouro Direto
+
+A aba **Tesouro Direto** permite exportar e importar todo o histórico de operações de aplicação e resgate em formato `.csv`. O arquivo gerado pelo botão **📤 Exportar** pode ser reimportado integralmente pelo botão **📥 Importar**, servindo como backup ou para migração entre carteiras.
+
+### Formato do CSV
+O arquivo contém um cabeçalho fixo na primeira linha, seguido de uma operação por linha:
+
+`ticker,treasury_type,maturity_date,has_coupons,type,quantity,unit_price,contracted_rate,transaction_date`
+
+| Coluna | Tipo | Descrição | Exemplo |
+|---|---|---|---|
+| `ticker` | string | Nome do título no formato do Tesouro Nacional | `TESOURO SELIC 2027` |
+| `treasury_type` | string | Tipo do título: `SELIC`, `PREFIXADO` ou `IPCA+` | `SELIC` |
+| `maturity_date` | date | Data de vencimento no formato `YYYY-MM-DD` | `2027-03-01` |
+| `has_coupons` | boolean | Se o título paga cupons semestrais (`true` / `false`) | `false` |
+| `type` | string | Tipo da operação: `SUBSCRIPTION` (aplicação) ou `REDEMPTION` (resgate) | `SUBSCRIPTION` |
+| `quantity` | float | Quantidade de frações negociadas | `0.5` |
+| `unit_price` | float | Preço unitário na data da operação (R$) | `14523.87` |
+| `contracted_rate` | float | Taxa contratada (% a.a.). Para Selic é o spread; para Prefixado e IPCA+ é a taxa inteira | `6.40` |
+| `transaction_date` | date | Data de execução da operação no formato `YYYY-MM-DD` | `2024-01-15` |
+
+### Endpoints Relacionados
+- `GET /api/v1/portfolios/{id}/treasury/transactions` — Retorna todas as operações do Tesouro em JSON (usado pelo botão Exportar para gerar o CSV).
+- `POST /api/v1/portfolios/{id}/treasury/transactions` — Registra uma operação individual (chamado sequencialmente pelo botão Importar para cada linha do CSV).
+
+> [!NOTE]
+> Durante a importação, cada linha é processada e enviada individualmente para a API. Ao final, uma notificação exibe o total de operações com sucesso e o total de erros.
 
 ---
 
