@@ -25,6 +25,115 @@ function SectionTitle({ emoji, title, subtitle }: { emoji: string; title: string
         {emoji} {title}
       </h3>
       {subtitle && <p className="text-secondary" style={{ fontSize: '0.78rem', marginTop: '0.2rem' }}>{subtitle}</p>}
+
+      {/* ── 7. Valuation & Margem de Segurança ── */}
+      <InsightCard>
+        <SectionTitle emoji="⚖️" title="Valuation e Descontos" subtitle="Ativos com maior margem de segurança na carteira" />
+        
+        {valuationData.grahamItems.length === 0 && valuationData.bazinItems.length === 0 ? (
+          <AlertBadge type="info" message="Não há dados suficientes de fundamentos para calcular margem de segurança." />
+        ) : (
+          <>
+             {valuationData.grahamItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Preço Teto - Graham</p>
+                  {valuationData.grahamItems.slice(0, 3).map(item => (
+                    <div key={`graham-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.graham!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+
+             {valuationData.bazinItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginTop: '1rem', marginBottom: '0.5rem' }}>Preço Teto - Bazin</p>
+                  {valuationData.bazinItems.slice(0, 3).map(item => (
+                    <div key={`bazin-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.bazin!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+          </>
+        )}
+      </InsightCard>
+
+      {/* ── 8. Sazonalidade de Proventos ── */}
+      <InsightCard>
+        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (últimos 12 meses)" />
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '120px', gap: '4px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+          {dividendSeasonality.map((item, i) => (
+             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                <div 
+                   title={`${item.month}: ${formatMoney(item.value, 'BRL')}`}
+                   style={{ 
+                     width: '100%', 
+                     height: `${Math.max(item.pct, 2)}%`, 
+                     background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)', 
+                     borderRadius: '4px 4px 0 0',
+                     transition: 'height 0.5s ease'
+                   }} 
+                />
+             </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
+           {dividendSeasonality.map((item, i) => (
+              <span key={i} style={{ fontSize: '0.6rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>{item.month}</span>
+           ))}
+        </div>
+        
+        {upcomingDividends.length > 0 && (
+           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(74,222,128,0.05)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.2)' }}>
+              <p style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
+              <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+                 {formatMoney(upcomingDividends.reduce((s, d) => s + d.net_amount, 0), 'BRL')}
+              </p>
+           </div>
+        )}
+      </InsightCard>
+
+      {/* ── 9. Liquidez e Renda Fixa ── */}
+      {fiPositions.length > 0 && (
+        <InsightCard>
+          <SectionTitle emoji="💧" title="Liquidez da Renda Fixa" subtitle="Perfil de vencimento dos seus ativos" />
+          
+          <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1rem' }}>
+            {fiLiquidity.map((item, i) => (
+              <div key={i} style={{ width: `${(item.value / fiLiquidity.reduce((s, x) => s + x.value, 0)) * 100}%`, background: item.color }} title={`${item.label}: ${formatMoney(item.value, kpiCurrency)}`} />
+            ))}
+          </div>
+          
+          <div>
+            {fiLiquidity.map((item, i) => {
+               const totalLiquidity = fiLiquidity.reduce((s, x) => s + x.value, 0);
+               const pct = totalLiquidity > 0 ? (item.value / totalLiquidity) * 100 : 0;
+               return (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                   </div>
+                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pct.toFixed(1)}%</span>
+                 </div>
+               );
+            })}
+          </div>
+        </InsightCard>
+      )}
     </div>
   );
 }
@@ -53,6 +162,115 @@ function ProgressBar({
           boxShadow: `0 0 6px ${color}55`,
         }} />
       </div>
+
+      {/* ── 7. Valuation & Margem de Segurança ── */}
+      <InsightCard>
+        <SectionTitle emoji="⚖️" title="Valuation e Descontos" subtitle="Ativos com maior margem de segurança na carteira" />
+        
+        {valuationData.grahamItems.length === 0 && valuationData.bazinItems.length === 0 ? (
+          <AlertBadge type="info" message="Não há dados suficientes de fundamentos para calcular margem de segurança." />
+        ) : (
+          <>
+             {valuationData.grahamItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Preço Teto - Graham</p>
+                  {valuationData.grahamItems.slice(0, 3).map(item => (
+                    <div key={`graham-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.graham!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+
+             {valuationData.bazinItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginTop: '1rem', marginBottom: '0.5rem' }}>Preço Teto - Bazin</p>
+                  {valuationData.bazinItems.slice(0, 3).map(item => (
+                    <div key={`bazin-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.bazin!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+          </>
+        )}
+      </InsightCard>
+
+      {/* ── 8. Sazonalidade de Proventos ── */}
+      <InsightCard>
+        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (últimos 12 meses)" />
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '120px', gap: '4px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+          {dividendSeasonality.map((item, i) => (
+             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                <div 
+                   title={`${item.month}: ${formatMoney(item.value, 'BRL')}`}
+                   style={{ 
+                     width: '100%', 
+                     height: `${Math.max(item.pct, 2)}%`, 
+                     background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)', 
+                     borderRadius: '4px 4px 0 0',
+                     transition: 'height 0.5s ease'
+                   }} 
+                />
+             </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
+           {dividendSeasonality.map((item, i) => (
+              <span key={i} style={{ fontSize: '0.6rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>{item.month}</span>
+           ))}
+        </div>
+        
+        {upcomingDividends.length > 0 && (
+           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(74,222,128,0.05)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.2)' }}>
+              <p style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
+              <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+                 {formatMoney(upcomingDividends.reduce((s, d) => s + d.net_amount, 0), 'BRL')}
+              </p>
+           </div>
+        )}
+      </InsightCard>
+
+      {/* ── 9. Liquidez e Renda Fixa ── */}
+      {fiPositions.length > 0 && (
+        <InsightCard>
+          <SectionTitle emoji="💧" title="Liquidez da Renda Fixa" subtitle="Perfil de vencimento dos seus ativos" />
+          
+          <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1rem' }}>
+            {fiLiquidity.map((item, i) => (
+              <div key={i} style={{ width: `${(item.value / fiLiquidity.reduce((s, x) => s + x.value, 0)) * 100}%`, background: item.color }} title={`${item.label}: ${formatMoney(item.value, kpiCurrency)}`} />
+            ))}
+          </div>
+          
+          <div>
+            {fiLiquidity.map((item, i) => {
+               const totalLiquidity = fiLiquidity.reduce((s, x) => s + x.value, 0);
+               const pct = totalLiquidity > 0 ? (item.value / totalLiquidity) * 100 : 0;
+               return (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                   </div>
+                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pct.toFixed(1)}%</span>
+                 </div>
+               );
+            })}
+          </div>
+        </InsightCard>
+      )}
     </div>
   );
 }
@@ -68,6 +286,115 @@ function InsightCard({ children, style }: { children: React.ReactNode; style?: R
       ...style,
     }}>
       {children}
+
+      {/* ── 7. Valuation & Margem de Segurança ── */}
+      <InsightCard>
+        <SectionTitle emoji="⚖️" title="Valuation e Descontos" subtitle="Ativos com maior margem de segurança na carteira" />
+        
+        {valuationData.grahamItems.length === 0 && valuationData.bazinItems.length === 0 ? (
+          <AlertBadge type="info" message="Não há dados suficientes de fundamentos para calcular margem de segurança." />
+        ) : (
+          <>
+             {valuationData.grahamItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Preço Teto - Graham</p>
+                  {valuationData.grahamItems.slice(0, 3).map(item => (
+                    <div key={`graham-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.graham!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+
+             {valuationData.bazinItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginTop: '1rem', marginBottom: '0.5rem' }}>Preço Teto - Bazin</p>
+                  {valuationData.bazinItems.slice(0, 3).map(item => (
+                    <div key={`bazin-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.bazin!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+          </>
+        )}
+      </InsightCard>
+
+      {/* ── 8. Sazonalidade de Proventos ── */}
+      <InsightCard>
+        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (últimos 12 meses)" />
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '120px', gap: '4px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+          {dividendSeasonality.map((item, i) => (
+             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                <div 
+                   title={`${item.month}: ${formatMoney(item.value, 'BRL')}`}
+                   style={{ 
+                     width: '100%', 
+                     height: `${Math.max(item.pct, 2)}%`, 
+                     background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)', 
+                     borderRadius: '4px 4px 0 0',
+                     transition: 'height 0.5s ease'
+                   }} 
+                />
+             </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
+           {dividendSeasonality.map((item, i) => (
+              <span key={i} style={{ fontSize: '0.6rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>{item.month}</span>
+           ))}
+        </div>
+        
+        {upcomingDividends.length > 0 && (
+           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(74,222,128,0.05)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.2)' }}>
+              <p style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
+              <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+                 {formatMoney(upcomingDividends.reduce((s, d) => s + d.net_amount, 0), 'BRL')}
+              </p>
+           </div>
+        )}
+      </InsightCard>
+
+      {/* ── 9. Liquidez e Renda Fixa ── */}
+      {fiPositions.length > 0 && (
+        <InsightCard>
+          <SectionTitle emoji="💧" title="Liquidez da Renda Fixa" subtitle="Perfil de vencimento dos seus ativos" />
+          
+          <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1rem' }}>
+            {fiLiquidity.map((item, i) => (
+              <div key={i} style={{ width: `${(item.value / fiLiquidity.reduce((s, x) => s + x.value, 0)) * 100}%`, background: item.color }} title={`${item.label}: ${formatMoney(item.value, kpiCurrency)}`} />
+            ))}
+          </div>
+          
+          <div>
+            {fiLiquidity.map((item, i) => {
+               const totalLiquidity = fiLiquidity.reduce((s, x) => s + x.value, 0);
+               const pct = totalLiquidity > 0 ? (item.value / totalLiquidity) * 100 : 0;
+               return (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                   </div>
+                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pct.toFixed(1)}%</span>
+                 </div>
+               );
+            })}
+          </div>
+        </InsightCard>
+      )}
     </div>
   );
 }
@@ -86,6 +413,115 @@ function AlertBadge({ type, message }: { type: 'warning' | 'info' | 'success'; m
       color: c.text, lineHeight: 1.4,
     }}>
       {message}
+
+      {/* ── 7. Valuation & Margem de Segurança ── */}
+      <InsightCard>
+        <SectionTitle emoji="⚖️" title="Valuation e Descontos" subtitle="Ativos com maior margem de segurança na carteira" />
+        
+        {valuationData.grahamItems.length === 0 && valuationData.bazinItems.length === 0 ? (
+          <AlertBadge type="info" message="Não há dados suficientes de fundamentos para calcular margem de segurança." />
+        ) : (
+          <>
+             {valuationData.grahamItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Preço Teto - Graham</p>
+                  {valuationData.grahamItems.slice(0, 3).map(item => (
+                    <div key={`graham-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.graham!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+
+             {valuationData.bazinItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginTop: '1rem', marginBottom: '0.5rem' }}>Preço Teto - Bazin</p>
+                  {valuationData.bazinItems.slice(0, 3).map(item => (
+                    <div key={`bazin-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.bazin!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+          </>
+        )}
+      </InsightCard>
+
+      {/* ── 8. Sazonalidade de Proventos ── */}
+      <InsightCard>
+        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (últimos 12 meses)" />
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '120px', gap: '4px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+          {dividendSeasonality.map((item, i) => (
+             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                <div 
+                   title={`${item.month}: ${formatMoney(item.value, 'BRL')}`}
+                   style={{ 
+                     width: '100%', 
+                     height: `${Math.max(item.pct, 2)}%`, 
+                     background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)', 
+                     borderRadius: '4px 4px 0 0',
+                     transition: 'height 0.5s ease'
+                   }} 
+                />
+             </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
+           {dividendSeasonality.map((item, i) => (
+              <span key={i} style={{ fontSize: '0.6rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>{item.month}</span>
+           ))}
+        </div>
+        
+        {upcomingDividends.length > 0 && (
+           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(74,222,128,0.05)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.2)' }}>
+              <p style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
+              <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+                 {formatMoney(upcomingDividends.reduce((s, d) => s + d.net_amount, 0), 'BRL')}
+              </p>
+           </div>
+        )}
+      </InsightCard>
+
+      {/* ── 9. Liquidez e Renda Fixa ── */}
+      {fiPositions.length > 0 && (
+        <InsightCard>
+          <SectionTitle emoji="💧" title="Liquidez da Renda Fixa" subtitle="Perfil de vencimento dos seus ativos" />
+          
+          <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1rem' }}>
+            {fiLiquidity.map((item, i) => (
+              <div key={i} style={{ width: `${(item.value / fiLiquidity.reduce((s, x) => s + x.value, 0)) * 100}%`, background: item.color }} title={`${item.label}: ${formatMoney(item.value, kpiCurrency)}`} />
+            ))}
+          </div>
+          
+          <div>
+            {fiLiquidity.map((item, i) => {
+               const totalLiquidity = fiLiquidity.reduce((s, x) => s + x.value, 0);
+               const pct = totalLiquidity > 0 ? (item.value / totalLiquidity) * 100 : 0;
+               return (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                   </div>
+                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pct.toFixed(1)}%</span>
+                 </div>
+               );
+            })}
+          </div>
+        </InsightCard>
+      )}
     </div>
   );
 }
@@ -168,17 +604,42 @@ export default function PortfolioInsights({
     'BDRs':       '#f87171',
   };
 
-  // 3. Dividend Yield (last 12 months)
-  const now = new Date();
-  const twelveMonthsAgo = new Date(now);
-  twelveMonthsAgo.setMonth(now.getMonth() - MONTHS_FOR_YIELD);
+  // 3. Dividend Yield & Sazonalidade
+  const { dividendsLast12m, upcomingDividends } = useMemo(() => {
+    const now = new Date();
+    const twelveMonthsAgo = new Date(now);
+    twelveMonthsAgo.setMonth(now.getMonth() - MONTHS_FOR_YIELD);
 
-  const dividendsLast12m = useMemo(() => dividends.filter(d => {
-    if (d.is_accrued) return false;
-    const dateStr = (d.payment_date && !d.payment_date.startsWith('0001')) ? d.payment_date : d.ex_date;
-    if (!dateStr) return false;
-    return new Date(dateStr) >= twelveMonthsAgo;
-  }), [dividends]);
+    const past = dividends.filter(d => {
+      if (d.is_accrued) return false;
+      const dateStr = (d.payment_date && !d.payment_date.startsWith('0001')) ? d.payment_date : d.ex_date;
+      if (!dateStr) return false;
+      return new Date(dateStr) >= twelveMonthsAgo;
+    });
+
+    const upcoming = dividends.filter(d => d.is_accrued);
+    return { dividendsLast12m: past, upcomingDividends: upcoming };
+  }, [dividends]);
+
+  // NEW: Sazonalidade de Proventos
+  const dividendSeasonality = useMemo(() => {
+    const months = Array(12).fill(0);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+
+    dividendsLast12m.forEach(d => {
+       const dateStr = (d.payment_date && !d.payment_date.startsWith('0001')) ? d.payment_date : d.ex_date;
+       if (!dateStr) return;
+       const date = new Date(dateStr);
+       const m = date.getMonth();
+       months[m] += d.net_amount;
+    });
+    
+    const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const maxVal = Math.max(...months, 1);
+    
+    return months.map((val, idx) => ({ month: monthLabels[idx], value: val, pct: (val/maxVal)*100, isCurrent: idx === currentMonth }));
+  }, [dividendsLast12m]);
 
   const totalDivLast12m = dividendsLast12m.reduce((s, d) => s + d.net_amount, 0);
   const totalCost = positions.reduce((s, p) => s + p.total_cost, 0);
@@ -207,7 +668,54 @@ export default function PortfolioInsights({
     [positions]
   );
   const topPerformers = rankedPositions.slice(0, TOP_N);
-  const worstPerformers = [...rankedPositions].reverse().slice(0, TOP_N);
+  const worstPerformers = [...rankedPositions]
+    .reverse()
+    .filter(p => !topPerformers.find(t => t.ticker === p.ticker))
+    .slice(0, TOP_N);
+
+  // NEW: Valuation Data (Graham / Bazin)
+  const valuationData = useMemo(() => {
+    const withGraham = positions.filter(p => p.graham_value && p.graham_value > 0 && p.current_price && p.current_price > 0);
+    const withBazin = positions.filter(p => p.bazin_value && p.bazin_value > 0 && p.current_price && p.current_price > 0);
+    
+    const grahamItems = withGraham.map(p => {
+        const discount = ((p.graham_value! - p.current_price!) / p.graham_value!) * 100;
+        return { ticker: p.ticker, discount, graham: p.graham_value, current: p.current_price };
+    }).sort((a, b) => b.discount - a.discount);
+
+    const bazinItems = withBazin.map(p => {
+        const discount = ((p.bazin_value! - p.current_price!) / p.bazin_value!) * 100;
+        return { ticker: p.ticker, discount, bazin: p.bazin_value, current: p.current_price };
+    }).sort((a, b) => b.discount - a.discount);
+
+    return { grahamItems, bazinItems };
+  }, [positions]);
+
+  // NEW: Renda Fixa Liquidez
+  const fiLiquidity = useMemo(() => {
+    let daily = 0;
+    let upTo1Year = 0;
+    let upTo3Years = 0;
+    let longTerm = 0;
+
+    fiPositions.forEach(p => {
+      if (p.days_to_maturity <= 0) {
+        daily += p.net_value;
+      } else if (p.days_to_maturity <= 365) {
+        upTo1Year += p.net_value;
+      } else if (p.days_to_maturity <= 1095) {
+        upTo3Years += p.net_value;
+      } else {
+        longTerm += p.net_value;
+      }
+    });
+    return [
+      { label: 'Liquidez Diária / Vencido', value: daily, color: '#4ade80' },
+      { label: 'Até 1 ano', value: upTo1Year, color: '#60a5fa' },
+      { label: '1 a 3 anos', value: upTo3Years, color: '#fbbf24' },
+      { label: 'Longo Prazo (> 3 anos)', value: longTerm, color: '#f87171' },
+    ].filter(i => i.value > 0);
+  }, [fiPositions]);
 
   // 6. Currency exposure
   const brlValue = useMemo(() => {
@@ -233,10 +741,10 @@ export default function PortfolioInsights({
   const maxAbsReturn = Math.max(...[...topPerformers, ...worstPerformers].map(p => Math.abs(p.return_percent || 0)), 1);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '1.25rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(480px, 100%), 1fr))', gap: '1.25rem' }}>
       {/* ── 1. Concentration ── */}
       <InsightCard>
-        <SectionTitle emoji="🎯" title="Concentração da Carteira" subtitle="Participação percentual de cada ativo no valor total" />
+        <SectionTitle emoji="📊" title="Concentração da Carteira" subtitle="Participação percentual de cada ativo no valor total" />
         {concentration.slice(0, 8).map(item => {
           const isConcentrated = item.pct >= CONCENTRATION_THRESHOLD;
           const color = isConcentrated ? '#fbbf24' : categoryColors[item.category] || '#60a5fa';
@@ -476,6 +984,115 @@ export default function PortfolioInsights({
           </>
         )}
       </InsightCard>
+
+      {/* ── 7. Valuation & Margem de Segurança ── */}
+      <InsightCard>
+        <SectionTitle emoji="⚖️" title="Valuation e Descontos" subtitle="Ativos com maior margem de segurança na carteira" />
+        
+        {valuationData.grahamItems.length === 0 && valuationData.bazinItems.length === 0 ? (
+          <AlertBadge type="info" message="Não há dados suficientes de fundamentos para calcular margem de segurança." />
+        ) : (
+          <>
+             {valuationData.grahamItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Preço Teto - Graham</p>
+                  {valuationData.grahamItems.slice(0, 3).map(item => (
+                    <div key={`graham-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.graham!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+
+             {valuationData.bazinItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginTop: '1rem', marginBottom: '0.5rem' }}>Preço Teto - Bazin</p>
+                  {valuationData.bazinItems.slice(0, 3).map(item => (
+                    <div key={`bazin-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.bazin!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+          </>
+        )}
+      </InsightCard>
+
+      {/* ── 8. Sazonalidade de Proventos ── */}
+      <InsightCard>
+        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (últimos 12 meses)" />
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '120px', gap: '4px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+          {dividendSeasonality.map((item, i) => (
+             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                <div 
+                   title={`${item.month}: ${formatMoney(item.value, 'BRL')}`}
+                   style={{ 
+                     width: '100%', 
+                     height: `${Math.max(item.pct, 2)}%`, 
+                     background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)', 
+                     borderRadius: '4px 4px 0 0',
+                     transition: 'height 0.5s ease'
+                   }} 
+                />
+             </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
+           {dividendSeasonality.map((item, i) => (
+              <span key={i} style={{ fontSize: '0.6rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>{item.month}</span>
+           ))}
+        </div>
+        
+        {upcomingDividends.length > 0 && (
+           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(74,222,128,0.05)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.2)' }}>
+              <p style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
+              <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+                 {formatMoney(upcomingDividends.reduce((s, d) => s + d.net_amount, 0), 'BRL')}
+              </p>
+           </div>
+        )}
+      </InsightCard>
+
+      {/* ── 9. Liquidez e Renda Fixa ── */}
+      {fiPositions.length > 0 && (
+        <InsightCard>
+          <SectionTitle emoji="💧" title="Liquidez da Renda Fixa" subtitle="Perfil de vencimento dos seus ativos" />
+          
+          <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1rem' }}>
+            {fiLiquidity.map((item, i) => (
+              <div key={i} style={{ width: `${(item.value / fiLiquidity.reduce((s, x) => s + x.value, 0)) * 100}%`, background: item.color }} title={`${item.label}: ${formatMoney(item.value, kpiCurrency)}`} />
+            ))}
+          </div>
+          
+          <div>
+            {fiLiquidity.map((item, i) => {
+               const totalLiquidity = fiLiquidity.reduce((s, x) => s + x.value, 0);
+               const pct = totalLiquidity > 0 ? (item.value / totalLiquidity) * 100 : 0;
+               return (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                   </div>
+                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pct.toFixed(1)}%</span>
+                 </div>
+               );
+            })}
+          </div>
+        </InsightCard>
+      )}
     </div>
   );
 }
