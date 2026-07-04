@@ -189,7 +189,10 @@ export default function PortfolioPage() {
   useEffect(() => {
     if (!activePortfolioId) return;
     let targetTickers: string[] = [];
-    if (activeCategoryFilter !== 'Todas' && activeCategoryFilter !== 'Renda Fixa') {
+    if (activeCategoryFilter === 'Renda Variável') {
+      targetTickers = positions.map(p => p.ticker);
+      if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
+    } else if (activeCategoryFilter !== 'Todas' && activeCategoryFilter !== 'Renda Fixa') {
       const filtered = positions.filter(pos => getAssetCategory(pos.type) === activeCategoryFilter);
       targetTickers = filtered.map(p => p.ticker);
       if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
@@ -490,13 +493,13 @@ export default function PortfolioPage() {
   const activeP = portfolios.find((p) => p.id === activePortfolioId);
   const kpiCurrency = activeP ? activeP.base_currency : 'BRL';
 
-  const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || getAssetCategory(pos.type) === activeCategoryFilter);
-  const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || getAssetCategory(tx.asset_type || '') === activeCategoryFilter || (activeCategoryFilter === 'Renda Fixa' && tx.module === 'RF'));
+  const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Variável' || getAssetCategory(pos.type) === activeCategoryFilter);
+  const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || (activeCategoryFilter === 'Renda Variável' && tx.module !== 'RF') || getAssetCategory(tx.asset_type || '') === activeCategoryFilter || (activeCategoryFilter === 'Renda Fixa' && tx.module === 'RF'));
   const categoryFilteredDividends = dividends.filter(div => {
-    if (activeCategoryFilter !== 'Todas') {
-      if (activeCategoryFilter === 'Renda Fixa' && !div.is_accrued) return false;
-      if (activeCategoryFilter !== 'Renda Fixa' && (div.is_accrued || getAssetCategory(div.asset_type) !== activeCategoryFilter)) return false;
-    }
+    if (activeCategoryFilter === 'Todas') return true;
+    if (activeCategoryFilter === 'Renda Variável') return !div.is_accrued;
+    if (activeCategoryFilter === 'Renda Fixa') return div.is_accrued;
+    if (div.is_accrued || getAssetCategory(div.asset_type) !== activeCategoryFilter) return false;
     return true;
   });
 
@@ -536,7 +539,8 @@ export default function PortfolioPage() {
   const avgDividends12m = sumDivs12m / 12;
 
   const availableCategories = Array.from(new Set(positions.map(pos => getAssetCategory(pos.type)))).sort();
-  const filterCategories = ['Todas', ...availableCategories];
+  const filterCategories = ['Todas'];
+  if (positions.length > 0) filterCategories.push('Renda Variável', ...availableCategories);
   if (fiPositions.length > 0) {
     filterCategories.push('Renda Fixa');
   }
