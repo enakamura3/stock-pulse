@@ -296,14 +296,6 @@ export default function TransactionHistory({
               <strong style={{ color: '#ff3d00' }}>{formatMoney(summary.totalSold, kpiCurrency)}</strong>
             </span>
           )}
-          {summary.totalBought > 0 && summary.totalSold > 0 && (
-            <span className="text-secondary">
-              📊 Saldo Líquido:{' '}
-              <strong style={{ color: summary.totalSold - summary.totalBought >= 0 ? '#00e676' : '#ff3d00' }}>
-                {formatMoney(summary.totalSold - summary.totalBought, kpiCurrency)}
-              </strong>
-            </span>
-          )}
         </div>
       )}
 
@@ -312,7 +304,7 @@ export default function TransactionHistory({
         {filteredTransactions.length > 0 ? (
           <>
             {grouped.map((group) => (
-              <div key={group.date} className="flex-col gap-xs">
+              <div key={group.date} className="flex-col" style={{ gap: '0.5rem', marginBottom: '0.8rem' }}>
                 {/* Date group separator */}
                 <div style={{
                   display: 'flex',
@@ -329,107 +321,110 @@ export default function TransactionHistory({
                   </span>
                 </div>
 
-                {group.txs.map((tx) => {
-                  const isRF      = tx.module === 'RF';
-                  const isSplit   = tx.type === 'SPLIT' || tx.type === 'REVERSE_SPLIT';
-                  const isReverse = tx.type === 'REVERSE_SPLIT';
-                  const badge     = getBadge(tx);
+                {/* Transactions list container for this day */}
+                <div className="flex-col" style={{ gap: '0.5rem' }}>
+                  {group.txs.map((tx) => {
+                    const isRF      = tx.module === 'RF';
+                    const isSplit   = tx.type === 'SPLIT' || tx.type === 'REVERSE_SPLIT';
+                    const isReverse = tx.type === 'REVERSE_SPLIT';
+                    const badge     = getBadge(tx);
 
-                  return (
-                    <div
-                      key={tx.id}
-                      style={{
-                        padding: '0.7rem 0.9rem',
-                        background: 'rgba(255,255,255,0.015)',
-                        border: '1px solid var(--panel-border)',
-                        borderRadius: '8px',
-                        fontSize: '0.8rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.35rem',
-                      }}
-                    >
-                      {/* Row 1: icon + badge + ticker + date */}
-                      <div className="flex-row items-center justify-between flex-wrap" style={{ gap: '0.4rem' }}>
-                        <div className="flex-row items-center" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span title={isRF ? 'Renda Fixa' : 'Renda Variável'} style={{ fontSize: '1.1rem', cursor: 'help' }}>
-                            {isRF ? '🏦' : '📈'}
-                          </span>
-                          <span className="badge" style={{ color: badge.color, background: badge.bg }}>
-                            {badge.text}
-                          </span>
-                          <span className="font-bold text-primary">{tx.asset_name}</span>
-                          <span className="text-secondary text-xs">{formatDateStr(tx.date)}</span>
-                        </div>
-
-                        {/* Action buttons — larger for WCAG accessibility */}
-                        <div className="flex-row items-center" style={{ gap: '0.4rem' }}>
-                          <button
-                            onClick={() => handleEditTransaction(tx)}
-                            className="btn-secondary"
-                            title="Editar Transação"
-                            style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px' }}
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTransaction(tx.id)}
-                            className="btn-danger"
-                            title="Excluir Transação"
-                            style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px' }}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Row 2: financial details */}
-                      <div className="flex-row items-center flex-wrap" style={{ gap: '0.5rem', paddingLeft: '0.1rem' }}>
-                        {isRF ? (
-                          <span className="font-bold">{formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}</span>
-                        ) : !isSplit ? (
-                          <>
-                            <span className="text-secondary">
-                              {formatQuantity(tx.quantity ?? 0)} un. × {formatMoney(tx.unit_price ?? 0, tx.currency || 'BRL')}
+                    return (
+                      <div
+                        key={tx.id}
+                        style={{
+                          padding: '0.7rem 0.9rem',
+                          background: 'rgba(255,255,255,0.015)',
+                          border: '1px solid var(--panel-border)',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.35rem',
+                        }}
+                      >
+                        {/* Row 1: icon + badge + ticker + date */}
+                        <div className="flex-row items-center justify-between flex-wrap" style={{ gap: '0.4rem' }}>
+                          <div className="flex-row items-center" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span title={isRF ? 'Renda Fixa' : 'Renda Variável'} style={{ fontSize: '1.1rem', cursor: 'help' }}>
+                              {isRF ? '🏦' : '📈'}
                             </span>
-                            {kpiCurrency && tx.currency !== kpiCurrency && tx.exchange_rate ? (
-                              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
-                                (Câmbio: {tx.exchange_rate.toFixed(4)})
-                              </span>
-                            ) : null}
-                            <span className="text-secondary">=</span>
-                            <span className="font-bold">{formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}</span>
-                          </>
-                        ) : (
-                          <span className="font-bold">
-                            Fator: {isReverse
-                              ? `${formatQuantity(tx.quantity ?? 0)} para 1`
-                              : `1 para ${formatQuantity(tx.quantity ?? 0)}`}
-                          </span>
-                        )}
+                            <span className="badge" style={{ color: badge.color, background: badge.bg }}>
+                              {badge.text}
+                            </span>
+                            <span className="font-bold text-primary">{tx.asset_name}</span>
+                            <span className="text-secondary text-xs">{formatDateStr(tx.date)}</span>
+                          </div>
 
-                        {!isRF && (
-                          <span style={{
-                            marginLeft: '0.5rem',
-                            borderLeft: '1px solid var(--panel-border)',
-                            paddingLeft: '0.75rem',
-                            fontSize: '0.75rem',
-                            color: 'rgba(255,255,255,0.6)',
-                            display: 'flex',
-                            gap: '0.4rem',
-                            flexWrap: 'wrap',
-                          }}>
-                            Saldo após:{' '}
-                            <strong style={{ color: '#00f2fe' }}>{formatQuantity(tx.resulting_quantity)} un.</strong>
-                            <span style={{ opacity: 0.4 }}>|</span>
-                            Investido:{' '}
-                            <strong style={{ color: '#00e676' }}>{formatMoney(tx.resulting_invested, tx.currency || 'BRL')}</strong>
-                          </span>
-                        )}
+                          {/* Action buttons — larger for WCAG accessibility */}
+                          <div className="flex-row items-center" style={{ gap: '0.4rem' }}>
+                            <button
+                              onClick={() => handleEditTransaction(tx)}
+                              className="btn-secondary"
+                              title="Editar Transação"
+                              style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px' }}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTransaction(tx.id)}
+                              className="btn-danger"
+                              title="Excluir Transação"
+                              style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px' }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Row 2: financial details */}
+                        <div className="flex-row items-center flex-wrap" style={{ gap: '0.5rem', paddingLeft: '0.1rem' }}>
+                          {isRF ? (
+                            <span className="font-bold">{formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}</span>
+                          ) : !isSplit ? (
+                            <>
+                              <span className="text-secondary">
+                                {formatQuantity(tx.quantity ?? 0)} un. × {formatMoney(tx.unit_price ?? 0, tx.currency || 'BRL')}
+                              </span>
+                              {kpiCurrency && tx.currency !== kpiCurrency && tx.exchange_rate ? (
+                                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
+                                  (Câmbio: {tx.exchange_rate.toFixed(4)})
+                                </span>
+                              ) : null}
+                              <span className="text-secondary">=</span>
+                              <span className="font-bold">{formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}</span>
+                            </>
+                          ) : (
+                            <span className="font-bold">
+                              Fator: {isReverse
+                                ? `${formatQuantity(tx.quantity ?? 0)} para 1`
+                                : `1 para ${formatQuantity(tx.quantity ?? 0)}`}
+                            </span>
+                          )}
+
+                          {!isRF && (
+                            <span style={{
+                              marginLeft: '0.5rem',
+                              borderLeft: '1px solid var(--panel-border)',
+                              paddingLeft: '0.75rem',
+                              fontSize: '0.75rem',
+                              color: 'rgba(255,255,255,0.6)',
+                              display: 'flex',
+                              gap: '0.4rem',
+                              flexWrap: 'wrap',
+                            }}>
+                              Saldo após:{' '}
+                              <strong style={{ color: '#00f2fe' }}>{formatQuantity(tx.resulting_quantity)} un.</strong>
+                              <span style={{ opacity: 0.4 }}>|</span>
+                              Investido:{' '}
+                              <strong style={{ color: '#00e676' }}>{formatMoney(tx.resulting_invested, tx.currency || 'BRL')}</strong>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             ))}
 
