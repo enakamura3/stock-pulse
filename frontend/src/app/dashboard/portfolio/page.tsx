@@ -17,6 +17,7 @@ import DailyReport from '@/components/portfolio/DailyReport';
 import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import TreasuryTab from '@/components/portfolio/TreasuryTab';
 import PortfolioInsights from '@/components/portfolio/PortfolioInsights';
+import PortfolioAnalysis from '@/components/portfolio/PortfolioAnalysis';
 import Modals from '@/components/portfolio/Modals';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -39,7 +40,7 @@ export default function PortfolioPage() {
   const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
   const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
   const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'insights' | 'diario' | 'renda-fixa' | 'tesouro'>('ativos');
+  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'insights' | 'analise' | 'diario' | 'renda-fixa' | 'tesouro'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
@@ -597,6 +598,9 @@ export default function PortfolioPage() {
             <button onClick={() => setActiveTab('insights')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'insights' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'insights' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'insights' ? 700 : 500, fontSize: '0.9rem' }}>
               📊 Análise da Carteira
             </button>
+            <button onClick={() => setActiveTab('analise')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'analise' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'analise' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'analise' ? 700 : 500, fontSize: '0.9rem' }}>
+              🔬 Análise Avançada
+            </button>
             <button onClick={() => setActiveTab('diario')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'diario' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'diario' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'diario' ? 700 : 500, fontSize: '0.9rem' }}>
               📈 Resumo Diário
             </button>
@@ -668,6 +672,16 @@ export default function PortfolioPage() {
               positions={filteredPositions}
               dividends={categoryFilteredDividends}
               fiPositions={filteredFI}
+              kpiCurrency={kpiCurrency}
+            />
+          )}
+
+          {activeTab === 'analise' && (
+            <PortfolioAnalysis
+              positions={filteredPositions}
+              dividends={categoryFilteredDividends}
+              fiPositions={filteredFI}
+              performanceData={performanceData}
               kpiCurrency={kpiCurrency}
             />
           )}
