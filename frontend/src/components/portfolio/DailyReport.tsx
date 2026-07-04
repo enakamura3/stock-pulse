@@ -287,16 +287,7 @@ export default function DailyReport({ positions, kpiCurrency }: DailyReportProps
                   );
                 })}
               </tbody>
-              <tfoot>
-                <tr style={{ borderTop: '2px solid rgba(255,255,255,0.1)', fontWeight: 700 }}>
-                  <td colSpan={6} className="text-right text-secondary" style={{ fontFamily: 'monospace', paddingRight: '1rem' }}>
-                    Total Impacto Diário:
-                  </td>
-                  <td className={`text-right font-bold ${totalImpact >= 0 ? 'text-success' : 'text-danger'}`} style={{ fontFamily: 'monospace' }}>
-                    {totalImpact >= 0 ? '+' : ''}{formatMoney(totalImpact, kpiCurrency)}
-                  </td>
-                </tr>
-              </tfoot>
+
             </table>
           ) : (
             <div className="flex-col items-center justify-center py-xl text-secondary" style={{ gap: '0.75rem' }}>
