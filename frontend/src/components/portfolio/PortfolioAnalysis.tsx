@@ -117,6 +117,7 @@ function KPIScorecard({
   label,
   value,
   subtitle,
+  description,
   color,
   icon,
   alertLevel,
@@ -124,6 +125,7 @@ function KPIScorecard({
   label: string;
   value: string;
   subtitle?: string;
+  description?: string;
   color: string;
   icon: string;
   alertLevel?: 'safe' | 'moderate' | 'danger';
@@ -142,7 +144,7 @@ function KPIScorecard({
 
   return (
     <div style={{
-      flex: '1 1 200px',
+      flex: '1 1 250px',
       background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
       border: `1px solid ${alertBorder}`,
       borderRadius: '14px',
@@ -161,6 +163,18 @@ function KPIScorecard({
       {subtitle && (
         <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.4rem', lineHeight: 1.3 }}>
           {subtitle}
+        </div>
+      )}
+      {description && (
+        <div style={{
+          fontSize: '0.75rem',
+          color: 'var(--text-secondary)',
+          marginTop: '0.75rem',
+          paddingTop: '0.75rem',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          lineHeight: 1.45,
+        }}>
+          {description}
         </div>
       )}
     </div>
@@ -1112,6 +1126,13 @@ export default function PortfolioAnalysis({
                     ? 'Eficiência moderada — espaço para otimizar'
                     : 'Eficiência abaixo do ideal — risco não compensado'
               }
+              description={
+                riskMetrics.sharpe! >= 1
+                  ? `O retorno gerado supera a volatilidade dos ativos. Cada 1% de risco assumido entregou mais de 1% de retorno excedente, demonstrando excelente equilíbrio.`
+                  : riskMetrics.sharpe! >= 0.5
+                    ? `O retorno compensa a volatilidade de forma moderada. É possível otimizar a carteira reduzindo ativos de alta oscilação ou melhorando a diversificação.`
+                    : `A volatilidade da carteira é alta demais para o retorno que ela entrega. Indica que a carteira corre risco pouco eficiente para o ganho obtido.`
+              }
               color={riskMetrics.sharpe! >= 1 ? '#4ade80' : riskMetrics.sharpe! >= 0.5 ? '#fbbf24' : '#f87171'}
               alertLevel={riskMetrics.sharpe! >= 1 ? 'safe' : riskMetrics.sharpe! >= 0.5 ? 'moderate' : 'danger'}
             />
@@ -1128,6 +1149,13 @@ export default function PortfolioAnalysis({
                     ? 'Volatilidade próxima ao mercado'
                     : 'Carteira agressiva — mais volátil que o mercado'
               }
+              description={
+                riskMetrics.beta! <= 0.8
+                  ? `A carteira tende a oscilar cerca de ${riskMetrics.beta!.toFixed(2)}x a variação do Ibovespa, oferecendo um perfil defensivo que amortece as quedas do mercado.`
+                  : riskMetrics.beta! <= 1.2
+                    ? `A carteira varia de forma muito semelhante ao Ibovespa (cerca de ${riskMetrics.beta!.toFixed(2)}x), replicando o comportamento médio do mercado.`
+                    : `A carteira tende a variar ${riskMetrics.beta!.toFixed(2)}x mais que o Ibovespa, o que amplifica os ganhos em altas, mas aumenta o risco de perdas em quedas.`
+              }
               color={riskMetrics.beta! <= 0.8 ? '#4ade80' : riskMetrics.beta! <= 1.2 ? '#fbbf24' : '#f87171'}
               alertLevel={riskMetrics.beta! <= 0.8 ? 'safe' : riskMetrics.beta! <= 1.2 ? 'moderate' : 'danger'}
             />
@@ -1143,6 +1171,13 @@ export default function PortfolioAnalysis({
                   : riskMetrics.maxDrawdown! <= 25
                     ? 'Drawdown moderado — considere proteger posições'
                     : 'Drawdown severo — revise a alocação de risco'
+              }
+              description={
+                riskMetrics.maxDrawdown! <= 10
+                  ? `A maior queda da carteira a partir do seu pico recente foi de -${riskMetrics.maxDrawdown!.toFixed(1)}%. Este comportamento indica excelente controle de perdas temporárias.`
+                  : riskMetrics.maxDrawdown! <= 25
+                    ? `A carteira sofreu uma queda máxima de -${riskMetrics.maxDrawdown!.toFixed(1)}% em relação ao seu pico recente. Sugere volatilidade intermediária a ser monitorada.`
+                    : `A carteira sofreu uma queda severa de -${riskMetrics.maxDrawdown!.toFixed(1)}% a partir do seu pico recente, indicando alta sensibilidade a cenários de forte estresse.`
               }
               color={riskMetrics.maxDrawdown! <= 10 ? '#4ade80' : riskMetrics.maxDrawdown! <= 25 ? '#fbbf24' : '#f87171'}
               alertLevel={riskMetrics.maxDrawdown! <= 10 ? 'safe' : riskMetrics.maxDrawdown! <= 25 ? 'moderate' : 'danger'}
