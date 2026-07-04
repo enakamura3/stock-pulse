@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   PieChart,
   Pie,
@@ -47,6 +47,53 @@ function SectionTitle({ emoji, title, subtitle }: { emoji: string; title: string
         {emoji} {title}
       </h3>
       {subtitle && <p className="text-secondary" style={{ fontSize: '0.78rem', marginTop: '0.2rem' }}>{subtitle}</p>}
+    </div>
+  );
+}
+
+
+function ProgressBar({
+  value, max, color = '#00f2fe', label, sublabel,
+}: {
+  value: number; max: number; color?: string; label?: string; sublabel?: string;
+}) {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+  return (
+    <div style={{ marginBottom: '0.75rem' }}>
+      {(label || sublabel) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{sublabel}</span>
+        </div>
+      )}
+      <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%',
+          width: `${pct}%`,
+          background: color,
+          borderRadius: '6px',
+          transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
+          boxShadow: `0 0 6px ${color}55`,
+        }} />
+      </div>
+    </div>
+  );
+}
+
+function AlertBadge({ type, message }: { type: 'warning' | 'info' | 'success'; message: string }) {
+  const colors = {
+    warning: { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)', text: '#fbbf24' },
+    info:    { bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.3)',  text: '#60a5fa' },
+    success: { bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)',  text: '#4ade80' },
+  };
+  const c = colors[type];
+  return (
+    <div style={{
+      background: c.bg, border: `1px solid ${c.border}`, borderRadius: '10px',
+      padding: '0.5rem 0.75rem', marginTop: '0.75rem', fontSize: '0.78rem',
+      color: c.text, lineHeight: 1.4,
+    }}>
+      {message}
     </div>
   );
 }
@@ -238,6 +285,10 @@ const isAcaoOuETF = (type: string) =>
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+
+const MONTHS_FOR_YIELD = 12;
+const TOP_N = 8;
+
 export default function PortfolioAnalysis({
   positions,
   dividends,
@@ -245,6 +296,32 @@ export default function PortfolioAnalysis({
   performanceData,
   kpiCurrency,
 }: PortfolioAnalysisProps) {
+
+  const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
+  const [goalInput, setGoalInput] = useState<string>('');
+  const [editingGoal, setEditingGoal] = useState<boolean>(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('stockpulse_monthly_goal');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) {
+        setMonthlyGoal(parsed);
+        setGoalInput(parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+      }
+    }
+  }, []);
+
+  const saveGoal = () => {
+    const raw = goalInput.replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setMonthlyGoal(parsed);
+      localStorage.setItem('stockpulse_monthly_goal', String(parsed));
+    }
+    setEditingGoal(false);
+  };
+
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SECTION 1: Alocação Estratégica
@@ -624,6 +701,64 @@ export default function PortfolioAnalysis({
       </div>
     );
   }
+
+
+  const avgMonthly = (dividendsLast12m.reduce((s, d) => s + d.net_amount, 0)) / MONTHS_FOR_YIELD;
+
+  // 4. Top performers & worst
+  const rankedPositions = useMemo(() =>
+    [...positions]
+      .filter(p => p.return_percent !== undefined)
+      .sort((a, b) => (b.return_percent || 0) - (a.return_percent || 0)),
+    [positions]
+  );
+  const topPerformers = rankedPositions.slice(0, TOP_N);
+
+  const maxAbsReturn = Math.max(...[...topPerformers, ...worstPerformers].map(p => Math.abs(p.return_percent || 0)), 1);
+
+  // NEW: Valuation Data (Graham / Bazin)
+  const valuationData = useMemo(() => {
+    const withGraham = positions.filter(p => p.graham_value && p.graham_value > 0 && p.current_price && p.current_price > 0);
+    const withBazin = positions.filter(p => p.bazin_value && p.bazin_value > 0 && p.current_price && p.current_price > 0);
+    
+    const grahamItems = withGraham.map(p => {
+        const discount = ((p.graham_value! - p.current_price!) / p.graham_value!) * 100;
+        return { ticker: p.ticker, discount, graham: p.graham_value, current: p.current_price };
+    }).sort((a, b) => b.discount - a.discount);
+
+    const bazinItems = withBazin.map(p => {
+        const discount = ((p.bazin_value! - p.current_price!) / p.bazin_value!) * 100;
+        return { ticker: p.ticker, discount, bazin: p.bazin_value, current: p.current_price };
+    }).sort((a, b) => b.discount - a.discount);
+
+    return { grahamItems, bazinItems };
+  }, [positions]);
+
+  // NEW: Renda Fixa Liquidez
+  const fiLiquidity = useMemo(() => {
+    let daily = 0;
+    let upTo1Year = 0;
+    let upTo3Years = 0;
+    let longTerm = 0;
+
+    fiPositions.forEach(p => {
+      if (p.days_to_maturity <= 0) {
+        daily += p.net_value;
+      } else if (p.days_to_maturity <= 365) {
+        upTo1Year += p.net_value;
+      } else if (p.days_to_maturity <= 1095) {
+        upTo3Years += p.net_value;
+      } else {
+        longTerm += p.net_value;
+      }
+    });
+    return [
+      { label: 'Liquidez Diária / Vencido', value: daily, color: '#4ade80' },
+      { label: 'Até 1 ano', value: upTo1Year, color: '#60a5fa' },
+      { label: '1 a 3 anos', value: upTo3Years, color: '#fbbf24' },
+      { label: 'Longo Prazo (> 3 anos)', value: longTerm, color: '#f87171' },
+    ].filter(i => i.value > 0);
+  }, [fiPositions]);
 
   return (
     <div className="flex-col gap-xl">
@@ -1078,6 +1213,260 @@ export default function PortfolioAnalysis({
           )}
         </div>
       </AnalysisCard>
+    
+      {/* ── 4. Top & Worst Performers ── */}
+      <AnalysisCard>
+        <SectionTitle emoji="🏆" title="Top Performers vs Piores" subtitle="Rentabilidade acumulada por ativo na sua carteira" />
+        {topPerformers.length === 0 ? (
+          <AlertBadge type="info" message="Sem dados de rentabilidade disponíveis." />
+        ) : (
+          <>
+            <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4ade80', marginBottom: '0.5rem' }}>Top {Math.min(TOP_N, topPerformers.length)} melhores</p>
+            {topPerformers.map(p => (
+              <div key={p.ticker} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
+                <span style={{ width: '52px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>{p.ticker}</span>
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${((p.return_percent || 0) / maxAbsReturn) * 100}%`,
+                    background: 'linear-gradient(90deg, #4ade80, #00e676)',
+                    borderRadius: '4px',
+                    transition: 'width 0.6s ease',
+                  }} />
+                </div>
+                <span style={{ width: '60px', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: '#4ade80', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                  +{(p.return_percent || 0).toFixed(1)}%
+                </span>
+              </div>
+            ))}
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '0.75rem 0' }} />
+
+            <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f87171', marginBottom: '0.5rem' }}>Top {Math.min(TOP_N, worstPerformers.length)} piores</p>
+            {worstPerformers.map(p => (
+              <div key={p.ticker} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
+                <span style={{ width: '52px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>{p.ticker}</span>
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${(Math.abs(p.return_percent || 0) / maxAbsReturn) * 100}%`,
+                    background: 'linear-gradient(90deg, #f87171, #ef4444)',
+                    borderRadius: '4px',
+                    transition: 'width 0.6s ease',
+                  }} />
+                </div>
+                <span style={{ width: '60px', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: '#f87171', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                  {(p.return_percent || 0).toFixed(1)}%
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+      </AnalysisCard>
+      {/* ── 5. Monthly Income Goal ── */}
+      <AnalysisCard>
+        <SectionTitle emoji="🎯" title="Cobertura de Renda Passiva" subtitle="Meta mensal vs média real dos últimos 12 meses" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Meta Mensal</div>
+            {editingGoal ? (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={goalInput}
+                  onChange={e => setGoalInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveGoal()}
+                  placeholder="Ex: 1.000,00"
+                  autoFocus
+                  style={{
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '8px', padding: '0.4rem 0.6rem', color: 'var(--text-primary)',
+                    fontSize: '0.9rem', width: '130px', outline: 'none', fontVariantNumeric: 'tabular-nums',
+                  }}
+                />
+                <button onClick={saveGoal} style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: '8px', padding: '0.4rem 0.75rem', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>Salvar</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.3rem', fontWeight: 700, color: monthlyGoal > 0 ? 'var(--text-primary)' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {monthlyGoal > 0 ? formatMoney(monthlyGoal, 'BRL') : 'Não definida'}
+                </span>
+                <button onClick={() => setEditingGoal(true)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '0.2rem 0.5rem', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.72rem' }}>
+                  ✏️ {monthlyGoal > 0 ? 'Editar' : 'Definir'}
+                </button>
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Média Real (12m)</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#4ade80', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(avgMonthly, 'BRL')}</div>
+          </div>
+        </div>
+
+        {monthlyGoal > 0 && (
+          <>
+            {(() => {
+              const coverage = Math.min((avgMonthly / monthlyGoal) * 100, 100);
+              const barColor = coverage >= 100 ? '#4ade80' : coverage >= 60 ? '#fbbf24' : '#f87171';
+              return (
+                <>
+                  <ProgressBar
+                    value={avgMonthly}
+                    max={monthlyGoal}
+                    color={barColor}
+                    sublabel={`${coverage.toFixed(1)}% da meta atingida`}
+                  />
+                  {coverage >= 100 ? (
+                    <AlertBadge type="success" message="🎉 Parabéns! Sua renda passiva já cobre 100% da sua meta mensal!" />
+                  ) : (
+                    <AlertBadge type="info" message={`Faltam ${formatMoney(monthlyGoal - avgMonthly, 'BRL')}/mês para atingir sua meta. Continue investindo!`} />
+                  )}
+                </>
+              );
+            })()}
+          </>
+        )}
+
+        {monthlyGoal === 0 && (
+          <AlertBadge type="info" message="Defina uma meta mensal de renda passiva para acompanhar seu progresso." />
+        )}
+      </AnalysisCard>
+      {/* ── 7. Valuation & Margem de Segurança ── */}
+      <AnalysisCard>
+        <SectionTitle emoji="⚖️" title="Valuation e Descontos" subtitle="Ativos com maior margem de segurança na carteira" />
+        
+        {valuationData.grahamItems.length === 0 && valuationData.bazinItems.length === 0 ? (
+          <AlertBadge type="info" message="Não há dados suficientes de fundamentos para calcular margem de segurança." />
+        ) : (
+          <>
+             {valuationData.grahamItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Preço Teto - Graham</p>
+                  {valuationData.grahamItems.slice(0, 6).map(item => (
+                    <div key={`graham-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.graham!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+
+             {valuationData.bazinItems.length > 0 && (
+                <>
+                  <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginTop: '1rem', marginBottom: '0.5rem' }}>Preço Teto - Bazin</p>
+                  {valuationData.bazinItems.slice(0, 6).map(item => (
+                    <div key={`bazin-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
+                       <div style={{ flex: 1 }}>
+                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
+                         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço: {formatMoney(item.current!, kpiCurrency)} · Teto: {formatMoney(item.bazin!, kpiCurrency)}</div>
+                       </div>
+                       <div style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: item.discount > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', color: item.discount > 0 ? '#4ade80' : '#f87171', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {item.discount > 0 ? '-' : '+'}{Math.abs(item.discount).toFixed(1)}%
+                       </div>
+                    </div>
+                  ))}
+                </>
+             )}
+          </>
+        )}
+      </AnalysisCard>
+      {/* ── 8. Sazonalidade de Proventos ── */}
+      <AnalysisCard>
+        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (12 meses + próximos)" />
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '140px', gap: '8px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+          {dividendSeasonality.map((item, i) => (
+             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                   {item.totalValue > 0 ? (item.totalValue >= 1000 ? `${(item.totalValue/1000).toFixed(1).replace('.0','')}k` : Math.round(item.totalValue)) : ''}
+                </span>
+                <div 
+                   title={`${item.monthLabel}: ${formatMoney(item.totalValue, 'BRL')} ${item.futureValue > 0 ? `(Provisionado: ${formatMoney(item.futureValue, 'BRL')})` : ''}`}
+                   style={{ 
+                     width: '100%', 
+                     display: 'flex',
+                     flexDirection: 'column',
+                     justifyContent: 'flex-end',
+                     height: `${Math.max(item.pctPast + item.pctFuture, 1)}%`, 
+                     minHeight: '4px',
+                     borderRadius: '4px 4px 0 0',
+                     overflow: 'hidden'
+                   }} 
+                >
+                   {item.pctFuture > 0 && (
+                      <div style={{ 
+                          width: '100%', 
+                          height: `${(item.pctFuture / (item.pctPast + item.pctFuture)) * 100}%`, 
+                          background: 'rgba(251, 191, 36, 0.8)'
+                      }} />
+                   )}
+                   {item.pctPast > 0 && (
+                      <div style={{ 
+                          width: '100%', 
+                          height: `${(item.pctPast / (item.pctPast + item.pctFuture)) * 100}%`, 
+                          background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)' 
+                      }} />
+                   )}
+                </div>
+             </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
+           {dividendSeasonality.map((item, i) => (
+              <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                 <span style={{ fontSize: '0.65rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>
+                    {item.monthLabel}
+                 </span>
+              </div>
+           ))}
+        </div>
+        
+        {upcomingDividends.length > 0 && (
+           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(74,222,128,0.05)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.2)' }}>
+              <p style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
+              <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+                 {formatMoney(upcomingDividends.reduce((s, d) => s + d.net_amount, 0), 'BRL')}
+              </p>
+           </div>
+        )}
+      </AnalysisCard>
+      {/* ── 9. Liquidez e Renda Fixa ── */}
+      {fiPositions.length > 0 && (
+        <AnalysisCard>
+          <SectionTitle emoji="💧" title="Liquidez da Renda Fixa" subtitle="Perfil de vencimento dos seus ativos" />
+          
+          <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '1rem' }}>
+            {fiLiquidity.map((item, i) => (
+              <div key={i} style={{ width: `${(item.value / fiLiquidity.reduce((s, x) => s + x.value, 0)) * 100}%`, background: item.color }} title={`${item.label}: ${formatMoney(item.value, kpiCurrency)}
+`} />
+            ))}
+
+          </div>
+          
+          <div>
+            {fiLiquidity.map((item, i) => {
+               const totalLiquidity = fiLiquidity.reduce((s, x) => s + x.value, 0);
+               const pct = totalLiquidity > 0 ? (item.value / totalLiquidity) * 100 : 0;
+               return (
+                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                   </div>
+                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pct.toFixed(1)}
+%</span>
+                 </div>
+               );
+            })}
+
+          </div>
+        </AnalysisCard>
+      )}
+
     </div>
   );
 }
