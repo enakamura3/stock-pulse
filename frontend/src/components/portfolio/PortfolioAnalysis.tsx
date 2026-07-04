@@ -703,7 +703,7 @@ export default function PortfolioAnalysis({
   }
 
 
-  const avgMonthly = (dividendsLast12m.reduce((s, d) => s + d.net_amount, 0)) / MONTHS_FOR_YIELD;
+  const avgMonthly = incomeKPIs.totalDiv12m / MONTHS_FOR_YIELD;
 
   // 4. Top performers & worst
   const rankedPositions = useMemo(() =>
@@ -713,6 +713,7 @@ export default function PortfolioAnalysis({
     [positions]
   );
   const topPerformers = rankedPositions.slice(0, TOP_N);
+  const worstPerformers = [...rankedPositions].reverse().slice(0, TOP_N);
 
   const maxAbsReturn = Math.max(...[...topPerformers, ...worstPerformers].map(p => Math.abs(p.return_percent || 0)), 1);
 
