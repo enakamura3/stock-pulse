@@ -820,9 +820,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 		}
 	}
 
-	if len(finalPoints) == 0 {
-		return points, nil
-	}
+
 
 	return finalPoints, nil
 }

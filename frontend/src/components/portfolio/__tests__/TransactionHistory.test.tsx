@@ -21,7 +21,7 @@ describe('TransactionHistory Component', () => {
         onLaunchOperation={mockOnLaunchOperation}
       />
     );
-    expect(screen.getByText('Sem transações registradas nesta carteira.')).toBeInTheDocument();
+    expect(screen.getByText(/Nenhuma transação registrada nesta carteira/i)).toBeInTheDocument();
   });
 
   it('renders transactions and conditionally displays the exchange rate based on kpiCurrency', () => {

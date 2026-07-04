@@ -145,17 +145,16 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 
-	resp, err := s.provider.(*YahooFinanceProvider).client.Do(req)
+	var resp *http.Response
+	if yp, ok := s.provider.(*YahooFinanceProvider); ok {
+		resp, err = yp.client.Do(req)
+	} else {
+		err = fmt.Errorf("not a YahooFinanceProvider")
+	}
 	// We need to use http.DefaultClient since we can't easily access the unexported client.
 	// Actually, just create a temporary client here for simplicity, since it's just an internal helper.
 	if err != nil {
 		// fallback to generic http
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err = client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-	} else if resp == nil {
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err = client.Do(req)
 		if err != nil {

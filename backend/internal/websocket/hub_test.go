@@ -104,6 +104,13 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeWS(rec, req)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	// Test handler bad upgrade (authorized but missing WS headers)
+	req2 := httptest.NewRequest("GET", "/ws", nil)
+	req2 = req2.WithContext(context.WithValue(req2.Context(), auth.UserIDKey, "test_user"))
+	rec2 := httptest.NewRecorder()
+	handler.ServeWS(rec2, req2)
+	assert.Equal(t, http.StatusBadRequest, rec2.Code)
 }
 
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
