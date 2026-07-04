@@ -40,10 +40,10 @@ export default function PortfolioHeader({ userName, onLogout, onLinkTelegram }: 
         <button 
           className="btn-secondary" 
           onClick={onLogout} 
-          style={{ padding: '0.45rem', fontSize: '1rem', border: 'none', background: 'transparent' }}
+          style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
           title="Sair"
         >
-          🚪
+          🚪 Sair
         </button>
       </div>
     </div>
