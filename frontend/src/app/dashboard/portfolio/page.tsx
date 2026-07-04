@@ -525,7 +525,15 @@ export default function PortfolioPage() {
   const currentValue = eqValue + fiValue;
   const profitLoss = currentValue - totalCost;
   const returnPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0.0;
-  const totalDividends = categoryFilteredDividends.reduce((acc, div) => acc + (div.total_value || 0), 0);
+  
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const divs12m = categoryFilteredDividends.filter(div => {
+    const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
+    return dateStr && new Date(dateStr) >= twelveMonthsAgo;
+  });
+  const sumDivs12m = divs12m.reduce((acc, div) => acc + ((div as any).total_value || div.net_amount || 0), 0);
+  const avgDividends12m = sumDivs12m / 12;
 
   const availableCategories = Array.from(new Set(positions.map(pos => getAssetCategory(pos.type)))).sort();
   const filterCategories = ['Todas', ...availableCategories];
@@ -562,7 +570,7 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <div className="flex-col gap-xl">
-          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} totalDividends={totalDividends} kpiCurrency={kpiCurrency} />
+          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} />
 
 
 

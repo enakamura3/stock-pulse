@@ -6,12 +6,12 @@ interface PortfolioSummaryCardsProps {
   currentValue: number;
   profitLoss: number;
   returnPercent: number;
-  totalDividends: number;
+  avgDividends12m: number;
   kpiCurrency: string;
 }
 
 export default function PortfolioSummaryCards({
-  totalCost, currentValue, profitLoss, returnPercent, totalDividends, kpiCurrency
+  totalCost, currentValue, profitLoss, returnPercent, avgDividends12m, kpiCurrency
 }: PortfolioSummaryCardsProps) {
   const isPos = profitLoss >= 0;
 
@@ -51,10 +51,11 @@ export default function PortfolioSummaryCards({
 
       <div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}>
         <span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          <span>💸</span> Proventos Recebidos
+          <span>💸</span> Média de Proventos (12m)
         </span>
         <span className="text-2xl font-bold mt-sm" style={{ color: '#00f2fe', letterSpacing: '-0.02em' }}>
-          {formatMoney(totalDividends, kpiCurrency)}
+          {formatMoney(avgDividends12m, kpiCurrency)}
+          <span style={{ fontSize: '0.8rem', opacity: 0.7, fontWeight: 500, marginLeft: '4px' }}>/mês</span>
         </span>
       </div>
     </div>
