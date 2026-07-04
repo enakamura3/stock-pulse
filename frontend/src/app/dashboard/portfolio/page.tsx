@@ -16,7 +16,6 @@ import DividendsHistory from '@/components/portfolio/DividendsHistory';
 import DailyReport from '@/components/portfolio/DailyReport';
 import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import TreasuryTab from '@/components/portfolio/TreasuryTab';
-import PortfolioInsights from '@/components/portfolio/PortfolioInsights';
 import PortfolioAnalysis from '@/components/portfolio/PortfolioAnalysis';
 import Modals from '@/components/portfolio/Modals';
 
@@ -595,9 +594,6 @@ export default function PortfolioPage() {
             <button onClick={() => setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}>
               💰 Proventos
             </button>
-            <button onClick={() => setActiveTab('insights')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'insights' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'insights' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'insights' ? 700 : 500, fontSize: '0.9rem' }}>
-              📊 Análise da Carteira
-            </button>
             <button onClick={() => setActiveTab('analise')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'analise' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'analise' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'analise' ? 700 : 500, fontSize: '0.9rem' }}>
               🔬 Análise Avançada
             </button>
@@ -665,15 +661,6 @@ export default function PortfolioPage() {
 
           {activeTab === 'proventos' && (
             <DividendsHistory dividends={filteredDividends} allDividends={categoryFilteredDividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
-          )}
-
-          {activeTab === 'insights' && (
-            <PortfolioInsights
-              positions={filteredPositions}
-              dividends={categoryFilteredDividends}
-              fiPositions={filteredFI}
-              kpiCurrency={kpiCurrency}
-            />
           )}
 
           {activeTab === 'analise' && (
