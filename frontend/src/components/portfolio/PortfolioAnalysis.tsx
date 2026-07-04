@@ -619,10 +619,6 @@ export default function PortfolioAnalysis({
   const benchmarkData = useMemo((): BenchmarkPoint[] => {
     if (!performanceData || performanceData.length === 0) return [];
 
-    const firstValue = performanceData[0].value;
-    const firstInvested = performanceData[0].total_invested;
-    if (firstInvested < 1e-6) return [];
-
     // CDI ~1.05%/month → daily ~0.034%
     // IPCA ~0.5%/month → daily ~0.016%
     // IFIX ~0.7%/month → daily ~0.023%
@@ -638,9 +634,9 @@ export default function PortfolioAnalysis({
     const step = Math.max(1, Math.floor(performanceData.length / 60));
     const sampled = performanceData.filter((_, i) => i === 0 || i === performanceData.length - 1 || i % step === 0);
 
-    return sampled.map((point, i) => {
-      const portfolioReturn = firstInvested > 1e-6
-        ? ((point.value - firstInvested) / firstInvested) * 100
+    return sampled.map((point) => {
+      const portfolioReturn = point.total_invested > 1e-6
+        ? ((point.value - point.total_invested) / point.total_invested) * 100
         : 0;
 
       const dayIndex = Math.round((new Date(point.date).getTime() - new Date(performanceData[0].date).getTime()) / (1000 * 60 * 60 * 24));
