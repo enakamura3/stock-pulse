@@ -50,6 +50,7 @@ type Repository interface {
 
 	// Positions & Performance
 	GetActiveSubscriptionLots(ctx context.Context, portfolioID string) ([]TreasuryTransaction, error)
+	GetTreasuryTransactionsList(ctx context.Context, portfolioID string) ([]TreasuryTxRequest, error)
 	GetTreasuryPerformancePoints(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
 	GetTreasuryAssetDetails(ctx context.Context, assetID string) (ticker string, treasuryType string, maturityDate time.Time, hasCoupons bool, err error)
 }
@@ -583,6 +584,38 @@ func (r *repository) GetTreasuryPerformancePoints(ctx context.Context, portfolio
 		})
 	}
 	return points, nil
+}
+
+func (r *repository) GetTreasuryTransactionsList(ctx context.Context, portfolioID string) ([]TreasuryTxRequest, error) {
+	query := `
+		SELECT a.ticker, ta.treasury_type, ta.maturity_date, ta.has_coupons, 
+		       t.type, t.quantity, t.unit_price, t.contracted_rate, t.transaction_date
+		FROM treasury_transactions t
+		JOIN treasury_assets ta ON t.asset_id = ta.id
+		JOIN asset a ON ta.id = a.id
+		WHERE t.portfolio_id = $1
+		ORDER BY t.transaction_date ASC, t.created_at ASC`
+	rows, err := r.db.Query(ctx, query, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reqs []TreasuryTxRequest
+	for rows.Next() {
+		var req TreasuryTxRequest
+		var matDate time.Time
+		var txDate time.Time
+		err = rows.Scan(&req.Ticker, &req.TreasuryType, &matDate, &req.HasCoupons, 
+			&req.Type, &req.Quantity, &req.UnitPrice, &req.ContractedRate, &txDate)
+		if err != nil {
+			return nil, err
+		}
+		req.MaturityDate = matDate.Format("2006-01-02")
+		req.TransactionDate = txDate.Format("2006-01-02")
+		reqs = append(reqs, req)
+	}
+	return reqs, nil
 }
 
 func (r *repository) GetTreasuryAssetDetails(ctx context.Context, assetID string) (ticker string, treasuryType string, maturityDate time.Time, hasCoupons bool, err error) {

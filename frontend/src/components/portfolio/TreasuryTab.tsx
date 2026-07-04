@@ -223,7 +223,78 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
       setIsSubmitting(false);
     }
   }
+  // ── Import / Export handlers ────────────────────────────────────────────────
 
+  async function handleExport() {
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/transactions`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tesouro_direto_${portfolioId}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Erro ao exportar operações.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao exportar.');
+    }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const operations: NewTreasuryTx[] = JSON.parse(text);
+
+      if (!Array.isArray(operations)) {
+        alert('Formato inválido. O arquivo deve conter uma lista (array) de operações em JSON.');
+        return;
+      }
+
+      setIsLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const op of operations) {
+        try {
+          const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/transactions`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(op),
+          });
+          if (res.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch {
+          errorCount++;
+        }
+      }
+
+      alert(`Importação concluída: ${successCount} sucesso(s), ${errorCount} erro(s).`);
+      fetchPositions();
+      fetchPerformance();
+    } catch (err) {
+      alert('Erro ao processar arquivo JSON. Certifique-se de que é um formato válido.');
+    } finally {
+      setIsLoading(false);
+      e.target.value = ''; // reset
+    }
+  }
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -302,14 +373,27 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
               {positions.length} título{positions.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <button
-            id="treasury-add-btn"
-            onClick={openModal}
-            className="primary-button"
-            style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-          >
-            + Nova Aplicação
-          </button>
+          <div className="flex-row gap-sm">
+            <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
+              📥 Importar
+              <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
+            </label>
+            <button
+              onClick={handleExport}
+              className="btn-secondary"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+            >
+              📤 Exportar
+            </button>
+            <button
+              id="treasury-add-btn"
+              onClick={openModal}
+              className="primary-button"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+            >
+              + Nova Aplicação
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
