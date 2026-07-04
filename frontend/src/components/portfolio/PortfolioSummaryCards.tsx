@@ -39,12 +39,12 @@ export default function PortfolioSummaryCards({
         <span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           <span>{isPos ? '📈' : '📉'}</span> Lucro / Prejuízo
         </span>
-        <div className="flex-row flex-wrap items-baseline gap-sm mt-sm">
-          <span className="text-2xl font-bold" style={{ color: isPos ? '#00e676' : '#ff3d00', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>
+        <div className="flex-col gap-xs mt-sm">
+          <span className="text-2xl font-bold" style={{ color: isPos ? '#00e676' : '#ff3d00', letterSpacing: '-0.02em', wordBreak: 'break-word', lineHeight: 1.1 }}>
             {isPos ? '+' : ''}{formatMoney(profitLoss, kpiCurrency)}
           </span>
-          <span style={{ fontSize: '0.8rem', color: isPos ? '#00e676' : '#ff3d00', opacity: 0.8, fontWeight: 600 }}>
-            ({formatPercentage(returnPercent)})
+          <span style={{ fontSize: '0.9rem', color: isPos ? '#00e676' : '#ff3d00', opacity: 0.9, fontWeight: 600 }}>
+            {formatPercentage(returnPercent)}
           </span>
         </div>
       </div>
