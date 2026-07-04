@@ -296,14 +296,6 @@ export default function TransactionHistory({
               <strong style={{ color: '#ff3d00' }}>{formatMoney(summary.totalSold, kpiCurrency)}</strong>
             </span>
           )}
-          {summary.totalBought > 0 && summary.totalSold > 0 && (
-            <span className="text-secondary">
-              📊 Saldo Líquido:{' '}
-              <strong style={{ color: summary.totalSold - summary.totalBought >= 0 ? '#00e676' : '#ff3d00' }}>
-                {formatMoney(summary.totalSold - summary.totalBought, kpiCurrency)}
-              </strong>
-            </span>
-          )}
         </div>
       )}
 
