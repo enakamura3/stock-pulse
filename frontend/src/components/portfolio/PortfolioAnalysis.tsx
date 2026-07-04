@@ -296,8 +296,126 @@ export default function PortfolioAnalysis({
   performanceData,
   kpiCurrency,
 }: PortfolioAnalysisProps) {
-  const dividendSeasonality: any[] = [];
-  const upcomingDividends: any[] = [];
+  const upcomingDividends = useMemo(() => {
+    return dividends.filter(div => {
+      if (!div.payment_date || div.payment_date.startsWith('0001')) return true;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const [year, month, day] = div.payment_date.split('T')[0].split('-');
+      const payDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return payDate > today;
+    });
+  }, [dividends]);
+
+  const dividendSeasonality = useMemo(() => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+
+    const getDividendMonthKey = (div: CalculatedDividend): string | null => {
+      let dateStr = div.payment_date;
+      if (!dateStr || dateStr.startsWith('0001')) {
+        dateStr = div.ex_date;
+      }
+      if (!dateStr || dateStr.startsWith('0001')) {
+        return null;
+      }
+      const parts = dateStr.split('T')[0].split('-');
+      if (parts.length >= 2) {
+        return `${parts[0]}-${parts[1]}`;
+      }
+      return null;
+    };
+
+    const isPaidVal = (div: CalculatedDividend) => {
+      if (!div.payment_date || div.payment_date.startsWith('0001')) return false;
+      const [y, mm, dd] = div.payment_date.split('T')[0].split('-');
+      const payDate = new Date(parseInt(y), parseInt(mm) - 1, parseInt(dd));
+      const t = new Date();
+      t.setHours(0, 0, 0, 0);
+      return payDate <= t;
+    };
+
+    const start = new Date(currentYear, currentMonth - 11, 1);
+    let end = new Date(currentYear, currentMonth, 1);
+
+    dividends.forEach(div => {
+      if (!isPaidVal(div)) {
+        const key = getDividendMonthKey(div);
+        if (key) {
+          const [y, m] = key.split('-').map(Number);
+          const divDate = new Date(y, m - 1, 1);
+          if (divDate > end) {
+            end = divDate;
+          }
+        }
+      }
+    });
+
+    const maxFuture = new Date(currentYear, currentMonth + 11, 1);
+    if (end > maxFuture) {
+      end = maxFuture;
+    }
+
+    const monthsList: { year: number; month: number; key: string; label: string; isCurrent: boolean }[] = [];
+    let current = new Date(start);
+    const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    while (current <= end) {
+      const y = current.getFullYear();
+      const m = current.getMonth();
+      const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+      const label = `${monthLabels[m]}/${String(y).slice(-2)}`;
+      const isCurr = y === currentYear && m === currentMonth;
+
+      monthsList.push({
+        year: y,
+        month: m,
+        key,
+        label,
+        isCurrent: isCurr,
+      });
+
+      current.setMonth(current.getMonth() + 1);
+    }
+
+    const monthlyData = monthsList.map(m => {
+      let pastValue = 0;
+      let futureValue = 0;
+
+      dividends.forEach(div => {
+        const key = getDividendMonthKey(div);
+        if (key === m.key) {
+          const amount = div.net_amount || div.gross_amount || 0;
+          if (isPaidVal(div)) {
+            pastValue += amount;
+          } else {
+            futureValue += amount;
+          }
+        }
+      });
+
+      return {
+        monthLabel: m.label,
+        isCurrent: m.isCurrent,
+        pastValue,
+        futureValue,
+        totalValue: pastValue + futureValue,
+      };
+    });
+
+    const maxVal = Math.max(...monthlyData.map(m => m.totalValue), 0);
+
+    return monthlyData.map(m => {
+      const pctPast = maxVal > 0 ? (m.pastValue / maxVal) * 100 : 0;
+      const pctFuture = maxVal > 0 ? (m.futureValue / maxVal) * 100 : 0;
+      return {
+        ...m,
+        pctPast,
+        pctFuture,
+      };
+    });
+  }, [dividends]);
 
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [goalInput, setGoalInput] = useState<string>('');
