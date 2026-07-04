@@ -44,9 +44,7 @@ func NewService(repo Repository, rdb *redis.Client) Service {
 
 func (s *service) GenerateLinkToken(ctx context.Context, userID uuid.UUID) (string, error) {
 	bytes := make([]byte, 16)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
+	rand.Read(bytes)
 	token := hex.EncodeToString(bytes)
 
 	err := s.redis.Set(ctx, "telegram_link:"+token, userID.String(), 10*time.Minute).Err()

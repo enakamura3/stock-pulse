@@ -296,6 +296,8 @@ export default function PortfolioAnalysis({
   performanceData,
   kpiCurrency,
 }: PortfolioAnalysisProps) {
+  const dividendSeasonality: any[] = [];
+  const upcomingDividends: any[] = [];
 
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [goalInput, setGoalInput] = useState<string>('');

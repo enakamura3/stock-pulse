@@ -13,7 +13,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
-	
+
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 )
 
@@ -52,7 +52,7 @@ func NewHandlers(svc Service, pSvc PortfolioService, mSvc MarketService, fiSvc F
 func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("/start", h.HandleStart)
 	bot.Handle("/menu", h.HandleMenu)
-	
+
 	// Callback dos Inline Keyboards estáticos
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
@@ -134,7 +134,7 @@ func (h *Handlers) resolveActivePortfolio(ctx context.Context, chatID int64, por
 	if len(portfolios) == 0 {
 		return "", ""
 	}
-	
+
 	activeID, err := h.svc.GetActivePortfolio(ctx, chatID)
 	if err == nil && activeID != "" {
 		for _, p := range portfolios {
@@ -170,7 +170,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	for _, pos := range positions {
 		totalValue += pos.CurrentValue
 		totalCost += pos.TotalCost
-		// Simplificação: Assumimos que o CurrentValue embute a taxa de câmbio. 
+		// Simplificação: Assumimos que o CurrentValue embute a taxa de câmbio.
 		rate := 1.0
 		if pos.CurrentPrice > 0 && pos.Quantity > 0 {
 			rate = pos.CurrentValue / (pos.CurrentPrice * pos.Quantity)
@@ -188,7 +188,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 				totalFIValue += pos.NetValue
 				totalValue += pos.NetValue
 				totalCost += pos.TotalInvested
-				
+
 				if pos.DaysToMaturity <= 30 && !pos.IsMatured {
 					nearMaturity = append(nearMaturity, pos)
 				}
@@ -205,7 +205,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📊 *Resumo: %s*\n\n", portfolioName)
 	msg += p.Sprintf("💰 Valor Total: *R$ %.2f*\n", totalValue)
-	
+
 	var variacaoDiaria string
 	if totalDailyChange >= 0 {
 		variacaoDiaria = p.Sprintf("🟢 +R$ %.2f", totalDailyChange)
@@ -213,7 +213,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		variacaoDiaria = p.Sprintf("🔴 R$ %.2f", totalDailyChange)
 	}
 	msg += p.Sprintf("📈 Variação Diária: *%s*\n", variacaoDiaria)
-	
+
 	var lucroPrejuizo string
 	if totalProfitLoss >= 0 {
 		lucroPrejuizo = p.Sprintf("🟢 +R$ %.2f (%.2f%%)", totalProfitLoss, totalReturnPercent)
@@ -221,7 +221,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		lucroPrejuizo = p.Sprintf("🔴 R$ %.2f (%.2f%%)", totalProfitLoss, totalReturnPercent)
 	}
 	msg += p.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
-	
+
 	if len(nearMaturity) > 0 {
 		msg += "\n⚠️ *Vencimentos Próximos (Renda Fixa)*\n"
 		for _, pos := range nearMaturity {
@@ -300,7 +300,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 
 	// Acknowledge the callback to remove the loading state on the button
 	c.Respond()
-	
+
 	return c.Send(msg, telebot.ModeMarkdown)
 }
 
@@ -383,7 +383,7 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 	data := c.Callback().Data
 	data = strings.TrimPrefix(data, "\f")
-	
+
 	if strings.HasPrefix(data, "btn_ticker_") {
 		ticker := strings.TrimPrefix(data, "btn_ticker_")
 		return h.handleSelectedTicker(c, ticker)
@@ -524,7 +524,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		if err != nil {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:")
 		}
-		
+
 		return h.handleSelectedTicker(c, ticker)
 
 	case "EXPECT_QTY":
@@ -575,7 +575,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		if state.Type == "SELL" {
 			tipoStr = "VENDA"
 		}
-		
+
 		p := message.NewPrinter(language.BrazilianPortuguese)
 		successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\nAtivo: %s\nTipo: %s\nQuantidade: %.4f\nPreço Unitário: %.2f\nTotal: %.2f",
 			state.Ticker, tipoStr, state.Quantity, price, tx.TotalCost)
@@ -609,7 +609,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	now := time.Now()
 	currentMonth := now.Month()
 	currentYear := now.Year()
-	
+
 	for _, d := range divs {
 		if d.PaymentDate.Year() == currentYear && d.PaymentDate.Month() == currentMonth {
 			if d.PaymentDate.After(now) {
@@ -624,7 +624,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	msg := p.Sprintf("💸 *Proventos: %s*\n\n", portfolioName)
 	msg += p.Sprintf("✅ *Recebidos (Mês Atual):* R$ %.2f\n", totalPaidMonth)
 	msg += p.Sprintf("⏳ *A Receber (Mês Atual):* R$ %.2f\n", totalFutureMonth)
-	
+
 	if len(divs) > 0 {
 		var pastDivs []portfolio.CalculatedDividend
 		var futureDivs []portfolio.CalculatedDividend
@@ -638,17 +638,17 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 
 		if len(pastDivs) > 0 {
 			msg += "\n📋 *Últimos Pagamentos*\n"
-			
+
 			// Ordernar pastDivs por data de pagamento decrescente
 			sort.Slice(pastDivs, func(i, j int) bool {
 				return pastDivs[i].PaymentDate.After(pastDivs[j].PaymentDate)
 			})
-			
+
 			limit := 3
 			if len(pastDivs) < 3 {
 				limit = len(pastDivs)
 			}
-			
+
 			sym := getCurrencySymbol("BRL")
 			for i := 0; i < limit; i++ {
 				d := pastDivs[i]
@@ -662,17 +662,17 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 
 		if len(futureDivs) > 0 {
 			msg += "\n📅 *Próximos Pagamentos*\n"
-			
+
 			// Ordernar futureDivs por data de pagamento crescente (mais próximos primeiro)
 			sort.Slice(futureDivs, func(i, j int) bool {
 				return futureDivs[i].PaymentDate.Before(futureDivs[j].PaymentDate)
 			})
-			
+
 			limit := 3
 			if len(futureDivs) < 3 {
 				limit = len(futureDivs)
 			}
-			
+
 			sym := getCurrencySymbol("BRL")
 			for i := 0; i < limit; i++ {
 				d := futureDivs[i]
@@ -798,7 +798,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📆 *Proventos por Mês: %s*\n_Página %d_\n\n", portfolioName, page+1)
-	
+
 	sym := getCurrencySymbol("BRL")
 	for _, k := range pageKeys {
 		// Format back to YYYY/MM for display
@@ -809,29 +809,29 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			parts := strings.Split(k, "-")
 			display = fmt.Sprintf("%s/%s", parts[0], parts[1])
 		}
-		
+
 		type tSummary struct {
 			amount float64
 			dates  []string
 			dType  string
 		}
 		summaryMap := make(map[string]*tSummary)
-		
+
 		var totalMonth float64
 		for _, d := range grouped[k] {
 			totalMonth += d.NetAmount
-			
+
 			dType := "Div"
 			if d.Type != "" {
 				dType = d.Type
 			}
-			
+
 			mapKey := d.Ticker + "|" + dType
 			if _, exists := summaryMap[mapKey]; !exists {
 				summaryMap[mapKey] = &tSummary{dType: dType}
 			}
 			summaryMap[mapKey].amount += d.NetAmount
-			
+
 			dateStr := d.PaymentDate.Format("2006-01-02")
 			if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
 				dateStr = "-"
@@ -847,16 +847,16 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 				summaryMap[mapKey].dates = append(summaryMap[mapKey].dates, dateStr)
 			}
 		}
-		
+
 		msg += p.Sprintf("• *%s*: R$ %.2f\n", display, totalMonth)
-		
+
 		// Sort mapKeys alphabetically
 		mapKeys := make([]string, 0, len(summaryMap))
 		for mk := range summaryMap {
 			mapKeys = append(mapKeys, mk)
 		}
 		sort.Strings(mapKeys)
-		
+
 		for _, mk := range mapKeys {
 			sum := summaryMap[mk]
 			ticker := strings.Split(mk, "|")[0]
@@ -868,7 +868,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 
 	menu := &telebot.ReplyMarkup{}
 	var btns []telebot.Btn
-	
+
 	if start > 0 {
 		btns = append(btns, menu.Data("⬅️ Anterior", "btn_divs_month", fmt.Sprintf("%d", page-1)))
 	}
@@ -937,7 +937,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 		if tx.Type == "SELL" {
 			tipoStr = "🔴 V"
 		}
-		
+
 		msg += p.Sprintf("%s | `%s`\n", tipoStr, tx.Ticker)
 		msg += p.Sprintf("Data: %s\n", tx.ExecutedAt.Format("2006-01-02"))
 		msg += p.Sprintf("Qtd: %.4f | Preço: %.2f | Total: %.2f\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost)
@@ -945,7 +945,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 
 	menu := &telebot.ReplyMarkup{}
 	var btns []telebot.Btn
-	
+
 	if start > 0 {
 		btns = append(btns, menu.Data("⬅️ Anterior", "btn_history", fmt.Sprintf("%d", page-1)))
 	}
@@ -958,12 +958,12 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	}
 
 	c.Respond()
-	
+
 	if pageStr != "" && c.Message() != nil && c.Message().Text != "" {
 		// It's a pagination click, update the existing message
 		return c.Edit(msg, telebot.ModeMarkdown, menu)
 	}
-	
+
 	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
 
@@ -1005,14 +1005,14 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	msg := p.Sprintf("🏛️ *Renda Fixa: %s*\n\n", portfolioName)
 	msg += p.Sprintf("💰 Valor Líquido: *R$ %.2f*\n", totalLiquido)
 	msg += p.Sprintf("📈 Valor Bruto: R$ %.2f\n", totalBruto)
-	
+
 	lucro := totalLiquido - totalCusto
 	lucroPct := 0.0
 	if totalCusto > 0 {
 		lucroPct = (lucro / totalCusto) * 100
 	}
 	msg += p.Sprintf("⚖️ Lucro Líquido: R$ %.2f (%.2f%%)\n\n", lucro, lucroPct)
-	
+
 	msg += "*Minhas Posições:*\n"
 	for _, pos := range positions {
 		status := ""
@@ -1021,14 +1021,14 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 		} else if pos.DaysToMaturity <= 30 {
 			status = " *(Vence logo!)*"
 		}
-		
+
 		taxa := ""
 		if pos.Asset.DebtType == "POS" {
 			taxa = p.Sprintf("%.2f%% %s", pos.Asset.Rate, pos.Asset.Indexer)
 		} else {
 			taxa = p.Sprintf("%.2f%% a.a.", pos.Asset.Rate)
 		}
-		
+
 		msg += p.Sprintf("• `%s %s` - %s\n", pos.Asset.Institution, pos.Asset.Type, taxa)
 		msg += p.Sprintf("  Líquido: R$ %.2f (+%.2f%%)%s\n", pos.NetValue, pos.NetReturnPercent, status)
 	}

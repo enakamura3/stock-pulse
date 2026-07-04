@@ -673,3 +673,181 @@ func (m *MockPortfolioRepo) GetOldestPriceDate(ctx context.Context, assetID stri
 	args := m.Called(ctx, assetID)
 	return args.Get(0).(time.Time), args.Error(1)
 }
+
+func TestService_DetermineAssetType(t *testing.T) {
+	assert.Equal(t, "CRYPTO", determineAssetType("BTC-USD", "Bitcoin", "USD"))
+	assert.Equal(t, "ETF_US", determineAssetType("SPY", "SPDR S&P 500 ETF Trust", "USD"))
+	assert.Equal(t, "STOCK_US", determineAssetType("AAPL", "Apple", "USD"))
+	assert.Equal(t, "BDR", determineAssetType("AAPL34.SA", "Apple BDR", "BRL"))
+	assert.Equal(t, "BDR", determineAssetType("AAPL35.SA", "Apple BDR", "BRL"))
+	assert.Equal(t, "BDR", determineAssetType("AAPL39.SA", "Apple BDR", "BRL"))
+	assert.Equal(t, "ETF_BR", determineAssetType("BOVA11.SA", "iShares Ibovespa ETF", "BRL"))
+	assert.Equal(t, "FIAGRO", determineAssetType("RZAG11.SA", "Riza Fiagro", "BRL"))
+	assert.Equal(t, "FII", determineAssetType("HGLG11.SA", "FII CSHG", "BRL"))
+	assert.Equal(t, "STOCK_BR", determineAssetType("PETR4.SA", "Petrobras", "BRL"))
+}
+
+func TestService_GetFixedIncomeService(t *testing.T) {
+	s, _, _, _ := setupServiceTest()
+	assert.Nil(t, s.GetFixedIncomeService())
+}
+
+func TestService_UpdateTransaction(t *testing.T) {
+	t.Run("Portfolio Not Found", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL"})
+		assert.ErrorContains(t, err, "carteira não encontrada")
+	})
+
+	t.Run("Invalid Ticker", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: ""})
+		assert.ErrorContains(t, err, "ticker do ativo inválido")
+	})
+
+	t.Run("Asset Not Found", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL"})
+		assert.ErrorContains(t, err, "ativo não encontrado na base")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
+		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err")) // Ignore background
+
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL", Quantity: 10, UnitPrice: 150})
+		assert.NoError(t, err)
+	})
+}
+
+func TestService_GetUnifiedTransactions(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+		{ID: "tx1", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 150, ExchangeRate: 1.0, Currency: "USD"},
+		{ID: "tx2", PortfolioID: "p1", Ticker: "AAPL", Type: "SPLIT", Quantity: 2, UnitPrice: 0, ExchangeRate: 1.0, Currency: "USD"},
+	}, nil)
+
+	unified, err := s.GetUnifiedTransactions(context.Background(), "p1", "u1")
+	assert.NoError(t, err)
+	assert.Len(t, unified, 2)
+	assert.Equal(t, float64(1500), unified[0].TotalValue)
+	assert.Equal(t, float64(0), unified[1].TotalValue)
+
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p2", "u1").Return(([]Transaction)(nil), errors.New("err"))
+	_, err = s.GetUnifiedTransactions(context.Background(), "p2", "u1")
+	assert.ErrorContains(t, err, "err")
+}
+
+func TestService_BackfillGap(t *testing.T) {
+	t.Run("Create Asset Fallback", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("err"))
+		repo.On("CreateAsset", mock.Anything, "USDBRL=X", "USDBRL=X", "CURRENCY", "BRL").Return("", errors.New("err"))
+
+		err := s.BackfillGap(context.Background(), "USDBRL=X", time.Now())
+		assert.ErrorContains(t, err, "falha ao criar ativo cambial")
+	})
+
+	t.Run("No Gap", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now().AddDate(0, 0, -10), nil)
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now())
+		assert.NoError(t, err)
+	})
+
+	t.Run("HTTP Error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		s, repo, _, _ := setupServiceTest()
+		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
+		assert.ErrorContains(t, err, "status 500")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"chart": {
+					"result": [{
+						"timestamp": [1609459200],
+						"indicators": {
+							"quote": [{
+								"close": [150.0]
+							}]
+						}
+					}]
+				}
+			}`))
+		}))
+		defer server.Close()
+
+		s, repo, _, _ := setupServiceTest()
+		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
+		assert.NoError(t, err)
+	})
+}
+
+func TestService_GetPortfolioDividends(t *testing.T) {
+	t.Run("Portfolio Not Found", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
+		_, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "err")
+	})
+
+	t.Run("Tx Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(([]Transaction)(nil), errors.New("err"))
+		_, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "err")
+	})
+
+	t.Run("Success Calculate", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "STOCK_US"},
+			{AssetID: "a1", Ticker: "AAPL", Type: "SELL", Quantity: 5, ExecutedAt: now.AddDate(0, -1, 5), Currency: "USD", AssetType: "STOCK_US"},
+			{AssetID: "a2", Ticker: "ITUB4", Type: "BUY", Quantity: 100, ExecutedAt: now.AddDate(0, -1, 0), Currency: "BRL", AssetType: "STOCK_BR"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", ExDate: now.AddDate(0, -1, 10), PaymentDate: now, GrossAmount: 1.0, Type: "DIVIDEND"},
+		}, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a2").Return([]AssetEvent{
+			{AssetID: "a2", ExDate: now.AddDate(0, -1, 10), PaymentDate: now, GrossAmount: 0.5, Type: "JCP"},
+		}, nil)
+
+		ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(5.0, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 2)
+	})
+}

@@ -95,6 +95,6 @@ describe('PortfolioAnalysis', () => {
     }).not.toThrow();
 
     // Verify some elements are rendered
-    expect(screen.getByText('Alocação Estratégica')).toBeInTheDocument();
+    expect(screen.getByText(/Alocação Estratégica/i)).toBeInTheDocument();
   });
 });

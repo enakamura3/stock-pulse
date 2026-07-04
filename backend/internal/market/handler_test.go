@@ -71,7 +71,7 @@ func TestHandler_GetQuote(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("Success Hit", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("GetQuoteWithCacheStatus", mock.Anything, "AAPL").Return(&Quote{Symbol: "AAPL", Price: 150.0}, true, nil)
 		req := reqWithParams(httptest.NewRequest("GET", "/quote/AAPL", nil), map[string]string{"ticker": "AAPL"})
@@ -79,6 +79,18 @@ func TestHandler_GetQuote(t *testing.T) {
 		h.GetQuote(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), "AAPL")
+		assert.Equal(t, "HIT", rec.Header().Get("X-Cache"))
+	})
+
+	t.Run("Success Miss", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("GetQuoteWithCacheStatus", mock.Anything, "MSFT").Return(&Quote{Symbol: "MSFT", Price: 300.0}, false, nil)
+		req := reqWithParams(httptest.NewRequest("GET", "/quote/MSFT", nil), map[string]string{"ticker": "MSFT"})
+		rec := httptest.NewRecorder()
+		h.GetQuote(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "MSFT")
+		assert.Equal(t, "MISS", rec.Header().Get("X-Cache"))
 	})
 }
 
@@ -125,7 +137,7 @@ func TestHandler_RespondWithJSON_Error(t *testing.T) {
 }
 
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
-	args := m.Called(ctx, ticker)
+	args := m.Called(ctx, ticker, assetType)
 	if args.Get(0) != nil {
 		return args.Get(0).([]DividendEvent), args.Error(1)
 	}

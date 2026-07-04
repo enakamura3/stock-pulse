@@ -278,6 +278,19 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "i3", item.ID)
 	})
+	
+	t.Run("New Crypto Asset - Crypto Branch", func(t *testing.T) {
+		s, repo, _, mp := setupServiceTest()
+		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)
+		repo.On("GetAssetByTicker", mock.Anything, "BTC-BRL").Return("", errors.New("not found"))
+		mp.On("GetQuote", mock.Anything, "BTC-BRL").Return(&market.Quote{Name: "Bitcoin", Currency: "BRL"}, nil)
+		repo.On("CreateAsset", mock.Anything, "BTC-BRL", "Bitcoin", "CRYPTO", "BRL").Return("a4", nil)
+		repo.On("AddWatchlistItem", mock.Anything, "w1", "a4").Return(&Item{ID: "i4"}, nil)
+
+		item, err := s.AddAssetToWatchlist(context.Background(), "w1", "u1", "BTC-BRL")
+		assert.NoError(t, err)
+		assert.Equal(t, "i4", item.ID)
+	})
 }
 
 func TestService_RemoveAssetFromWatchlist(t *testing.T) {
