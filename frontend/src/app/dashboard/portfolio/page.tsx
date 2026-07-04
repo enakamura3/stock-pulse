@@ -525,6 +525,7 @@ export default function PortfolioPage() {
   const currentValue = eqValue + fiValue;
   const profitLoss = currentValue - totalCost;
   const returnPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0.0;
+  const totalDividends = categoryFilteredDividends.reduce((acc, div) => acc + (div.total_value || 0), 0);
 
   const availableCategories = Array.from(new Set(positions.map(pos => getAssetCategory(pos.type)))).sort();
   const filterCategories = ['Todas', ...availableCategories];
@@ -561,7 +562,7 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <div className="flex-col gap-xl">
-          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} kpiCurrency={kpiCurrency} />
+          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} totalDividends={totalDividends} kpiCurrency={kpiCurrency} />
 
 
 

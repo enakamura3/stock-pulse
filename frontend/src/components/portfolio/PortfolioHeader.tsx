@@ -28,16 +28,22 @@ export default function PortfolioHeader({ userName, onLogout, onLinkTelegram }: 
         <button 
           className="btn-secondary" 
           onClick={onLinkTelegram} 
-          style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', background: '#0088cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+          style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+          title="Vincular Telegram"
         >
-          📱 Vincular Telegram
+          📱 Telegram
         </button>
         <div className="text-right text-xs">
           <span className="font-semibold" style={{ display: 'block' }}>{userName}</span>
           <span className="text-secondary" style={{ fontSize: '0.7rem' }}>Sessão Segura</span>
         </div>
-        <button className="primary-button" onClick={onLogout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
-          Sair
+        <button 
+          className="btn-secondary" 
+          onClick={onLogout} 
+          style={{ padding: '0.45rem', fontSize: '1rem', border: 'none', background: 'transparent' }}
+          title="Sair"
+        >
+          🚪
         </button>
       </div>
     </div>

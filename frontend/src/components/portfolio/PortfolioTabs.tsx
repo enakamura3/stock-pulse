@@ -51,11 +51,11 @@ export default function PortfolioTabs({
           {portfolios.length > 1 && (
             <button
               onClick={handleDeletePortfolio}
-              className="btn-danger"
-              style={{ background: 'none', border: 'none', padding: '0.5rem' }}
+              className="btn-secondary"
+              style={{ background: 'transparent', border: 'none', padding: '0.4rem', fontSize: '1rem', opacity: 0.6 }}
               title="Excluir carteira atual"
             >
-              🗑️ Excluir Carteira
+              🗑️
             </button>
           )}
         </div>
