@@ -113,6 +113,47 @@ function AnalysisCard({ children, style, id }: { children: React.ReactNode; styl
   );
 }
 
+function AssetRiskDetailRow({
+  ticker,
+  subText,
+  valueText,
+  valueColor,
+  barPct,
+  barColor,
+}: {
+  ticker: string;
+  subText: string;
+  valueText: string;
+  valueColor?: string;
+  barPct?: number;
+  barColor?: string;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', margin: '0.25rem 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{ticker}</span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '0.4rem' }}>{subText}</span>
+        </div>
+        <span style={{ fontWeight: 600, color: valueColor || 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', fontSize: '0.78rem' }}>
+          {valueText}
+        </span>
+      </div>
+      {barPct !== undefined && (
+        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%',
+            width: `${barPct}%`,
+            background: barColor || '#00f2fe',
+            borderRadius: '4px',
+            transition: 'width 0.4s ease'
+          }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KPIScorecard({
   label,
   value,
@@ -121,6 +162,7 @@ function KPIScorecard({
   color,
   icon,
   alertLevel,
+  children,
 }: {
   label: string;
   value: string;
@@ -129,7 +171,11 @@ function KPIScorecard({
   color: string;
   icon: string;
   alertLevel?: 'safe' | 'moderate' | 'danger';
+  children?: React.ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
   const alertBorder = alertLevel === 'danger'
     ? 'rgba(248,113,113,0.4)'
     : alertLevel === 'moderate'
@@ -143,16 +189,23 @@ function KPIScorecard({
       : '0 0 20px rgba(74,222,128,0.08)';
 
   return (
-    <div style={{
-      flex: '1 1 250px',
-      background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
-      border: `1px solid ${alertBorder}`,
-      borderRadius: '14px',
-      padding: '1.25rem',
-      boxShadow: alertGlow,
-      transition: 'transform 0.2s ease, box-shadow 0.3s ease',
-      cursor: 'default',
-    }}>
+    <div
+      onClick={() => children && setExpanded(!expanded)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        flex: '1 1 280px',
+        background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
+        border: `1px solid ${alertBorder}`,
+        borderRadius: '14px',
+        padding: '1.25rem',
+        boxShadow: isHovered && children ? '0 8px 30px rgba(0,0,0,0.35)' : alertGlow,
+        transform: isHovered && children ? 'translateY(-2px)' : 'none',
+        transition: 'transform 0.2s ease, box-shadow 0.3s ease',
+        cursor: children ? 'pointer' : 'default',
+        position: 'relative',
+      }}
+    >
       <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
         <span style={{ fontSize: '1rem' }}>{icon}</span>
         {label}
@@ -175,6 +228,47 @@ function KPIScorecard({
           lineHeight: 1.45,
         }}>
           {description}
+        </div>
+      )}
+
+      {children && (
+        <div style={{
+          marginTop: '0.75rem',
+          paddingTop: '0.75rem',
+          borderTop: '1px dashed rgba(255,255,255,0.08)',
+          fontSize: '0.72rem',
+          color: color,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '0.3rem',
+          opacity: isHovered ? 1 : 0.8,
+          transition: 'opacity 0.2s ease',
+          fontWeight: 600,
+        }}>
+          <span>{expanded ? 'Ocultar detalhes' : 'Ver detalhes e ativos'}</span>
+          <span style={{
+            display: 'inline-block',
+            transition: 'transform 0.2s ease',
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}>▼</span>
+        </div>
+      )}
+
+      {expanded && children && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            marginTop: '1rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            cursor: 'default',
+          }}
+        >
+          {children}
         </div>
       )}
     </div>
@@ -623,6 +717,132 @@ export default function PortfolioAnalysis({
       maxDrawdown: Number((maxDD * 100).toFixed(1)),
     };
   }, [performanceData]);
+
+  // Asset Profit & Loss and contributions for Sharpe Ratio
+  const assetProfitLoss = useMemo(() => {
+    const list: { ticker: string; name: string; profitLoss: number; returnPercent: number; weight: number }[] = [];
+    
+    positions.forEach(p => {
+      const pl = p.profit_loss !== undefined ? p.profit_loss : ((p.current_value || 0) - p.total_cost);
+      const retPct = p.return_percent !== undefined ? p.return_percent : (p.total_cost > 0 ? (pl / p.total_cost) * 100 : 0);
+      const weight = totalPortfolioValue > 1e-6 ? ((p.current_value || 0) / totalPortfolioValue) * 100 : 0;
+      list.push({
+        ticker: p.ticker,
+        name: p.name,
+        profitLoss: pl,
+        returnPercent: retPct,
+        weight,
+      });
+    });
+
+    fiPositions.forEach(p => {
+      const invested = p.total_invested !== undefined ? p.total_invested : ((p as any).invested_amount || 0);
+      const pl = p.net_value - invested;
+      const retPct = p.net_return_percent !== undefined ? p.net_return_percent : (invested > 0 ? (pl / invested) * 100 : 0);
+      const weight = totalPortfolioValue > 1e-6 ? (p.net_value / totalPortfolioValue) * 100 : 0;
+      
+      const type = p.asset?.type || p.type || 'Renda Fixa';
+      const indexer = p.asset?.indexer || (p as any).index_type || (p as any).indexer || 'CDI';
+      const institution = p.asset?.institution || (p as any).institution || '';
+      const indexerLabel = indexer === 'PREFIXADO' ? 'Pré' : indexer;
+      
+      list.push({
+        ticker: `${type} ${indexerLabel}`,
+        name: institution,
+        profitLoss: pl,
+        returnPercent: retPct,
+        weight,
+      });
+    });
+
+    return list;
+  }, [positions, fiPositions, totalPortfolioValue]);
+
+  // Volatility profiles and aggressive assets for Beta Card
+  const volatilityExposure = useMemo(() => {
+    let highVolVal = 0;
+    let medVolVal = 0;
+    let lowVolVal = 0;
+
+    positions.forEach(p => {
+      const val = p.current_value || 0;
+      if (['STOCK_BR', 'STOCK_US', 'ETF_BR', 'ETF_US', 'CRYPTO', 'BDR'].includes(p.type)) {
+        highVolVal += val;
+      } else if (['FII', 'FIAGRO'].includes(p.type)) {
+        medVolVal += val;
+      } else {
+        lowVolVal += val;
+      }
+    });
+
+    fiPositions.forEach(p => {
+      lowVolVal += p.net_value;
+    });
+
+    const total = highVolVal + medVolVal + lowVolVal;
+    if (total < 1e-6) {
+      return { highPct: 0, medPct: 0, lowPct: 0, topAggressive: [] };
+    }
+
+    const highVolAssets = positions
+      .filter(p => ['STOCK_BR', 'STOCK_US', 'ETF_BR', 'ETF_US', 'CRYPTO', 'BDR'].includes(p.type))
+      .map(p => ({
+        ticker: p.ticker,
+        weight: totalPortfolioValue > 1e-6 ? ((p.current_value || 0) / totalPortfolioValue) * 100 : 0,
+      }))
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 3);
+
+    return {
+      highPct: (highVolVal / total) * 100,
+      medPct: (medVolVal / total) * 100,
+      lowPct: (lowVolVal / total) * 100,
+      topAggressive: highVolAssets,
+    };
+  }, [positions, fiPositions, totalPortfolioValue]);
+
+  // Concentration metrics for Max Drawdown Card
+  const concentrationMetrics = useMemo(() => {
+    const list: { ticker: string; weight: number }[] = [];
+
+    positions.forEach(p => {
+      const w = totalPortfolioValue > 1e-6 ? ((p.current_value || 0) / totalPortfolioValue) * 100 : 0;
+      list.push({ ticker: p.ticker, weight: w });
+    });
+
+    fiPositions.forEach(p => {
+      const w = totalPortfolioValue > 1e-6 ? (p.net_value / totalPortfolioValue) * 100 : 0;
+      const type = p.asset?.type || p.type || 'Renda Fixa';
+      const indexer = p.asset?.indexer || (p as any).index_type || (p as any).indexer || 'CDI';
+      const institution = p.asset?.institution || (p as any).institution || '';
+      const indexerLabel = indexer === 'PREFIXADO' ? 'Pré' : indexer;
+      
+      list.push({ ticker: `${type} ${indexerLabel} (${institution || 'Renda Fixa'})`, weight: w });
+    });
+
+    const sorted = [...list].sort((a, b) => b.weight - a.weight);
+    const top3 = sorted.slice(0, 3);
+    const top3Sum = top3.reduce((s, x) => s + x.weight, 0);
+
+    return {
+      top3,
+      top3Sum,
+    };
+  }, [positions, fiPositions, totalPortfolioValue]);
+
+  const topGainers = useMemo(() => {
+    return [...assetProfitLoss]
+      .filter(item => item.profitLoss > 0)
+      .sort((a, b) => b.profitLoss - a.profitLoss)
+      .slice(0, 3);
+  }, [assetProfitLoss]);
+
+  const topLosers = useMemo(() => {
+    return [...assetProfitLoss]
+      .filter(item => item.profitLoss < 0)
+      .sort((a, b) => a.profitLoss - b.profitLoss)
+      .slice(0, 3);
+  }, [assetProfitLoss]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SECTION 4: Geração de Renda (Proventos)
@@ -1135,7 +1355,53 @@ export default function PortfolioAnalysis({
               }
               color={riskMetrics.sharpe! >= 1 ? '#4ade80' : riskMetrics.sharpe! >= 0.5 ? '#fbbf24' : '#f87171'}
               alertLevel={riskMetrics.sharpe! >= 1 ? 'safe' : riskMetrics.sharpe! >= 0.5 ? 'moderate' : 'danger'}
-            />
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {topGainers.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: '#4ade80', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span>📈</span> Ativos mais lucrativos
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {topGainers.map(item => (
+                        <AssetRiskDetailRow
+                          key={item.ticker}
+                          ticker={item.ticker}
+                          subText={`Peso: ${item.weight.toFixed(1)}%`}
+                          valueText={`+${formatMoney(item.profitLoss, kpiCurrency || 'BRL')} (${item.returnPercent.toFixed(1)}%)`}
+                          valueColor="#4ade80"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {topLosers.length > 0 && (
+                  <div style={{ marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: '#f87171', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span>📉</span> Ativos detratores
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {topLosers.map(item => (
+                        <AssetRiskDetailRow
+                          key={item.ticker}
+                          ticker={item.ticker}
+                          subText={`Peso: ${item.weight.toFixed(1)}%`}
+                          valueText={`${formatMoney(item.profitLoss, kpiCurrency || 'BRL')} (${item.returnPercent.toFixed(1)}%)`}
+                          valueColor="#f87171"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {topGainers.length === 0 && topLosers.length === 0 && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                    Nenhum ativo com ganhos ou perdas significativos.
+                  </div>
+                )}
+              </div>
+            </KPIScorecard>
 
             {/* Beta */}
             <KPIScorecard
@@ -1158,7 +1424,54 @@ export default function PortfolioAnalysis({
               }
               color={riskMetrics.beta! <= 0.8 ? '#4ade80' : riskMetrics.beta! <= 1.2 ? '#fbbf24' : '#f87171'}
               alertLevel={riskMetrics.beta! <= 0.8 ? 'safe' : riskMetrics.beta! <= 1.2 ? 'moderate' : 'danger'}
-            />
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                    Perfil de Oscilação da Carteira
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <AssetRiskDetailRow
+                      ticker="Alta Oscilação"
+                      subText="Ações, ETFs, BDRs, Cripto"
+                      valueText={`${volatilityExposure.highPct.toFixed(1)}%`}
+                      barPct={volatilityExposure.highPct}
+                      barColor="linear-gradient(90deg, #f87171, #ef4444)"
+                    />
+                    <AssetRiskDetailRow
+                      ticker="Média Oscilação"
+                      subText="FIIs, FIAGROs"
+                      valueText={`${volatilityExposure.medPct.toFixed(1)}%`}
+                      barPct={volatilityExposure.medPct}
+                      barColor="linear-gradient(90deg, #fbbf24, #f59e0b)"
+                    />
+                    <AssetRiskDetailRow
+                      ticker="Baixa Oscilação"
+                      subText="Renda Fixa & Caixa"
+                      valueText={`${volatilityExposure.lowPct.toFixed(1)}%`}
+                      barPct={volatilityExposure.lowPct}
+                      barColor="linear-gradient(90deg, #4ade80, #10b981)"
+                    />
+                  </div>
+                </div>
+
+                {volatilityExposure.topAggressive.length > 0 && (
+                  <div style={{ marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: '#fbbf24', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span>⚡</span> Ativos mais Voláteis (por peso)
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {volatilityExposure.topAggressive.map(item => (
+                        <div key={item.ticker} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</span>
+                          <span>Peso na Carteira: <strong style={{ color: 'var(--text-primary)' }}>{item.weight.toFixed(1)}%</strong></span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </KPIScorecard>
 
             {/* Max Drawdown */}
             <KPIScorecard
@@ -1181,7 +1494,48 @@ export default function PortfolioAnalysis({
               }
               color={riskMetrics.maxDrawdown! <= 10 ? '#4ade80' : riskMetrics.maxDrawdown! <= 25 ? '#fbbf24' : '#f87171'}
               alertLevel={riskMetrics.maxDrawdown! <= 10 ? 'safe' : riskMetrics.maxDrawdown! <= 25 ? 'moderate' : 'danger'}
-            />
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                    Concentração nos 3 Maiores Ativos
+                  </div>
+                  <AssetRiskDetailRow
+                    ticker="Concentração Top 3"
+                    subText={
+                      concentrationMetrics.top3Sum > 50
+                        ? 'Concentração elevada (risco alto)'
+                        : concentrationMetrics.top3Sum > 30
+                          ? 'Concentração moderada'
+                          : 'Bem diversificada'
+                    }
+                    valueText={`${concentrationMetrics.top3Sum.toFixed(1)}%`}
+                    barPct={concentrationMetrics.top3Sum}
+                    barColor={concentrationMetrics.top3Sum > 50 ? '#f87171' : concentrationMetrics.top3Sum > 30 ? '#fbbf24' : '#4ade80'}
+                  />
+                </div>
+
+                {concentrationMetrics.top3.length > 0 && (
+                  <div style={{ marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                      Maiores Alocações Individuais
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {concentrationMetrics.top3.map((item, idx) => (
+                        <AssetRiskDetailRow
+                          key={item.ticker}
+                          ticker={`${idx + 1}. ${item.ticker}`}
+                          subText="Alocação"
+                          valueText={`${item.weight.toFixed(1)}%`}
+                          barPct={item.weight}
+                          barColor="#00f2fe"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </KPIScorecard>
           </div>
         ) : (
           <div style={{
