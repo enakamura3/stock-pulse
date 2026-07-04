@@ -14,7 +14,7 @@ interface PortfolioInsightsProps {
 
 const CONCENTRATION_THRESHOLD = 0.20; // 20%
 const MONTHS_FOR_YIELD = 12;
-const TOP_N = 5;
+const TOP_N = 8;
 
 // ─── Mini reusable components ───────────────────────────────────────────────
 
@@ -187,23 +187,69 @@ export default function PortfolioInsights({
 
   // NEW: Sazonalidade de Proventos
   const dividendSeasonality = useMemo(() => {
-    const months = Array(12).fill(0);
     const now = new Date();
     const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const monthsData: { label: string; month: number; year: number; pastValue: number; futureValue: number }[] = [];
+    
+    for (let i = 11; i >= 0; i--) {
+       const d = new Date(currentYear, currentMonth - i, 1);
+       monthsData.push({
+          label: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][d.getMonth()],
+          month: d.getMonth(),
+          year: d.getFullYear(),
+          pastValue: 0,
+          futureValue: 0
+       });
+    }
 
     dividendsLast12m.forEach(d => {
        const dateStr = (d.payment_date && !d.payment_date.startsWith('0001')) ? d.payment_date : d.ex_date;
        if (!dateStr) return;
        const date = new Date(dateStr);
        const m = date.getMonth();
-       months[m] += d.net_amount;
+       const y = date.getFullYear();
+       
+       const target = monthsData.find(md => md.month === m && md.year === y);
+       if (target) {
+          target.pastValue += d.net_amount;
+       }
     });
+
+    upcomingDividends.forEach(d => {
+       const dateStr = (d.payment_date && !d.payment_date.startsWith('0001')) ? d.payment_date : d.ex_date;
+       if (!dateStr) return;
+       const date = new Date(dateStr);
+       const m = date.getMonth();
+       const y = date.getFullYear();
+
+       let target = monthsData.find(md => md.month === m && md.year === y);
+       if (!target) {
+           monthsData.push({
+               label: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][m],
+               month: m,
+               year: y,
+               pastValue: 0,
+               futureValue: 0
+           });
+           target = monthsData[monthsData.length - 1];
+       }
+       target.futureValue += d.net_amount;
+    });
+
+    const maxVal = Math.max(...monthsData.map(m => m.pastValue + m.futureValue), 1);
     
-    const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const maxVal = Math.max(...months, 1);
-    
-    return months.map((val, idx) => ({ month: monthLabels[idx], value: val, pct: (val/maxVal)*100, isCurrent: idx === currentMonth }));
-  }, [dividendsLast12m]);
+    return monthsData.map(md => ({
+       monthLabel: md.label,
+       pastValue: md.pastValue,
+       futureValue: md.futureValue,
+       totalValue: md.pastValue + md.futureValue,
+       pctPast: (md.pastValue / maxVal) * 100,
+       pctFuture: (md.futureValue / maxVal) * 100,
+       isCurrent: md.month === currentMonth && md.year === currentYear
+    }));
+  }, [dividendsLast12m, upcomingDividends]);
 
   const totalDivLast12m = dividendsLast12m.reduce((s, d) => s + d.net_amount, 0);
   const totalCost = positions.reduce((s, p) => s + p.total_cost, 0);
@@ -380,7 +426,7 @@ export default function PortfolioInsights({
         {yieldPerTicker.length > 0 && (
           <>
             <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Maiores Pagadores (YOC)</p>
-            {yieldPerTicker.slice(0, 4).map(item => (
+            {yieldPerTicker.slice(0, 8).map(item => (
               <ProgressBar
                 key={item.ticker}
                 value={item.yoc}
@@ -560,7 +606,7 @@ export default function PortfolioInsights({
              {valuationData.grahamItems.length > 0 && (
                 <>
                   <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Preço Teto - Graham</p>
-                  {valuationData.grahamItems.slice(0, 3).map(item => (
+                  {valuationData.grahamItems.slice(0, 6).map(item => (
                     <div key={`graham-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
                        <div style={{ flex: 1 }}>
                          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
@@ -577,7 +623,7 @@ export default function PortfolioInsights({
              {valuationData.bazinItems.length > 0 && (
                 <>
                   <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginTop: '1rem', marginBottom: '0.5rem' }}>Preço Teto - Bazin</p>
-                  {valuationData.bazinItems.slice(0, 3).map(item => (
+                  {valuationData.bazinItems.slice(0, 6).map(item => (
                     <div key={`bazin-${item.ticker}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px' }}>
                        <div style={{ flex: 1 }}>
                          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.ticker}</div>
@@ -596,26 +642,51 @@ export default function PortfolioInsights({
 
       {/* ── 8. Sazonalidade de Proventos ── */}
       <InsightCard>
-        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (últimos 12 meses)" />
-        <div style={{ display: 'flex', alignItems: 'flex-end', height: '120px', gap: '4px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+        <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (12 meses + próximos)" />
+        <div style={{ display: 'flex', alignItems: 'flex-end', height: '140px', gap: '8px', marginTop: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
           {dividendSeasonality.map((item, i) => (
              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                   {item.totalValue > 0 ? (item.totalValue >= 1000 ? `${(item.totalValue/1000).toFixed(1).replace('.0','')}k` : Math.round(item.totalValue)) : ''}
+                </span>
                 <div 
-                   title={`${item.month}: ${formatMoney(item.value, 'BRL')}`}
+                   title={`${item.monthLabel}: ${formatMoney(item.totalValue, 'BRL')} ${item.futureValue > 0 ? `(Provisionado: ${formatMoney(item.futureValue, 'BRL')})` : ''}`}
                    style={{ 
                      width: '100%', 
-                     height: `${Math.max(item.pct, 2)}%`, 
-                     background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)', 
+                     display: 'flex',
+                     flexDirection: 'column',
+                     justifyContent: 'flex-end',
+                     height: `${Math.max(item.pctPast + item.pctFuture, 1)}%`, 
+                     minHeight: '4px',
                      borderRadius: '4px 4px 0 0',
-                     transition: 'height 0.5s ease'
+                     overflow: 'hidden'
                    }} 
-                />
+                >
+                   {item.pctFuture > 0 && (
+                      <div style={{ 
+                          width: '100%', 
+                          height: `${(item.pctFuture / (item.pctPast + item.pctFuture)) * 100}%`, 
+                          background: 'rgba(251, 191, 36, 0.8)'
+                      }} />
+                   )}
+                   {item.pctPast > 0 && (
+                      <div style={{ 
+                          width: '100%', 
+                          height: `${(item.pctPast / (item.pctPast + item.pctFuture)) * 100}%`, 
+                          background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)' 
+                      }} />
+                   )}
+                </div>
              </div>
           ))}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
            {dividendSeasonality.map((item, i) => (
-              <span key={i} style={{ fontSize: '0.6rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>{item.month}</span>
+              <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                 <span style={{ fontSize: '0.65rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>
+                    {item.monthLabel}
+                 </span>
+              </div>
            ))}
         </div>
         
