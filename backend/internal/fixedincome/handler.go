@@ -34,6 +34,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 
 	r.Route("/portfolios/{portfolioID}/treasury", func(r chi.Router) {
 		r.Get("/positions", h.getTreasuryPositions)
+		r.Get("/transactions", h.getTreasuryTransactions)
 		r.Post("/transactions", h.createTreasuryTransaction)
 		r.Get("/performance", h.getTreasuryPerformance)
 	})
@@ -260,6 +261,23 @@ func (h *Handler) getTreasuryPositions(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(positions)
+}
+
+func (h *Handler) getTreasuryTransactions(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		return
+	}
+
+	transactions, err := h.service.GetTreasuryTransactions(r.Context(), portfolioID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(transactions)
 }
 
 func (h *Handler) createTreasuryTransaction(w http.ResponseWriter, r *http.Request) {

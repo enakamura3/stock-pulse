@@ -29,6 +29,7 @@ type Service interface {
 	GetAssetsByPortfolio(ctx context.Context, portfolioID string) ([]Asset, error)
 
 	GetTreasuryPositions(ctx context.Context, portfolioID string) ([]TreasuryPosition, error)
+	GetTreasuryTransactions(ctx context.Context, portfolioID string) ([]TreasuryTxRequest, error)
 	CreateTreasuryTransaction(ctx context.Context, portfolioID string, req *TreasuryTxRequest) (interface{}, error)
 	GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
 }
@@ -781,6 +782,17 @@ func (s *service) GetTreasuryPositions(ctx context.Context, portfolioID string) 
 		positions = []TreasuryPosition{}
 	}
 	return positions, nil
+}
+
+func (s *service) GetTreasuryTransactions(ctx context.Context, portfolioID string) ([]TreasuryTxRequest, error) {
+	reqs, err := s.repo.GetTreasuryTransactionsList(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+	if reqs == nil {
+		reqs = []TreasuryTxRequest{}
+	}
+	return reqs, nil
 }
 
 func (s *service) CreateTreasuryTransaction(ctx context.Context, portfolioID string, req *TreasuryTxRequest) (interface{}, error) {
