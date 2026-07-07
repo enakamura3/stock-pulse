@@ -582,11 +582,17 @@ func (s *Service) DeletePortfolio(ctx context.Context, id, userID string) error 
 	return s.repo.DeletePortfolio(ctx, id, userID)
 }
 
-// PerformancePoint representa o saldo consolidado de um portfólio em uma data histórica.
+// PerformancePoint representa o saldo consolidado de um portfólio em uma data histórica com retornos e benchmarks.
 type PerformancePoint struct {
-	Date          string  `json:"date"`
-	Value         float64 `json:"value"`
-	TotalInvested float64 `json:"total_invested"`
+	Date           string  `json:"date"`
+	Value          float64 `json:"value"`
+	TotalInvested  float64 `json:"total_invested"`
+	ReturnPct      float64 `json:"return_pct"`
+	CdiReturnPct   float64 `json:"cdi_return_pct"`
+	IpcaReturnPct  float64 `json:"ipca_return_pct"`
+	IfixReturnPct  float64 `json:"ifix_return_pct"`
+	IbovReturnPct  float64 `json:"ibov_return_pct"`
+	Sp500ReturnPct float64 `json:"sp500_return_pct"`
 }
 
 // GetPortfolioPerformance constrói a série histórica de rentabilidade consolidada.
@@ -820,7 +826,215 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 		}
 	}
 
+	if len(finalPoints) == 0 {
+		return finalPoints, nil
+	}
 
+	// 1. TWRR da Carteira dentro da janela finalPoints
+	var cumulativeTWRR float64 = 0.0
+	var prevValue float64 = 0.0
+
+	for idx := range finalPoints {
+		pt := &finalPoints[idx]
+		d, err := time.Parse("2006-01-02", pt.Date)
+		var dailyCashFlow float64
+		if err == nil {
+			for _, tx := range txs {
+				if tx.ExecutedAt.Year() == d.Year() && tx.ExecutedAt.Month() == d.Month() && tx.ExecutedAt.Day() == d.Day() {
+					if tx.Type == "BUY" {
+						dailyCashFlow += tx.Quantity * tx.UnitPrice * tx.ExchangeRate
+					} else if tx.Type == "SELL" {
+						dailyCashFlow -= tx.Quantity * tx.UnitPrice * tx.ExchangeRate
+					}
+				}
+			}
+		}
+
+		var dailyReturn float64 = 0.0
+		if idx > 0 && prevValue > 1e-6 {
+			// Retorno diário isolando fluxos de caixa externos (TWRR)
+			dailyReturn = (pt.Value - dailyCashFlow - prevValue) / prevValue
+		}
+
+		cumulativeTWRR = (1+cumulativeTWRR)*(1+dailyReturn) - 1
+		pt.ReturnPct = cumulativeTWRR * 100.0
+		prevValue = pt.Value
+	}
+
+	// 2. Cálculo dos Benchmarks Reais
+	startT, err := time.Parse("2006-01-02", finalPoints[0].Date)
+	if err == nil {
+		endT, err := time.Parse("2006-01-02", finalPoints[len(finalPoints)-1].Date)
+		if err == nil {
+			// Busca as taxas no banco de dados via fiService
+			var cdiRatesRaw, ipcaRatesRaw, ifixRatesRaw, ibovRatesRaw, sp500RatesRaw []fixedincome.IndexRate
+			if s.fiService != nil {
+				cdiRatesRaw, _ = s.fiService.GetIndexRates(ctx, "CDI", startT, endT)
+				ipcaRatesRaw, _ = s.fiService.GetIndexRates(ctx, "IPCA", startT, endT)
+				ifixRatesRaw, _ = s.fiService.GetIndexRates(ctx, "IFIX", startT, endT)
+				ibovRatesRaw, _ = s.fiService.GetIndexRates(ctx, "IBOV", startT, endT)
+				sp500RatesRaw, _ = s.fiService.GetIndexRates(ctx, "SP500", startT, endT)
+			}
+
+			cdiMap := make(map[string]float64)
+			for _, r := range cdiRatesRaw {
+				cdiMap[r.Date.Format("2006-01-02")] = r.Rate
+			}
+
+			ipcaMap := make(map[string]float64)
+			var latestIpcaRate float64
+			var latestIpcaDate string
+			for _, r := range ipcaRatesRaw {
+				key := r.Date.Format("2006-01-02")
+				ipcaMap[key] = r.Rate
+				if key > latestIpcaDate {
+					latestIpcaDate = key
+					latestIpcaRate = r.Rate
+				}
+			}
+
+			ifixMap := make(map[string]float64)
+			for _, r := range ifixRatesRaw {
+				ifixMap[r.Date.Format("2006-01-02")] = r.Rate
+			}
+
+			ibovMap := make(map[string]float64)
+			for _, r := range ibovRatesRaw {
+				ibovMap[r.Date.Format("2006-01-02")] = r.Rate
+			}
+
+			sp500Map := make(map[string]float64)
+			for _, r := range sp500RatesRaw {
+				sp500Map[r.Date.Format("2006-01-02")] = r.Rate
+			}
+
+			// Carrega câmbio USD/BRL se a carteira for BRL
+			usdBrlMap := make(map[string]float64)
+			if p.BaseCurrency == "BRL" {
+				usdBrlID, err := s.repo.GetAssetByTicker(ctx, "USDBRL=X")
+				if err == nil {
+					histPrices, err := s.repo.GetDailyPrices(ctx, usdBrlID, startT, endT)
+					if err == nil {
+						for _, dp := range histPrices {
+							usdBrlMap[dp.PriceDate.Format("2006-01-02")] = dp.ClosePrice
+						}
+					}
+				}
+			}
+
+			// Helper LOCF para cotações (evitar falha em finais de semana/feriados)
+			getIndexLOCF := func(d time.Time, rates map[string]float64) float64 {
+				chk := d
+				for i := 0; i < 100; i++ {
+					dateStr := chk.Format("2006-01-02")
+					if val, ok := rates[dateStr]; ok && val > 0 {
+						return val
+					}
+					chk = chk.AddDate(0, 0, -1)
+				}
+				return 0.0
+			}
+
+			getUsdBrlLOCF := func(d time.Time) float64 {
+				chk := d
+				for i := 0; i < 100; i++ {
+					dateStr := chk.Format("2006-01-02")
+					if val, ok := usdBrlMap[dateStr]; ok && val > 0 {
+						return val
+					}
+					chk = chk.AddDate(0, 0, -1)
+				}
+				return 1.0
+			}
+
+			countBusinessDaysInMonth := func(year int, month time.Month) int {
+				days := 0
+				t := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+				for t.Month() == month {
+					wd := t.Weekday()
+					if wd != time.Saturday && wd != time.Sunday {
+						days++
+					}
+					t = t.AddDate(0, 0, 1)
+				}
+				return days
+			}
+
+			// Valores iniciais no dia t_0 (startT)
+			ifixInit := getIndexLOCF(startT, ifixMap)
+			ibovInit := getIndexLOCF(startT, ibovMap)
+			sp500Init := getIndexLOCF(startT, sp500Map)
+			sp500InitBrl := sp500Init * getUsdBrlLOCF(startT)
+
+			cdiCumulativeFactor := 1.0
+			ipcaCumulativeFactor := 1.0
+
+			for idx := range finalPoints {
+				pt := &finalPoints[idx]
+				d, err := time.Parse("2006-01-02", pt.Date)
+				if err != nil {
+					continue
+				}
+
+				if idx > 0 {
+					// CDI: acumula fator diário apenas em dias úteis
+					wd := d.Weekday()
+					if wd != time.Saturday && wd != time.Sunday {
+						cdiRate := cdiMap[pt.Date]
+						cdiCumulativeFactor *= 1.0 + (cdiRate / 100.0)
+					}
+
+					// IPCA: pro-rata diário por dias úteis
+					if wd != time.Saturday && wd != time.Sunday {
+						monthKey := time.Date(d.Year(), d.Month(), 1, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+						rMonthly, ok := ipcaMap[monthKey]
+						if !ok {
+							rMonthly = latestIpcaRate // fallback para último IPCA conhecido
+						}
+						busDays := countBusinessDaysInMonth(d.Year(), d.Month())
+						if busDays > 0 {
+							dailyFactor := math.Pow(1.0+(rMonthly/100.0), 1.0/float64(busDays))
+							ipcaCumulativeFactor *= dailyFactor
+						}
+					}
+				}
+
+				pt.CdiReturnPct = (cdiCumulativeFactor - 1.0) * 100.0
+				pt.IpcaReturnPct = (ipcaCumulativeFactor - 1.0) * 100.0
+
+				// IFIX
+				if ifixInit > 1e-6 {
+					ifixVal := getIndexLOCF(d, ifixMap)
+					if ifixVal > 0 {
+						pt.IfixReturnPct = ((ifixVal - ifixInit) / ifixInit) * 100.0
+					}
+				}
+
+				// Ibovespa
+				if ibovInit > 1e-6 {
+					ibovVal := getIndexLOCF(d, ibovMap)
+					if ibovVal > 0 {
+						pt.IbovReturnPct = ((ibovVal - ibovInit) / ibovInit) * 100.0
+					}
+				}
+
+				// S&P 500
+				if sp500Init > 1e-6 {
+					sp500Val := getIndexLOCF(d, sp500Map)
+					if sp500Val > 0 {
+						if p.BaseCurrency == "BRL" {
+							sp500ValBrl := sp500Val * getUsdBrlLOCF(d)
+							if sp500InitBrl > 1e-6 {
+								pt.Sp500ReturnPct = ((sp500ValBrl - sp500InitBrl) / sp500InitBrl) * 100.0
+							}
+						} else {
+							pt.Sp500ReturnPct = ((sp500Val - sp500Init) / sp500Init) * 100.0
+						}
+					}
+				}
+			}
+		}
+	}
 
 	return finalPoints, nil
 }

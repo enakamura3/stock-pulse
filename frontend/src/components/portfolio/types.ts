@@ -49,6 +49,12 @@ export interface PerformancePoint {
   date: string;
   value: number;
   total_invested: number;
+  return_pct?: number;
+  cdi_return_pct?: number;
+  ipca_return_pct?: number;
+  ifix_return_pct?: number;
+  ibov_return_pct?: number;
+  sp500_return_pct?: number;
 }
 
 export interface CalculatedDividend {

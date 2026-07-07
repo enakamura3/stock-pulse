@@ -110,7 +110,19 @@ func main() {
 	fiAnbimaClient := fixedincome.NewAnbimaClient()
 	fiService := fixedincome.NewService(fiRepo, fiBcbClient)
 	fiHandler := fixedincome.NewHandler(fiService, fiRepo)
-	fiWorker := fixedincome.NewWorker(fiRepo, fiBcbClient)
+
+	// Configuração do Registro Dinâmico de Índices (Gateways com Fallback)
+	brapiProvider := fixedincome.NewBrapiProvider()
+	yahooProvider := fixedincome.NewYahooFinanceIndexProvider()
+	indexRegistry := fixedincome.NewIndexRegistry()
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "CDI", PrimaryProvider: fiBcbClient})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SELIC", PrimaryProvider: fiBcbClient})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IPCA", PrimaryProvider: fiBcbClient})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IFIX", PrimaryProvider: brapiProvider, FallbackProvider: yahooProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IBOV", PrimaryProvider: brapiProvider, FallbackProvider: yahooProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SP500", PrimaryProvider: yahooProvider})
+
+	fiWorker := fixedincome.NewWorker(fiRepo, indexRegistry)
 	fiAnbimaWorker := fixedincome.NewAnbimaHolidayWorker(fiRepo, fiAnbimaClient)
 
 	// Inicialização de Camadas de Portfólio & Daily Worker

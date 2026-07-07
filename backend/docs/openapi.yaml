@@ -496,7 +496,41 @@ paths:
             example: ALL
       responses:
         '200':
-          description: Série histórica de evolução de saldo para gráficos
+          description: Série histórica de evolução de saldo e rentabilidade comparativa para gráficos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      example: "2026-07-07"
+                    value:
+                      type: number
+                      example: 10500.42
+                    total_invested:
+                      type: number
+                      example: 10000.00
+                    return_pct:
+                      type: number
+                      example: 5.00
+                    cdi_return_pct:
+                      type: number
+                      example: 3.42
+                    ipca_return_pct:
+                      type: number
+                      example: 1.25
+                    ifix_return_pct:
+                      type: number
+                      example: 2.10
+                    ibov_return_pct:
+                      type: number
+                      example: 4.56
+                    sp500_return_pct:
+                      type: number
+                      example: 6.80
 
   /alerts:
     get:
