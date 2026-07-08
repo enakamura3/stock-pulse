@@ -850,6 +850,36 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, divs, 2)
 	})
+
+	t.Run("Data Com Transaction Included", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		exDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		txs := []Transaction{
+			// Compra no ex_date (Data Com)
+			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, ExecutedAt: exDate.Add(14 * time.Hour), Currency: "USD", AssetType: "STOCK_US"},
+			// Compra depois do ex_date (não deve ser incluída)
+			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 20, ExecutedAt: exDate.AddDate(0, 0, 1), Currency: "USD", AssetType: "STOCK_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", ExDate: exDate, PaymentDate: now, GrossAmount: 1.0, Type: "DIVIDEND"},
+		}, nil)
+
+		ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(5.0, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		if len(divs) == 1 {
+			// Deve calcular baseando-se apenas nas 10 ações compradas no ex_date (Data Com).
+			// O valor bruto original deve ser 10 * 1.0 = 10.0
+			assert.Equal(t, 10.0, divs[0].OriginalGross)
+		}
+	})
 }
 
 // ─── Testes de TWRR (Time-Weighted Rate of Return) ──────────────────────────

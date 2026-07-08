@@ -217,14 +217,14 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 		for _, div := range divs {
 			exDate := div.ExDate
 
-			// Calcula a quantidade na carteira no fechamento do dia anterior à ex-date,
-			// Ou seja, compras efetuadas ATÉ a ex-date (pois na ex-date a ação já é negociada sem o dividendo,
-			// mas o comprador do dia D-1 recebe o dividendo).
-			// Simplificando: compras onde ExecutedAt < exDate (começo do dia).
+			// Calcula a quantidade na carteira na Data Com / Data Base (ex_date),
+			// ou seja, transações efetuadas até a ex_date inclusive.
 			var quantity float64 = 0
+			exDateNorm := time.Date(exDate.Year(), exDate.Month(), exDate.Day(), 0, 0, 0, 0, time.UTC)
 			for _, tx := range txs {
-				// Se a transação ocorreu depois do início do exDate, interrompe a soma (lista tá ordenada)
-				if tx.ExecutedAt.After(exDate) || tx.ExecutedAt.Equal(exDate) {
+				txDate := time.Date(tx.ExecutedAt.Year(), tx.ExecutedAt.Month(), tx.ExecutedAt.Day(), 0, 0, 0, 0, time.UTC)
+				// Se a transação ocorreu em um dia após a Data Com (ex_date), interrompe a soma
+				if txDate.After(exDateNorm) {
 					break
 				}
 
