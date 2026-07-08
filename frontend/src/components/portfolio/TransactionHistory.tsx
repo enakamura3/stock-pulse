@@ -171,7 +171,12 @@ export default function TransactionHistory({
     let totalBought = 0;
     let totalSold   = 0;
     filteredTransactions.forEach((tx) => {
-      const val = tx.total_value ?? 0;
+      let val = tx.total_value ?? 0;
+      if (kpiCurrency && tx.currency && tx.currency !== kpiCurrency) {
+        if (tx.exchange_rate && tx.exchange_rate > 0) {
+          val = val * tx.exchange_rate;
+        }
+      }
       if (tx.type === 'BUY' || tx.type === 'BONUS' || (tx.module === 'RF' && tx.type === 'SUBSCRIPTION')) {
         totalBought += val;
       } else if (tx.type === 'SELL' || (tx.module === 'RF' && tx.type !== 'SUBSCRIPTION')) {
@@ -179,7 +184,7 @@ export default function TransactionHistory({
       }
     });
     return { totalBought, totalSold };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, kpiCurrency]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
   const totalPages   = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));

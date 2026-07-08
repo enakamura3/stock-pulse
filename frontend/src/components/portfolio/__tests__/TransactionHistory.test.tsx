@@ -57,6 +57,10 @@ describe('TransactionHistory Component', () => {
     // Deve exibir o câmbio já que a moeda é USD e o kpiCurrency é BRL
     expect(screen.getByText('(Câmbio: 5.2500)')).toBeInTheDocument();
 
+    // O total comprado deve ser convertido de 5000 USD para 26250 BRL (R$ 26.250,00)
+    const totalCompradoElement = screen.getByText(/Total Comprado/i);
+    expect(totalCompradoElement).toHaveTextContent(/26\.250,00/);
+
     // Re-renderizar com kpiCurrency igual à moeda do ativo (USD)
     rerender(
       <TransactionHistory
