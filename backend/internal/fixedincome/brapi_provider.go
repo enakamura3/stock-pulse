@@ -105,7 +105,8 @@ func (p *BrapiProvider) mapIndexerToTicker(indexer string) string {
 	case "IFIX":
 		return "IFIX.SA"
 	case "IBOV":
-		return "^BVSP"
+		// A BRAPI usa o ticker nativo "IBOV", não "^BVSP" (que é formato Yahoo Finance)
+		return "IBOV"
 	default:
 		return ""
 	}

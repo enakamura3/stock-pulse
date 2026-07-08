@@ -851,3 +851,132 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 		assert.Len(t, divs, 2)
 	})
 }
+
+// ─── Testes de TWRR (Time-Weighted Rate of Return) ──────────────────────────
+
+// TestTWRR_SimpleGain valida que quando a carteira sobe de valor sem nenhum
+// aporte externo, o TWRR é matematicamente equivalente ao retorno simples.
+func TestTWRR_SimpleGain(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	buyDate := now.AddDate(0, -1, -5) // 1 mês e 5 dias atrás — dentro da janela 1M
+
+	// Compra 10 ações a R$100 (custo total: R$1.000)
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: buyDate},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+
+	// Preços: sobe de 100 para 110 (+10%) — preço atual recente
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: buyDate, ClosePrice: 100.0},
+		{AssetID: "a1", PriceDate: now.AddDate(0, 0, -3), ClosePrice: 110.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	// O último ponto deve ter ReturnPct > 0 (carteira valorizou)
+	lastPoint := res[len(res)-1]
+	assert.Greater(t, lastPoint.ReturnPct, 0.0, "carteira que subiu deve ter ReturnPct positivo")
+}
+
+// TestTWRR_ExternalCashFlowDoesNotInflateReturn valida que um aporte externo
+// (novo BUY) no segundo dia NÃO deve inflar artificialmente o TWRR.
+// Sem TWRR, o aporte tornaria o retorno negativo ou distorcido.
+func TestTWRR_ExternalCashFlowDoesNotInflateReturn(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	day0 := now.AddDate(0, -1, -3)
+	day1 := now.AddDate(0, -1, -2)
+
+	// Dia 0: compra 10 ações a 100 (R$1.000)
+	// Dia 1: compra mais 10 ações a 100 (R$1.000 novo aporte, preço não mudou)
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: day0},
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: day1},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+	// Preço estável em 100 durante todo o período
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: day0, ClosePrice: 100.0},
+		{AssetID: "a1", PriceDate: day1, ClosePrice: 100.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	// Preço não mudou → TWRR deve ser ~0% (o aporte não deve inflar o retorno)
+	lastPoint := res[len(res)-1]
+	assert.InDelta(t, 0.0, lastPoint.ReturnPct, 0.1,
+		"aporte externo com preço estável não deve alterar o TWRR (esperado ~0%%)")
+}
+
+// TestTWRR_ZeroReturnOnFlatPrice garante que retorno zero com preço constante
+// resulta em ReturnPct = 0.
+func TestTWRR_ZeroReturnOnFlatPrice(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	buyDate := now.AddDate(0, -1, -1)
+
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 50, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: buyDate},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+	// Preço constante = sem valorização
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: buyDate, ClosePrice: 50.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	// Todos os pontos devem ter ReturnPct muito próximo de 0
+	for _, pt := range res {
+		assert.InDelta(t, 0.0, pt.ReturnPct, 0.01,
+			"preço constante deve resultar em ReturnPct ≈ 0 no ponto %s", pt.Date)
+	}
+}
+
+// TestTWRR_NegativeReturn valida que queda de preço resulta em ReturnPct < 0.
+func TestTWRR_NegativeReturn(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	buyDate := now.AddDate(0, -1, -5) // 1 mês e 5 dias atrás — dentro da janela 1M
+
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: buyDate},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+	// Preço cai de 100 para 80 (-20%) — preço recente
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: buyDate, ClosePrice: 100.0},
+		{AssetID: "a1", PriceDate: now.AddDate(0, 0, -3), ClosePrice: 80.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	lastPoint := res[len(res)-1]
+	assert.Less(t, lastPoint.ReturnPct, 0.0, "queda de preço deve resultar em ReturnPct negativo")
+}
+

@@ -497,16 +497,16 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		if currency != p.BaseCurrency {
 			currencyPair := fmt.Sprintf("%s%s=X", currency, p.BaseCurrency)
 			log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, tx.ExecutedAt)
-			
+
 			rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
 			if err != nil || rate <= 0 {
 				log.Printf("[Portfolio] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
 				s.BackfillGap(ctx, currencyPair, tx.ExecutedAt)
-				
+
 				// Tenta buscar novamente
 				rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
 			}
-			
+
 			if err == nil && rate > 0 {
 				tx.ExchangeRate = rate
 				log.Printf("[Portfolio] Câmbio encontrado na base: %.4f", rate)
@@ -534,7 +534,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		existing, err := s.repo.GetDailyPrices(bgCtx, id, time.Now().AddDate(0, 0, -7), time.Now())
 		if err == nil && len(existing) > 0 {
 			log.Printf("[Backfill] Ativo %s já possui histórico recente.", ticker)
-			
+
 			// Se possui histórico recente, vamos verificar se a transação é mais antiga que o nosso buraco
 			oldestDate, err := s.repo.GetOldestPriceDate(bgCtx, id)
 			if err == nil && !oldestDate.IsZero() && tx.ExecutedAt.Before(oldestDate) {
@@ -869,14 +869,31 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			// Busca as taxas no banco de dados via fiService
 			var cdiRatesRaw, ipcaRatesRaw, ifixRatesRaw, ibovRatesRaw, sp500RatesRaw []fixedincome.IndexRate
 			if s.fiService != nil {
-				cdiRatesRaw, _ = s.fiService.GetIndexRates(ctx, "CDI", startT, endT)
-				ipcaRatesRaw, _ = s.fiService.GetIndexRates(ctx, "IPCA", startT, endT)
-				ifixRatesRaw, _ = s.fiService.GetIndexRates(ctx, "IFIX", startT, endT)
-				ibovRatesRaw, _ = s.fiService.GetIndexRates(ctx, "IBOV", startT, endT)
-				sp500RatesRaw, _ = s.fiService.GetIndexRates(ctx, "SP500", startT, endT)
+				var errIdx error
+				cdiRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "CDI", startT, endT)
+				if errIdx != nil {
+					log.Printf("portfolio performance: benchmark CDI indisponível (%v) — execute o sync de índices", errIdx)
+				}
+				ipcaRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "IPCA", startT, endT)
+				if errIdx != nil {
+					log.Printf("portfolio performance: benchmark IPCA indisponível (%v)", errIdx)
+				}
+				ifixRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "IFIX", startT, endT)
+				if errIdx != nil {
+					log.Printf("portfolio performance: benchmark IFIX indisponível (%v)", errIdx)
+				}
+				ibovRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "IBOV", startT, endT)
+				if errIdx != nil {
+					log.Printf("portfolio performance: benchmark IBOV indisponível (%v)", errIdx)
+				}
+				sp500RatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "SP500", startT, endT)
+				if errIdx != nil {
+					log.Printf("portfolio performance: benchmark SP500 indisponível (%v)", errIdx)
+				}
 			}
 
 			cdiMap := make(map[string]float64)
+
 			for _, r := range cdiRatesRaw {
 				cdiMap[r.Date.Format("2006-01-02")] = r.Rate
 			}
@@ -1163,16 +1180,16 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 		if currency != p.BaseCurrency {
 			currencyPair := fmt.Sprintf("%s%s=X", currency, p.BaseCurrency)
 			log.Printf("[Portfolio-Update] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, tx.ExecutedAt)
-			
+
 			rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
 			if err != nil || rate <= 0 {
 				log.Printf("[Portfolio-Update] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
 				s.BackfillGap(ctx, currencyPair, tx.ExecutedAt)
-				
+
 				// Tenta buscar novamente
 				rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
 			}
-			
+
 			if err == nil && rate > 0 {
 				tx.ExchangeRate = rate
 				log.Printf("[Portfolio-Update] Câmbio encontrado na base: %.4f", rate)

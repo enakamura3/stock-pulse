@@ -112,15 +112,17 @@ func main() {
 	fiHandler := fixedincome.NewHandler(fiService, fiRepo)
 
 	// Configuração do Registro Dinâmico de Índices (Gateways com Fallback)
+	bcbProvider := fixedincome.NewBCBProvider(fiBcbClient)
 	brapiProvider := fixedincome.NewBrapiProvider()
 	yahooProvider := fixedincome.NewYahooFinanceIndexProvider()
 	indexRegistry := fixedincome.NewIndexRegistry()
-	indexRegistry.Register(fixedincome.IndexerConfig{Name: "CDI", PrimaryProvider: fiBcbClient})
-	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SELIC", PrimaryProvider: fiBcbClient})
-	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IPCA", PrimaryProvider: fiBcbClient})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "CDI", PrimaryProvider: bcbProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SELIC", PrimaryProvider: bcbProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IPCA", PrimaryProvider: bcbProvider})
 	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IFIX", PrimaryProvider: brapiProvider, FallbackProvider: yahooProvider})
 	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IBOV", PrimaryProvider: brapiProvider, FallbackProvider: yahooProvider})
 	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SP500", PrimaryProvider: yahooProvider})
+
 
 	fiWorker := fixedincome.NewWorker(fiRepo, indexRegistry)
 	fiAnbimaWorker := fixedincome.NewAnbimaHolidayWorker(fiRepo, fiAnbimaClient)
