@@ -1,9 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { CalculatedDividend } from './types';
 import { getAssetCategory, formatMoney } from './helpers';
 import dynamic from 'next/dynamic';
 
 const DividendsMatrix = dynamic(() => import('./DividendsMatrix'), { ssr: false });
+
+type SortField = 'status' | 'ticker' | 'category' | 'type' | 'ex_date' | 'payment_date' | 'quantity' | 'per_share_amount' | 'gross_amount' | 'net_amount';
+type SortOrder = 'asc' | 'desc';
 
 interface DividendsHistoryProps {
   dividends: CalculatedDividend[];
@@ -38,6 +41,94 @@ export default function DividendsHistory({
     if (lower.includes('rendimento')) return 'Rendimento';
     if (lower.includes('amorti')) return 'Amortização';
     return div.type.charAt(0).toUpperCase() + div.type.slice(1).toLowerCase();
+  };
+
+  const [sortField, setSortField] = useState<SortField>('ex_date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const sortedDividends = useMemo(() => {
+    return [...dividends].sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      switch (sortField) {
+        case 'status':
+          valA = isPaid(a);
+          valB = isPaid(b);
+          break;
+        case 'ticker':
+          valA = a.ticker || '';
+          valB = b.ticker || '';
+          break;
+        case 'category':
+          valA = a.is_accrued ? 'Renda Fixa' : getAssetCategory(a.asset_type);
+          valB = b.is_accrued ? 'Renda Fixa' : getAssetCategory(b.asset_type);
+          break;
+        case 'type':
+          valA = formatType(a);
+          valB = formatType(b);
+          break;
+        case 'ex_date':
+          valA = a.ex_date ? new Date(a.ex_date).getTime() : 0;
+          valB = b.ex_date ? new Date(b.ex_date).getTime() : 0;
+          break;
+        case 'payment_date':
+          const hasA = a.payment_date && !a.payment_date.startsWith('0001');
+          const hasB = b.payment_date && !b.payment_date.startsWith('0001');
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          valA = new Date(a.payment_date).getTime();
+          valB = new Date(b.payment_date).getTime();
+          break;
+        case 'quantity':
+          valA = a.is_accrued ? 0 : Number(a.quantity) || 0;
+          valB = b.is_accrued ? 0 : Number(b.quantity) || 0;
+          break;
+        case 'per_share_amount':
+          valA = a.is_accrued ? 0 : Number(a.per_share_amount) || 0;
+          valB = b.is_accrued ? 0 : Number(b.per_share_amount) || 0;
+          break;
+        case 'gross_amount':
+          valA = Number(a.gross_amount) || 0;
+          valB = Number(b.gross_amount) || 0;
+          break;
+        case 'net_amount':
+          valA = Number(a.net_amount) || 0;
+          valB = Number(b.net_amount) || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (valA === valB) return 0;
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        const compare = valA.localeCompare(valB);
+        return sortOrder === 'asc' ? compare : -compare;
+      }
+
+      if (typeof valA === 'boolean' && typeof valB === 'boolean') {
+        const compare = valA === valB ? 0 : valA ? 1 : -1;
+        return sortOrder === 'asc' ? compare : -compare;
+      }
+
+      return sortOrder === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [dividends, sortField, sortOrder]);
+
+  const renderSortIndicator = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortOrder === 'asc' ? ' ▲' : ' ▼';
   };
 
   // Agrupamentos e Reduções
@@ -151,7 +242,9 @@ export default function DividendsHistory({
             {/* Table */}
             <div className="table-container mt-lg" style={{ border: '1px solid var(--panel-border)', borderRadius: '12px', overflow: 'hidden' }}>
               <style>{`
-                .dividends-table th { padding: 0.75rem 1rem !important; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); background: rgba(255,255,255,0.02); }
+                .dividends-table th { padding: 0.75rem 1rem !important; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); background: rgba(255,255,255,0.02); cursor: pointer; user-select: none; transition: background 0.2s, color 0.2s; }
+                .dividends-table th:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+                .dividends-table th.active-sort { color: var(--text-primary); background: rgba(255,255,255,0.04); }
                 .dividends-table td { padding: 1rem 1rem !important; font-size: 0.875rem; border-top: 1px solid rgba(255,255,255,0.03); }
                 .dividends-table tbody tr:hover { background: rgba(255,255,255,0.02); }
                 .badge-pill { border-radius: 20px; padding: 0.25rem 0.6rem; font-size: 0.7rem; font-weight: 600; display: inline-block; }
@@ -160,20 +253,20 @@ export default function DividendsHistory({
               <table className="data-table dividends-table w-full">
                 <thead>
                   <tr>
-                    <th className="text-center">Status</th>
-                    <th className="text-center">Ativo</th>
-                    <th className="text-center">Categoria</th>
-                    <th className="text-center">Tipo</th>
-                    <th className="text-center">Data Com</th>
-                    <th className="text-center">Pagamento</th>
-                    <th className="text-center">Qtd</th>
-                    <th className="text-right">Vlr / Cota</th>
-                    <th className="text-right">Vlr Bruto</th>
-                    <th className="text-right">Vlr Líquido</th>
+                    <th className={`text-center ${sortField === 'status' ? 'active-sort' : ''}`} onClick={() => handleSort('status')}>Status{renderSortIndicator('status')}</th>
+                    <th className={`text-center ${sortField === 'ticker' ? 'active-sort' : ''}`} onClick={() => handleSort('ticker')}>Ativo{renderSortIndicator('ticker')}</th>
+                    <th className={`text-center ${sortField === 'category' ? 'active-sort' : ''}`} onClick={() => handleSort('category')}>Categoria{renderSortIndicator('category')}</th>
+                    <th className={`text-center ${sortField === 'type' ? 'active-sort' : ''}`} onClick={() => handleSort('type')}>Tipo{renderSortIndicator('type')}</th>
+                    <th className={`text-center ${sortField === 'ex_date' ? 'active-sort' : ''}`} onClick={() => handleSort('ex_date')}>Data Com{renderSortIndicator('ex_date')}</th>
+                    <th className={`text-center ${sortField === 'payment_date' ? 'active-sort' : ''}`} onClick={() => handleSort('payment_date')}>Pagamento{renderSortIndicator('payment_date')}</th>
+                    <th className={`text-center ${sortField === 'quantity' ? 'active-sort' : ''}`} onClick={() => handleSort('quantity')}>Qtd{renderSortIndicator('quantity')}</th>
+                    <th className={`text-right ${sortField === 'per_share_amount' ? 'active-sort' : ''}`} onClick={() => handleSort('per_share_amount')}>Vlr / Cota{renderSortIndicator('per_share_amount')}</th>
+                    <th className={`text-right ${sortField === 'gross_amount' ? 'active-sort' : ''}`} onClick={() => handleSort('gross_amount')}>Vlr Bruto{renderSortIndicator('gross_amount')}</th>
+                    <th className={`text-right ${sortField === 'net_amount' ? 'active-sort' : ''}`} onClick={() => handleSort('net_amount')}>Vlr Líquido{renderSortIndicator('net_amount')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dividends.map((div, i) => {
+                  {sortedDividends.map((div, i) => {
                     const paid = isPaid(div);
                     const typeStr = formatType(div);
                     return (
