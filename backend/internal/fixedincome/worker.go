@@ -6,20 +6,23 @@ import (
 	"time"
 )
 
+// Worker gerencia a sincronização em segundo plano dos indicadores e índices
 type Worker struct {
-	repo      Repository
-	bcbClient BCBClient
+	repo     Repository
+	registry *IndexRegistry
 }
 
-func NewWorker(repo Repository, bcbClient BCBClient) *Worker {
+// NewWorker inicializa o worker com o repositório e o registro de provedores
+func NewWorker(repo Repository, registry *IndexRegistry) *Worker {
 	return &Worker{
-		repo:      repo,
-		bcbClient: bcbClient,
+		repo:     repo,
+		registry: registry,
 	}
 }
 
+// SyncRates sincroniza as séries históricas de todos os indexadores configurados
 func (w *Worker) SyncRates(ctx context.Context) {
-	indexers := []string{"CDI", "SELIC"}
+	indexers := []string{"CDI", "SELIC", "IPCA", "IFIX", "IBOV", "SP500"}
 	endDate := time.Now()
 
 	for _, indexer := range indexers {
@@ -29,7 +32,7 @@ func (w *Worker) SyncRates(ctx context.Context) {
 		if err == nil && latest != nil {
 			startDate = latest.Date.AddDate(0, 0, 1)
 		} else {
-			// Se não tem nada (primeira sincronização ou wipe), busca histórico desde 2010 para garantir o cálculo de ativos antigos.
+			// Se não tem dados históricos, inicia em 01/01/2010 (conforme acordado)
 			startDate = time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
 		}
 
@@ -37,8 +40,7 @@ func (w *Worker) SyncRates(ctx context.Context) {
 			continue // já está atualizado
 		}
 
-		// The BCB API limits daily series queries to 10 years.
-		// We will chunk the requests in 5-year intervals.
+		// Divide a sincronização em blocos de no máximo 5 anos para evitar timeouts
 		currentStart := startDate
 		for currentStart.Before(endDate) {
 			currentEnd := currentStart.AddDate(5, 0, 0)
@@ -46,22 +48,34 @@ func (w *Worker) SyncRates(ctx context.Context) {
 				currentEnd = endDate
 			}
 
-			rates, err := w.bcbClient.FetchRates(ctx, indexer, currentStart, currentEnd)
+			rates, err := w.registry.Fetch(ctx, indexer, currentStart, currentEnd)
 			if err != nil {
-				log.Printf("fixedincome worker: error fetching rates for %s (%v to %v): %v", indexer, currentStart, currentEnd, err)
+				log.Printf("fixedincome worker: erro ao buscar dados de %s (%s a %s): %v", indexer, currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02"), err)
 			} else if len(rates) > 0 {
-				err = w.repo.SaveIndexRates(ctx, rates)
-				if err != nil {
-					log.Printf("fixedincome worker: error saving rates for %s: %v", indexer, err)
-				} else {
-					log.Printf("fixedincome worker: successfully saved %d rates for %s (%v to %v)", len(rates), indexer, currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02"))
+				// Filtra finais de semana para economizar espaço e evitar inconsistências (exceto IPCA que é mensal)
+				var filteredRates []IndexRate
+				for _, r := range rates {
+					wd := r.Date.Weekday()
+					if indexer != "IPCA" && (wd == time.Saturday || wd == time.Sunday) {
+						continue
+					}
+					filteredRates = append(filteredRates, r)
+				}
+
+				if len(filteredRates) > 0 {
+					err = w.repo.SaveIndexRates(ctx, filteredRates)
+					if err != nil {
+						log.Printf("fixedincome worker: erro ao salvar taxas no banco para %s: %v", indexer, err)
+					} else {
+						log.Printf("fixedincome worker: sucesso ao sincronizar %d registros para %s (%s a %s)", len(filteredRates), indexer, currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02"))
+					}
 				}
 			}
 
-			// Move to the next chunk (next day after currentEnd)
+			// Avança para o próximo bloco (dia seguinte a currentEnd)
 			currentStart = currentEnd.AddDate(0, 0, 1)
-			
-			// Sleep briefly to avoid hammering the BCB API
+
+			// Pequeno delay entre requisições para evitar rate limit/bloqueio
 			time.Sleep(500 * time.Millisecond)
 		}
 	}

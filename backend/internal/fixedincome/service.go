@@ -32,6 +32,7 @@ type Service interface {
 	GetTreasuryTransactions(ctx context.Context, portfolioID string) ([]TreasuryTxRequest, error)
 	CreateTreasuryTransaction(ctx context.Context, portfolioID string, req *TreasuryTxRequest) (interface{}, error)
 	GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
+	GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error)
 }
 
 type service struct {
@@ -993,4 +994,8 @@ func (s *service) GetTreasuryPerformance(ctx context.Context, portfolioID string
 		points = []TreasuryPerfPoint{}
 	}
 	return points, nil
+}
+
+func (s *service) GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error) {
+	return s.repo.GetIndexRates(ctx, indexer, startDate, endDate)
 }

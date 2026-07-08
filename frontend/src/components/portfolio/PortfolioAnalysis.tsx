@@ -35,6 +35,7 @@ interface BenchmarkPoint {
   cdi: number;
   ipca: number;
   ifix: number;
+  ibov: number;
   sp500: number;
 }
 
@@ -366,6 +367,7 @@ const BENCHMARK_COLORS = {
   cdi: '#fbbf24',
   ipca: '#f87171',
   ifix: '#c084fc',
+  ibov: '#f472b6',
   sp500: '#34d399',
 };
 
@@ -619,38 +621,23 @@ export default function PortfolioAnalysis({
   const benchmarkData = useMemo((): BenchmarkPoint[] => {
     if (!performanceData || performanceData.length === 0) return [];
 
-    // CDI ~1.05%/month → daily ~0.034%
-    // IPCA ~0.5%/month → daily ~0.016%
-    // IFIX ~0.7%/month → daily ~0.023%
-    // S&P 500 ~0.9%/month → daily ~0.029%
-    const dailyRates = {
-      cdi: 0.00034,
-      ipca: 0.00016,
-      ifix: 0.00023,
-      sp500: 0.00029,
-    };
-
-    // Sample at most ~60 data points for rendering performance
+    // Filtra para renderizar no máximo ~60 pontos para melhor performance do gráfico
     const step = Math.max(1, Math.floor(performanceData.length / 60));
     const sampled = performanceData.filter((_, i) => i === 0 || i === performanceData.length - 1 || i % step === 0);
 
     return sampled.map((point) => {
-      const portfolioReturn = point.total_invested > 1e-6
-        ? ((point.value - point.total_invested) / point.total_invested) * 100
-        : 0;
-
-      const dayIndex = Math.round((new Date(point.date).getTime() - new Date(performanceData[0].date).getTime()) / (1000 * 60 * 60 * 24));
-
       const d = new Date(point.date);
-      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      const utcDate = new Date(d.getTime() + d.getTimezoneOffset() * 60 * 1000);
+      const label = utcDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
 
       return {
         label,
-        portfolio: Number(portfolioReturn.toFixed(2)),
-        cdi: Number(((Math.pow(1 + dailyRates.cdi, dayIndex) - 1) * 100).toFixed(2)),
-        ipca: Number(((Math.pow(1 + dailyRates.ipca, dayIndex) - 1) * 100).toFixed(2)),
-        ifix: Number(((Math.pow(1 + dailyRates.ifix, dayIndex) - 1) * 100).toFixed(2)),
-        sp500: Number(((Math.pow(1 + dailyRates.sp500, dayIndex) - 1) * 100).toFixed(2)),
+        portfolio: Number((point.return_pct ?? 0).toFixed(2)),
+        cdi: Number((point.cdi_return_pct ?? 0).toFixed(2)),
+        ipca: Number((point.ipca_return_pct ?? 0).toFixed(2)),
+        ifix: Number((point.ifix_return_pct ?? 0).toFixed(2)),
+        ibov: Number((point.ibov_return_pct ?? 0).toFixed(2)),
+        sp500: Number((point.sp500_return_pct ?? 0).toFixed(2)),
       };
     });
   }, [performanceData]);
@@ -1292,6 +1279,7 @@ export default function PortfolioAnalysis({
                 <Line type="monotone" dataKey="cdi" name="CDI" stroke={BENCHMARK_COLORS.cdi} strokeWidth={1.5} dot={false} strokeDasharray="6 3" opacity={0.7} />
                 <Line type="monotone" dataKey="ipca" name="IPCA+" stroke={BENCHMARK_COLORS.ipca} strokeWidth={1.5} dot={false} strokeDasharray="4 4" opacity={0.6} />
                 <Line type="monotone" dataKey="ifix" name="IFIX" stroke={BENCHMARK_COLORS.ifix} strokeWidth={1.5} dot={false} strokeDasharray="8 4" opacity={0.6} />
+                <Line type="monotone" dataKey="ibov" name="Ibovespa" stroke={BENCHMARK_COLORS.ibov} strokeWidth={1.5} dot={false} strokeDasharray="5 5" opacity={0.6} />
                 <Line type="monotone" dataKey="sp500" name="S&P 500" stroke={BENCHMARK_COLORS.sp500} strokeWidth={1.5} dot={false} strokeDasharray="3 6" opacity={0.6} />
               </LineChart>
             </ResponsiveContainer>
@@ -1306,8 +1294,7 @@ export default function PortfolioAnalysis({
               color: 'var(--text-secondary)',
               lineHeight: 1.5,
             }}>
-              💡 <strong style={{ color: 'var(--text-primary)' }}>Nota:</strong> Os benchmarks utilizam taxas estimadas para fins de comparação visual.
-              Para resultados precisos, conecte uma fonte de dados de mercado em tempo real.
+              💡 <strong style={{ color: 'var(--text-primary)' }}>Nota:</strong> Os benchmarks utilizam dados históricos reais obtidos da B3 (IFIX e Ibovespa), Banco Central (CDI e IPCA) e S&P 500 (com câmbio ajustado para BRL se a moeda base da carteira for Real).
             </div>
           </>
         ) : (
