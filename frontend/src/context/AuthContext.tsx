@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(data);
-      window.location.href = '/dashboard';
+      window.location.href = '/dashboard/portfolio';
     } catch (error) {
       setIsLoading(false);
       throw error;

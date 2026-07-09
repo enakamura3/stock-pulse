@@ -44,7 +44,7 @@ describe('Middleware', () => {
     const req = createRequest('/login', 'token123');
     const res = await middleware(req);
     expect(NextResponse.redirect).toHaveBeenCalled();
-    expect((res as any).url).toContain('/dashboard');
+    expect((res as any).url).toContain('/dashboard/portfolio');
   });
 
   it('allows access to protected route with token', async () => {
