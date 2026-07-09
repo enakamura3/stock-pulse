@@ -156,7 +156,7 @@ describe('AuthContext', () => {
     await userEvent.click(screen.getByTestId('btn-login'));
     
     await waitFor(() => {
-      expect(window.location.href).toBe('/dashboard');
+      expect(window.location.href).toBe('/dashboard/portfolio');
     });
   });
 
@@ -215,7 +215,7 @@ describe('AuthContext', () => {
     await userEvent.click(screen.getByTestId('btn-register'));
     
     await waitFor(() => {
-      expect(window.location.href).toBe('/dashboard');
+      expect(window.location.href).toBe('/dashboard/portfolio');
     });
   });
 

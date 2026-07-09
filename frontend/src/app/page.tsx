@@ -6,7 +6,7 @@ export default function Home() {
       <div className="glass-panel">
         <h1>stock-pulse</h1>
         <p>A arquitetura foi estabelecida. A infraestrutura 100% Dockerizada está no ar.</p>
-        <Link href="/dashboard" passHref>
+        <Link href="/dashboard/portfolio" passHref>
           <button className="primary-button">Entrar no Dashboard</button>
         </Link>
       </div>
