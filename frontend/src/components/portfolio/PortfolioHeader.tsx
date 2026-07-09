@@ -15,11 +15,11 @@ export default function PortfolioHeader({ userName, onLogout, onLinkTelegram }: 
           stock-pulse
         </h1>
         <div className="flex-row mt-sm gap-lg">
-          <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-            📊 Monitoramento
-          </Link>
           <Link href="/dashboard/portfolio" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
             💼 Minha Carteira
+          </Link>
+          <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+            📊 Monitoramento
           </Link>
         </div>
       </div>

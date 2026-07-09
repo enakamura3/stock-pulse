@@ -508,14 +508,14 @@ export default function DashboardPage() {
           
           {/* Navegação entre telas do Dashboard */}
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}>
-            <Link href="/dashboard" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              📊 Painel
-            </Link>
             <Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              💼 Carteiras
+              💼 Minha Carteira
+            </Link>
+            <Link href="/dashboard" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              📊 Monitoramento
             </Link>
             <Link href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              🔔 Alertas
+              🔔 Meus Alertas
             </Link>
           </div>
         </div>
