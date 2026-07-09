@@ -20,6 +20,10 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, name, email, passwordHash string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	GetUserByID(ctx context.Context, id string) (*User, error)
+	GetUserByIDWithHash(ctx context.Context, id string) (*User, error)
+	UpdateUser(ctx context.Context, id, name, email string) (*User, error)
+	UpdatePassword(ctx context.Context, id, passwordHash string) error
+	DeleteUser(ctx context.Context, id string) error
 }
 
 // Service lida com regras de negócio de autenticação, hashing e controle de sessão.
@@ -213,4 +217,51 @@ func (s *Service) RevokeRefreshToken(ctx context.Context, token string) error {
 // GetUserByID retorna um usuário pelo ID.
 func (s *Service) GetUserByID(ctx context.Context, id string) (*User, error) {
 	return s.repo.GetUserByID(ctx, id)
+}
+
+// UpdateProfile atualiza o nome e e-mail do usuário.
+func (s *Service) UpdateProfile(ctx context.Context, id, name, email string) (*User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	name = strings.TrimSpace(name)
+
+	if email == "" || name == "" {
+		return nil, errors.New("todos os campos são obrigatórios")
+	}
+
+	// Verifica se o e-mail já está em uso por outro usuário
+	existing, err := s.repo.GetUserByEmail(ctx, email)
+	if err == nil && existing != nil && existing.ID != id {
+		return nil, errors.New("este e-mail já está cadastrado por outro usuário")
+	}
+
+	return s.repo.UpdateUser(ctx, id, name, email)
+}
+
+// UpdatePassword valida a senha atual e define a nova senha.
+func (s *Service) UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error {
+	if len(newPassword) < 6 {
+		return errors.New("a nova senha deve ter no mínimo 6 caracteres")
+	}
+
+	user, err := s.repo.GetUserByIDWithHash(ctx, id)
+	if err != nil {
+		return errors.New("usuário não encontrado")
+	}
+
+	match, err := comparePasswordAndHash(currentPassword, user.PasswordHash)
+	if err != nil || !match {
+		return errors.New("senha atual incorreta")
+	}
+
+	hash, err := hashPassword(newPassword, defaultParams)
+	if err != nil {
+		return fmt.Errorf("falha ao criptografar nova senha: %w", err)
+	}
+
+	return s.repo.UpdatePassword(ctx, id, hash)
+}
+
+// DeleteUser deleta o usuário do banco de dados.
+func (s *Service) DeleteUser(ctx context.Context, id string) error {
+	return s.repo.DeleteUser(ctx, id)
 }

@@ -547,7 +547,7 @@ export default function PortfolioPage() {
 
   return (
     <main className="container" style={{ maxWidth: 1400 }}>
-      <PortfolioHeader userName={user?.name || 'Investidor'} onLogout={logout} onLinkTelegram={handleLinkTelegram} />
+      <PortfolioHeader userName={user?.name || 'Investidor'} onLogout={logout} />
 
       <PortfolioTabs 
         portfolios={portfolios} 

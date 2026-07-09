@@ -22,6 +22,9 @@ type AuthService interface {
 	ValidateRefreshToken(ctx context.Context, token string) (string, error)
 	GetUserByID(ctx context.Context, id string) (*User, error)
 	GenerateAccessToken(user *User) (string, error)
+	UpdateProfile(ctx context.Context, id, name, email string) (*User, error)
+	UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error
+	DeleteUser(ctx context.Context, id string) error
 }
 
 // Handler expõe os métodos HTTP da API de Autenticação.
@@ -221,4 +224,83 @@ func (h *Handler) respondWithJSON(w http.ResponseWriter, status int, payload int
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(response)
+}
+
+type updateProfilePayload struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+type updatePasswordPayload struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// UpdateProfile atualiza as informações do usuário.
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(UserIDKey).(string)
+	if !ok || userID == "" {
+		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	var payload updateProfilePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		h.respondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		return
+	}
+
+	user, err := h.service.UpdateProfile(r.Context(), userID, payload.Name, payload.Email)
+	if err != nil {
+		h.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	h.respondWithJSON(w, http.StatusOK, user)
+}
+
+// UpdatePassword altera a senha do usuário logado.
+func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(UserIDKey).(string)
+	if !ok || userID == "" {
+		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	var payload updatePasswordPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		h.respondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		return
+	}
+
+	err := h.service.UpdatePassword(r.Context(), userID, payload.CurrentPassword, payload.NewPassword)
+	if err != nil {
+		h.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	h.respondWithJSON(w, http.StatusOK, map[string]string{"message": "Senha atualizada com sucesso"})
+}
+
+// DeleteUser exclui a conta do usuário e limpa os cookies.
+func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(UserIDKey).(string)
+	if !ok || userID == "" {
+		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	cookie, err := r.Cookie("refresh_token")
+	if err == nil && cookie != nil {
+		_ = h.service.RevokeRefreshToken(r.Context(), cookie.Value)
+	}
+
+	err = h.service.DeleteUser(r.Context(), userID)
+	if err != nil {
+		h.respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.clearTokenCookies(w)
+	h.respondWithJSON(w, http.StatusOK, map[string]string{"message": "Conta excluída com sucesso"})
 }

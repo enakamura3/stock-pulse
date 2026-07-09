@@ -96,3 +96,78 @@ func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 	}
 	return user, nil
 }
+
+// GetUserByIDWithHash busca o usuário completo pelo ID, incluindo o hash da senha.
+func (r *Repository) GetUserByIDWithHash(ctx context.Context, id string) (*User, error) {
+	query := `
+		SELECT id, name, email, password_hash, created_at, updated_at
+		FROM "user"
+		WHERE id = $1
+	`
+	user := &User{}
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.PasswordHash,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// UpdateUser atualiza os dados públicos (nome e e-mail) do usuário.
+func (r *Repository) UpdateUser(ctx context.Context, id, name, email string) (*User, error) {
+	query := `
+		UPDATE "user"
+		SET name = $2, email = $3, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, name, email, created_at, updated_at
+	`
+	user := &User{}
+	err := r.db.QueryRow(ctx, query, id, name, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao atualizar usuário: %w", err)
+	}
+	return user, nil
+}
+
+// UpdatePassword atualiza o hash da senha do usuário.
+func (r *Repository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	query := `
+		UPDATE "user"
+		SET password_hash = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id
+	`
+	var returnedID string
+	err := r.db.QueryRow(ctx, query, id, passwordHash).Scan(&returnedID)
+	if err != nil {
+		return fmt.Errorf("erro ao atualizar senha: %w", err)
+	}
+	return nil
+}
+
+// DeleteUser remove o usuário e todas as suas informações associadas em cascata.
+func (r *Repository) DeleteUser(ctx context.Context, id string) error {
+	query := `
+		DELETE FROM "user"
+		WHERE id = $1
+		RETURNING id
+	`
+	var returnedID string
+	err := r.db.QueryRow(ctx, query, id).Scan(&returnedID)
+	if err != nil {
+		return fmt.Errorf("erro ao excluir usuário: %w", err)
+	}
+	return nil
+}

@@ -238,6 +238,9 @@ export default function AlertsPage() {
             <Link href="/dashboard/alerts" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
               🔔 Meus Alertas
             </Link>
+            <Link href="/dashboard/settings" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              ⚙️ Configurações
+            </Link>
           </div>
         </div>
         

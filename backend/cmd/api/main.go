@@ -226,6 +226,13 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(customMiddleware.AuthRequired([]byte(jwtSecret)))
 
+			// Gestão de Usuário
+			r.Route("/user", func(r chi.Router) {
+				r.Put("/profile", authHandler.UpdateProfile)
+				r.Put("/password", authHandler.UpdatePassword)
+				r.Delete("/", authHandler.DeleteUser)
+			})
+
 			// Cotações e Busca
 			r.Get("/quotes/{ticker}", marketHandler.GetQuote)
 			r.Get("/assets/search", marketHandler.Search)
@@ -267,7 +274,9 @@ func main() {
 
 			// Integração Telegram
 			r.Route("/telegram", func(r chi.Router) {
+				r.Get("/status", telegramHttpHandler.GetTelegramStatus)
 				r.Post("/link", telegramHttpHandler.GenerateLinkToken)
+				r.Delete("/link", telegramHttpHandler.UnlinkTelegram)
 			})
 
 			// Workers / System Management
