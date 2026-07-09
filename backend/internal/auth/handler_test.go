@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,6 +55,22 @@ func (m *MockAuthService) GetUserByID(ctx context.Context, id string) (*User, er
 func (m *MockAuthService) GenerateAccessToken(user *User) (string, error) {
 	args := m.Called(user)
 	return args.String(0), args.Error(1)
+}
+
+func (m *MockAuthService) UpdateProfile(ctx context.Context, id, name, email string) (*User, error) {
+	args := m.Called(ctx, id, name, email)
+	if args.Get(0) != nil {
+		return args.Get(0).(*User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockAuthService) UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error {
+	return m.Called(ctx, id, currentPassword, newPassword).Error(0)
+}
+
+func (m *MockAuthService) DeleteUser(ctx context.Context, id string) error {
+	return m.Called(ctx, id).Error(0)
 }
 
 func TestHandler_Register(t *testing.T) {
@@ -354,4 +371,64 @@ func TestHandler_RespondWithJSON_Error(t *testing.T) {
 
 	h.respondWithJSON(rec, http.StatusOK, failMarshal{})
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestHandler_UpdateProfile(t *testing.T) {
+	m := new(MockAuthService)
+	m.On("UpdateProfile", mock.Anything, "1", "NewName", "new@test.com").Return(&User{ID: "1", Name: "NewName", Email: "new@test.com"}, nil)
+	h := NewHandler(m)
+
+	payload := `{"name":"NewName","email":"new@test.com"}`
+	req := httptest.NewRequest(http.MethodPut, "/user/profile", strings.NewReader(payload))
+	ctx := context.WithValue(req.Context(), UserIDKey, "1")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.UpdateProfile(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp User
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.Equal(t, "NewName", resp.Name)
+	assert.Equal(t, "new@test.com", resp.Email)
+	m.AssertExpectations(t)
+}
+
+func TestHandler_UpdatePassword(t *testing.T) {
+	m := new(MockAuthService)
+	m.On("UpdatePassword", mock.Anything, "1", "oldpass", "newpass").Return(nil)
+	h := NewHandler(m)
+
+	payload := `{"current_password":"oldpass","new_password":"newpass"}`
+	req := httptest.NewRequest(http.MethodPut, "/user/password", strings.NewReader(payload))
+	ctx := context.WithValue(req.Context(), UserIDKey, "1")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.UpdatePassword(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	m.AssertExpectations(t)
+}
+
+func TestHandler_DeleteUser(t *testing.T) {
+	m := new(MockAuthService)
+	m.On("DeleteUser", mock.Anything, "1").Return(nil)
+	h := NewHandler(m)
+
+	req := httptest.NewRequest(http.MethodDelete, "/user", nil)
+	ctx := context.WithValue(req.Context(), UserIDKey, "1")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	h.DeleteUser(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	// should clear cookies
+	cookies := rec.Result().Cookies()
+	assert.Len(t, cookies, 2)
+	assert.Equal(t, "access_token", cookies[0].Name)
+	assert.Equal(t, "refresh_token", cookies[1].Name)
+	m.AssertExpectations(t)
 }

@@ -27,6 +27,9 @@ func (m *MockRepository) GetChatIDByUserID(ctx context.Context, userID uuid.UUID
 	args := m.Called(ctx, userID)
 	return args.Get(0).(int64), args.Error(1)
 }
+func (m *MockRepository) UnlinkAccount(ctx context.Context, userID uuid.UUID) error {
+	return m.Called(ctx, userID).Error(0)
+}
 
 func setupServiceTest(t *testing.T) (*service, *MockRepository, *miniredis.Miniredis, *redis.Client) {
 	mr := miniredis.RunT(t)

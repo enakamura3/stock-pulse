@@ -517,6 +517,9 @@ export default function DashboardPage() {
             <Link href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
               🔔 Meus Alertas
             </Link>
+            <Link href="/dashboard/settings" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              ⚙️ Configurações
+            </Link>
           </div>
         </div>
         

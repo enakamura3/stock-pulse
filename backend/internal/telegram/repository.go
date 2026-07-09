@@ -14,6 +14,7 @@ type Repository interface {
 	LinkAccount(ctx context.Context, userID uuid.UUID, telegramChatID int64) error
 	GetUserIDByChatID(ctx context.Context, telegramChatID int64) (uuid.UUID, error)
 	GetChatIDByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
+	UnlinkAccount(ctx context.Context, userID uuid.UUID) error
 }
 
 type repository struct {
@@ -61,4 +62,13 @@ func (r *repository) GetChatIDByUserID(ctx context.Context, userID uuid.UUID) (i
 		return 0, fmt.Errorf("failed to query chat id: %w", err)
 	}
 	return chatID, nil
+}
+
+func (r *repository) UnlinkAccount(ctx context.Context, userID uuid.UUID) error {
+	query := `DELETE FROM user_telegram_link WHERE user_id = $1;`
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to unlink account: %w", err)
+	}
+	return nil
 }

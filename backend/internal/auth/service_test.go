@@ -40,6 +40,30 @@ func (m *MockUserRepository) GetUserByID(ctx context.Context, id string) (*User,
 	return nil, args.Error(1)
 }
 
+func (m *MockUserRepository) GetUserByIDWithHash(ctx context.Context, id string) (*User, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) != nil {
+		return args.Get(0).(*User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) UpdateUser(ctx context.Context, id, name, email string) (*User, error) {
+	args := m.Called(ctx, id, name, email)
+	if args.Get(0) != nil {
+		return args.Get(0).(*User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	return m.Called(ctx, id, passwordHash).Error(0)
+}
+
+func (m *MockUserRepository) DeleteUser(ctx context.Context, id string) error {
+	return m.Called(ctx, id).Error(0)
+}
+
 func setupService() (*Service, *MockUserRepository, redismock.ClientMock) {
 	repoMock := new(MockUserRepository)
 	db, mockRedis := redismock.NewClientMock()
@@ -163,4 +187,33 @@ func TestComparePasswordAndHash(t *testing.T) {
 	// Invalid format
 	_, err = comparePasswordAndHash("test1234", "invalid")
 	assert.Error(t, err)
+}
+
+func TestService_UpdateProfile(t *testing.T) {
+	s, repo, _ := setupService()
+	repo.On("GetUserByEmail", mock.Anything, "new@test.com").Return(nil, errors.New("not found"))
+	repo.On("UpdateUser", mock.Anything, "1", "NewName", "new@test.com").Return(&User{ID: "1", Name: "NewName", Email: "new@test.com"}, nil)
+
+	user, err := s.UpdateProfile(context.Background(), "1", "NewName", "new@test.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "NewName", user.Name)
+	assert.Equal(t, "new@test.com", user.Email)
+}
+
+func TestService_UpdatePassword(t *testing.T) {
+	s, repo, _ := setupService()
+	hash, _ := hashPassword("oldpassword", defaultParams)
+	repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+	repo.On("UpdatePassword", mock.Anything, "1", mock.Anything).Return(nil)
+
+	err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
+	assert.NoError(t, err)
+}
+
+func TestService_DeleteUser(t *testing.T) {
+	s, repo, _ := setupService()
+	repo.On("DeleteUser", mock.Anything, "1").Return(nil)
+
+	err := s.DeleteUser(context.Background(), "1")
+	assert.NoError(t, err)
 }

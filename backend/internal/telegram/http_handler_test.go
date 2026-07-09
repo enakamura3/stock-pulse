@@ -49,6 +49,13 @@ func (m *MockService) GetActivePortfolio(ctx context.Context, chatID int64) (str
 	args := m.Called(ctx, chatID)
 	return args.String(0), args.Error(1)
 }
+func (m *MockService) GetChatIDByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).(int64), args.Error(1)
+}
+func (m *MockService) UnlinkAccount(ctx context.Context, userID uuid.UUID) error {
+	return m.Called(ctx, userID).Error(0)
+}
 
 func TestHTTPHandler_GenerateLinkToken(t *testing.T) {
 	t.Run("unauthorized", func(t *testing.T) {
@@ -94,23 +101,84 @@ func TestHTTPHandler_GenerateLinkToken(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		svc := new(MockService)
-		h := NewHTTPHandler(svc, "testbot")
-		uID := uuid.New()
+		userID := uuid.New()
+		svc.On("GenerateLinkToken", mock.Anything, userID).Return("token-123", nil)
+		h := NewHTTPHandler(svc, "bot")
 
-		svc.On("GenerateLinkToken", mock.Anything, uID).Return("mytoken123", nil)
+		req := httptest.NewRequest("POST", "/telegram/link", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, userID.String())
+		req = req.WithContext(ctx)
 
-		req := httptest.NewRequest("POST", "/link", nil)
-		req = req.WithContext(context.WithValue(req.Context(), auth.UserIDKey, uID.String()))
 		rec := httptest.NewRecorder()
-
 		h.GenerateLinkToken(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
-
 		var resp map[string]string
-		err := json.NewDecoder(rec.Body).Decode(&resp)
-		assert.NoError(t, err)
-		assert.Equal(t, "mytoken123", resp["token"])
-		assert.Equal(t, "testbot", resp["bot_username"])
+		json.NewDecoder(rec.Body).Decode(&resp)
+		assert.Equal(t, "token-123", resp["token"])
+		assert.Equal(t, "bot", resp["bot_username"])
+	})
+}
+
+func TestHTTPHandler_GetTelegramStatus(t *testing.T) {
+	t.Run("success linked", func(t *testing.T) {
+		svc := new(MockService)
+		userID := uuid.New()
+		svc.On("GetChatIDByUserID", mock.Anything, userID).Return(int64(12345), nil)
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("GET", "/telegram/status", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, userID.String())
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		h.GetTelegramStatus(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var resp map[string]any
+		json.NewDecoder(rec.Body).Decode(&resp)
+		assert.True(t, resp["linked"].(bool))
+		assert.Equal(t, float64(12345), resp["chat_id"].(float64))
+		assert.Equal(t, "bot", resp["bot_username"])
+	})
+
+	t.Run("success unlinked", func(t *testing.T) {
+		svc := new(MockService)
+		userID := uuid.New()
+		svc.On("GetChatIDByUserID", mock.Anything, userID).Return(int64(0), errors.New("not linked"))
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("GET", "/telegram/status", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, userID.String())
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		h.GetTelegramStatus(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var resp map[string]any
+		json.NewDecoder(rec.Body).Decode(&resp)
+		assert.False(t, resp["linked"].(bool))
+	})
+}
+
+func TestHTTPHandler_UnlinkTelegram(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		svc := new(MockService)
+		userID := uuid.New()
+		svc.On("UnlinkAccount", mock.Anything, userID).Return(nil)
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("DELETE", "/telegram/link", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, userID.String())
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		h.UnlinkTelegram(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var resp map[string]string
+		json.NewDecoder(rec.Body).Decode(&resp)
+		assert.Equal(t, "Telegram desvinculado com sucesso", resp["message"])
 	})
 }
