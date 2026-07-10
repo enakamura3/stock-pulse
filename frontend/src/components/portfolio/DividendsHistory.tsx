@@ -43,7 +43,7 @@ export default function DividendsHistory({
     return div.type.charAt(0).toUpperCase() + div.type.slice(1).toLowerCase();
   };
 
-  const [sortField, setSortField] = useState<SortField>('cum_date');
+  const [sortField, setSortField] = useState<SortField>('payment_date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
   const handleSort = (field: SortField) => {
