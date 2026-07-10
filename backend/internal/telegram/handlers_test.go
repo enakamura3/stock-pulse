@@ -17,6 +17,29 @@ import (
 type MockTelebotContext struct {
 	mock.Mock
 	telebot.Context // embed to panic on unimplemented methods instead of failing compilation if interface grows
+	store           map[string]interface{}
+}
+
+func (m *MockTelebotContext) Get(key string) interface{} {
+	if m.store != nil {
+		if val, ok := m.store[key]; ok {
+			return val
+		}
+	}
+	if key == "user_id" {
+		return "00000000-0000-0000-0000-000000000000"
+	}
+	// Fallback to mock.Called for backward compatibility in tests if any
+	args := m.Called(key)
+	return args.Get(0)
+}
+
+func (m *MockTelebotContext) Set(key string, val interface{}) {
+	if m.store == nil {
+		m.store = make(map[string]interface{})
+	}
+	m.store[key] = val
+	m.Called(key, val)
 }
 
 func (m *MockTelebotContext) Send(what interface{}, opts ...interface{}) error {
