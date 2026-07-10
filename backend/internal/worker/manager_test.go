@@ -11,7 +11,7 @@ func TestWorkerManager_RegisterAndGetAll(t *testing.T) {
 	m := NewManager()
 
 	job := func(ctx context.Context) {}
-	w := NewWorker("TestWorker", 10*time.Millisecond, job)
+	w := NewWorker("TestWorker", "Test Description", 10*time.Millisecond, job)
 
 	m.Register(w)
 
@@ -36,7 +36,7 @@ func TestWorkerManager_Trigger(t *testing.T) {
 		atomic.AddInt32(&counter, 1)
 	}
 	
-	w := NewWorker("ManualWorker", 1*time.Hour, job)
+	w := NewWorker("ManualWorker", "Manual Description", 1*time.Hour, job)
 	m.Register(w)
 
 	ctx, cancel := context.WithCancel(context.Background())
