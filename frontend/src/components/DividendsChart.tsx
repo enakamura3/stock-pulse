@@ -13,7 +13,7 @@ import {
 interface CalculatedDividend {
   asset_id: string;
   ticker: string;
-  ex_date: string;
+  cum_date: string;
   payment_date: string;
   gross_amount: number;
   net_amount: number;
@@ -31,7 +31,7 @@ export default function DividendsChart({ data }: DividendsChartProps) {
   const chartData = useMemo(() => {
     // Agrupa por mês (YYYY-MM) usando a data de pagamento
     const grouped = data.reduce((acc, div) => {
-      const month = div.payment_date ? div.payment_date.substring(0, 7) : div.ex_date.substring(0, 7); // Pega YYYY-MM
+      const month = div.payment_date ? div.payment_date.substring(0, 7) : div.cum_date.substring(0, 7); // Pega YYYY-MM
       if (!acc[month]) {
         const [yearStr, monthStr] = month.split('-');
         acc[month] = { name: month, rawDate: new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1), BRL: 0, USD: 0, RF: 0 };

@@ -425,7 +425,7 @@ export default function PortfolioAnalysis({
     const getDividendMonthKey = (div: CalculatedDividend): string | null => {
       let dateStr = div.payment_date;
       if (!dateStr || dateStr.startsWith('0001')) {
-        dateStr = div.ex_date;
+        dateStr = div.cum_date;
       }
       if (!dateStr || dateStr.startsWith('0001')) {
         return null;
@@ -839,7 +839,7 @@ export default function PortfolioAnalysis({
     const grouped: Record<string, { label: string; rawDate: Date; nacionais: number; internacionais: number; rendaFixa: number }> = {};
 
     dividends.forEach(div => {
-      const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
+      const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
       if (!dateStr) return;
       const date = new Date(dateStr);
       if (date < twelveMonthsAgo) return;
@@ -882,7 +882,7 @@ export default function PortfolioAnalysis({
 
     const recentDividends = dividends.filter(d => {
       if (d.is_accrued) return false;
-      const dateStr = (d.payment_date && !d.payment_date.startsWith('0001')) ? d.payment_date : d.ex_date;
+      const dateStr = (d.payment_date && !d.payment_date.startsWith('0001')) ? d.payment_date : d.cum_date;
       if (!dateStr) return false;
       return new Date(dateStr) >= twelveMonthsAgo;
     });

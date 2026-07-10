@@ -150,7 +150,7 @@ export default function PortfolioPage() {
             ticker: fy.asset_name,
             asset_name: fy.asset_name,
             asset_type: fy.asset_type,
-            ex_date: date,
+            cum_date: date,
             payment_date: date,
             gross_amount: fy.gross_amount,
             net_amount: fy.net_amount,
@@ -165,8 +165,8 @@ export default function PortfolioPage() {
       }
       
       allDividends.sort((a, b) => {
-        const dateA = new Date(a.payment_date || a.ex_date).getTime();
-        const dateB = new Date(b.payment_date || b.ex_date).getTime();
+        const dateA = new Date(a.payment_date || a.cum_date).getTime();
+        const dateB = new Date(b.payment_date || b.cum_date).getTime();
         return dateB - dateA; // Descending
       });
       
@@ -504,14 +504,14 @@ export default function PortfolioPage() {
   });
 
   const filteredDividends = categoryFilteredDividends.filter(div => {
-    const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
+    const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
     if (!dateStr) return true;
     const year = dateStr.substring(0, 4);
     const month = dateStr.substring(5, 7);
     return (filterDivYear === 'Todos' || year === filterDivYear) && (filterDivMonth === 'Todos' || month === filterDivMonth);
   });
 
-  const availableYears = Array.from(new Set(categoryFilteredDividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.ex_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  const availableYears = Array.from(new Set(categoryFilteredDividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.cum_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
 
   // Se a categoria for Renda Fixa ou Todas, precisamos somar a renda fixa
   const includeFI = activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Fixa';
@@ -532,7 +532,7 @@ export default function PortfolioPage() {
   const twelveMonthsAgo = new Date();
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
   const divs12m = categoryFilteredDividends.filter(div => {
-    const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
+    const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
     return dateStr && new Date(dateStr) >= twelveMonthsAgo;
   });
   const sumDivs12m = divs12m.reduce((acc, div) => acc + ((div as any).total_value || div.net_amount || 0), 0);

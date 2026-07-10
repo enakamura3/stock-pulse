@@ -16,8 +16,8 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
     const grouped: Record<string, number[]> = {};
 
     data.forEach(div => {
-      // Usar payment_date se existir e não for nula/0001, senão fallback para ex_date
-      const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.ex_date;
+      // Usar payment_date se existir e não for nula/0001, senão fallback para cum_date
+      const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
       if (!dateStr) return;
       
       const [year, monthStr] = dateStr.split('T')[0].split('-');

@@ -194,7 +194,7 @@ A plataforma gerencia a persistência relacional de forma rígida através de **
    - **Constraint:** `UNIQUE (asset_id, price_date)` garante integridade da série de preços.
 5. **`asset_event`**
    - **Propósito:** Registra eventos corporativos históricos (dividendos, JCP, splits, grupamentos e bonificações) associados aos ativos.
-   - **Colunas Principais:** `id` (UUID, PK), `asset_id` (UUID, FK -> `asset`), `type` (VARCHAR), `gross_amount` (DECIMAL), `net_amount` (DECIMAL), `split_factor` (DECIMAL), `ex_date` (DATE), `payment_date` (DATE), `created_at`, `updated_at`.
+   - **Colunas Principais:** `id` (UUID, PK), `asset_id` (UUID, FK -> `asset`), `type` (VARCHAR), `gross_amount` (DECIMAL), `net_amount` (DECIMAL), `split_factor` (DECIMAL), `cum_date` (DATE), `payment_date` (DATE), `created_at`, `updated_at`.
 6. **`transaction`**
    - **Propósito:** Livro-razão de transações executadas em ativos de renda variável pertencentes a uma carteira.
    - **Colunas Principais:** `id` (UUID, PK), `portfolio_id` (UUID, FK -> `portfolio`), `asset_id` (UUID, FK -> `asset`), `type` (VARCHAR), `quantity` (DECIMAL), `unit_price` (DECIMAL), `total_cost` (DECIMAL), `exchange_rate` (DECIMAL), `executed_at` (DATE), `created_at`.

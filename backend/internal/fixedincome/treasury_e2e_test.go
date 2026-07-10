@@ -1005,7 +1005,7 @@ func TestTreasuryE2E_Tier4(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = pool.Exec(ctx, `
-			INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, ex_date)
+			INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, cum_date)
 			VALUES ($1, 'COUPON', 500.00, 425.00, '2026-11-15')`,
 			assetID,
 		)

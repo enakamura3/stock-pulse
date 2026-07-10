@@ -93,7 +93,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 					Type:        ev.Type,
 					GrossAmount: ev.Amount,
 					NetAmount:   ev.Amount, // We store gross in both places, taxes are applied per-portfolio later
-					ExDate:      ev.Date,
+					CumDate:     ev.Date,
 					PaymentDate: ev.PaymentDate,
 				})
 				if err != nil {
