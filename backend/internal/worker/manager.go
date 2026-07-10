@@ -7,19 +7,21 @@ import (
 )
 
 type Info struct {
-	Name     string     `json:"name"`
-	LastRun  *time.Time `json:"last_run"`
-	NextRun  *time.Time `json:"next_run"`
-	Status   string     `json:"status"`
-	Interval string     `json:"interval"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	LastRun     *time.Time `json:"last_run"`
+	NextRun     *time.Time `json:"next_run"`
+	Status      string     `json:"status"`
+	Interval    string     `json:"interval"`
 }
 
 type Job func(ctx context.Context)
 
 type Worker struct {
-	Name     string
-	Interval time.Duration
-	Job      Job
+	Name        string
+	Description string
+	Interval    time.Duration
+	Job         Job
 
 	lastRun  time.Time
 	nextRun  time.Time
@@ -28,13 +30,14 @@ type Worker struct {
 	trigger  chan struct{}
 }
 
-func NewWorker(name string, interval time.Duration, job Job) *Worker {
+func NewWorker(name string, description string, interval time.Duration, job Job) *Worker {
 	return &Worker{
-		Name:     name,
-		Interval: interval,
-		Job:      job,
-		status:   "idle",
-		trigger:  make(chan struct{}, 1),
+		Name:        name,
+		Description: description,
+		Interval:    interval,
+		Job:         job,
+		status:      "idle",
+		trigger:     make(chan struct{}, 1),
 	}
 }
 
@@ -97,11 +100,12 @@ func (w *Worker) Info() Info {
 	}
 
 	return Info{
-		Name:     w.Name,
-		LastRun:  lr,
-		NextRun:  nr,
-		Status:   w.status,
-		Interval: w.Interval.String(),
+		Name:        w.Name,
+		Description: w.Description,
+		LastRun:     lr,
+		NextRun:     nr,
+		Status:      w.status,
+		Interval:    w.Interval.String(),
 	}
 }
 

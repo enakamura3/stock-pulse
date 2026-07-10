@@ -13,7 +13,7 @@ import (
 
 func TestHandler_ListWorkers(t *testing.T) {
 	m := NewManager()
-	m.Register(NewWorker("TestWorker", time.Minute, func(ctx context.Context) {}))
+	m.Register(NewWorker("TestWorker", "Test Description", time.Minute, func(ctx context.Context) {}))
 
 	h := NewHandler(m)
 	r := chi.NewRouter()
@@ -40,7 +40,7 @@ func TestHandler_ListWorkers(t *testing.T) {
 
 func TestHandler_TriggerWorker(t *testing.T) {
 	m := NewManager()
-	m.Register(NewWorker("TestWorker", time.Minute, func(ctx context.Context) {}))
+	m.Register(NewWorker("TestWorker", "Test Description", time.Minute, func(ctx context.Context) {}))
 
 	h := NewHandler(m)
 	r := chi.NewRouter()

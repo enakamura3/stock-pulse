@@ -173,11 +173,11 @@ func main() {
 		return defaultInterval
 	}
 
-	workerManager.Register(worker.NewWorker("DividendWorker", getInterval("DIVIDEND_WORKER_INTERVAL", 6*time.Hour), dividendWorker.SyncAllDividends))
-	workerManager.Register(worker.NewWorker("DailyWorker", getInterval("DAILY_WORKER_INTERVAL", 6*time.Hour), portfolioWorker.Run))
-	workerManager.Register(worker.NewWorker("FixedIncomeWorker", getInterval("FI_WORKER_INTERVAL", 6*time.Hour), fiWorker.SyncRates))
-	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", getInterval("ANBIMA_WORKER_INTERVAL", 6*time.Hour), fiAnbimaWorker.SyncHolidays))
-	workerManager.Register(worker.NewWorker("AlertWorker", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
+	workerManager.Register(worker.NewWorker("DividendWorker", "Sincroniza proventos (dividendos, JCP, rendimentos) com fontes externas", getInterval("DIVIDEND_WORKER_INTERVAL", 6*time.Hour), dividendWorker.SyncAllDividends))
+	workerManager.Register(worker.NewWorker("DailyWorker", "Atualiza cotações e calcula a performance diária de todas as carteiras", getInterval("DAILY_WORKER_INTERVAL", 6*time.Hour), portfolioWorker.Run))
+	workerManager.Register(worker.NewWorker("FixedIncomeWorker", "Sincroniza taxas e séries históricas de índices de renda fixa (CDI, SELIC, IPCA, etc.)", getInterval("FI_WORKER_INTERVAL", 6*time.Hour), fiWorker.SyncRates))
+	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", "Sincroniza a tabela de feriados nacionais da ANBIMA para cálculos de dias úteis", getInterval("ANBIMA_WORKER_INTERVAL", 6*time.Hour), fiAnbimaWorker.SyncHolidays))
+	workerManager.Register(worker.NewWorker("AlertWorker", "Verifica os alertas de preços ativos e dispara notificações de push/Telegram", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
 	
 	workerManager.StartAll(workerCtx)
 	workerHandler := worker.NewHandler(workerManager)

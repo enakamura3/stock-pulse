@@ -35,6 +35,21 @@ export default function SettingsPage() {
   const [isLoadingTelegram, setIsLoadingTelegram] = useState(true);
   const [telegramError, setTelegramError] = useState<string | null>(null);
 
+  // Estados dos Workers
+  interface WorkerInfo {
+    name: string;
+    description: string;
+    last_run: string | null;
+    next_run: string | null;
+    status: string;
+    interval: string;
+  }
+  const [workers, setWorkers] = useState<WorkerInfo[]>([]);
+  const [isLoadingWorkers, setIsLoadingWorkers] = useState(true);
+  const [workersError, setWorkersError] = useState<string | null>(null);
+  const [triggeringWorker, setTriggeringWorker] = useState<string | null>(null);
+  const [workerSuccess, setWorkerSuccess] = useState<string | null>(null);
+
   // Inicialização dos campos do perfil
   useEffect(() => {
     if (user) {
@@ -64,8 +79,77 @@ export default function SettingsPage() {
     }
   };
 
+  const loadWorkers = async () => {
+    setIsLoadingWorkers(true);
+    setWorkersError(null);
+    try {
+      const res = await fetch(`${API_URL}/workers`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.sort((a: WorkerInfo, b: WorkerInfo) => a.name.localeCompare(b.name));
+          setWorkers(data);
+        } else {
+          setWorkersError('Formato de resposta de workers inválido.');
+        }
+      } else {
+        setWorkersError('Não foi possível carregar a lista de workers.');
+      }
+    } catch (err) {
+      console.error(err);
+      setWorkersError('Erro de conexão ao carregar workers.');
+    } finally {
+      setIsLoadingWorkers(false);
+    }
+  };
+
+  const handleTriggerWorker = async (name: string) => {
+    setTriggeringWorker(name);
+    setWorkerSuccess(null);
+    setWorkersError(null);
+    try {
+      const res = await fetch(`${API_URL}/workers/${name}/trigger`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setWorkerSuccess(`Worker "${name}" disparado com sucesso!`);
+        setTimeout(loadWorkers, 1500);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setWorkersError(data.message || `Não foi possível disparar o worker "${name}".`);
+      }
+    } catch (err) {
+      console.error(err);
+      setWorkersError(`Erro de rede ao disparar o worker "${name}".`);
+    } finally {
+      setTriggeringWorker(null);
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return 'Nunca';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Nunca';
+      return date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch (err) {
+      return 'Nunca';
+    }
+  };
+
   useEffect(() => {
     loadTelegramStatus();
+    loadWorkers();
   }, []);
 
   if (authLoading) {
@@ -412,7 +496,86 @@ export default function SettingsPage() {
           )}
         </section>
 
-        {/* Seção 4: Zona de Perigo */}
+        {/* Seção 4: Controle de Workers */}
+        <section className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 className="card-title">⚙️ Controle de Workers</h2>
+            <button 
+              className="btn-secondary" 
+              onClick={loadWorkers} 
+              disabled={isLoadingWorkers} 
+              style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              {isLoadingWorkers ? 'Atualizando...' : '🔄 Atualizar'}
+            </button>
+          </div>
+          
+          {workersError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{workersError}</div>}
+          {workerSuccess && <div style={{ color: '#00e676', fontSize: '0.9rem', padding: '0.5rem 0', fontWeight: 600, marginBottom: '1rem' }}>{workerSuccess}</div>}
+
+          {isLoadingWorkers && workers.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <span className="loading-spinner" style={{ borderTopColor: '#00f2fe' }}></span>
+              <span style={{ marginLeft: '10px', color: 'var(--text-secondary)' }}>Carregando workers...</span>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Worker</th>
+                    <th>Descrição</th>
+                    <th>Intervalo</th>
+                    <th>Última Execução</th>
+                    <th>Próxima Execução</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {workers.map((worker) => (
+                    <tr key={worker.name}>
+                      <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{worker.name}</td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '250px' }}>{worker.description}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{worker.interval}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{formatDate(worker.last_run)}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{formatDate(worker.next_run)}</td>
+                      <td>
+                        {worker.status === 'running' ? (
+                          <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="pulse-dot"></span>
+                            Executando
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral">Inativo</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          className="primary-button"
+                          onClick={() => handleTriggerWorker(worker.name)}
+                          disabled={triggeringWorker === worker.name || worker.status === 'running'}
+                          style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
+                        >
+                          {triggeringWorker === worker.name ? 'Disparando...' : 'Executar'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {workers.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                        Nenhum worker registrado no sistema.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Seção 5: Zona de Perigo */}
         <section className="card" style={{ borderColor: 'rgba(255, 74, 90, 0.3)', background: 'rgba(255, 74, 90, 0.02)' }}>
           <div className="card-header" style={{ borderColor: 'rgba(255, 74, 90, 0.2)' }}>
             <h2 className="card-title" style={{ color: '#ff4a5a' }}>⚠️ Zona de Perigo</h2>
