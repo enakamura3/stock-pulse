@@ -69,7 +69,7 @@ describe('PortfolioAnalysis', () => {
         asset_id: 1,
         ticker: 'PETR4',
         type: 'DIVIDEND',
-        ex_date: '2023-01-01',
+        cum_date: '2023-01-01',
         payment_date: '2023-01-15',
         gross_amount: 100,
         net_amount: 100,

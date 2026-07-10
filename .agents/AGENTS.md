@@ -10,13 +10,13 @@ Todo worker de sincronização de dados (como o `DividendWorker`) deve implement
 
 ## 3. Modelo de Dados: Asset Events (Proventos)
 - A tabela `asset_events` armazena proventos (dividendos, JCP, rendimentos, amortizações).
-- O campo `ex_date` representa a **"Data Com / Data Base"** (data em que o investidor precisava ter o ativo para receber o provento).
-- A chave de unicidade de um provento na tabela é a combinação exata: `(asset_id, ex_date, type, gross_amount)`.
-- Ao integrar com qualquer fonte de dados (ex: scraper Fundamentus), mapear a data de referência/aprovação do provento para `ex_date`.
+- O campo `cum_date` representa a **"Data Com / Data Base"** (data em que o investidor precisava ter o ativo para receber o provento).
+- A chave de unicidade de um provento na tabela é a combinação exata: `(asset_id, cum_date, type, gross_amount)`.
+- Ao integrar com qualquer fonte de dados (ex: scraper Fundamentus), mapear a data de referência/aprovação do provento para `cum_date`.
 
 ## 4. Fuzzy Matching de Proventos (Regra de Negócio)
 Ao sincronizar proventos da fonte externa, antes de inserir um novo registro:
-1. Busque proventos existentes no banco com o mesmo `asset_id` e `ex_date`.
+1. Busque proventos existentes no banco com o mesmo `asset_id` e `cum_date`.
 2. Filtre pelo mesmo `type`.
 3. Se houver um provento existente cuja diferença absoluta de `gross_amount` seja **≤ R$ 0,05**, considere como o mesmo provento (trata-se de um ajuste de centavos da fonte).
 4. Se a diferença for **zero** (< 1e-6) e a `payment_date` também for idêntica, faça **skip** (não atualize).

@@ -47,11 +47,11 @@ func TestServiceCoverage_GetPortfolioDividends_Calculation(t *testing.T) {
 		{AssetID: "a1", Ticker: "AAPL", Type: "SPLIT", Quantity: 2, ExecutedAt: time.Now().AddDate(0, 0, -8), Currency: "USD"},
 		{AssetID: "a1", Ticker: "AAPL", Type: "REVERSE_SPLIT", Quantity: 2, ExecutedAt: time.Now().AddDate(0, 0, -7), Currency: "USD"},
 		{AssetID: "a1", Ticker: "AAPL", Type: "BONUS", Quantity: 1, ExecutedAt: time.Now().AddDate(0, 0, -6), Currency: "USD"},
-		{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 5, ExecutedAt: time.Now().AddDate(0, 0, 5), Currency: "USD"}, // After ExDate
+		{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 5, ExecutedAt: time.Now().AddDate(0, 0, 5), Currency: "USD"}, // After CumDate
 	}, nil)
 
 	repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
-		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), ExDate: time.Now()},
+		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), CumDate: time.Now()},
 	}, nil)
 
 	ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(0.0, errors.New("err"))
@@ -71,11 +71,11 @@ func TestServiceCoverage_GetPortfolioDividends_BRL_Taxes(t *testing.T) {
 	}, nil)
 
 	repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
-		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), ExDate: time.Now()},
+		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), CumDate: time.Now()},
 	}, nil)
 	repo.On("GetAssetEvents", mock.Anything, "a2").Return([]AssetEvent{
-		{Type: "JCP", GrossAmount: 1, PaymentDate: time.Now(), ExDate: time.Now()},
-		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), ExDate: time.Now()},
+		{Type: "JCP", GrossAmount: 1, PaymentDate: time.Now(), CumDate: time.Now()},
+		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), CumDate: time.Now()},
 	}, nil)
 
 	divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
@@ -90,7 +90,7 @@ func TestServiceCoverage_GetPortfolioDividends_FallbackError(t *testing.T) {
 		{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, ExecutedAt: time.Now().AddDate(0, 0, -10), Currency: "USD"},
 	}, nil)
 	repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
-		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), ExDate: time.Now()},
+		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), CumDate: time.Now()},
 	}, nil)
 	ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(0.0, errors.New("err"))
 	repo.On("GetExchangeRateByDate", mock.Anything, "USDBRL", mock.Anything).Return(0.0, errors.New("err"))
@@ -138,10 +138,10 @@ func TestServiceCoverage_GetPortfolioDetails_Transactions(t *testing.T) {
 		{AssetID: "a1", Ticker: "AAPL", Type: "BONUS", Quantity: 1, UnitPrice: 0, ExchangeRate: 1, ExecutedAt: time.Now().Add(3*time.Hour), Currency: "USD"},
 	}, nil)
 	repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
-		{Type: "JCP", GrossAmount: 1, PaymentDate: time.Now(), ExDate: time.Now().AddDate(0, 1, 0)},
-		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), ExDate: time.Now().AddDate(0, 1, 0)},
-		{Type: "AMORTIZATION", GrossAmount: 3, PaymentDate: time.Now(), ExDate: time.Now().AddDate(0, 1, 0)},
-		{Type: "YIELD", GrossAmount: 4, PaymentDate: time.Now(), ExDate: time.Now().AddDate(0, 1, 0)},
+		{Type: "JCP", GrossAmount: 1, PaymentDate: time.Now(), CumDate: time.Now().AddDate(0, 1, 0)},
+		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), CumDate: time.Now().AddDate(0, 1, 0)},
+		{Type: "AMORTIZATION", GrossAmount: 3, PaymentDate: time.Now(), CumDate: time.Now().AddDate(0, 1, 0)},
+		{Type: "YIELD", GrossAmount: 4, PaymentDate: time.Now(), CumDate: time.Now().AddDate(0, 1, 0)},
 	}, nil)
 	repo.On("GetLatestPrices", mock.Anything, []string{"a1"}).Return(map[string]float64{"a1": 150.0}, nil)
 	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return(nil, errors.New("ignored"))

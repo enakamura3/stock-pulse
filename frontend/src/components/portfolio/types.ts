@@ -60,7 +60,7 @@ export interface PerformancePoint {
 export interface CalculatedDividend {
   asset_id: string;
   ticker: string;
-  ex_date: string;
+  cum_date: string;
   payment_date: string;
   gross_amount: number;
   net_amount: number;

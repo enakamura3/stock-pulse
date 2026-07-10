@@ -159,7 +159,7 @@ func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio
 type CalculatedDividend struct {
 	AssetID        string    `json:"asset_id"`
 	Ticker         string    `json:"ticker"`
-	ExDate         time.Time `json:"ex_date"`
+	CumDate        time.Time `json:"cum_date"`
 	PaymentDate    time.Time `json:"payment_date"`
 	GrossAmount    float64   `json:"gross_amount"`
 	NetAmount      float64   `json:"net_amount"`
@@ -173,7 +173,7 @@ type CalculatedDividend struct {
 	AssetName      string    `json:"asset_name"`
 }
 
-// GetPortfolioDividends calcula todos os dividendos (históricos e futuros) com base na posição da carteira na data ex-dividendo.
+// GetPortfolioDividends calcula todos os dividendos (históricos e futuros) com base na posição da carteira na data com-dividendo (cum-dividend date).
 func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]CalculatedDividend, error) {
 	// Verifica a existência do portfólio para garantir autorização
 	_, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
@@ -215,16 +215,16 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 		}
 
 		for _, div := range divs {
-			exDate := div.ExDate
+			cumDate := div.CumDate
 
-			// Calcula a quantidade na carteira na Data Com / Data Base (ex_date),
-			// ou seja, transações efetuadas até a ex_date inclusive.
+			// Calcula a quantidade na carteira na Data Com / Data Base (cum_date),
+			// ou seja, transações efetuadas até a cum_date inclusive.
 			var quantity float64 = 0
-			exDateNorm := time.Date(exDate.Year(), exDate.Month(), exDate.Day(), 0, 0, 0, 0, time.UTC)
+			cumDateNorm := time.Date(cumDate.Year(), cumDate.Month(), cumDate.Day(), 0, 0, 0, 0, time.UTC)
 			for _, tx := range txs {
 				txDate := time.Date(tx.ExecutedAt.Year(), tx.ExecutedAt.Month(), tx.ExecutedAt.Day(), 0, 0, 0, 0, time.UTC)
-				// Se a transação ocorreu em um dia após a Data Com (ex_date), interrompe a soma
-				if txDate.After(exDateNorm) {
+				// Se a transação ocorreu em um dia após a Data Com (cum_date), interrompe a soma
+				if txDate.After(cumDateNorm) {
 					break
 				}
 
@@ -275,7 +275,7 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 					originalGross = grossAmount
 					originalNet = netAmount
 
-					fx, err := s.marketService.GetHistoricalExchangeRate(ctx, exDate)
+					fx, err := s.marketService.GetHistoricalExchangeRate(ctx, cumDate)
 					if err == nil {
 						exchangeRate = fx
 					} else {
@@ -291,7 +291,7 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 				results = append(results, CalculatedDividend{
 					AssetID:        txs[0].AssetID,
 					Ticker:         ticker,
-					ExDate:         exDate,
+					CumDate:        cumDate,
 					PaymentDate:    div.PaymentDate,
 					GrossAmount:    grossAmount,
 					NetAmount:      netAmount,

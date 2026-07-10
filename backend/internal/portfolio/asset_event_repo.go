@@ -12,16 +12,16 @@ type AssetEvent struct {
 	Type        string    `json:"type"`
 	GrossAmount float64   `json:"gross_amount"`
 	NetAmount   float64   `json:"net_amount"`
-	ExDate      time.Time `json:"ex_date"`
+	CumDate     time.Time `json:"cum_date"`
 	PaymentDate time.Time `json:"payment_date"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func (r *Repository) UpsertAssetEvent(ctx context.Context, event AssetEvent) error {
 	query := `
-		INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, ex_date, payment_date)
+		INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, cum_date, payment_date)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (asset_id, ex_date, type, gross_amount) 
+		ON CONFLICT (asset_id, cum_date, type, gross_amount) 
 		DO UPDATE SET 
 			payment_date = EXCLUDED.payment_date,
 			net_amount = EXCLUDED.net_amount,
@@ -35,17 +35,17 @@ func (r *Repository) UpsertAssetEvent(ctx context.Context, event AssetEvent) err
 		paymentDate = nil
 	}
 	_, err := r.db.Exec(ctx, query,
-		event.AssetID, event.Type, event.GrossAmount, event.NetAmount, event.ExDate, paymentDate,
+		event.AssetID, event.Type, event.GrossAmount, event.NetAmount, event.CumDate, paymentDate,
 	)
 	return err
 }
 
 func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error) {
 	query := `
-		SELECT id, asset_id, type, gross_amount, net_amount, ex_date, payment_date, updated_at
+		SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at
 		FROM asset_event
 		WHERE asset_id = $1
-		ORDER BY ex_date DESC
+		ORDER BY cum_date DESC
 	`
 	rows, err := r.db.Query(ctx, query, assetID)
 	if err != nil {
@@ -57,7 +57,7 @@ func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]Asse
 	for rows.Next() {
 		var e AssetEvent
 		var paymentDate sql.NullTime
-		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.ExDate, &paymentDate, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.CumDate, &paymentDate, &e.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if paymentDate.Valid {
@@ -68,13 +68,13 @@ func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]Asse
 	return list, nil
 }
 
-func (r *Repository) GetAssetEventsByDate(ctx context.Context, assetID string, exDate time.Time) ([]AssetEvent, error) {
+func (r *Repository) GetAssetEventsByDate(ctx context.Context, assetID string, cumDate time.Time) ([]AssetEvent, error) {
 	query := `
-		SELECT id, asset_id, type, gross_amount, net_amount, ex_date, payment_date, updated_at
+		SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at
 		FROM asset_event
-		WHERE asset_id = $1 AND ex_date = $2
+		WHERE asset_id = $1 AND cum_date = $2
 	`
-	rows, err := r.db.Query(ctx, query, assetID, exDate)
+	rows, err := r.db.Query(ctx, query, assetID, cumDate)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (r *Repository) GetAssetEventsByDate(ctx context.Context, assetID string, e
 	for rows.Next() {
 		var e AssetEvent
 		var paymentDate sql.NullTime
-		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.ExDate, &paymentDate, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.CumDate, &paymentDate, &e.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if paymentDate.Valid {

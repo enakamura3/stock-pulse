@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 const DividendsMatrix = dynamic(() => import('./DividendsMatrix'), { ssr: false });
 
-type SortField = 'status' | 'ticker' | 'category' | 'type' | 'ex_date' | 'payment_date' | 'quantity' | 'per_share_amount' | 'gross_amount' | 'net_amount';
+type SortField = 'status' | 'ticker' | 'category' | 'type' | 'cum_date' | 'payment_date' | 'quantity' | 'per_share_amount' | 'gross_amount' | 'net_amount';
 type SortOrder = 'asc' | 'desc';
 
 interface DividendsHistoryProps {
@@ -43,7 +43,7 @@ export default function DividendsHistory({
     return div.type.charAt(0).toUpperCase() + div.type.slice(1).toLowerCase();
   };
 
-  const [sortField, setSortField] = useState<SortField>('ex_date');
+  const [sortField, setSortField] = useState<SortField>('cum_date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
   const handleSort = (field: SortField) => {
@@ -77,9 +77,9 @@ export default function DividendsHistory({
           valA = formatType(a);
           valB = formatType(b);
           break;
-        case 'ex_date':
-          valA = a.ex_date ? new Date(a.ex_date).getTime() : 0;
-          valB = b.ex_date ? new Date(b.ex_date).getTime() : 0;
+        case 'cum_date':
+          valA = a.cum_date ? new Date(a.cum_date).getTime() : 0;
+          valB = b.cum_date ? new Date(b.cum_date).getTime() : 0;
           break;
         case 'payment_date':
           const hasA = a.payment_date && !a.payment_date.startsWith('0001');
@@ -257,7 +257,7 @@ export default function DividendsHistory({
                     <th className={`text-center ${sortField === 'ticker' ? 'active-sort' : ''}`} onClick={() => handleSort('ticker')}>Ativo{renderSortIndicator('ticker')}</th>
                     <th className={`text-center ${sortField === 'category' ? 'active-sort' : ''}`} onClick={() => handleSort('category')}>Categoria{renderSortIndicator('category')}</th>
                     <th className={`text-center ${sortField === 'type' ? 'active-sort' : ''}`} onClick={() => handleSort('type')}>Tipo{renderSortIndicator('type')}</th>
-                    <th className={`text-center ${sortField === 'ex_date' ? 'active-sort' : ''}`} onClick={() => handleSort('ex_date')}>Data Com{renderSortIndicator('ex_date')}</th>
+                    <th className={`text-center ${sortField === 'cum_date' ? 'active-sort' : ''}`} onClick={() => handleSort('cum_date')}>Data Com{renderSortIndicator('cum_date')}</th>
                     <th className={`text-center ${sortField === 'payment_date' ? 'active-sort' : ''}`} onClick={() => handleSort('payment_date')}>Pagamento{renderSortIndicator('payment_date')}</th>
                     <th className={`text-center ${sortField === 'quantity' ? 'active-sort' : ''}`} onClick={() => handleSort('quantity')}>Qtd{renderSortIndicator('quantity')}</th>
                     <th className={`text-right ${sortField === 'per_share_amount' ? 'active-sort' : ''}`} onClick={() => handleSort('per_share_amount')}>Vlr / Cota{renderSortIndicator('per_share_amount')}</th>
@@ -296,7 +296,7 @@ export default function DividendsHistory({
                             {typeStr}
                           </span>
                         </td>
-                        <td className="text-center text-secondary num-col">{new Date(div.ex_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
+                        <td className="text-center text-secondary num-col">{new Date(div.cum_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
                         <td className="text-center text-secondary num-col">{(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
                         <td className="text-center font-semibold num-col">{div.is_accrued ? '--' : Number(div.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}</td>
                         <td className="text-right font-semibold num-col">{div.is_accrued ? '--' : formatMoney(div.per_share_amount, div.currency)}</td>

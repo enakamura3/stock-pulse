@@ -45,7 +45,7 @@ func TestDividendWorker_SyncAllDividends_FuzzyMatch(t *testing.T) {
 			AssetID:     "asset-1",
 			Type:        "Dividendo",
 			GrossAmount: 1.50,
-			ExDate:      exDate,
+			CumDate:     exDate,
 			PaymentDate: payDate,
 		},
 	}
@@ -95,7 +95,7 @@ func TestDividendWorker_SyncAllDividends_NoMatch(t *testing.T) {
 			AssetID:     "asset-1",
 			Type:        "Dividendo",
 			GrossAmount: 1.50,
-			ExDate:      exDate,
+			CumDate:     exDate,
 			PaymentDate: payDate,
 		},
 	}
@@ -145,7 +145,7 @@ func TestDividendWorker_SyncAllDividends_ExactMatchSkip(t *testing.T) {
 			AssetID:     "asset-1",
 			Type:        "Dividendo",
 			GrossAmount: 1.50,
-			ExDate:      exDate,
+			CumDate:     exDate,
 			PaymentDate: payDate,
 		},
 	}

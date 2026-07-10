@@ -17,10 +17,10 @@ interface DividendsYearlyChartProps {
 export default function DividendsYearlyChart({ data }: DividendsYearlyChartProps) {
   const chartData = useMemo(() => {
     const grouped = data.reduce((acc, div) => {
-      // Use payment date if available, else ex_date
+      // Use payment date if available, else cum_date
       const year = div.payment_date && !div.payment_date.startsWith('0001') 
         ? div.payment_date.substring(0, 4) 
-        : div.ex_date.substring(0, 4);
+        : div.cum_date.substring(0, 4);
         
       if (!acc[year]) {
         acc[year] = { name: year, total: 0 };
