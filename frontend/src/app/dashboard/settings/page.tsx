@@ -140,8 +140,7 @@ export default function SettingsPage() {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
-      });
+      }).replace(', ', ' ');
     } catch (err) {
       return 'Nunca';
     }
@@ -519,28 +518,41 @@ export default function SettingsPage() {
               <span style={{ marginLeft: '10px', color: 'var(--text-secondary)' }}>Carregando workers...</span>
             </div>
           ) : (
-            <div className="table-container">
-              <table className="data-table">
+            <div className="table-container" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className="data-table" style={{ tableLayout: 'auto' }}>
                 <thead>
                   <tr>
-                    <th>Worker</th>
-                    <th>Descrição</th>
-                    <th>Intervalo</th>
-                    <th>Última Execução</th>
-                    <th>Próxima Execução</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Ação</th>
+                    <th style={{ padding: '0.75rem 0.5rem' }}>Worker</th>
+                    <th style={{ padding: '0.75rem 0.5rem' }}>Descrição</th>
+                    <th style={{ padding: '0.75rem 0.5rem' }}>Intervalo</th>
+                    <th style={{ padding: '0.75rem 0.5rem' }}>Execuções</th>
+                    <th style={{ padding: '0.75rem 0.5rem' }}>Status</th>
+                    <th style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {workers.map((worker) => (
                     <tr key={worker.name}>
-                      <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{worker.name}</td>
-                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '250px' }}>{worker.description}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{worker.interval}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{formatDate(worker.last_run)}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{formatDate(worker.next_run)}</td>
-                      <td>
+                      <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>{worker.name}</td>
+                      <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{worker.description}</td>
+                      <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.85rem' }}>
+                        <span className="badge badge-neutral" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
+                          {worker.interval}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem 0.5rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.8rem' }}>
+                          <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }} title="Última Execução">
+                            <span style={{ color: 'var(--text-secondary)', marginRight: '4px', fontSize: '0.75rem' }}>Últ:</span>
+                            {formatDate(worker.last_run)}
+                          </span>
+                          <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }} title="Próxima Execução">
+                            <span style={{ color: 'var(--text-secondary)', marginRight: '4px', fontSize: '0.75rem' }}>Próx:</span>
+                            {formatDate(worker.next_run)}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.75rem 0.5rem' }}>
                         {worker.status === 'running' ? (
                           <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                             <span className="pulse-dot"></span>
@@ -550,7 +562,7 @@ export default function SettingsPage() {
                           <span className="badge badge-neutral">Inativo</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
                         <button
                           className="primary-button"
                           onClick={() => handleTriggerWorker(worker.name)}
@@ -564,7 +576,7 @@ export default function SettingsPage() {
                   ))}
                   {workers.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
                         Nenhum worker registrado no sistema.
                       </td>
                     </tr>
