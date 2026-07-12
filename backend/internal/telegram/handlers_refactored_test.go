@@ -275,9 +275,42 @@ func TestHandlers_Dividends(t *testing.T) {
 			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
 			hasUSD := strings.Contains(msg, "US$ 10,00")
 			hasBRL := strings.Contains(msg, "R$ 15,00")
-			hasAAPL := strings.Contains(msg, "✅ `AAPL` (DIV) • US$ 10,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
-			hasMSFT := strings.Contains(msg, "⏳ `MSFT` (JCP) • R$ 15,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
+			hasAAPL := strings.Contains(msg, "✅ 🇺🇸 `AAPL` (DIV) • US$ 10,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasMSFT := strings.Contains(msg, "⏳ 🇺🇸 `MSFT` (JCP) • R$ 15,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
 			return hasTitle && hasUSD && hasBRL && hasAAPL && hasMSFT
+		}), mock.Anything).Return(nil)
+
+		err := h.HandleDividends(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleDividends - success with BR assets and position details", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
+			{ID: "p1", Name: "P1"},
+		}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		now := time.Date(time.Now().Year(), time.Now().Month(), 15, 12, 0, 0, 0, time.Local)
+		divs := []portfolio.CalculatedDividend{
+			{Ticker: "PETR4.SA", NetAmount: 50.0, PaymentDate: now.AddDate(0, 0, -5), Type: "JCP", Currency: "BRL", Quantity: 100, PerShareAmount: 0.5, AssetType: "STOCK_BR"},
+			{Ticker: "MXRF11.SA", NetAmount: 12.0, PaymentDate: now.AddDate(0, 0, 5), Type: "RENDIMENTO", Currency: "BRL", Quantity: 120, PerShareAmount: 0.1, AssetType: "FII"},
+		}
+		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
+
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
+			hasTotalAcumulado := strings.Contains(msg, "💰 *Total Acumulado:* R$ 50,00")
+			hasBRLRecebidos := strings.Contains(msg, "✅ *Recebidos no Mês:* R$ 50,00")
+			hasBRLAReceber := strings.Contains(msg, "⏳ *A Receber no Mês:* R$ 12,00")
+			hasPETR4 := strings.Contains(msg, "✅ 📈 `PETR4` (JCP) • R$ 50,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasPETR4Sub := strings.Contains(msg, "   ↳ _100 un x R$ 0,50_")
+			hasMXRF11 := strings.Contains(msg, "⏳ 🏢 `MXRF11` (REND) • R$ 12,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
+			hasMXRF11Sub := strings.Contains(msg, "   ↳ _120 un x R$ 0,10_")
+			return hasTitle && hasTotalAcumulado && hasBRLRecebidos && hasBRLAReceber && hasPETR4 && hasPETR4Sub && hasMXRF11 && hasMXRF11Sub
 		}), mock.Anything).Return(nil)
 
 		err := h.HandleDividends(mCtx)
