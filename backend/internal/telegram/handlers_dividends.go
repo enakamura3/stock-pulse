@@ -354,7 +354,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			}
 			summaryMap[mapKey].amount += d.NetAmount
 
-			dateStr := d.PaymentDate.Format("2006-01-02")
+			dateStr := d.PaymentDate.Format("02")
 			if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
 				dateStr = "-"
 			}
@@ -392,7 +392,11 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			sum := summaryMap[mk]
 			ticker := strings.Split(mk, "|")[0]
 			datesStr := strings.Join(sum.dates, ", ")
-			msg += p.Sprintf("   ↳ `%s` (%s) • %s %.2f • %s\n", ticker, abbreviateDividendType(sum.dType), getCurrencySymbol(sum.currency), sum.amount, datesStr)
+			formattedDates := datesStr
+			if datesStr != "-" {
+				formattedDates = "Dia " + datesStr
+			}
+			msg += p.Sprintf("   ↳ `%s` (%s) • %s %.2f • %s\n", ticker, abbreviateDividendType(sum.dType), getCurrencySymbol(sum.currency), sum.amount, formattedDates)
 		}
 		msg += "\n"
 	}
