@@ -337,9 +337,12 @@ func TestHandlers_Dividends(t *testing.T) {
 
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
 			hasTitle := strings.Contains(msg, "📅 *Proventos por Ano: P1*")
-			has2026 := strings.Contains(msg, "• *2026*: R$ 15,00")
-			has2025 := strings.Contains(msg, "• *2025*: US$ 10,00")
-			return hasTitle && has2026 && has2025
+			has2026 := strings.Contains(msg, "📅 *Ano 2026*\n• *Total:* R$ 15,00\n• *Média Mensal:* R$ 2,14/mês")
+			has2025 := strings.Contains(msg, "📅 *Ano 2025*\n• *Total:* US$ 10,00\n• *Média Mensal:* US$ 0,83/mês")
+			hasAcumulado := strings.Contains(msg, "💰 *Acumulado Geral:* R$ 15,00 | US$ 10,00")
+			hasTipos := strings.Contains(msg, "• *Tipos:* JCP: R$ 15,00") && strings.Contains(msg, "• *Tipos:* DIV: US$ 10,00")
+			hasTop := strings.Contains(msg, "• *Top Ativos:* MSFT (R$ 15,00)") && strings.Contains(msg, "• *Top Ativos:* AAPL (US$ 10,00)")
+			return hasTitle && has2026 && has2025 && hasAcumulado && hasTipos && hasTop
 		}), mock.Anything).Return(nil)
 
 		err := h.HandleDividendsByYear(mCtx)
