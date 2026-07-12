@@ -408,6 +408,11 @@ export default function PortfolioPage() {
 
   const handleEditTransaction = (tx: UnifiedTransaction) => {
     if (tx.module === 'RF') {
+      if (tx.asset_type === 'TESOURO') {
+        alert('Para alterar uma operação do Tesouro Direto, utilize a aba "Tesouro Direto" ou exclua esta transação e registre-a novamente.');
+        setActiveTab('tesouro');
+        return;
+      }
       setEditingTxId(tx.id);
       setFiEditTxAssetName(tx.asset_name);
       setFiTxType(tx.type);
@@ -476,7 +481,11 @@ export default function PortfolioPage() {
       const tx = transactions.find(t => t.id === txId);
       let endpoint = `${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`;
       if (tx?.module === 'RF') {
-        endpoint = `${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
+        if (tx.asset_type === 'TESOURO') {
+          endpoint = `${API_URL}/portfolios/${activePortfolioId}/treasury/transactions/${txId}`;
+        } else {
+          endpoint = `${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
+        }
       }
 
       const res = await fetch(endpoint, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
@@ -538,7 +547,13 @@ export default function PortfolioPage() {
   const kpiCurrency = activeP ? activeP.base_currency : 'BRL';
 
   const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Variável' || getAssetCategory(pos.type) === activeCategoryFilter);
-  const filteredTransactions = transactions.filter(tx => activeCategoryFilter === 'Todas' || (activeCategoryFilter === 'Renda Variável' && tx.module !== 'RF') || getAssetCategory(tx.asset_type || '') === activeCategoryFilter || (activeCategoryFilter === 'Renda Fixa' && tx.module === 'RF'));
+  const filteredTransactions = transactions.filter(tx => {
+    if (activeCategoryFilter === 'Todas') return true;
+    if (activeCategoryFilter === 'Renda Variável') return tx.module !== 'RF';
+    if (activeCategoryFilter === 'Renda Fixa') return tx.module === 'RF' && tx.asset_type !== 'TESOURO';
+    if (activeCategoryFilter === 'Tesouro Direto') return tx.module === 'RF' && tx.asset_type === 'TESOURO';
+    return getAssetCategory(tx.asset_type || '') === activeCategoryFilter;
+  });
   const categoryFilteredDividends = dividends.filter(div => {
     if (activeCategoryFilter === 'Todas') return true;
     if (activeCategoryFilter === 'Renda Variável') return !div.is_accrued;
