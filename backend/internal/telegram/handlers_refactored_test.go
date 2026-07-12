@@ -257,12 +257,12 @@ func TestHandlers_Dividends(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
-		
+
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
 			{ID: "p1", Name: "P1"},
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
-		
+
 		// Set fixed day in middle of month to prevent test failures near month boundaries
 		now := time.Date(time.Now().Year(), time.Now().Month(), 15, 12, 0, 0, 0, time.Local)
 		divs := []portfolio.CalculatedDividend{
@@ -270,7 +270,7 @@ func TestHandlers_Dividends(t *testing.T) {
 			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: now.AddDate(0, 0, 5), Type: "JCP", Currency: "BRL"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
-		
+
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
 			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
 			hasUSD := strings.Contains(msg, "US$ 10,00")
@@ -854,4 +854,43 @@ func TestHandlers_DynamicCallbackExtra(t *testing.T) {
 		err := h.HandleDynamicCallback(mCtx)
 		assert.NoError(t, err)
 	})
+}
+
+func TestSortCurrencies(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected []string
+	}{
+		{
+			input:    []string{"USD", "BRL"},
+			expected: []string{"BRL", "USD"},
+		},
+		{
+			input:    []string{"EUR", "USD", "BRL"},
+			expected: []string{"BRL", "USD", "EUR"},
+		},
+		{
+			input:    []string{"USD", "EUR"},
+			expected: []string{"USD", "EUR"},
+		},
+		{
+			input:    []string{"EUR", "GBP"},
+			expected: []string{"EUR", "GBP"},
+		},
+		{
+			input:    []string{"GBP", "EUR"},
+			expected: []string{"EUR", "GBP"},
+		},
+		{
+			input:    []string{"BRL", "BRL"},
+			expected: []string{"BRL", "BRL"},
+		},
+	}
+
+	for _, tc := range tests {
+		inputCopy := make([]string, len(tc.input))
+		copy(inputCopy, tc.input)
+		sortCurrencies(inputCopy)
+		assert.Equal(t, tc.expected, inputCopy)
+	}
 }
