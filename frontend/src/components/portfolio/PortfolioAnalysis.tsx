@@ -16,7 +16,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
-import { Position, CalculatedDividend, FixedIncomePosition, PerformancePoint } from './types';
+import { Position, CalculatedDividend, FixedIncomePosition, PerformancePoint, TreasuryPosition } from './types';
 import { formatMoney, getAssetCategory } from './helpers';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ interface PortfolioAnalysisProps {
   positions: Position[];
   dividends: CalculatedDividend[];
   fiPositions: FixedIncomePosition[];
+  treasuryPositions: TreasuryPosition[];
   performanceData: PerformancePoint[];
   kpiCurrency: string;
 }
@@ -354,6 +355,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'ETF Internacional': '#2dd4bf',
   'Cripto': '#fb923c',
   'Renda Fixa': '#fbbf24',
+  'Tesouro Direto': '#10b981',
   'Desconhecido': '#94a3b8',
 };
 
@@ -403,6 +405,7 @@ export default function PortfolioAnalysis({
   positions,
   dividends,
   fiPositions,
+  treasuryPositions = [],
   performanceData,
   kpiCurrency,
 }: PortfolioAnalysisProps) {
@@ -560,19 +563,22 @@ export default function PortfolioAnalysis({
   const totalPortfolioValue = useMemo(() => {
     const eq = positions.reduce((s, p) => s + (p.current_value || 0), 0);
     const fi = fiPositions.reduce((s, p) => s + p.net_value, 0);
-    return eq + fi;
-  }, [positions, fiPositions]);
+    const td = treasuryPositions.reduce((s, p) => s + p.net_value, 0);
+    return eq + fi + td;
+  }, [positions, fiPositions, treasuryPositions]);
 
   // 1a. Classe de Ativo: Renda Fixa vs Renda Variável
   const assetClassData = useMemo(() => {
     const rv = positions.reduce((s, p) => s + (p.current_value || 0), 0);
     const rf = fiPositions.reduce((s, p) => s + p.net_value, 0);
-    if (rv + rf < 1e-6) return [];
+    const td = treasuryPositions.reduce((s, p) => s + p.net_value, 0);
+    const totalRF = rf + td;
+    if (rv + totalRF < 1e-6) return [];
     return [
-      { name: 'Renda Variável', value: rv, pct: (rv / (rv + rf)) * 100 },
-      { name: 'Renda Fixa', value: rf, pct: (rf / (rv + rf)) * 100 },
+      { name: 'Renda Variável', value: rv, pct: (rv / (rv + totalRF)) * 100 },
+      { name: 'Renda Fixa', value: totalRF, pct: (totalRF / (rv + totalRF)) * 100 },
     ].filter(d => d.value > 1e-6);
-  }, [positions, fiPositions]);
+  }, [positions, fiPositions, treasuryPositions]);
 
   // 1a-extra. Detalhamento por categoria
   const categoryBreakdown = useMemo(() => {
@@ -583,6 +589,8 @@ export default function PortfolioAnalysis({
     });
     const fiTotal = fiPositions.reduce((s, p) => s + p.net_value, 0);
     if (fiTotal > 1e-6) map['Renda Fixa'] = (map['Renda Fixa'] || 0) + fiTotal;
+    const tdTotal = treasuryPositions.reduce((s, p) => s + p.net_value, 0);
+    if (tdTotal > 1e-6) map['Tesouro Direto'] = (map['Tesouro Direto'] || 0) + tdTotal;
     return Object.entries(map)
       .map(([name, value]) => ({
         name,
@@ -591,7 +599,7 @@ export default function PortfolioAnalysis({
       }))
       .filter(d => d.value > 1e-6)
       .sort((a, b) => b.value - a.value);
-  }, [positions, fiPositions, totalPortfolioValue]);
+  }, [positions, fiPositions, treasuryPositions, totalPortfolioValue]);
 
   // 1b. Exposição Cambial e Geográfica
   const geoExposureData = useMemo(() => {
@@ -604,7 +612,8 @@ export default function PortfolioAnalysis({
       .reduce((s, p) => s + (p.current_value || 0), 0);
 
     const fi = fiPositions.reduce((s, p) => s + p.net_value, 0);
-    const localTotal = localEquity + fi;
+    const td = treasuryPositions.reduce((s, p) => s + p.net_value, 0);
+    const localTotal = localEquity + fi + td;
 
     if (localTotal + globalVal < 1e-6) return [];
     const total = localTotal + globalVal;
@@ -612,7 +621,7 @@ export default function PortfolioAnalysis({
       { name: '🇧🇷 Risco Local', value: localTotal, pct: (localTotal / total) * 100 },
       { name: '🌍 Exposição Global', value: globalVal, pct: (globalVal / total) * 100 },
     ].filter(d => d.value > 1e-6);
-  }, [positions, fiPositions]);
+  }, [positions, fiPositions, treasuryPositions]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SECTION 2: Comparação com Benchmarks (simulated)
@@ -724,7 +733,7 @@ export default function PortfolioAnalysis({
       const retPct = p.net_return_percent !== undefined ? p.net_return_percent : (invested > 0 ? (pl / invested) * 100 : 0);
       const weight = totalPortfolioValue > 1e-6 ? (p.net_value / totalPortfolioValue) * 100 : 0;
       
-      const type = p.asset?.type || p.type || 'Renda Fixa';
+      const type = p.asset?.type || (p as any).type || 'Renda Fixa';
       const indexer = p.asset?.indexer || (p as any).index_type || (p as any).indexer || 'CDI';
       const institution = p.asset?.institution || (p as any).institution || '';
       const indexerLabel = indexer === 'PREFIXADO' ? 'Pré' : indexer;
@@ -738,8 +747,22 @@ export default function PortfolioAnalysis({
       });
     });
 
+    treasuryPositions.forEach(p => {
+      const invested = p.total_invested;
+      const pl = p.net_value - invested;
+      const retPct = invested > 0 ? (pl / invested) * 100 : 0;
+      const weight = totalPortfolioValue > 1e-6 ? (p.net_value / totalPortfolioValue) * 100 : 0;
+      list.push({
+        ticker: p.ticker,
+        name: 'Tesouro Nacional',
+        profitLoss: pl,
+        returnPercent: retPct,
+        weight,
+      });
+    });
+
     return list;
-  }, [positions, fiPositions, totalPortfolioValue]);
+  }, [positions, fiPositions, treasuryPositions, totalPortfolioValue]);
 
   // Volatility profiles and aggressive assets for Beta Card
   const volatilityExposure = useMemo(() => {
@@ -759,6 +782,10 @@ export default function PortfolioAnalysis({
     });
 
     fiPositions.forEach(p => {
+      lowVolVal += p.net_value;
+    });
+
+    treasuryPositions.forEach(p => {
       lowVolVal += p.net_value;
     });
 
@@ -782,7 +809,7 @@ export default function PortfolioAnalysis({
       lowPct: (lowVolVal / total) * 100,
       topAggressive: highVolAssets,
     };
-  }, [positions, fiPositions, totalPortfolioValue]);
+  }, [positions, fiPositions, treasuryPositions, totalPortfolioValue]);
 
   // Concentration metrics for Max Drawdown Card
   const concentrationMetrics = useMemo(() => {
@@ -795,12 +822,17 @@ export default function PortfolioAnalysis({
 
     fiPositions.forEach(p => {
       const w = totalPortfolioValue > 1e-6 ? (p.net_value / totalPortfolioValue) * 100 : 0;
-      const type = p.asset?.type || p.type || 'Renda Fixa';
+      const type = p.asset?.type || (p as any).type || 'Renda Fixa';
       const indexer = p.asset?.indexer || (p as any).index_type || (p as any).indexer || 'CDI';
       const institution = p.asset?.institution || (p as any).institution || '';
       const indexerLabel = indexer === 'PREFIXADO' ? 'Pré' : indexer;
       
       list.push({ ticker: `${type} ${indexerLabel} (${institution || 'Renda Fixa'})`, weight: w });
+    });
+
+    treasuryPositions.forEach(p => {
+      const w = totalPortfolioValue > 1e-6 ? (p.net_value / totalPortfolioValue) * 100 : 0;
+      list.push({ ticker: `${p.ticker} (Tesouro)`, weight: w });
     });
 
     const sorted = [...list].sort((a, b) => b.weight - a.weight);
@@ -811,7 +843,7 @@ export default function PortfolioAnalysis({
       top3,
       top3Sum,
     };
-  }, [positions, fiPositions, totalPortfolioValue]);
+  }, [positions, fiPositions, treasuryPositions, totalPortfolioValue]);
 
   const topGainers = useMemo(() => {
     return [...assetProfitLoss]
@@ -1030,7 +1062,7 @@ export default function PortfolioAnalysis({
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════════
 
-  if (positions.length === 0 && fiPositions.length === 0) {
+  if (positions.length === 0 && fiPositions.length === 0 && treasuryPositions.length === 0) {
     return (
       <div className="text-center text-secondary" style={{ padding: '3rem' }}>
         <span className="text-2xl" style={{ display: 'block', marginBottom: '0.5rem' }}>📊</span>
@@ -1090,13 +1122,26 @@ export default function PortfolioAnalysis({
         longTerm += p.net_value;
       }
     });
+
+    treasuryPositions.forEach(p => {
+      if (p.days_to_maturity <= 0) {
+        daily += p.net_value;
+      } else if (p.days_to_maturity <= 365) {
+        upTo1Year += p.net_value;
+      } else if (p.days_to_maturity <= 1095) {
+        upTo3Years += p.net_value;
+      } else {
+        longTerm += p.net_value;
+      }
+    });
+
     return [
       { label: 'Liquidez Diária / Vencido', value: daily, color: '#4ade80' },
       { label: 'Até 1 ano', value: upTo1Year, color: '#60a5fa' },
       { label: '1 a 3 anos', value: upTo3Years, color: '#fbbf24' },
       { label: 'Longo Prazo (> 3 anos)', value: longTerm, color: '#f87171' },
     ].filter(i => i.value > 0);
-  }, [fiPositions]);
+  }, [fiPositions, treasuryPositions]);
 
   return (
     <div className="flex-col gap-xl">
@@ -1928,7 +1973,7 @@ export default function PortfolioAnalysis({
         )}
       </AnalysisCard>
       {/* ── 9. Liquidez e Renda Fixa ── */}
-      {fiPositions.length > 0 && (
+      {(fiPositions.length > 0 || treasuryPositions.length > 0) && (
         <AnalysisCard>
           <SectionTitle emoji="💧" title="Liquidez da Renda Fixa" subtitle="Perfil de vencimento dos seus ativos" />
           

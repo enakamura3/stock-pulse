@@ -39,6 +39,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Put("/transactions/{txID}", h.updateTreasuryTransaction)
 		r.Delete("/transactions/{txID}", h.deleteTreasuryTransaction)
 		r.Get("/performance", h.getTreasuryPerformance)
+		r.Get("/monthly-yields", h.getTreasuryMonthlyYields)
 	})
 }
 
@@ -362,3 +363,24 @@ func (h *Handler) deleteTreasuryTransaction(w http.ResponseWriter, r *http.Reque
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Handler) getTreasuryMonthlyYields(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		return
+	}
+
+	yields, err := h.service.GetTreasuryMonthlyYields(r.Context(), portfolioID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if yields == nil {
+		yields = []MonthlyYield{}
+	}
+	json.NewEncoder(w).Encode(yields)
+}
+
