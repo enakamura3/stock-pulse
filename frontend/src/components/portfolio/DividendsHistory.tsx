@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CalculatedDividend } from './types';
 import { getAssetCategory, formatMoney } from './helpers';
 import dynamic from 'next/dynamic';
+import AnnualSummary from './AnnualSummary';
 
 const DividendsMatrix = dynamic(() => import('./DividendsMatrix'), { ssr: false });
 
@@ -237,6 +238,13 @@ export default function DividendsHistory({
               onMonthClick={(y, m) => { setFilterDivYear(y); setFilterDivMonth(m); }}
               activeYear={filterDivYear}
               activeMonth={filterDivMonth}
+            />
+
+            <AnnualSummary
+              dividends={allDividends.length > 0 ? allDividends : dividends}
+              selectedYear={filterDivYear}
+              setSelectedYear={setFilterDivYear}
+              availableYears={availableYears}
             />
 
             {/* Table */}
