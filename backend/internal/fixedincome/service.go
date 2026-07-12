@@ -488,6 +488,47 @@ func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userI
 			MaturityDate: &asset.MaturityDate,
 		})
 	}
+
+	// Fetch Treasury Direct transactions
+	treasuryTxs, err := s.repo.GetTreasuryTransactionsList(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, tx := range treasuryTxs {
+		txDate, err := time.Parse("2006-01-02", tx.TransactionDate)
+		if err != nil {
+			txDate = time.Now()
+		}
+
+		var matDate *time.Time
+		if tx.MaturityDate != "" {
+			tParsed, err := time.Parse("2006-01-02", tx.MaturityDate)
+			if err == nil {
+				matDate = &tParsed
+			}
+		}
+
+		qVal := tx.Quantity
+		uVal := tx.UnitPrice
+
+		unified = append(unified, history.UnifiedTransaction{
+			ID:           tx.ID,
+			PortfolioID:  portfolioID,
+			Module:       "RF",
+			Date:         txDate,
+			AssetName:    tx.Ticker,
+			AssetType:    "TESOURO",
+			Type:         tx.Type,
+			Quantity:     &qVal,
+			UnitPrice:    &uVal,
+			ExchangeRate: nil,
+			TotalValue:   qVal * uVal,
+			Currency:     "BRL",
+			MaturityDate: matDate,
+		})
+	}
+
 	return unified, nil
 }
 

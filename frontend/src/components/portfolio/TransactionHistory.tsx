@@ -116,7 +116,7 @@ export default function TransactionHistory({
     const cumInv: Record<string, number> = {};
 
     return [...transactions].reverse().map((tx): TransactionWithBalance => {
-      if (tx.module === 'RF') {
+      if (tx.module === 'RF' && tx.asset_type !== 'TESOURO') {
         return { ...tx, resulting_quantity: 0, resulting_invested: 0 };
       }
 
@@ -125,12 +125,12 @@ export default function TransactionHistory({
       const txQty   = tx.quantity    ?? 0;
       const txPrice = tx.unit_price  ?? 0;
 
-      if (tx.type === 'BUY') {
+      if (tx.type === 'BUY' || tx.type === 'SUBSCRIPTION') {
         qty += txQty;
         inv += txQty * txPrice;
       } else if (tx.type === 'BONUS') {
         qty += txQty;
-      } else if (tx.type === 'SELL') {
+      } else if (tx.type === 'SELL' || tx.type === 'REDEMPTION') {
         const avgCost = qty > 0 ? inv / qty : 0;
         qty -= txQty;
         inv  = qty > 0 ? qty * avgCost : 0;
@@ -351,8 +351,8 @@ export default function TransactionHistory({
                         {/* Row 1: icon + badge + ticker + date */}
                         <div className="flex-row items-center justify-between flex-wrap" style={{ gap: '0.4rem' }}>
                           <div className="flex-row items-center" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <span title={isRF ? 'Renda Fixa' : 'Renda Variável'} style={{ fontSize: '1.1rem', cursor: 'help' }}>
-                              {isRF ? '🏦' : '📈'}
+                            <span title={isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'} style={{ fontSize: '1.1rem', cursor: 'help' }}>
+                              {isRF ? (tx.asset_type === 'TESOURO' ? '🏛️' : '🏦') : '📈'}
                             </span>
                             <span className="badge" style={{ color: badge.color, background: badge.bg }}>
                               {badge.text}
@@ -384,7 +384,7 @@ export default function TransactionHistory({
 
                         {/* Row 2: financial details */}
                         <div className="flex-row items-center flex-wrap" style={{ gap: '0.5rem', paddingLeft: '0.1rem' }}>
-                          {isRF ? (
+                          {isRF && tx.asset_type !== 'TESOURO' ? (
                             <span className="font-bold">{formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}</span>
                           ) : !isSplit ? (
                             <>
@@ -407,7 +407,7 @@ export default function TransactionHistory({
                             </span>
                           )}
 
-                          {!isRF && (
+                          {(!isRF || tx.asset_type === 'TESOURO') && (
                             <span style={{
                               marginLeft: '0.5rem',
                               borderLeft: '1px solid var(--panel-border)',
