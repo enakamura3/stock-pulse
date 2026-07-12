@@ -187,7 +187,7 @@ func TestService_RedisErrors(t *testing.T) {
 
 func TestService_EdgeCases(t *testing.T) {
 	svc, _, _, _ := setupServiceTest(t)
-	
+
 	// Test SetConversationState marshal error
 	state := ConversationState{
 		Quantity: math.NaN(), // Causes json.Marshal to fail

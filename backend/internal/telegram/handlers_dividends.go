@@ -61,34 +61,87 @@ func (h *Handlers) fetchDividends(c telebot.Context) ([]portfolio.CalculatedDivi
 	return divs, portfolioName, nil
 }
 
+func sortCurrencies(currencies []string) {
+	sort.Slice(currencies, func(i, j int) bool {
+		if currencies[i] == "BRL" {
+			return true
+		}
+		if currencies[j] == "BRL" {
+			return false
+		}
+		if currencies[i] == "USD" {
+			return true
+		}
+		if currencies[j] == "USD" {
+			return false
+		}
+		return currencies[i] < currencies[j]
+	})
+}
+
 func (h *Handlers) HandleDividends(c telebot.Context) error {
 	defer c.Respond()
-	
+
 	divs, portfolioName, err := h.fetchDividends(c)
 	if err != nil {
 		slog.Error("Failed to fetch dividends for telegram bot", "error", err)
 		return c.Edit("❌ Ocorreu um erro ao buscar os proventos da sua carteira.")
 	}
 
-	var totalPaidMonth, totalFutureMonth float64
+	totalPaidMonth := make(map[string]float64)
+	totalFutureMonth := make(map[string]float64)
 	now := time.Now()
 	currentMonth := now.Month()
 	currentYear := now.Year()
 
 	for _, d := range divs {
 		if d.PaymentDate.Year() == currentYear && d.PaymentDate.Month() == currentMonth {
+			currency := d.Currency
+			if currency == "" {
+				currency = "BRL"
+			}
 			if d.PaymentDate.After(now) {
-				totalFutureMonth += d.NetAmount
+				totalFutureMonth[currency] += d.NetAmount
 			} else {
-				totalPaidMonth += d.NetAmount
+				totalPaidMonth[currency] += d.NetAmount
 			}
 		}
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("💸 *Proventos: %s*\n\n", portfolioName)
-	msg += p.Sprintf("✅ *Recebidos (Mês Atual):* R$ %.2f\n", totalPaidMonth)
-	msg += p.Sprintf("⏳ *A Receber (Mês Atual):* R$ %.2f\n", totalFutureMonth)
+
+	var paidStrings []string
+	var paidCurrencies []string
+	for curr := range totalPaidMonth {
+		paidCurrencies = append(paidCurrencies, curr)
+	}
+	sortCurrencies(paidCurrencies)
+	for _, curr := range paidCurrencies {
+		paidStrings = append(paidStrings, p.Sprintf("%s %.2f", getCurrencySymbol(curr), totalPaidMonth[curr]))
+	}
+
+	if len(paidStrings) > 0 {
+		msg += p.Sprintf("✅ *Recebidos (Mês Atual):* %s\n", strings.Join(paidStrings, " | "))
+	} else {
+		msg += p.Sprintf("✅ *Recebidos (Mês Atual):* R$ 0,00\n")
+	}
+
+	var futureStrings []string
+	var futureCurrencies []string
+	for curr := range totalFutureMonth {
+		futureCurrencies = append(futureCurrencies, curr)
+	}
+	sortCurrencies(futureCurrencies)
+	for _, curr := range futureCurrencies {
+		futureStrings = append(futureStrings, p.Sprintf("%s %.2f", getCurrencySymbol(curr), totalFutureMonth[curr]))
+	}
+
+	if len(futureStrings) > 0 {
+		msg += p.Sprintf("⏳ *A Receber (Mês Atual):* %s\n", strings.Join(futureStrings, " | "))
+	} else {
+		msg += p.Sprintf("⏳ *A Receber (Mês Atual):* R$ 0,00\n")
+	}
 
 	if len(divs) > 0 {
 		var pastDivs []portfolio.CalculatedDividend
@@ -110,14 +163,17 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 			if len(pastDivs) < 3 {
 				limit = len(pastDivs)
 			}
-			sym := getCurrencySymbol("BRL")
 			for i := 0; i < limit; i++ {
 				d := pastDivs[i]
 				tipoStr := "Div"
 				if d.Type != "" {
 					tipoStr = d.Type
 				}
-				msg += p.Sprintf("✅ `%s`: %s %.2f • %s • %s\n", d.Ticker, sym, d.NetAmount, d.PaymentDate.Format("2006-01-02"), abbreviateDividendType(tipoStr))
+				curr := d.Currency
+				if curr == "" {
+					curr = "BRL"
+				}
+				msg += p.Sprintf("✅ `%s` (%s) • %s %.2f • %s\n", d.Ticker, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("02/01/2006"))
 			}
 		}
 
@@ -130,14 +186,17 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 			if len(futureDivs) < 3 {
 				limit = len(futureDivs)
 			}
-			sym := getCurrencySymbol("BRL")
 			for i := 0; i < limit; i++ {
 				d := futureDivs[i]
 				tipoStr := "Div"
 				if d.Type != "" {
 					tipoStr = d.Type
 				}
-				msg += p.Sprintf("⏳ `%s`: %s %.2f • %s • %s\n", d.Ticker, sym, d.NetAmount, d.PaymentDate.Format("2006-01-02"), abbreviateDividendType(tipoStr))
+				curr := d.Currency
+				if curr == "" {
+					curr = "BRL"
+				}
+				msg += p.Sprintf("⏳ `%s` (%s) • %s %.2f • %s\n", d.Ticker, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("02/01/2006"))
 			}
 		}
 	} else {
@@ -148,7 +207,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	btnAno := menu.Data("📅 Agrupar por Ano", "btn_divs_year")
 	btnMes := menu.Data("📆 Agrupar por Mês", "btn_divs_month")
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
-	
+
 	if len(divs) > 0 {
 		menu.Inline(menu.Row(btnAno, btnMes), menu.Row(btnBack))
 	} else {
@@ -165,9 +224,17 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 		return c.Edit("❌ Erro ao buscar proventos.")
 	}
 
-	grouped := make(map[int]float64)
+	grouped := make(map[int]map[string]float64)
 	for _, d := range divs {
-		grouped[d.PaymentDate.Year()] += d.NetAmount
+		y := d.PaymentDate.Year()
+		curr := d.Currency
+		if curr == "" {
+			curr = "BRL"
+		}
+		if _, exists := grouped[y]; !exists {
+			grouped[y] = make(map[string]float64)
+		}
+		grouped[y][curr] += d.NetAmount
 	}
 
 	years := make([]int, 0, len(grouped))
@@ -179,10 +246,20 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📅 *Proventos por Ano: %s*\n\n", portfolioName)
 	for _, y := range years {
+		var yearStrings []string
+		currencies := make([]string, 0, len(grouped[y]))
+		for c := range grouped[y] {
+			currencies = append(currencies, c)
+		}
+		sortCurrencies(currencies)
+		for _, curr := range currencies {
+			yearStrings = append(yearStrings, p.Sprintf("%s %.2f", getCurrencySymbol(curr), grouped[y][curr]))
+		}
+
 		if y <= 1 {
-			msg += p.Sprintf("• *A Definir*: R$ %.2f\n", grouped[y])
+			msg += p.Sprintf("• *A Definir*: %s\n", strings.Join(yearStrings, " | "))
 		} else {
-			msg += p.Sprintf("• *%s*: R$ %.2f\n", fmt.Sprint(y), grouped[y])
+			msg += p.Sprintf("• *%s*: %s\n", fmt.Sprint(y), strings.Join(yearStrings, " | "))
 		}
 	}
 
@@ -241,39 +318,44 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📆 *Proventos por Mês: %s*\n_Página %d_\n\n", portfolioName, page+1)
 
-	sym := getCurrencySymbol("BRL")
 	for _, k := range pageKeys {
 		display := ""
 		if k == "0000-00" {
 			display = "A Definir"
 		} else {
 			parts := strings.Split(k, "-")
-			display = fmt.Sprintf("%s/%s", parts[0], parts[1])
+			display = fmt.Sprintf("%s/%s", parts[1], parts[0]) // MM/YYYY format
 		}
 
+		totalMonthCurr := make(map[string]float64)
+
 		type tSummary struct {
-			amount float64
-			dates  []string
-			dType  string
+			amount   float64
+			dates    []string
+			dType    string
+			currency string
 		}
 		summaryMap := make(map[string]*tSummary)
 
-		var totalMonth float64
 		for _, d := range grouped[k] {
-			totalMonth += d.NetAmount
+			curr := d.Currency
+			if curr == "" {
+				curr = "BRL"
+			}
+			totalMonthCurr[curr] += d.NetAmount
 
 			dType := "Div"
 			if d.Type != "" {
 				dType = d.Type
 			}
 
-			mapKey := d.Ticker + "|" + dType
+			mapKey := d.Ticker + "|" + dType + "|" + curr
 			if _, exists := summaryMap[mapKey]; !exists {
-				summaryMap[mapKey] = &tSummary{dType: dType}
+				summaryMap[mapKey] = &tSummary{dType: dType, currency: curr}
 			}
 			summaryMap[mapKey].amount += d.NetAmount
 
-			dateStr := d.PaymentDate.Format("2006-01-02")
+			dateStr := d.PaymentDate.Format("02/01/2006")
 			if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
 				dateStr = "-"
 			}
@@ -289,7 +371,17 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			}
 		}
 
-		msg += p.Sprintf("• *%s*: R$ %.2f\n", display, totalMonth)
+		var monthTotalStrings []string
+		monthCurrencies := make([]string, 0, len(totalMonthCurr))
+		for c := range totalMonthCurr {
+			monthCurrencies = append(monthCurrencies, c)
+		}
+		sortCurrencies(monthCurrencies)
+		for _, curr := range monthCurrencies {
+			monthTotalStrings = append(monthTotalStrings, p.Sprintf("%s %.2f", getCurrencySymbol(curr), totalMonthCurr[curr]))
+		}
+
+		msg += p.Sprintf("• *%s*: %s\n", display, strings.Join(monthTotalStrings, " | "))
 
 		mapKeys := make([]string, 0, len(summaryMap))
 		for mk := range summaryMap {
@@ -301,7 +393,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			sum := summaryMap[mk]
 			ticker := strings.Split(mk, "|")[0]
 			datesStr := strings.Join(sum.dates, ", ")
-			msg += p.Sprintf("   ↳ `%s`: %s %.2f • %s • %s\n", ticker, sym, sum.amount, datesStr, abbreviateDividendType(sum.dType))
+			msg += p.Sprintf("   ↳ `%s` (%s) • %s %.2f • %s\n", ticker, abbreviateDividendType(sum.dType), getCurrencySymbol(sum.currency), sum.amount, datesStr)
 		}
 		msg += "\n"
 	}

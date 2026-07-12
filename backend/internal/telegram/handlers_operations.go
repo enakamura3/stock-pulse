@@ -74,7 +74,7 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 		portfolioID := strings.TrimPrefix(data, "btn_sel_port_")
 		return h.handleSelectedPortfolio(c, portfolioID)
 	}
-	
+
 	if strings.HasPrefix(data, "btn_qty_") {
 		qtyStr := strings.TrimPrefix(data, "btn_qty_")
 		return h.handleSelectedQty(c, qtyStr)
@@ -98,7 +98,7 @@ func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error 
 	btnBuy := menu.Data("🟢 Compra", "btn_buy")
 	btnSell := menu.Data("🔴 Venda", "btn_sell")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	
+
 	menu.Inline(menu.Row(btnBuy, btnSell), menu.Row(btnCancel))
 
 	msg := fmt.Sprintf("Operação para *%s*.\n\nÉ uma operação de *Compra* ou *Venda*?", ticker)
@@ -146,7 +146,7 @@ func (h *Handlers) handleSetType(c telebot.Context, txType string) error {
 	btnQ10 := menu.Data("10", "btn_qty_10")
 	btnQ100 := menu.Data("100", "btn_qty_100")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	
+
 	menu.Inline(menu.Row(btnQ1, btnQ10, btnQ100), menu.Row(btnCancel))
 
 	return c.Edit("Qual a quantidade negociada?\n\nEscolha abaixo ou digite o valor:", menu)
@@ -161,15 +161,15 @@ func (h *Handlers) handleSelectedQty(c telebot.Context, qtyStr string) error {
 
 	var qty float64
 	fmt.Sscanf(qtyStr, "%f", &qty)
-	
+
 	state.Quantity = qty
 	state.Step = "EXPECT_PRICE"
 	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
-	
+
 	menu := &telebot.ReplyMarkup{}
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 	menu.Inline(menu.Row(btnCancel))
-	
+
 	return c.Edit("Qual o preço unitário da transação? (ex: 15.50)", menu)
 }
 
