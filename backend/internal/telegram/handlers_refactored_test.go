@@ -275,9 +275,11 @@ func TestHandlers_Dividends(t *testing.T) {
 			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
 			hasUSD := strings.Contains(msg, "US$ 10,00")
 			hasBRL := strings.Contains(msg, "R$ 15,00")
-			hasAAPL := strings.Contains(msg, "✅ 🇺🇸 `AAPL` (DIV) • US$ 10,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
-			hasMSFT := strings.Contains(msg, "⏳ 🇺🇸 `MSFT` (JCP) • R$ 15,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
-			return hasTitle && hasUSD && hasBRL && hasAAPL && hasMSFT
+			hasAAPL := strings.Contains(msg, "✅ 🇺🇸 `AAPL` • US$ 10,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasAAPLSub := strings.Contains(msg, "   ↳ _DIV_")
+			hasMSFT := strings.Contains(msg, "⏳ 🇺🇸 `MSFT` • R$ 15,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
+			hasMSFTSub := strings.Contains(msg, "   ↳ _JCP_")
+			return hasTitle && hasUSD && hasBRL && hasAAPL && hasAAPLSub && hasMSFT && hasMSFTSub
 		}), mock.Anything).Return(nil)
 
 		err := h.HandleDividends(mCtx)
@@ -306,10 +308,10 @@ func TestHandlers_Dividends(t *testing.T) {
 			hasTotalAcumulado := strings.Contains(msg, "💰 *Total Acumulado:* R$ 50,00")
 			hasBRLRecebidos := strings.Contains(msg, "✅ *Recebidos no Mês:* R$ 50,00")
 			hasBRLAReceber := strings.Contains(msg, "⏳ *A Receber no Mês:* R$ 12,00")
-			hasPETR4 := strings.Contains(msg, "✅ 📈 `PETR4` (JCP) • R$ 50,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
-			hasPETR4Sub := strings.Contains(msg, "   ↳ _100 un x R$ 0,50_")
-			hasMXRF11 := strings.Contains(msg, "⏳ 🏢 `MXRF11` (REND) • R$ 12,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
-			hasMXRF11Sub := strings.Contains(msg, "   ↳ _120 un x R$ 0,10_")
+			hasPETR4 := strings.Contains(msg, "✅ 📈 `PETR4` • R$ 50,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasPETR4Sub := strings.Contains(msg, "   ↳ _JCP • 100 un x R$ 0,50_")
+			hasMXRF11 := strings.Contains(msg, "⏳ 🏢 `MXRF11` • R$ 12,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
+			hasMXRF11Sub := strings.Contains(msg, "   ↳ _REND • 120 un x R$ 0,10_")
 			return hasTitle && hasTotalAcumulado && hasBRLRecebidos && hasBRLAReceber && hasPETR4 && hasPETR4Sub && hasMXRF11 && hasMXRF11Sub
 		}), mock.Anything).Return(nil)
 
