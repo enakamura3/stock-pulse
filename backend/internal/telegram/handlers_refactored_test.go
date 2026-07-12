@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func TestHandlers_AuthMiddleware(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Message").Return(&telebot.Message{})
 		mCtx.On("Text").Return("/start token123")
-		
+
 		called := false
 		next := func(c telebot.Context) error {
 			called = true
@@ -192,14 +193,14 @@ func TestHandlers_PortfolioSummaryAndSelection(t *testing.T) {
 			{ID: "p1", Name: "P1"},
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
-		
+
 		pDetails := &portfolio.Portfolio{ID: "p1", Name: "P1"}
 		positions := []portfolio.Position{
 			{Ticker: "AAPL", Quantity: 10, CurrentPrice: 150, CurrentValue: 1500, TotalCost: 1400, DailyChange: 5, DailyChangePercent: 3.33},
 			{Ticker: "MSFT", Quantity: 5, CurrentPrice: 300, CurrentValue: 1500, TotalCost: 1600, DailyChange: -10, DailyChangePercent: -3.23},
 		}
 		pSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(pDetails, positions, nil).Once()
-		
+
 		fiPositions := []fixedincome.Position{
 			{GrossValue: 1050, NetValue: 1000, TotalInvested: 950, DaysToMaturity: 15, IsMatured: false, Asset: fixedincome.Asset{Institution: "Banco X", Type: "CDB", Rate: 12.5, DebtType: "PRE"}},
 		}
@@ -233,7 +234,7 @@ func TestHandlers_PortfolioSummaryAndSelection(t *testing.T) {
 			{ID: "p2", Name: "P2"},
 		}, nil).Once()
 		svc.On("SetActivePortfolio", mock.Anything, int64(123), "p2").Return(nil).Once()
-		
+
 		// For returning back to menu
 		mCtx.On("Callback").Return(&telebot.Callback{})
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
@@ -256,19 +257,28 @@ func TestHandlers_Dividends(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
-		
+
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
 			{ID: "p1", Name: "P1"},
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
-		
-		now := time.Now()
+
+		// Set fixed day in middle of month to prevent test failures near month boundaries
+		now := time.Date(time.Now().Year(), time.Now().Month(), 15, 12, 0, 0, 0, time.Local)
 		divs := []portfolio.CalculatedDividend{
-			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: now.AddDate(0, 0, -5), Type: "DIVIDENDO"},
-			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: now.AddDate(0, 0, 5), Type: "JCP"},
+			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: now.AddDate(0, 0, -5), Type: "DIVIDENDO", Currency: "USD"},
+			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: now.AddDate(0, 0, 5), Type: "JCP", Currency: "BRL"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
-		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
+			hasUSD := strings.Contains(msg, "US$ 10,00")
+			hasBRL := strings.Contains(msg, "R$ 15,00")
+			hasAAPL := strings.Contains(msg, "✅ `AAPL` (DIV) • US$ 10,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasMSFT := strings.Contains(msg, "⏳ `MSFT` (JCP) • R$ 15,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
+			return hasTitle && hasUSD && hasBRL && hasAAPL && hasMSFT
+		}), mock.Anything).Return(nil)
 
 		err := h.HandleDividends(mCtx)
 		assert.NoError(t, err)
@@ -278,18 +288,24 @@ func TestHandlers_Dividends(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
-		
+
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
 			{ID: "p1", Name: "P1"},
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
-		
+
 		divs := []portfolio.CalculatedDividend{
-			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: time.Date(2025, 5, 10, 0, 0, 0, 0, time.UTC), Type: "DIVIDENDO"},
-			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC), Type: "JCP"},
+			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: time.Date(2025, 5, 10, 0, 0, 0, 0, time.UTC), Type: "DIVIDENDO", Currency: "USD"},
+			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC), Type: "JCP", Currency: "BRL"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
-		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			hasTitle := strings.Contains(msg, "📅 *Proventos por Ano: P1*")
+			has2026 := strings.Contains(msg, "• *2026*: R$ 15,00")
+			has2025 := strings.Contains(msg, "• *2025*: US$ 10,00")
+			return hasTitle && has2026 && has2025
+		}), mock.Anything).Return(nil)
 
 		err := h.HandleDividendsByYear(mCtx)
 		assert.NoError(t, err)
@@ -300,18 +316,25 @@ func TestHandlers_Dividends(t *testing.T) {
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 		mCtx.On("Data").Return("0").Once()
-		
+
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
 			{ID: "p1", Name: "P1"},
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
-		
+
 		divs := []portfolio.CalculatedDividend{
-			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC), Type: "DIVIDENDO"},
-			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: time.Date(2026, 5, 12, 0, 0, 0, 0, time.UTC), Type: "JCP"},
+			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC), Type: "DIVIDENDO", Currency: "USD"},
+			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: time.Date(2026, 5, 12, 0, 0, 0, 0, time.UTC), Type: "JCP", Currency: "BRL"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
-		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			hasTitle := strings.Contains(msg, "📆 *Proventos por Mês: P1*")
+			hasMonthTotal := strings.Contains(msg, "• *2026-05*: R$ 15,00 | US$ 10,00")
+			hasAAPL := strings.Contains(msg, "↳ `AAPL` (DIV) • US$ 10,00 • 2026-05-10")
+			hasMSFT := strings.Contains(msg, "↳ `MSFT` (JCP) • R$ 15,00 • 2026-05-12")
+			return hasTitle && hasMonthTotal && hasAAPL && hasMSFT
+		}), mock.Anything).Return(nil)
 
 		err := h.HandleDividendsByMonth(mCtx)
 		assert.NoError(t, err)
@@ -372,7 +395,7 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Times(2)
-		
+
 		// For sending menu inside sendOrEditMenu
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
 			{ID: "p1", Name: "P1"},
@@ -477,7 +500,7 @@ func TestHandlers_Operations(t *testing.T) {
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_TICKER", PortfolioID: "p1"}, nil).Times(2)
 		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL"}, nil).Once()
-		
+
 		// Expected inside handleSelectedTicker
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_TYPE", PortfolioID: "p1", Ticker: "AAPL"}).Return(nil).Once()
 		mCtx.On("Callback").Return((*telebot.Callback)(nil))
@@ -544,7 +567,7 @@ func TestHandlers_ExtraErrors(t *testing.T) {
 	t.Run("fetchDividends - no portfolios", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{}, nil).Once()
-		
+
 		divs, pName, err := h.fetchDividends(mCtx)
 		assert.Error(t, err)
 		assert.Nil(t, divs)
@@ -554,7 +577,7 @@ func TestHandlers_ExtraErrors(t *testing.T) {
 	t.Run("fetchDividends - portfolios error", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{}, errors.New("db error")).Once()
-		
+
 		divs, pName, err := h.fetchDividends(mCtx)
 		assert.Error(t, err)
 		assert.Nil(t, divs)
@@ -567,7 +590,7 @@ func TestHandlers_ExtraErrors(t *testing.T) {
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "P1"}}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return([]portfolio.CalculatedDividend{}, errors.New("db error")).Once()
-		
+
 		divs, pName, err := h.fetchDividends(mCtx)
 		assert.Error(t, err)
 		assert.Nil(t, divs)
@@ -727,7 +750,7 @@ func TestHandlers_TextErrors(t *testing.T) {
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Callback").Return((*telebot.Callback)(nil))
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return((*ConversationState)(nil), nil).Once()
-		
+
 		// For menu redirection
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
@@ -803,7 +826,7 @@ func TestHandlers_DynamicCallbackExtra(t *testing.T) {
 			{ID: "p2", Name: "P2"},
 		}, nil).Once()
 		svc.On("SetActivePortfolio", mock.Anything, int64(123), "p2").Return(nil).Once()
-		
+
 		// For menu redirection
 		mCtx.On("Callback").Return(&telebot.Callback{})
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
@@ -833,3 +856,41 @@ func TestHandlers_DynamicCallbackExtra(t *testing.T) {
 	})
 }
 
+func TestSortCurrencies(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected []string
+	}{
+		{
+			input:    []string{"USD", "BRL"},
+			expected: []string{"BRL", "USD"},
+		},
+		{
+			input:    []string{"EUR", "USD", "BRL"},
+			expected: []string{"BRL", "USD", "EUR"},
+		},
+		{
+			input:    []string{"USD", "EUR"},
+			expected: []string{"USD", "EUR"},
+		},
+		{
+			input:    []string{"EUR", "GBP"},
+			expected: []string{"EUR", "GBP"},
+		},
+		{
+			input:    []string{"GBP", "EUR"},
+			expected: []string{"EUR", "GBP"},
+		},
+		{
+			input:    []string{"BRL", "BRL"},
+			expected: []string{"BRL", "BRL"},
+		},
+	}
+
+	for _, tc := range tests {
+		inputCopy := make([]string, len(tc.input))
+		copy(inputCopy, tc.input)
+		sortCurrencies(inputCopy)
+		assert.Equal(t, tc.expected, inputCopy)
+	}
+}
