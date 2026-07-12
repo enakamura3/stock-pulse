@@ -140,12 +140,16 @@ export interface UnifiedTransaction {
 }
 
 export interface TreasuryPosition {
+  transaction_id: string;
   asset_id: string;
   ticker: string;
   treasury_type: string;
   maturity_date: string;
   has_coupons: boolean;
   start_date: string;
+  quantity: number;
+  unit_price: number;
+  contracted_rate: number;
   total_invested: number;
   gross_value: number;
   net_value: number;

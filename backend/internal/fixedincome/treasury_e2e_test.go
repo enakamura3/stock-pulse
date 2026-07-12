@@ -75,12 +75,16 @@ type TxRequest struct {
 }
 
 type PositionJSON struct {
+	TransactionID  string    `json:"transaction_id"`
 	AssetID        string    `json:"asset_id"`
 	Ticker         string    `json:"ticker"`
 	TreasuryType   string    `json:"treasury_type"`
 	MaturityDate   time.Time `json:"maturity_date"`
 	HasCoupons     bool      `json:"has_coupons"`
 	StartDate      time.Time `json:"start_date"`
+	Quantity       float64   `json:"quantity"`
+	UnitPrice      float64   `json:"unit_price"`
+	ContractedRate float64   `json:"contracted_rate"`
 	TotalInvested  float64   `json:"total_invested"`
 	GrossValue     float64   `json:"gross_value"`
 	NetValue       float64   `json:"net_value"`
@@ -445,8 +449,8 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 
 		// Calculate active positions in real-time
 		rows, err := pool.Query(ctx, `
-			SELECT t.asset_id, a.ticker, ta.treasury_type, ta.maturity_date, ta.has_coupons,
-			       t.unit_price, t.contracted_rate, t.remaining_quantity, t.transaction_date
+			SELECT t.id, t.asset_id, a.ticker, ta.treasury_type, ta.maturity_date, ta.has_coupons,
+			       t.quantity, t.unit_price, t.contracted_rate, t.remaining_quantity, t.transaction_date
 			FROM treasury_transactions t
 			JOIN treasury_assets ta ON t.asset_id = ta.id
 			JOIN asset a ON ta.id = a.id
@@ -474,23 +478,23 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 
 		for rows.Next() {
 			var p PositionJSON
-			var uPrice, contractedRate, remainingQty float64
+			var remainingQty float64
 			var tDate time.Time
-			err = rows.Scan(&p.AssetID, &p.Ticker, &p.TreasuryType, &p.MaturityDate, &p.HasCoupons,
-				&uPrice, &contractedRate, &remainingQty, &tDate)
+			err = rows.Scan(&p.TransactionID, &p.AssetID, &p.Ticker, &p.TreasuryType, &p.MaturityDate, &p.HasCoupons,
+				&p.Quantity, &p.UnitPrice, &p.ContractedRate, &remainingQty, &tDate)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			p.StartDate = tDate
-			p.TotalInvested = remainingQty * uPrice
+			p.TotalInvested = remainingQty * p.UnitPrice
 
 			// Calculations of theoretical curve to today
 			holdingDays := int(today.Sub(tDate).Hours() / 24)
 			busDays := countBusinessDays(tDate, today, holidays)
 
-			dailyRate := math.Pow(1.0+contractedRate/100.0, 1.0/252.0) - 1.0
+			dailyRate := math.Pow(1.0+p.ContractedRate/100.0, 1.0/252.0) - 1.0
 			factor := math.Pow(1.0+dailyRate, float64(busDays))
 			p.GrossValue = p.TotalInvested * factor
 
@@ -583,6 +587,86 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(points)
+	})
+
+	r.Put("/api/v1/portfolios/{portfolioID}/treasury/transactions/{txID}", func(w http.ResponseWriter, req *http.Request) {
+		portfolioID := chi.URLParam(req, "portfolioID")
+		txID := chi.URLParam(req, "txID")
+		var body TxRequest
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		ctx := req.Context()
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		var assetID string
+		err = tx.QueryRow(ctx, "SELECT id FROM asset WHERE ticker = $1", body.Ticker).Scan(&assetID)
+		if err == pgx.ErrNoRows {
+			err = tx.QueryRow(ctx, 
+				"INSERT INTO asset (ticker, name, asset_type, currency) VALUES ($1, $2, 'TREASURY', 'BRL') RETURNING id",
+				body.Ticker, body.Ticker,
+			).Scan(&assetID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			_, err = tx.Exec(ctx,
+				"INSERT INTO treasury_assets (id, treasury_type, maturity_date, has_coupons) VALUES ($1, $2, $3, $4)",
+				assetID, body.TreasuryType, body.MaturityDate, body.HasCoupons,
+			)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		parsedTxDate, _ := time.Parse("2006-01-02", body.TransactionDate)
+
+		var remainingQuantity float64
+		if body.Type == "SUBSCRIPTION" {
+			remainingQuantity = body.Quantity
+		} else {
+			remainingQuantity = 0.0
+		}
+
+		_, err = tx.Exec(ctx, `
+			UPDATE treasury_transactions
+			SET asset_id = $1, type = $2, quantity = $3, unit_price = $4, contracted_rate = $5, remaining_quantity = $6, transaction_date = $7, updated_at = NOW()
+			WHERE id = $8 AND portfolio_id = $9`,
+			assetID, body.Type, body.Quantity, body.UnitPrice, body.ContractedRate, remainingQuantity, parsedTxDate, txID, portfolioID,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		tx.Commit(ctx)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Delete("/api/v1/portfolios/{portfolioID}/treasury/transactions/{txID}", func(w http.ResponseWriter, req *http.Request) {
+		portfolioID := chi.URLParam(req, "portfolioID")
+		txID := chi.URLParam(req, "txID")
+
+		ctx := req.Context()
+		_, err := pool.Exec(ctx, "DELETE FROM treasury_transactions WHERE id = $1 AND portfolio_id = $2", txID, portfolioID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	return r
@@ -1045,5 +1129,103 @@ func TestTreasuryE2E_Tier4(t *testing.T) {
 		// Check that the position is closed
 		err = pool.QueryRow(ctx, "SELECT remaining_quantity FROM treasury_transactions WHERE asset_id = $1 AND type = 'SUBSCRIPTION'", assetID).Scan(&remainingQty)
 		assert.Equal(t, 0.0, remainingQty)
+	})
+}
+
+func TestTreasuryE2E_Tier5(t *testing.T) {
+	pool := getTestDB(t)
+	ctx := context.Background()
+	
+	err := cleanupDB(ctx, pool)
+	require.NoError(t, err)
+
+	var userID string
+	err = pool.QueryRow(ctx, "INSERT INTO \"user\" (email, password_hash, name) VALUES ('e2e_fi_edit@test.com', 'hash', 'Test FI User') RETURNING id").Scan(&userID)
+	require.NoError(t, err)
+
+	var portfolioID string
+	err = pool.QueryRow(ctx, "INSERT INTO portfolio (user_id, name) VALUES ($1, 'Edit/Delete Portfolio') RETURNING id", userID).Scan(&portfolioID)
+	require.NoError(t, err)
+
+	router := setupTestRouter(pool)
+
+	var txID string
+
+	t.Run("F1: Create subscription lot", func(t *testing.T) {
+		body := TxRequest{
+			Ticker:          "TESOURO SELIC 2030",
+			TreasuryType:    "SELIC",
+			MaturityDate:    "2030-03-01",
+			HasCoupons:      false,
+			Type:            "SUBSCRIPTION",
+			Quantity:        2.0,
+			UnitPrice:       15000.0,
+			ContractedRate:  0.08,
+			TransactionDate: "2026-06-01",
+		}
+		jsonBody, _ := json.Marshal(body)
+		
+		req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions", portfolioID), bytes.NewBuffer(jsonBody))
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusCreated, rec.Code)
+		
+		var resp map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &resp)
+		txID = resp["id"].(string)
+		assert.NotEmpty(t, txID)
+	})
+
+	t.Run("F2: Edit subscription lot", func(t *testing.T) {
+		body := TxRequest{
+			Ticker:          "TESOURO SELIC 2030",
+			TreasuryType:    "SELIC",
+			MaturityDate:    "2030-03-01",
+			HasCoupons:      false,
+			Type:            "SUBSCRIPTION",
+			Quantity:        3.0,
+			UnitPrice:       16000.0,
+			ContractedRate:  0.08,
+			TransactionDate: "2026-06-01",
+		}
+		jsonBody, _ := json.Marshal(body)
+		
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions/%s", portfolioID, txID), bytes.NewBuffer(jsonBody))
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		reqGet := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/portfolios/%s/treasury/positions", portfolioID), nil)
+		recGet := httptest.NewRecorder()
+		router.ServeHTTP(recGet, reqGet)
+
+		assert.Equal(t, http.StatusOK, recGet.Code)
+		var positions []PositionJSON
+		json.Unmarshal(recGet.Body.Bytes(), &positions)
+		
+		require.Len(t, positions, 1)
+		assert.Equal(t, txID, positions[0].TransactionID)
+		assert.Equal(t, 3.0, positions[0].Quantity)
+		assert.Equal(t, 16000.0, positions[0].UnitPrice)
+		assert.Equal(t, 3.0*16000.0, positions[0].TotalInvested)
+	})
+
+	t.Run("F3: Delete subscription lot", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions/%s", portfolioID, txID), nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+
+		reqGet := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/portfolios/%s/treasury/positions", portfolioID), nil)
+		recGet := httptest.NewRecorder()
+		router.ServeHTTP(recGet, reqGet)
+
+		assert.Equal(t, http.StatusOK, recGet.Code)
+		var positions []PositionJSON
+		json.Unmarshal(recGet.Body.Bytes(), &positions)
+		assert.Empty(t, positions)
 	})
 }

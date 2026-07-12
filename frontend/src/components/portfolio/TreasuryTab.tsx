@@ -10,12 +10,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TreasuryPosition {
+  transaction_id: string;
   asset_id: string;
   ticker: string;
   treasury_type: string;  // SELIC, PREFIXADO, IPCA+
   maturity_date: string;
   has_coupons: boolean;
   start_date: string;
+  quantity: number;
+  unit_price: number;
+  contracted_rate: number;
   total_invested: number;
   gross_value: number;
   net_value: number;
@@ -105,6 +109,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<NewTreasuryTx>(EMPTY_TX);
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // ── Fetchers ────────────────────────────────────────────────────────────────
@@ -165,17 +170,58 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
 
   function openModal() {
     setForm(EMPTY_TX);
+    setEditingTxId(null);
     setError(null);
     setShowModal(true);
   }
 
   function closeModal() {
     setShowModal(false);
+    setEditingTxId(null);
     setError(null);
   }
 
   function handleFormChange(field: keyof NewTreasuryTx, value: string | number | boolean) {
     setForm(prev => ({ ...prev, [field]: value }));
+  }
+
+  function handleEdit(pos: TreasuryPosition) {
+    setEditingTxId(pos.transaction_id);
+    setForm({
+      ticker: pos.ticker,
+      treasury_type: pos.treasury_type,
+      maturity_date: new Date(pos.maturity_date).toISOString().split('T')[0],
+      has_coupons: pos.has_coupons,
+      type: 'SUBSCRIPTION',
+      quantity: pos.quantity,
+      unit_price: pos.unit_price,
+      contracted_rate: pos.contracted_rate,
+      transaction_date: new Date(pos.start_date).toISOString().split('T')[0],
+    });
+    setError(null);
+    setShowModal(true);
+  }
+
+  async function handleDelete(txId: string) {
+    if (!confirm('Deseja realmente excluir esta operação do Tesouro Direto? Isso irá recalcular o FIFO e o histórico da carteira.')) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/transactions/${txId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        fetchPositions();
+        fetchPerformance();
+      } else {
+        const txt = await res.text();
+        alert(txt || 'Erro ao excluir a operação.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão. Tente novamente.');
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -202,8 +248,13 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
         transaction_date: form.transaction_date,
       };
 
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/transactions`, {
-        method: 'POST',
+      const method = editingTxId ? 'PUT' : 'POST';
+      const url = editingTxId
+        ? `${API_URL}/portfolios/${portfolioId}/treasury/transactions/${editingTxId}`
+        : `${API_URL}/portfolios/${portfolioId}/treasury/transactions`;
+
+      const res = await fetch(url, {
+        method: method,
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -215,7 +266,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
         fetchPerformance();
       } else {
         const txt = await res.text();
-        setError(txt || 'Erro ao registrar a operação.');
+        setError(txt || 'Erro ao salvar a operação.');
       }
     } catch {
       setError('Erro de conexão. Tente novamente.');
@@ -464,6 +515,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
                   <th className="text-right">IR</th>
                   <th className="text-right">Taxa B3</th>
                   <th className="text-center">Status</th>
+                  <th className="text-center">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -473,7 +525,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
                     : 0;
                   const isPositive = liqReturn >= 0;
                   return (
-                    <tr key={pos.asset_id}>
+                    <tr key={pos.transaction_id}>
                       <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                         {pos.ticker}
                         {pos.has_coupons && (
@@ -520,6 +572,34 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
                         ) : (
                           <span style={{ color: '#4caf50', fontSize: '0.7rem', fontWeight: 700 }}>● Ativo</span>
                         )}
+                      </td>
+                      <td className="text-center">
+                        <div className="flex-row justify-center gap-xs">
+                          <button
+                            onClick={() => handleEdit(pos)}
+                            title="Editar"
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '2px 6px',
+                              borderRadius: '4px', color: 'var(--text-secondary)'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'}
+                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDelete(pos.transaction_id)}
+                            title="Apagar"
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '2px 6px',
+                              borderRadius: '4px', color: 'var(--text-secondary)'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.color = '#f44336'}
+                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -571,7 +651,9 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
               ✕
             </button>
 
-            <h3 className="card-title mb-lg">🏛️ Registrar Operação — Tesouro Direto</h3>
+            <h3 className="card-title mb-lg">
+              {editingTxId ? '✏️ Editar Operação — Tesouro Direto' : '🏛️ Registrar Operação — Tesouro Direto'}
+            </h3>
 
             <form onSubmit={handleSubmit} className="flex-col gap-md">
 
@@ -763,7 +845,11 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
                   disabled={isSubmitting}
                   style={{ fontSize: '0.85rem', minWidth: '130px' }}
                 >
-                  {isSubmitting ? '⏳ Registrando...' : form.type === 'SUBSCRIPTION' ? '📥 Registrar Aplicação' : '📤 Registrar Resgate'}
+                  {isSubmitting 
+                    ? (editingTxId ? '⏳ Salvando...' : '⏳ Registrando...') 
+                    : editingTxId 
+                      ? '💾 Salvar Alterações' 
+                      : form.type === 'SUBSCRIPTION' ? '📥 Registrar Aplicação' : '📤 Registrar Resgate'}
                 </button>
               </div>
             </form>

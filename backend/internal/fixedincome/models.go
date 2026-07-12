@@ -68,6 +68,7 @@ type MonthlyYield struct {
 
 // TreasuryTxRequest represents the incoming payload for subscriptions/redemptions.
 type TreasuryTxRequest struct {
+	ID              string  `json:"id,omitempty"`
 	Ticker          string  `json:"ticker"`
 	TreasuryType    string  `json:"treasury_type"` // SELIC, PREFIXADO, IPCA+
 	MaturityDate    string  `json:"maturity_date"`  // YYYY-MM-DD
@@ -81,12 +82,16 @@ type TreasuryTxRequest struct {
 
 // TreasuryPosition represents an active asset position in the portfolio calculated in real-time.
 type TreasuryPosition struct {
+	TransactionID  string    `json:"transaction_id"`
 	AssetID        string    `json:"asset_id"`
 	Ticker         string    `json:"ticker"`
 	TreasuryType   string    `json:"treasury_type"`
 	MaturityDate   time.Time `json:"maturity_date"`
 	HasCoupons     bool      `json:"has_coupons"`
 	StartDate      time.Time `json:"start_date"`
+	Quantity       float64   `json:"quantity"`
+	UnitPrice      float64   `json:"unit_price"`
+	ContractedRate float64   `json:"contracted_rate"`
 	TotalInvested  float64   `json:"total_invested"`
 	GrossValue     float64   `json:"gross_value"`
 	NetValue       float64   `json:"net_value"`

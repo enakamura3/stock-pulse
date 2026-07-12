@@ -36,6 +36,8 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Get("/positions", h.getTreasuryPositions)
 		r.Get("/transactions", h.getTreasuryTransactions)
 		r.Post("/transactions", h.createTreasuryTransaction)
+		r.Put("/transactions/{txID}", h.updateTreasuryTransaction)
+		r.Delete("/transactions/{txID}", h.deleteTreasuryTransaction)
 		r.Get("/performance", h.getTreasuryPerformance)
 	})
 }
@@ -319,4 +321,44 @@ func (h *Handler) getTreasuryPerformance(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(performance)
+}
+
+func (h *Handler) updateTreasuryTransaction(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	txID := chi.URLParam(r, "txID")
+	if portfolioID == "" || txID == "" {
+		http.Error(w, "portfolioID and txID are required", http.StatusBadRequest)
+		return
+	}
+
+	var req TreasuryTxRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.UpdateTreasuryTransaction(r.Context(), portfolioID, txID, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) deleteTreasuryTransaction(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	txID := chi.URLParam(r, "txID")
+	if portfolioID == "" || txID == "" {
+		http.Error(w, "portfolioID and txID are required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.DeleteTreasuryTransaction(r.Context(), portfolioID, txID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
