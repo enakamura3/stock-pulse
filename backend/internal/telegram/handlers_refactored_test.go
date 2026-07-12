@@ -323,17 +323,18 @@ func TestHandlers_Dividends(t *testing.T) {
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 
 		divs := []portfolio.CalculatedDividend{
-			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC), Type: "DIVIDENDO", Currency: "USD"},
-			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: time.Date(2026, 5, 12, 0, 0, 0, 0, time.UTC), Type: "JCP", Currency: "BRL"},
+			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC), Type: "DIVIDENDO", Currency: "USD"},
+			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC), Type: "JCP", Currency: "BRL"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
 
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
 			hasTitle := strings.Contains(msg, "📆 *Proventos por Mês: P1*")
 			hasMonthTotal := strings.Contains(msg, "• *2026-05*: R$ 15,00 | US$ 10,00")
-			hasAAPL := strings.Contains(msg, "↳ `AAPL` (DIV) • US$ 10,00 • Dia 10")
-			hasMSFT := strings.Contains(msg, "↳ `MSFT` (JCP) • R$ 15,00 • Dia 12")
-			return hasTitle && hasMonthTotal && hasAAPL && hasMSFT
+			hasAAPL := strings.Contains(msg, "↳ `AAPL` (DIV) • US$ 10,00 • Dia 15")
+			hasMSFT := strings.Contains(msg, "↳ `MSFT` (JCP) • R$ 15,00 • Dia 10")
+			correctOrder := strings.Index(msg, "MSFT") < strings.Index(msg, "AAPL")
+			return hasTitle && hasMonthTotal && hasAAPL && hasMSFT && correctOrder
 		}), mock.Anything).Return(nil)
 
 		err := h.HandleDividendsByMonth(mCtx)

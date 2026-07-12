@@ -328,13 +328,23 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 
 		totalMonthCurr := make(map[string]float64)
 
-		type tSummary struct {
+		type monthItem struct {
+			day      int
+			dateStr  string
+			ticker   string
+			dType    string
+			currency string
 			amount   float64
-			dates    []string
+		}
+
+		type itemKey struct {
+			day      int
+			ticker   string
 			dType    string
 			currency string
 		}
-		summaryMap := make(map[string]*tSummary)
+
+		summaryMap := make(map[itemKey]float64)
 
 		for _, d := range grouped[k] {
 			curr := d.Currency
@@ -348,26 +358,18 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 				dType = d.Type
 			}
 
-			mapKey := d.Ticker + "|" + dType + "|" + curr
-			if _, exists := summaryMap[mapKey]; !exists {
-				summaryMap[mapKey] = &tSummary{dType: dType, currency: curr}
+			day := 0
+			if !d.PaymentDate.IsZero() && d.PaymentDate.Year() > 1 {
+				day = d.PaymentDate.Day()
 			}
-			summaryMap[mapKey].amount += d.NetAmount
 
-			dateStr := d.PaymentDate.Format("02")
-			if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
-				dateStr = "-"
+			key := itemKey{
+				day:      day,
+				ticker:   d.Ticker,
+				dType:    dType,
+				currency: curr,
 			}
-			foundDate := false
-			for _, existing := range summaryMap[mapKey].dates {
-				if existing == dateStr {
-					foundDate = true
-					break
-				}
-			}
-			if !foundDate {
-				summaryMap[mapKey].dates = append(summaryMap[mapKey].dates, dateStr)
-			}
+			summaryMap[key] += d.NetAmount
 		}
 
 		var monthTotalStrings []string
@@ -382,21 +384,41 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 
 		msg += p.Sprintf("• *%s*: %s\n", display, strings.Join(monthTotalStrings, " | "))
 
-		mapKeys := make([]string, 0, len(summaryMap))
-		for mk := range summaryMap {
-			mapKeys = append(mapKeys, mk)
-		}
-		sort.Strings(mapKeys)
-
-		for _, mk := range mapKeys {
-			sum := summaryMap[mk]
-			ticker := strings.Split(mk, "|")[0]
-			datesStr := strings.Join(sum.dates, ", ")
-			formattedDates := datesStr
-			if datesStr != "-" {
-				formattedDates = "Dia " + datesStr
+		var items []monthItem
+		for key, amt := range summaryMap {
+			dateStr := "-"
+			if key.day > 0 {
+				dateStr = fmt.Sprintf("%02d", key.day)
 			}
-			msg += p.Sprintf("   ↳ `%s` (%s) • %s %.2f • %s\n", ticker, abbreviateDividendType(sum.dType), getCurrencySymbol(sum.currency), sum.amount, formattedDates)
+			items = append(items, monthItem{
+				day:      key.day,
+				dateStr:  dateStr,
+				ticker:   key.ticker,
+				dType:    key.dType,
+				currency: key.currency,
+				amount:   amt,
+			})
+		}
+
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].day != items[j].day {
+				return items[i].day < items[j].day
+			}
+			if items[i].ticker != items[j].ticker {
+				return items[i].ticker < items[j].ticker
+			}
+			if items[i].dType != items[j].dType {
+				return items[i].dType < items[j].dType
+			}
+			return items[i].currency < items[j].currency
+		})
+
+		for _, item := range items {
+			formattedDates := item.dateStr
+			if item.dateStr != "-" {
+				formattedDates = "Dia " + item.dateStr
+			}
+			msg += p.Sprintf("   ↳ `%s` (%s) • %s %.2f • %s\n", item.ticker, abbreviateDividendType(item.dType), getCurrencySymbol(item.currency), item.amount, formattedDates)
 		}
 		msg += "\n"
 	}
