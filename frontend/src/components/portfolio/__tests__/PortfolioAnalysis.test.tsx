@@ -97,4 +97,45 @@ describe('PortfolioAnalysis', () => {
     // Verify some elements are rendered
     expect(screen.getByText(/Alocação Estratégica/i)).toBeInTheDocument();
   });
+
+  it('renders correctly with treasury positions data', () => {
+    const mockTreasuryPositions = [
+      {
+        transaction_id: 't1',
+        asset_id: 'a1',
+        ticker: 'TESOURO SELIC 2029',
+        treasury_type: 'SELIC',
+        maturity_date: '2029-03-01',
+        has_coupons: false,
+        start_date: '2024-01-01',
+        quantity: 1.5,
+        unit_price: 14000.0,
+        contracted_rate: 0.15,
+        total_invested: 21000.0,
+        gross_value: 22000.0,
+        net_value: 21800.0,
+        is_matured: false,
+        days_to_maturity: 1000,
+        taxes_calculated: 200.0,
+        b3_fee: 10.0,
+        ir_tax: 190.0,
+        iof_tax: 0.0,
+      }
+    ];
+
+    render(
+      <PortfolioAnalysis
+        positions={[]}
+        dividends={[]}
+        fiPositions={[]}
+        treasuryPositions={mockTreasuryPositions as any}
+        performanceData={[]}
+        kpiCurrency="BRL"
+      />
+    );
+
+    // Verify some elements related to treasury positions or allocation/liquidity are rendered
+    expect(screen.getByText(/Alocação Estratégica/i)).toBeInTheDocument();
+    expect(screen.getByText(/Liquidez da Renda Fixa/i)).toBeInTheDocument();
+  });
 });

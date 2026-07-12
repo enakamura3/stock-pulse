@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Position } from './types';
+import { Position, TreasuryPosition } from './types';
 import { formatMoney, formatPercentage } from './helpers';
 
 interface DailyReportProps {
   positions: Position[];
+  treasuryPositions?: TreasuryPosition[];
   kpiCurrency: string;
 }
 
@@ -22,7 +23,7 @@ function getExchangeRate(pos: Position): number {
 
 // Helper: retorna o rótulo de tipo de ativo
 function getAssetTypeBadge(pos: Position): { label: string; color: string } | null {
-  const type = (pos.asset_type || '').toUpperCase();
+  const type = (pos.type || '').toUpperCase();
   if (type === 'FII') return { label: 'FII', color: 'var(--color-warning, #f59e0b)' };
   if (type === 'ETF') return { label: 'ETF', color: 'var(--color-info, #38bdf8)' };
   if (type === 'BDR') return { label: 'BDR', color: 'var(--color-secondary-text, #a78bfa)' };
@@ -31,7 +32,7 @@ function getAssetTypeBadge(pos: Position): { label: string; color: string } | nu
   return null;
 }
 
-export default function DailyReport({ positions, kpiCurrency }: DailyReportProps) {
+export default function DailyReport({ positions, treasuryPositions = [], kpiCurrency }: DailyReportProps) {
   const [sortKey, setSortKey] = useState<SortKey>('daily_change_percent');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -49,6 +50,9 @@ export default function DailyReport({ positions, kpiCurrency }: DailyReportProps
     totalDailyChange += (pos.daily_change ?? 0) * (pos.quantity ?? 0) * rate;
     totalPortfolioValue += (pos.current_value ?? 0);
   });
+
+  const totalTreasuryValue = treasuryPositions.reduce((s, p) => s + p.net_value, 0);
+  totalPortfolioValue += totalTreasuryValue;
 
   // Variação % total ponderada = totalDailyChange / (valor_anterior = totalPortfolioValue - totalDailyChange)
   const previousTotalValue = totalPortfolioValue - totalDailyChange;
@@ -298,6 +302,55 @@ export default function DailyReport({ positions, kpiCurrency }: DailyReportProps
           )}
         </div>
       </div>
+
+      {treasuryPositions.length > 0 && (
+        <div className="card flex-col gap-md w-full">
+          <h3 className="card-title">🏛️ Posição Atualizada: Tesouro Direto</h3>
+          <p className="text-xs text-secondary">
+            Títulos do Tesouro Nacional não possuem cotação intraday. Os valores abaixo
+            representam a última posição de liquidação líquida disponível.
+          </p>
+          <div className="table-container flex-col">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Título</th>
+                  <th>Tipo</th>
+                  <th className="text-right">Vencimento</th>
+                  <th className="text-right">Total Investido</th>
+                  <th className="text-right">Valor Líquido</th>
+                  <th className="text-right">Rentabilidade Acumulada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {treasuryPositions.map(p => {
+                  const returnPct = p.total_invested > 1e-6
+                    ? ((p.net_value - p.total_invested) / p.total_invested) * 100
+                    : 0;
+                  const badgeColor = p.treasury_type === 'SELIC' ? '#4caf50'
+                    : p.treasury_type === 'PREFIXADO' ? '#2196f3' : '#ff9800';
+                  return (
+                    <tr key={p.transaction_id}>
+                      <td><span className="font-bold">{p.ticker}</span></td>
+                      <td>
+                        <span style={{ background: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}`, fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          {p.treasury_type}
+                        </span>
+                      </td>
+                      <td className="text-right">{new Date(p.maturity_date).toLocaleDateString('pt-BR')}</td>
+                      <td className="text-right">{formatMoney(p.total_invested, kpiCurrency)}</td>
+                      <td className="text-right" style={{ fontWeight: 600 }}>{formatMoney(p.net_value, kpiCurrency)}</td>
+                      <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(2)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

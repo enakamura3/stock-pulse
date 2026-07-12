@@ -35,6 +35,7 @@ type Service interface {
 	DeleteTreasuryTransaction(ctx context.Context, portfolioID, txID string) error
 	GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
 	GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error)
+	GetTreasuryMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error)
 }
 
 type service struct {
@@ -1244,3 +1245,95 @@ func (s *service) rebuildTreasuryFIFO(ctx context.Context, tx pgx.Tx, portfolioI
 
 	return nil
 }
+
+func (s *service) GetTreasuryMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error) {
+	lots, err := s.repo.GetActiveSubscriptionLots(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+
+	holidays, err := s.repo.GetAnbimaHolidays(ctx)
+	if err != nil {
+		holidays = make(map[string]bool)
+	}
+
+	selicRates, err := s.repo.GetSelicRates(ctx)
+	if err != nil {
+		selicRates = make(map[string]float64)
+	}
+
+	var allYields []MonthlyYield
+
+	for _, lot := range lots {
+		ticker, treasuryType, maturityDate, _, err := s.repo.GetTreasuryAssetDetails(ctx, lot.AssetID)
+		if err != nil {
+			continue
+		}
+
+		startDate := lot.TransactionDate
+		today := time.Now()
+		limitDate := today
+		if !maturityDate.IsZero() && today.After(maturityDate) {
+			limitDate = maturityDate
+		}
+
+		grossValue := lot.RemainingQuantity * lot.UnitPrice
+		monthlyGross := make(map[string]float64)
+		monthlyLastDay := make(map[string]time.Time)
+
+		currDate := startDate
+		for !currDate.After(limitDate) {
+			if currDate.Weekday() != time.Saturday &&
+				currDate.Weekday() != time.Sunday &&
+				!holidays[currDate.Format("2006-01-02")] {
+
+				var dailyFactor float64
+				if treasuryType == "SELIC" {
+					rate := 10.75
+					if rVal, exists := selicRates[currDate.Format("2006-01-02")]; exists {
+						rate = rVal
+					}
+					dailyRate := math.Pow(1.0+rate/100.0, 1.0/252.0) - 1.0
+					dailySpread := math.Pow(1.0+lot.ContractedRate/100.0, 1.0/252.0) - 1.0
+					dailyFactor = 1.0 + dailyRate + dailySpread
+				} else {
+					dailyFactor = math.Pow(1.0+lot.ContractedRate/100.0, 1.0/252.0)
+				}
+
+				monthStr := currDate.Format("2006-01")
+				monthlyGross[monthStr] += grossValue * (dailyFactor - 1)
+				monthlyLastDay[monthStr] = currDate
+				grossValue *= dailyFactor
+			}
+			currDate = currDate.AddDate(0, 0, 1)
+		}
+
+		for monthStr, grossYield := range monthlyGross {
+			if grossYield <= 0 {
+				continue
+			}
+			lastDay := monthlyLastDay[monthStr]
+			daysHeld := int(lastDay.Sub(startDate).Hours() / 24)
+			if daysHeld < 0 {
+				daysHeld = 0
+			}
+			irRate := calculateIRRate(daysHeld)
+			allYields = append(allYields, MonthlyYield{
+				AssetID:     lot.AssetID,
+				AssetName:   ticker,
+				AssetType:   "TESOURO",
+				Month:       monthStr,
+				GrossAmount: grossYield,
+				NetAmount:   grossYield * (1 - irRate),
+				IsAccrued:   true,
+			})
+		}
+	}
+
+	if allYields == nil {
+		allYields = []MonthlyYield{}
+	}
+
+	return allYields, nil
+}
+

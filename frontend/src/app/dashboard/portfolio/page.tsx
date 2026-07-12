@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import dynamic from 'next/dynamic';
 
-import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult, FixedIncomePosition, UnifiedTransaction } from '@/components/portfolio/types';
+import { Portfolio, Position, Transaction, PerformancePoint, CalculatedDividend, SearchResult, FixedIncomePosition, UnifiedTransaction, TreasuryPosition } from '@/components/portfolio/types';
 import { getAssetCategory } from '@/components/portfolio/helpers';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
@@ -31,6 +31,8 @@ export default function PortfolioPage() {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('Todas');
   const [positions, setPositions] = useState<Position[]>([]);
   const [fiPositions, setFiPositions] = useState<FixedIncomePosition[]>([]);
+  const [treasuryPositions, setTreasuryPositions] = useState<TreasuryPosition[]>([]);
+  const [isLoadingTreasury, setIsLoadingTreasury] = useState(false);
   const [transactions, setTransactions] = useState<UnifiedTransaction[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
   const [dividends, setDividends] = useState<CalculatedDividend[]>([]);
@@ -99,6 +101,21 @@ export default function PortfolioPage() {
     } catch (e) { console.error('Erro ao buscar portfólios:', e); } finally { setIsLoadingPortfolios(false); }
   }, []);
 
+  const loadTreasuryPositions = useCallback(async (id: string) => {
+    if (!id) return;
+    setIsLoadingTreasury(true);
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${id}/treasury/positions`, {
+        credentials: 'include', cache: 'no-store'
+      });
+      if (res.ok) setTreasuryPositions(await res.json() || []);
+    } catch (e) {
+      console.error('Erro ao carregar Tesouro:', e);
+    } finally {
+      setIsLoadingTreasury(false);
+    }
+  }, []);
+
   const loadPortfolioDetails = useCallback(async (id: string) => {
     if (!id) return;
     setIsLoadingDetails(true);
@@ -110,8 +127,10 @@ export default function PortfolioPage() {
       
       const resFI = await fetch(`${API_URL}/portfolios/${id}/fixed-income/positions`, { credentials: 'include', cache: 'no-store' });
       if (resFI.ok) setFiPositions(await resFI.json() || []);
+
+      await loadTreasuryPositions(id);
     } catch (e) { console.error('Erro ao buscar detalhes:', e); } finally { setIsLoadingDetails(false); }
-  }, []);
+  }, [loadTreasuryPositions]);
 
   const loadPerformance = useCallback(async (id: string, selectPeriod: string, filterTickers: string[] = []) => {
     if (!id) return;
@@ -128,9 +147,10 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingDividends(true);
     try {
-      const [resDivs, resFI] = await Promise.all([
+      const [resDivs, resFI, resTD] = await Promise.all([
         fetch(`${API_URL}/portfolios/${id}/dividends`, { credentials: 'include', cache: 'no-store' }),
-        fetch(`${API_URL}/portfolios/${id}/fixed-income/monthly-yields`, { credentials: 'include', cache: 'no-store' })
+        fetch(`${API_URL}/portfolios/${id}/fixed-income/monthly-yields`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${API_URL}/portfolios/${id}/treasury/monthly-yields`, { credentials: 'include', cache: 'no-store' })
       ]);
       
       let allDividends: CalculatedDividend[] = [];
@@ -162,6 +182,30 @@ export default function PortfolioPage() {
           } as CalculatedDividend;
         });
         allDividends = [...allDividends, ...mappedFI];
+      }
+
+      if (resTD.ok) {
+        const tdYields = await resTD.json() || [];
+        const mappedTD = tdYields.map((ty: any) => {
+          const [yearStr, monthStr] = ty.month.split('-');
+          const date = new Date(parseInt(yearStr), parseInt(monthStr), 0).toISOString().split('T')[0];
+          return {
+            asset_id: ty.asset_id,
+            ticker: ty.asset_name,
+            asset_name: ty.asset_name,
+            asset_type: 'TESOURO',
+            cum_date: date,
+            payment_date: date,
+            gross_amount: ty.gross_amount,
+            net_amount: ty.net_amount,
+            currency: 'BRL',
+            type: 'YIELD',
+            quantity: 1,
+            per_share_amount: ty.net_amount,
+            is_accrued: true
+          } as CalculatedDividend;
+        });
+        allDividends = [...allDividends, ...mappedTD];
       }
       
       allDividends.sort((a, b) => {
@@ -498,7 +542,8 @@ export default function PortfolioPage() {
   const categoryFilteredDividends = dividends.filter(div => {
     if (activeCategoryFilter === 'Todas') return true;
     if (activeCategoryFilter === 'Renda Variável') return !div.is_accrued;
-    if (activeCategoryFilter === 'Renda Fixa') return div.is_accrued;
+    if (activeCategoryFilter === 'Renda Fixa') return div.is_accrued && div.asset_type !== 'TESOURO';
+    if (activeCategoryFilter === 'Tesouro Direto') return div.is_accrued && div.asset_type === 'TESOURO';
     if (div.is_accrued || getAssetCategory(div.asset_type) !== activeCategoryFilter) return false;
     return true;
   });
@@ -517,15 +562,21 @@ export default function PortfolioPage() {
   const includeFI = activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Fixa';
   const filteredFI = includeFI ? fiPositions : [];
 
+  const includeTreasury = activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Tesouro Direto';
+  const filteredTreasury = includeTreasury ? treasuryPositions : [];
+
   const eqCost = filteredPositions.reduce((acc, pos) => acc + pos.total_cost, 0);
   const eqValue = filteredPositions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
   
   const fiCost = filteredFI.reduce((acc, pos) => acc + pos.total_invested, 0);
   const fiValue = filteredFI.reduce((acc, pos) => acc + pos.net_value, 0);
 
+  const tdCost = filteredTreasury.reduce((acc, pos) => acc + pos.total_invested, 0);
+  const tdValue = filteredTreasury.reduce((acc, pos) => acc + pos.net_value, 0);
+
   // Se o filtro for APENAS Renda Fixa, eqCost e eqValue serão 0 (porque filteredPositions estará vazio).
-  const totalCost = eqCost + fiCost;
-  const currentValue = eqValue + fiValue;
+  const totalCost = eqCost + fiCost + tdCost;
+  const currentValue = eqValue + fiValue + tdValue;
   const profitLoss = currentValue - totalCost;
   const returnPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0.0;
   
@@ -543,6 +594,9 @@ export default function PortfolioPage() {
   if (positions.length > 0) filterCategories.push('Renda Variável', ...availableCategories);
   if (fiPositions.length > 0) {
     filterCategories.push('Renda Fixa');
+  }
+  if (treasuryPositions.length > 0) {
+    filterCategories.push('Tesouro Direto');
   }
 
   return (
@@ -574,7 +628,7 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <div className="flex-col gap-xl">
-          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} />
+          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} />
 
 
 
@@ -668,13 +722,14 @@ export default function PortfolioPage() {
               positions={filteredPositions}
               dividends={categoryFilteredDividends}
               fiPositions={filteredFI}
+              treasuryPositions={filteredTreasury}
               performanceData={performanceData}
               kpiCurrency={kpiCurrency}
             />
           )}
 
           {activeTab === 'diario' && (
-            <DailyReport positions={filteredPositions} kpiCurrency={kpiCurrency} />
+            <DailyReport positions={filteredPositions} treasuryPositions={treasuryPositions} kpiCurrency={kpiCurrency} />
           )}
 
           {activeTab === 'renda-fixa' && (
@@ -682,7 +737,12 @@ export default function PortfolioPage() {
           )}
 
           {activeTab === 'tesouro' && (
-            <TreasuryTab portfolioId={activePortfolioId} />
+            <TreasuryTab
+              portfolioId={activePortfolioId}
+              positions={treasuryPositions}
+              isLoadingPositions={isLoadingTreasury}
+              onRefresh={async () => { await loadTreasuryPositions(activePortfolioId); }}
+            />
           )}
         </div>
       )}

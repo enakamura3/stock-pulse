@@ -7,35 +7,7 @@ const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ss
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface TreasuryPosition {
-  transaction_id: string;
-  asset_id: string;
-  ticker: string;
-  treasury_type: string;  // SELIC, PREFIXADO, IPCA+
-  maturity_date: string;
-  has_coupons: boolean;
-  start_date: string;
-  quantity: number;
-  unit_price: number;
-  contracted_rate: number;
-  total_invested: number;
-  gross_value: number;
-  net_value: number;
-  is_matured: boolean;
-  days_to_maturity: number;
-  taxes_calculated: number;  // IOF + IR
-  b3_fee: number;
-  ir_tax: number;
-  iof_tax: number;
-}
-
-interface TreasuryPerfPoint {
-  date: string;
-  value: number;
-  total_invested: number;
-}
+import { TreasuryPosition, TreasuryPerfPoint } from './types';
 
 interface NewTreasuryTx {
   ticker: string;
@@ -87,6 +59,9 @@ function getTreasuryTypeBadgeColor(t: string): string {
 
 interface TreasuryTabProps {
   portfolioId: string;
+  positions: TreasuryPosition[];
+  isLoadingPositions: boolean;
+  onRefresh: () => Promise<void>;
 }
 
 const EMPTY_TX: NewTreasuryTx = {
@@ -101,10 +76,9 @@ const EMPTY_TX: NewTreasuryTx = {
   transaction_date: new Date().toISOString().split('T')[0],
 };
 
-export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
-  const [positions, setPositions] = useState<TreasuryPosition[]>([]);
+export default function TreasuryTab({ portfolioId, positions, isLoadingPositions, onRefresh }: TreasuryTabProps) {
   const [perfData, setPerfData] = useState<TreasuryPerfPoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
   const [isLoadingPerf, setIsLoadingPerf] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -113,25 +87,6 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
   const [error, setError] = useState<string | null>(null);
 
   // ── Fetchers ────────────────────────────────────────────────────────────────
-
-  const fetchPositions = useCallback(async () => {
-    if (!portfolioId) return;
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/positions`, {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPositions(data || []);
-      }
-    } catch (e) {
-      console.error('Erro ao buscar posições do Tesouro:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [portfolioId]);
 
   const fetchPerformance = useCallback(async () => {
     if (!portfolioId) return;
@@ -153,9 +108,8 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
   }, [portfolioId]);
 
   useEffect(() => {
-    fetchPositions();
     fetchPerformance();
-  }, [fetchPositions, fetchPerformance]);
+  }, [fetchPerformance]);
 
   // ── KPIs ────────────────────────────────────────────────────────────────────
 
@@ -212,7 +166,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
         credentials: 'include',
       });
       if (res.ok) {
-        fetchPositions();
+        await onRefresh();
         fetchPerformance();
       } else {
         const txt = await res.text();
@@ -262,7 +216,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
 
       if (res.ok) {
         closeModal();
-        fetchPositions();
+        await onRefresh();
         fetchPerformance();
       } else {
         const txt = await res.text();
@@ -348,7 +302,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
         operations.push(op as NewTreasuryTx);
       }
 
-      setIsLoading(true);
+      setIsImporting(true);
       let successCount = 0;
       let errorCount = 0;
 
@@ -371,12 +325,12 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
       }
 
       alert(`Importação concluída: ${successCount} sucesso(s), ${errorCount} erro(s).`);
-      fetchPositions();
+      await onRefresh();
       fetchPerformance();
     } catch (err) {
       alert('Erro ao processar arquivo CSV. Certifique-se de que é um formato válido.');
     } finally {
-      setIsLoading(false);
+      setIsImporting(false);
       e.target.value = ''; // reset
     }
   }
@@ -481,7 +435,7 @@ export default function TreasuryTab({ portfolioId }: TreasuryTabProps) {
           </div>
         </div>
 
-        {isLoading ? (
+        {(isLoadingPositions || isImporting) ? (
           <div className="flex-row items-center justify-center" style={{ height: '120px' }}>
             <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 28, height: 28 }} />
           </div>
