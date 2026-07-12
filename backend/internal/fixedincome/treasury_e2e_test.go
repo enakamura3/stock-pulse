@@ -75,12 +75,16 @@ type TxRequest struct {
 }
 
 type PositionJSON struct {
+	TransactionID  string    `json:"transaction_id"`
 	AssetID        string    `json:"asset_id"`
 	Ticker         string    `json:"ticker"`
 	TreasuryType   string    `json:"treasury_type"`
 	MaturityDate   time.Time `json:"maturity_date"`
 	HasCoupons     bool      `json:"has_coupons"`
 	StartDate      time.Time `json:"start_date"`
+	Quantity       float64   `json:"quantity"`
+	UnitPrice      float64   `json:"unit_price"`
+	ContractedRate float64   `json:"contracted_rate"`
 	TotalInvested  float64   `json:"total_invested"`
 	GrossValue     float64   `json:"gross_value"`
 	NetValue       float64   `json:"net_value"`
@@ -1045,5 +1049,103 @@ func TestTreasuryE2E_Tier4(t *testing.T) {
 		// Check that the position is closed
 		err = pool.QueryRow(ctx, "SELECT remaining_quantity FROM treasury_transactions WHERE asset_id = $1 AND type = 'SUBSCRIPTION'", assetID).Scan(&remainingQty)
 		assert.Equal(t, 0.0, remainingQty)
+	})
+}
+
+func TestTreasuryE2E_Tier5(t *testing.T) {
+	pool := getTestDB(t)
+	ctx := context.Background()
+	
+	err := cleanupDB(ctx, pool)
+	require.NoError(t, err)
+
+	var userID string
+	err = pool.QueryRow(ctx, "INSERT INTO \"user\" (email, password_hash, name) VALUES ('e2e_fi_edit@test.com', 'hash', 'Test FI User') RETURNING id").Scan(&userID)
+	require.NoError(t, err)
+
+	var portfolioID string
+	err = pool.QueryRow(ctx, "INSERT INTO portfolio (user_id, name) VALUES ($1, 'Edit/Delete Portfolio') RETURNING id", userID).Scan(&portfolioID)
+	require.NoError(t, err)
+
+	router := setupTestRouter(pool)
+
+	var txID string
+
+	t.Run("F1: Create subscription lot", func(t *testing.T) {
+		body := TxRequest{
+			Ticker:          "TESOURO SELIC 2030",
+			TreasuryType:    "SELIC",
+			MaturityDate:    "2030-03-01",
+			HasCoupons:      false,
+			Type:            "SUBSCRIPTION",
+			Quantity:        2.0,
+			UnitPrice:       15000.0,
+			ContractedRate:  0.08,
+			TransactionDate: "2026-06-01",
+		}
+		jsonBody, _ := json.Marshal(body)
+		
+		req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions", portfolioID), bytes.NewBuffer(jsonBody))
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusCreated, rec.Code)
+		
+		var resp map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &resp)
+		txID = resp["id"].(string)
+		assert.NotEmpty(t, txID)
+	})
+
+	t.Run("F2: Edit subscription lot", func(t *testing.T) {
+		body := TxRequest{
+			Ticker:          "TESOURO SELIC 2030",
+			TreasuryType:    "SELIC",
+			MaturityDate:    "2030-03-01",
+			HasCoupons:      false,
+			Type:            "SUBSCRIPTION",
+			Quantity:        3.0,
+			UnitPrice:       16000.0,
+			ContractedRate:  0.08,
+			TransactionDate: "2026-06-01",
+		}
+		jsonBody, _ := json.Marshal(body)
+		
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions/%s", portfolioID, txID), bytes.NewBuffer(jsonBody))
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		reqGet := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/portfolios/%s/treasury/positions", portfolioID), nil)
+		recGet := httptest.NewRecorder()
+		router.ServeHTTP(recGet, reqGet)
+
+		assert.Equal(t, http.StatusOK, recGet.Code)
+		var positions []PositionJSON
+		json.Unmarshal(recGet.Body.Bytes(), &positions)
+		
+		require.Len(t, positions, 1)
+		assert.Equal(t, txID, positions[0].TransactionID)
+		assert.Equal(t, 3.0, positions[0].Quantity)
+		assert.Equal(t, 16000.0, positions[0].UnitPrice)
+		assert.Equal(t, 3.0*16000.0, positions[0].TotalInvested)
+	})
+
+	t.Run("F3: Delete subscription lot", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions/%s", portfolioID, txID), nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+
+		reqGet := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/portfolios/%s/treasury/positions", portfolioID), nil)
+		recGet := httptest.NewRecorder()
+		router.ServeHTTP(recGet, reqGet)
+
+		assert.Equal(t, http.StatusOK, recGet.Code)
+		var positions []PositionJSON
+		json.Unmarshal(recGet.Body.Bytes(), &positions)
+		assert.Empty(t, positions)
 	})
 }

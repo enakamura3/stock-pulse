@@ -31,6 +31,8 @@ type Service interface {
 	GetTreasuryPositions(ctx context.Context, portfolioID string) ([]TreasuryPosition, error)
 	GetTreasuryTransactions(ctx context.Context, portfolioID string) ([]TreasuryTxRequest, error)
 	CreateTreasuryTransaction(ctx context.Context, portfolioID string, req *TreasuryTxRequest) (interface{}, error)
+	UpdateTreasuryTransaction(ctx context.Context, portfolioID, txID string, req *TreasuryTxRequest) error
+	DeleteTreasuryTransaction(ctx context.Context, portfolioID, txID string) error
 	GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
 	GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error)
 }
@@ -712,12 +714,16 @@ func (s *service) GetTreasuryPositions(ctx context.Context, portfolioID string) 
 		}
 
 		var p TreasuryPosition
+		p.TransactionID = l.ID
 		p.AssetID = l.AssetID
 		p.Ticker = ticker
 		p.TreasuryType = treasuryType
 		p.MaturityDate = maturityDate
 		p.HasCoupons = hasCoupons
 		p.StartDate = l.TransactionDate
+		p.Quantity = l.Quantity
+		p.UnitPrice = l.UnitPrice
+		p.ContractedRate = l.ContractedRate
 		p.TotalInvested = l.RemainingQuantity * l.UnitPrice
 
 		holdingDays := int(today.Sub(l.TransactionDate).Hours() / 24)
@@ -998,4 +1004,243 @@ func (s *service) GetTreasuryPerformance(ctx context.Context, portfolioID string
 
 func (s *service) GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error) {
 	return s.repo.GetIndexRates(ctx, indexer, startDate, endDate)
+}
+
+func (s *service) UpdateTreasuryTransaction(ctx context.Context, portfolioID, txID string, req *TreasuryTxRequest) error {
+	maturityDate, err := time.Parse("2006-01-02", req.MaturityDate)
+	if err != nil {
+		return fmt.Errorf("invalid maturity date: %w", err)
+	}
+	transactionDate, err := time.Parse("2006-01-02", req.TransactionDate)
+	if err != nil {
+		return fmt.Errorf("invalid transaction date: %w", err)
+	}
+
+	return s.repo.ExecuteInTx(ctx, func(tx pgx.Tx) error {
+		existingTx, err := s.repo.GetTreasuryTransactionByID(ctx, tx, txID)
+		if err != nil {
+			return fmt.Errorf("transaction not found: %w", err)
+		}
+
+		if existingTx.PortfolioID != portfolioID {
+			return fmt.Errorf("unauthorized: transaction does not belong to the portfolio")
+		}
+
+		oldAssetID := existingTx.AssetID
+
+		assetID, err := s.repo.GetTreasuryAssetByTicker(ctx, tx, req.Ticker)
+		if err == pgx.ErrNoRows {
+			assetID, err = s.repo.CreateTreasuryAsset(ctx, tx, req.Ticker, req.Ticker, req.TreasuryType, maturityDate, req.HasCoupons)
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+
+		existingTx.AssetID = assetID
+		existingTx.Type = req.Type
+		existingTx.Quantity = req.Quantity
+		existingTx.UnitPrice = req.UnitPrice
+		existingTx.ContractedRate = req.ContractedRate
+		existingTx.TransactionDate = transactionDate
+
+		if req.Type == "SUBSCRIPTION" {
+			existingTx.RemainingQuantity = req.Quantity
+		} else {
+			existingTx.RemainingQuantity = 0.0
+		}
+
+		err = s.repo.UpdateTreasuryTransaction(ctx, tx, existingTx)
+		if err != nil {
+			return err
+		}
+
+		if oldAssetID != assetID {
+			err = s.rebuildTreasuryFIFO(ctx, tx, portfolioID, oldAssetID)
+			if err != nil {
+				return err
+			}
+		}
+
+		return s.rebuildTreasuryFIFO(ctx, tx, portfolioID, assetID)
+	})
+}
+
+func (s *service) DeleteTreasuryTransaction(ctx context.Context, portfolioID, txID string) error {
+	return s.repo.ExecuteInTx(ctx, func(tx pgx.Tx) error {
+		existingTx, err := s.repo.GetTreasuryTransactionByID(ctx, tx, txID)
+		if err != nil {
+			return fmt.Errorf("transaction not found: %w", err)
+		}
+
+		if existingTx.PortfolioID != portfolioID {
+			return fmt.Errorf("unauthorized: transaction does not belong to the portfolio")
+		}
+
+		assetID := existingTx.AssetID
+
+		err = s.repo.DeleteTreasuryTransactionByID(ctx, tx, txID)
+		if err != nil {
+			return err
+		}
+
+		return s.rebuildTreasuryFIFO(ctx, tx, portfolioID, assetID)
+	})
+}
+
+func (s *service) rebuildTreasuryFIFO(ctx context.Context, tx pgx.Tx, portfolioID, assetID string) error {
+	err := s.repo.DeleteDepletionsByAsset(ctx, tx, portfolioID, assetID)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.ResetSubscriptionsRemainingQuantity(ctx, tx, portfolioID, assetID)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.ResetRedemptionFinancials(ctx, tx, portfolioID, assetID)
+	if err != nil {
+		return err
+	}
+
+	redemptions, err := s.repo.GetRedemptionsForAsset(ctx, tx, portfolioID, assetID)
+	if err != nil {
+		return err
+	}
+
+	if len(redemptions) == 0 {
+		return nil
+	}
+
+	holidays, err := s.repo.GetAnbimaHolidays(ctx)
+	if err != nil {
+		return err
+	}
+
+	selicRates, err := s.repo.GetSelicRates(ctx)
+	if err != nil {
+		return err
+	}
+
+	totalSelicInvested, err := s.repo.GetTotalSelicInvested(ctx, tx, portfolioID)
+	if err != nil {
+		return err
+	}
+
+	_, treasuryType, _, _, err := s.repo.GetTreasuryAssetDetails(ctx, assetID)
+	if err != nil {
+		return err
+	}
+
+	for _, redemption := range redemptions {
+		lots, err := s.repo.GetActiveLotsForAsset(ctx, tx, portfolioID, assetID)
+		if err != nil {
+			return err
+		}
+
+		remainingToRedeem := redemption.Quantity
+		var totalGross, totalIOF, totalIR, totalB3, totalNet float64
+
+		for _, l := range lots {
+			if remainingToRedeem <= 0 {
+				break
+			}
+			depleteQty := l.RemainingQuantity
+			if depleteQty > remainingToRedeem {
+				depleteQty = remainingToRedeem
+			}
+
+			holdingDays := int(redemption.TransactionDate.Sub(l.TransactionDate).Hours() / 24)
+			busDays := countTreasuryBusinessDays(l.TransactionDate, redemption.TransactionDate, holidays)
+
+			var valAtRedemption float64
+			if treasuryType == "SELIC" {
+				factor := 1.0
+				currDate := l.TransactionDate
+				for currDate.Before(redemption.TransactionDate) {
+					currDate = currDate.AddDate(0, 0, 1)
+					if currDate.Weekday() != time.Saturday && currDate.Weekday() != time.Sunday && !holidays[currDate.Format("2006-01-02")] {
+						rate := 10.75
+						if rVal, exists := selicRates[currDate.Format("2006-01-02")]; exists {
+							rate = rVal
+						}
+						dailyRate := math.Pow(1.0+rate/100.0, 1.0/252.0) - 1.0
+						dailySpread := math.Pow(1.0+l.ContractedRate/100.0, 1.0/252.0) - 1.0
+						factor *= (1.0 + dailyRate + dailySpread)
+					}
+				}
+				valAtRedemption = depleteQty * l.UnitPrice * factor
+			} else {
+				rate := l.ContractedRate
+				dailyRate := math.Pow(1.0+rate/100.0, 1.0/252.0) - 1.0
+				factor := math.Pow(1.0+dailyRate, float64(busDays))
+				valAtRedemption = depleteQty * l.UnitPrice * factor
+			}
+
+			costBasis := depleteQty * l.UnitPrice
+			grossYield := valAtRedemption - costBasis
+			if grossYield < 0 {
+				grossYield = 0
+			}
+
+			var b3Fee float64
+			dailyB3Rate := math.Pow(1.0+0.0020, 1.0/252.0) - 1.0
+
+			if treasuryType == "SELIC" {
+				exemptFraction := 1.0
+				if totalSelicInvested > 10000.0 {
+					exemptFraction = 10000.0 / totalSelicInvested
+				}
+				if exemptFraction > 1.0 {
+					exemptFraction = 1.0
+				}
+				taxablePortion := 1.0 - exemptFraction
+				accruedFeeFactor := math.Pow(1.0+dailyB3Rate*taxablePortion, float64(busDays)) - 1.0
+				b3Fee = valAtRedemption * accruedFeeFactor
+			} else {
+				accruedFeeFactor := math.Pow(1.0+dailyB3Rate, float64(busDays)) - 1.0
+				b3Fee = valAtRedemption * accruedFeeFactor
+			}
+
+			iofRate := getTreasuryIOFRate(holdingDays)
+			iofTax := grossYield * (iofRate / 100.0)
+
+			irRate := getTreasuryIRRate(holdingDays)
+			irTax := (grossYield - iofTax) * (irRate / 100.0)
+			if irTax < 0 {
+				irTax = 0
+			}
+
+			netYield := grossYield - iofTax - irTax - b3Fee
+			netVal := costBasis + netYield
+
+			totalGross += valAtRedemption
+			totalIOF += iofTax
+			totalIR += irTax
+			totalB3 += b3Fee
+			totalNet += netVal
+
+			newRemaining := l.RemainingQuantity - depleteQty
+			err = s.repo.UpdateLotRemainingQuantity(ctx, tx, l.ID, newRemaining)
+			if err != nil {
+				return err
+			}
+
+			err = s.repo.CreateDepletionLink(ctx, tx, l.ID, redemption.ID, depleteQty)
+			if err != nil {
+				return err
+			}
+
+			remainingToRedeem -= depleteQty
+		}
+
+		err = s.repo.UpdateRedemptionFinancials(ctx, tx, redemption.ID, totalGross, totalIOF, totalIR, totalB3, totalNet)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
