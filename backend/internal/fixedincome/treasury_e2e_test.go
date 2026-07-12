@@ -449,8 +449,8 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 
 		// Calculate active positions in real-time
 		rows, err := pool.Query(ctx, `
-			SELECT t.asset_id, a.ticker, ta.treasury_type, ta.maturity_date, ta.has_coupons,
-			       t.unit_price, t.contracted_rate, t.remaining_quantity, t.transaction_date
+			SELECT t.id, t.asset_id, a.ticker, ta.treasury_type, ta.maturity_date, ta.has_coupons,
+			       t.quantity, t.unit_price, t.contracted_rate, t.remaining_quantity, t.transaction_date
 			FROM treasury_transactions t
 			JOIN treasury_assets ta ON t.asset_id = ta.id
 			JOIN asset a ON ta.id = a.id
@@ -478,23 +478,23 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 
 		for rows.Next() {
 			var p PositionJSON
-			var uPrice, contractedRate, remainingQty float64
+			var remainingQty float64
 			var tDate time.Time
-			err = rows.Scan(&p.AssetID, &p.Ticker, &p.TreasuryType, &p.MaturityDate, &p.HasCoupons,
-				&uPrice, &contractedRate, &remainingQty, &tDate)
+			err = rows.Scan(&p.TransactionID, &p.AssetID, &p.Ticker, &p.TreasuryType, &p.MaturityDate, &p.HasCoupons,
+				&p.Quantity, &p.UnitPrice, &p.ContractedRate, &remainingQty, &tDate)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			p.StartDate = tDate
-			p.TotalInvested = remainingQty * uPrice
+			p.TotalInvested = remainingQty * p.UnitPrice
 
 			// Calculations of theoretical curve to today
 			holdingDays := int(today.Sub(tDate).Hours() / 24)
 			busDays := countBusinessDays(tDate, today, holidays)
 
-			dailyRate := math.Pow(1.0+contractedRate/100.0, 1.0/252.0) - 1.0
+			dailyRate := math.Pow(1.0+p.ContractedRate/100.0, 1.0/252.0) - 1.0
 			factor := math.Pow(1.0+dailyRate, float64(busDays))
 			p.GrossValue = p.TotalInvested * factor
 
@@ -587,6 +587,86 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(points)
+	})
+
+	r.Put("/api/v1/portfolios/{portfolioID}/treasury/transactions/{txID}", func(w http.ResponseWriter, req *http.Request) {
+		portfolioID := chi.URLParam(req, "portfolioID")
+		txID := chi.URLParam(req, "txID")
+		var body TxRequest
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		ctx := req.Context()
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		var assetID string
+		err = tx.QueryRow(ctx, "SELECT id FROM asset WHERE ticker = $1", body.Ticker).Scan(&assetID)
+		if err == pgx.ErrNoRows {
+			err = tx.QueryRow(ctx, 
+				"INSERT INTO asset (ticker, name, asset_type, currency) VALUES ($1, $2, 'TREASURY', 'BRL') RETURNING id",
+				body.Ticker, body.Ticker,
+			).Scan(&assetID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			_, err = tx.Exec(ctx,
+				"INSERT INTO treasury_assets (id, treasury_type, maturity_date, has_coupons) VALUES ($1, $2, $3, $4)",
+				assetID, body.TreasuryType, body.MaturityDate, body.HasCoupons,
+			)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		parsedTxDate, _ := time.Parse("2006-01-02", body.TransactionDate)
+
+		var remainingQuantity float64
+		if body.Type == "SUBSCRIPTION" {
+			remainingQuantity = body.Quantity
+		} else {
+			remainingQuantity = 0.0
+		}
+
+		_, err = tx.Exec(ctx, `
+			UPDATE treasury_transactions
+			SET asset_id = $1, type = $2, quantity = $3, unit_price = $4, contracted_rate = $5, remaining_quantity = $6, transaction_date = $7, updated_at = NOW()
+			WHERE id = $8 AND portfolio_id = $9`,
+			assetID, body.Type, body.Quantity, body.UnitPrice, body.ContractedRate, remainingQuantity, parsedTxDate, txID, portfolioID,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		tx.Commit(ctx)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Delete("/api/v1/portfolios/{portfolioID}/treasury/transactions/{txID}", func(w http.ResponseWriter, req *http.Request) {
+		portfolioID := chi.URLParam(req, "portfolioID")
+		txID := chi.URLParam(req, "txID")
+
+		ctx := req.Context()
+		_, err := pool.Exec(ctx, "DELETE FROM treasury_transactions WHERE id = $1 AND portfolio_id = $2", txID, portfolioID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	return r
