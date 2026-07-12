@@ -333,17 +333,45 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 		return c.Edit("❌ Erro ao buscar proventos.")
 	}
 
+	// 1. Calcular totais gerais por moeda (Acumulado Geral)
+	grandTotals := make(map[string]float64)
+	for _, d := range divs {
+		curr := d.Currency
+		if curr == "" {
+			curr = "BRL"
+		}
+		grandTotals[curr] += d.NetAmount
+	}
+
+	// 2. Agrupar dados por ano
 	grouped := make(map[int]map[string]float64)
+	byType := make(map[int]map[string]map[string]float64)   // year -> currency -> type -> total
+	byTicker := make(map[int]map[string]map[string]float64) // year -> currency -> ticker -> total
+
 	for _, d := range divs {
 		y := d.PaymentDate.Year()
 		curr := d.Currency
 		if curr == "" {
 			curr = "BRL"
 		}
+
 		if _, exists := grouped[y]; !exists {
 			grouped[y] = make(map[string]float64)
+			byType[y] = make(map[string]map[string]float64)
+			byTicker[y] = make(map[string]map[string]float64)
 		}
+		if _, exists := byType[y][curr]; !exists {
+			byType[y][curr] = make(map[string]float64)
+			byTicker[y][curr] = make(map[string]float64)
+		}
+
 		grouped[y][curr] += d.NetAmount
+
+		tType := abbreviateDividendType(d.Type)
+		byType[y][curr][tType] += d.NetAmount
+
+		tickerClean := cleanTickerForDisplay(d.Ticker)
+		byTicker[y][curr][tickerClean] += d.NetAmount
 	}
 
 	years := make([]int, 0, len(grouped))
@@ -353,22 +381,142 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(years)))
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📅 *Proventos por Ano: %s*\n\n", portfolioName)
+
+	// Formatar acumulado geral histórico
+	var grandStrings []string
+	grandCurrencies := make([]string, 0, len(grandTotals))
+	for c := range grandTotals {
+		grandCurrencies = append(grandCurrencies, c)
+	}
+	sortCurrencies(grandCurrencies)
+	for _, curr := range grandCurrencies {
+		grandStrings = append(grandStrings, p.Sprintf("%s %.2f", getCurrencySymbol(curr), grandTotals[curr]))
+	}
+	grandTotalStr := "R$ 0,00"
+	if len(grandStrings) > 0 {
+		grandTotalStr = strings.Join(grandStrings, " | ")
+	}
+
+	msg := p.Sprintf("📅 *Proventos por Ano: %s*\n", portfolioName)
+	msg += p.Sprintf("💰 *Acumulado Geral:* %s\n", grandTotalStr)
+	msg += "----------------------------------\n\n"
+
+	type assetShare struct {
+		ticker string
+		amount float64
+	}
+
+	now := time.Now()
+	currentYear := now.Year()
+	currentMonth := int(now.Month())
+
 	for _, y := range years {
-		var yearStrings []string
 		currencies := make([]string, 0, len(grouped[y]))
 		for c := range grouped[y] {
 			currencies = append(currencies, c)
 		}
 		sortCurrencies(currencies)
+
+		// A) Formatar Totais e Crescimento (YoY)
+		var totalStrings []string
 		for _, curr := range currencies {
-			yearStrings = append(yearStrings, p.Sprintf("%s %.2f", getCurrencySymbol(curr), grouped[y][curr]))
+			val := grouped[y][curr]
+			growthStr := ""
+			if y > 1 {
+				if prevMap, ok := grouped[y-1]; ok {
+					if prevVal, exists := prevMap[curr]; exists && prevVal > 0 {
+						growth := ((val - prevVal) / prevVal) * 100
+						if growth >= 0 {
+							growthStr = p.Sprintf(" (+%.1f%% YoY)", growth)
+						} else {
+							growthStr = p.Sprintf(" (%.1f%% YoY)", growth)
+						}
+					}
+				}
+			}
+			totalStrings = append(totalStrings, p.Sprintf("%s %.2f%s", getCurrencySymbol(curr), val, growthStr))
+		}
+		totalLine := strings.Join(totalStrings, " | ")
+
+		// B) Média Mensal
+		var avgLine string
+		if y > 1 {
+			var monthsDivisor int
+			if y < currentYear {
+				monthsDivisor = 12
+			} else if y == currentYear {
+				monthsDivisor = currentMonth
+				if monthsDivisor < 1 {
+					monthsDivisor = 1
+				}
+			} else {
+				monthsDivisor = 12
+			}
+
+			var avgStrings []string
+			for _, curr := range currencies {
+				val := grouped[y][curr]
+				avgVal := val / float64(monthsDivisor)
+				avgStrings = append(avgStrings, p.Sprintf("%s %.2f/mês", getCurrencySymbol(curr), avgVal))
+			}
+			if y == currentYear {
+				avgLine = p.Sprintf("%s (%dm)", strings.Join(avgStrings, " | "), monthsDivisor)
+			} else {
+				avgLine = strings.Join(avgStrings, " | ")
+			}
 		}
 
+		// C) Distribuição por Tipo
+		var typeStrings []string
+		for _, curr := range currencies {
+			var tStrings []string
+			types := make([]string, 0, len(byType[y][curr]))
+			for t := range byType[y][curr] {
+				types = append(types, t)
+			}
+			sort.Strings(types)
+			for _, t := range types {
+				tStrings = append(tStrings, p.Sprintf("%s: %s %.2f", t, getCurrencySymbol(curr), byType[y][curr][t]))
+			}
+			typeStrings = append(typeStrings, strings.Join(tStrings, " • "))
+		}
+		typeLine := strings.Join(typeStrings, " | ")
+
+		// D) Top 3 Ativos Pagadores
+		var topStrings []string
+		for _, curr := range currencies {
+			var shares []assetShare
+			for ticker, amt := range byTicker[y][curr] {
+				shares = append(shares, assetShare{ticker: ticker, amount: amt})
+			}
+			sort.Slice(shares, func(i, j int) bool {
+				return shares[i].amount > shares[j].amount
+			})
+
+			limit := 3
+			if len(shares) < 3 {
+				limit = len(shares)
+			}
+
+			var tShares []string
+			for i := 0; i < limit; i++ {
+				tShares = append(tShares, p.Sprintf("%s (%s %.2f)", shares[i].ticker, getCurrencySymbol(curr), shares[i].amount))
+			}
+			topStrings = append(topStrings, strings.Join(tShares, ", "))
+		}
+		topLine := strings.Join(topStrings, " | ")
+
 		if y <= 1 {
-			msg += p.Sprintf("• *A Definir*: %s\n", strings.Join(yearStrings, " | "))
+			msg += "📅 *A Definir*\n"
+			msg += p.Sprintf("• *Total:* %s\n", totalLine)
+			msg += p.Sprintf("• *Tipos:* %s\n", typeLine)
+			msg += p.Sprintf("• *Top Ativos:* %s\n\n", topLine)
 		} else {
-			msg += p.Sprintf("• *%s*: %s\n", fmt.Sprint(y), strings.Join(yearStrings, " | "))
+			msg += fmt.Sprintf("📅 *Ano %d*\n", y)
+			msg += p.Sprintf("• *Total:* %s\n", totalLine)
+			msg += p.Sprintf("• *Média Mensal:* %s\n", avgLine)
+			msg += p.Sprintf("• *Tipos:* %s\n", typeLine)
+			msg += p.Sprintf("• *Top Ativos:* %s\n\n", topLine)
 		}
 	}
 
