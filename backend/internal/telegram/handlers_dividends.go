@@ -250,8 +250,8 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 			sort.Slice(pastDivs, func(i, j int) bool {
 				return pastDivs[i].PaymentDate.After(pastDivs[j].PaymentDate)
 			})
-			limit := 3
-			if len(pastDivs) < 3 {
+			limit := 5
+			if len(pastDivs) < 5 {
 				limit = len(pastDivs)
 			}
 			for i := 0; i < limit; i++ {
@@ -266,9 +266,13 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				}
 				emoji := getAssetTypeEmoji(d.AssetType, d.Ticker)
 				tickerClean := cleanTickerForDisplay(d.Ticker)
-				msg += p.Sprintf("✅ %s `%s` (%s) • %s %.2f • %s\n", emoji, tickerClean, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
+				tipoAbbr := abbreviateDividendType(tipoStr)
+
+				msg += p.Sprintf("✅ %s `%s` • %s %.2f • %s\n", emoji, tickerClean, getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
 				if d.Quantity > 0 && d.PerShareAmount > 0 {
-					msg += p.Sprintf("   ↳ _%s un x %s %s_\n", formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+					msg += p.Sprintf("   ↳ _%s • %s un x %s %s_\n", tipoAbbr, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+				} else {
+					msg += p.Sprintf("   ↳ _%s_\n", tipoAbbr)
 				}
 			}
 		}
@@ -278,8 +282,8 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 			sort.Slice(futureDivs, func(i, j int) bool {
 				return futureDivs[i].PaymentDate.Before(futureDivs[j].PaymentDate)
 			})
-			limit := 3
-			if len(futureDivs) < 3 {
+			limit := 5
+			if len(futureDivs) < 5 {
 				limit = len(futureDivs)
 			}
 			for i := 0; i < limit; i++ {
@@ -294,9 +298,13 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				}
 				emoji := getAssetTypeEmoji(d.AssetType, d.Ticker)
 				tickerClean := cleanTickerForDisplay(d.Ticker)
-				msg += p.Sprintf("⏳ %s `%s` (%s) • %s %.2f • %s\n", emoji, tickerClean, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
+				tipoAbbr := abbreviateDividendType(tipoStr)
+
+				msg += p.Sprintf("⏳ %s `%s` • %s %.2f • %s\n", emoji, tickerClean, getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
 				if d.Quantity > 0 && d.PerShareAmount > 0 {
-					msg += p.Sprintf("   ↳ _%s un x %s %s_\n", formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+					msg += p.Sprintf("   ↳ _%s • %s un x %s %s_\n", tipoAbbr, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+				} else {
+					msg += p.Sprintf("   ↳ _%s_\n", tipoAbbr)
 				}
 			}
 		}
