@@ -257,12 +257,12 @@ func TestHandlers_Dividends(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
-
+		
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
 			{ID: "p1", Name: "P1"},
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
-
+		
 		// Set fixed day in middle of month to prevent test failures near month boundaries
 		now := time.Date(time.Now().Year(), time.Now().Month(), 15, 12, 0, 0, 0, time.Local)
 		divs := []portfolio.CalculatedDividend{
@@ -270,13 +270,13 @@ func TestHandlers_Dividends(t *testing.T) {
 			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: now.AddDate(0, 0, 5), Type: "JCP", Currency: "BRL"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
-
+		
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
 			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
 			hasUSD := strings.Contains(msg, "US$ 10,00")
 			hasBRL := strings.Contains(msg, "R$ 15,00")
-			hasAAPL := strings.Contains(msg, "✅ `AAPL` (DIV) • US$ 10,00")
-			hasMSFT := strings.Contains(msg, "⏳ `MSFT` (JCP) • R$ 15,00")
+			hasAAPL := strings.Contains(msg, "✅ `AAPL` (DIV) • US$ 10,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasMSFT := strings.Contains(msg, "⏳ `MSFT` (JCP) • R$ 15,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
 			return hasTitle && hasUSD && hasBRL && hasAAPL && hasMSFT
 		}), mock.Anything).Return(nil)
 
@@ -330,9 +330,9 @@ func TestHandlers_Dividends(t *testing.T) {
 
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
 			hasTitle := strings.Contains(msg, "📆 *Proventos por Mês: P1*")
-			hasMonthTotal := strings.Contains(msg, "• *05/2026*: R$ 15,00 | US$ 10,00")
-			hasAAPL := strings.Contains(msg, "↳ `AAPL` (DIV) • US$ 10,00 • 10/05/2026")
-			hasMSFT := strings.Contains(msg, "↳ `MSFT` (JCP) • R$ 15,00 • 12/05/2026")
+			hasMonthTotal := strings.Contains(msg, "• *2026-05*: R$ 15,00 | US$ 10,00")
+			hasAAPL := strings.Contains(msg, "↳ `AAPL` (DIV) • US$ 10,00 • 2026-05-10")
+			hasMSFT := strings.Contains(msg, "↳ `MSFT` (JCP) • R$ 15,00 • 2026-05-12")
 			return hasTitle && hasMonthTotal && hasAAPL && hasMSFT
 		}), mock.Anything).Return(nil)
 

@@ -173,7 +173,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				if curr == "" {
 					curr = "BRL"
 				}
-				msg += p.Sprintf("✅ `%s` (%s) • %s %.2f • %s\n", d.Ticker, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("02/01/2006"))
+				msg += p.Sprintf("✅ `%s` (%s) • %s %.2f • %s\n", d.Ticker, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
 			}
 		}
 
@@ -196,7 +196,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				if curr == "" {
 					curr = "BRL"
 				}
-				msg += p.Sprintf("⏳ `%s` (%s) • %s %.2f • %s\n", d.Ticker, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("02/01/2006"))
+				msg += p.Sprintf("⏳ `%s` (%s) • %s %.2f • %s\n", d.Ticker, abbreviateDividendType(tipoStr), getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
 			}
 		}
 	} else {
@@ -323,8 +323,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 		if k == "0000-00" {
 			display = "A Definir"
 		} else {
-			parts := strings.Split(k, "-")
-			display = fmt.Sprintf("%s/%s", parts[1], parts[0]) // MM/YYYY format
+			display = k
 		}
 
 		totalMonthCurr := make(map[string]float64)
@@ -355,7 +354,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 			}
 			summaryMap[mapKey].amount += d.NetAmount
 
-			dateStr := d.PaymentDate.Format("02/01/2006")
+			dateStr := d.PaymentDate.Format("2006-01-02")
 			if d.PaymentDate.IsZero() || d.PaymentDate.Year() <= 1 {
 				dateStr = "-"
 			}
