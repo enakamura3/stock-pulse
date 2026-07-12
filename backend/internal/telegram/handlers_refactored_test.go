@@ -331,8 +331,8 @@ func TestHandlers_Dividends(t *testing.T) {
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
 			hasTitle := strings.Contains(msg, "📆 *Proventos por Mês: P1*")
 			hasMonthTotal := strings.Contains(msg, "• *2026-05*: R$ 15,00 | US$ 10,00")
-			hasAAPL := strings.Contains(msg, "↳ `AAPL` (DIV) • US$ 10,00 • 2026-05-10")
-			hasMSFT := strings.Contains(msg, "↳ `MSFT` (JCP) • R$ 15,00 • 2026-05-12")
+			hasAAPL := strings.Contains(msg, "↳ `AAPL` (DIV) • US$ 10,00 • Dia 10")
+			hasMSFT := strings.Contains(msg, "↳ `MSFT` (JCP) • R$ 15,00 • Dia 12")
 			return hasTitle && hasMonthTotal && hasAAPL && hasMSFT
 		}), mock.Anything).Return(nil)
 
