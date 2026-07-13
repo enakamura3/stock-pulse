@@ -39,8 +39,10 @@ export default function PortfolioPage() {
   
   const [filterTxTicker, setFilterTxTicker] = useState<string>('');
   const [filterChartTicker, setFilterChartTicker] = useState<string>('Todos');
-  const [filterDivYear, setFilterDivYear] = useState<string>('Todos');
-  const [filterDivMonth, setFilterDivMonth] = useState<string>('Todos');
+  const currentYear = new Date().getFullYear().toString();
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const [filterDivYear, setFilterDivYear] = useState<string>(currentYear);
+  const [filterDivMonth, setFilterDivMonth] = useState<string>(currentMonth);
   const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'insights' | 'analise' | 'diario' | 'renda-fixa' | 'tesouro'>('ativos');
   const [period, setPeriod] = useState<string>('ALL');
 
