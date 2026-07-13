@@ -288,70 +288,59 @@ export default function AnnualSummary({
           className="flex-col gap-lg"
         >
           {/* Top KPIs */}
-          {/* Top KPIs */}
-          <div className="grid gap-md" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div className="flex-row gap-md mb-md flex-wrap">
             {/* Total Recebido */}
-            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <div>
-                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Total Líquido ({activeYearData.year})</span>
-                <div className="flex-row items-baseline gap-sm flex-wrap">
-                  <span className="font-bold text-2xl text-primary" style={{ letterSpacing: '-0.5px' }}>
-                    {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
-                  </span>
-                </div>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Total Líquido ({activeYearData.year})</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#00e676', letterSpacing: '-0.5px' }}>
+                {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
               </div>
-              <div className="mt-sm">
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem' }}>
                 {activeYearData.growthPct !== null ? (
                   <span className={`growth-badge ${activeYearData.growthPct >= 0 ? 'positive' : 'negative'}`}>
                     {activeYearData.growthPct >= 0 ? '▲' : '▼'} {Math.abs(activeYearData.growthPct).toFixed(1)}% YoY
                   </span>
                 ) : (
-                  <span className="text-secondary text-xs opacity-70">Sem histórico anterior</span>
+                  <span style={{ opacity: 0.5 }}>Sem histórico anterior</span>
                 )}
               </div>
             </div>
 
             {/* Média Mensal */}
-            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <div>
-                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Média Mensal</span>
-                <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
-                  {formatMoney(activeYearData.monthlyAverage, activeYearData.currency)}
-                  <span className="text-secondary font-normal text-xs" style={{ marginLeft: '4px' }}>/mês</span>
-                </span>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Média Mensal</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>
+                {formatMoney(activeYearData.monthlyAverage, activeYearData.currency)}
+                <span className="text-secondary font-normal text-sm" style={{ marginLeft: '4px' }}>/mês</span>
               </div>
-              <span className="text-secondary text-xs mt-sm block opacity-70" style={{ lineHeight: '1.4' }}>
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
                 {activeYearData.year === new Date().getFullYear() 
                   ? `Calculado sobre ${activeYearData.monthsCount} meses (Jan-${getMonthName(activeYearData.monthsCount)})`
                   : `Calculado sobre 12 meses`
                 }
-              </span>
+              </div>
             </div>
 
             {/* Maior Pagamento Único */}
-            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <div>
-                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Recorde de Pagamento</span>
-                <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
-                  {formatMoney(activeYearData.highestSinglePayment, activeYearData.currency)}
-                </span>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Recorde de Pagamento</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>
+                {formatMoney(activeYearData.highestSinglePayment, activeYearData.currency)}
               </div>
-              <span className="text-secondary text-xs mt-sm block opacity-70" style={{ lineHeight: '1.4' }}>
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
                 {activeYearData.highestSinglePaymentTicker !== 'OUTROS' ? `Pago por ${activeYearData.highestSinglePaymentTicker}` : 'Sem dados suficientes'}
-              </span>
+              </div>
             </div>
 
             {/* Mês Campeão */}
-            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <div>
-                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Mês Campeão</span>
-                <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
-                  {activeYearData.bestMonthStr ? getMonthName(parseInt(activeYearData.bestMonthStr, 10)) : '--'}
-                </span>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Mês Campeão</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#FFB300', letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
+                {activeYearData.bestMonthStr ? getMonthName(parseInt(activeYearData.bestMonthStr, 10)) : '--'}
               </div>
-              <span className="text-secondary text-xs mt-sm block opacity-70" style={{ lineHeight: '1.4' }}>
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
                 {formatMoney(activeYearData.bestMonthAmount, activeYearData.currency)} acumulados no mês
-              </span>
+              </div>
             </div>
           </div>
 
