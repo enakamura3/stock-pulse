@@ -221,7 +221,7 @@ export default function AnnualSummary({
         </h4>
         
         {/* Abas dos Anos */}
-        <div className="flex-row gap-xs flex-wrap">
+        <div className="flex-row gap-sm flex-wrap">
           {yearsList.map(yr => (
             <button
               key={yr}

@@ -232,19 +232,19 @@ export default function DividendsHistory({
               ))}
             </div>
 
+            <AnnualSummary
+              dividends={allDividends.length > 0 ? allDividends : dividends}
+              selectedYear={filterDivYear}
+              setSelectedYear={setFilterDivYear}
+              availableYears={availableYears}
+            />
+
             <DividendsMatrix 
               data={allDividends.length > 0 ? allDividends : dividends} 
               onYearClick={(y) => { setFilterDivYear(y); setFilterDivMonth('Todos'); }}
               onMonthClick={(y, m) => { setFilterDivYear(y); setFilterDivMonth(m); }}
               activeYear={filterDivYear}
               activeMonth={filterDivMonth}
-            />
-
-            <AnnualSummary
-              dividends={allDividends.length > 0 ? allDividends : dividends}
-              selectedYear={filterDivYear}
-              setSelectedYear={setFilterDivYear}
-              availableYears={availableYears}
             />
 
             {/* Table */}
