@@ -358,7 +358,7 @@ export default function AnnualSummary({
                 {activeYearData.year === 'Todos'
                   ? `Calculado sobre todo o período histórico (${activeYearData.monthsCount} meses)`
                   : activeYearData.year === new Date().getFullYear() 
-                    ? `Calculado sobre ${activeYearData.monthsCount} meses (Jan-${getMonthName(activeYearData.monthsCount)})`
+                    ? `Calculado sobre os ${activeYearData.monthsCount} meses decorridos (Jan-${getMonthName(activeYearData.monthsCount)})`
                     : `Calculado sobre 12 meses`
                 }
               </div>
