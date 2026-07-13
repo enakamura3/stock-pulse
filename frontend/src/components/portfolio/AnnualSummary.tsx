@@ -289,9 +289,9 @@ export default function AnnualSummary({
         >
           {/* Top KPIs */}
           {/* Top KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md" style={{ gap: '1rem' }}>
+          <div className="grid gap-md" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
             {/* Total Recebido */}
-            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
               <div>
                 <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Total Líquido ({activeYearData.year})</span>
                 <div className="flex-row items-baseline gap-sm flex-wrap">
@@ -312,7 +312,7 @@ export default function AnnualSummary({
             </div>
 
             {/* Média Mensal */}
-            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
               <div>
                 <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Média Mensal</span>
                 <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
@@ -329,7 +329,7 @@ export default function AnnualSummary({
             </div>
 
             {/* Maior Pagamento Único */}
-            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
               <div>
                 <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Recorde de Pagamento</span>
                 <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
@@ -342,7 +342,7 @@ export default function AnnualSummary({
             </div>
 
             {/* Mês Campeão */}
-            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
               <div>
                 <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Mês Campeão</span>
                 <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
