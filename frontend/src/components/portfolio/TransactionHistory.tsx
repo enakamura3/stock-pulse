@@ -82,6 +82,58 @@ function getBadge(tx: UnifiedTransaction): { text: string; color: string; bg: st
   }
 }
 
+function getTransactionCircleDetails(tx: UnifiedTransaction): {
+  emoji: string;
+  gradient: string;
+  borderColor: string;
+} {
+  const isRF = tx.module === 'RF';
+  const categoryEmoji = isRF ? (tx.asset_type === 'TESOURO' ? '🏛️' : '🏦') : '📈';
+
+  if (isRF) {
+    return tx.type === 'SUBSCRIPTION'
+      ? {
+          emoji: categoryEmoji,
+          gradient: 'linear-gradient(135deg, rgba(33,150,243,0.15) 0%, rgba(33,150,243,0.03) 100%)',
+          borderColor: 'rgba(33,150,243,0.25)',
+        }
+      : {
+          emoji: categoryEmoji,
+          gradient: 'linear-gradient(135deg, rgba(255,152,0,0.15) 0%, rgba(255,152,0,0.03) 100%)',
+          borderColor: 'rgba(255,152,0,0.25)',
+        };
+  }
+
+  switch (tx.type) {
+    case 'BUY':
+    case 'BONUS':
+      return {
+        emoji: categoryEmoji,
+        gradient: 'linear-gradient(135deg, rgba(0,230,118,0.15) 0%, rgba(0,230,118,0.03) 100%)',
+        borderColor: 'rgba(0,230,118,0.25)',
+      };
+    case 'SELL':
+      return {
+        emoji: categoryEmoji,
+        gradient: 'linear-gradient(135deg, rgba(255,61,0,0.15) 0%, rgba(255,61,0,0.03) 100%)',
+        borderColor: 'rgba(255,61,0,0.25)',
+      };
+    case 'SPLIT':
+    case 'REVERSE_SPLIT':
+      return {
+        emoji: categoryEmoji,
+        gradient: 'linear-gradient(135deg, rgba(0,242,254,0.15) 0%, rgba(0,242,254,0.03) 100%)',
+        borderColor: 'rgba(0,242,254,0.25)',
+      };
+    default: 
+      return {
+        emoji: categoryEmoji,
+        gradient: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+        borderColor: 'rgba(255,255,255,0.1)',
+      };
+  }
+}
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface TransactionHistoryProps {
@@ -280,26 +332,48 @@ export default function TransactionHistory({
         </div>
       </div>
 
-      {/* ── Financial Summary Bar ─────────────────────────────────────────── */}
+      {/* ── Financial Summary Cards ───────────────────────────────────────── */}
       {filteredTransactions.length > 0 && (summary.totalBought > 0 || summary.totalSold > 0) && (
-        <div className="flex-row gap-md flex-wrap" style={{
-          padding: '0.6rem 0.9rem',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid var(--panel-border)',
-          borderRadius: '8px',
-          fontSize: '0.8rem',
-        }}>
+        <div className="flex-row gap-md flex-wrap" style={{ width: '100%' }}>
           {summary.totalBought > 0 && (
-            <span className="text-secondary">
-              💰 Total Comprado:{' '}
-              <strong style={{ color: '#00e676' }}>{formatMoney(summary.totalBought, kpiCurrency)}</strong>
-            </span>
+            <div style={{
+              flex: '1 1 200px',
+              padding: '0.75rem 1rem',
+              background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.08) 0%, rgba(0, 0, 0, 0) 100%)',
+              border: '1px solid rgba(0, 230, 118, 0.2)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>💰</span>
+              <div className="flex-col">
+                <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8 }}>
+                  Total Comprado:{' '}
+                  <strong style={{ color: '#00e676', fontSize: '1.1rem', fontWeight: 700, display: 'block', marginTop: '0.2rem' }}>{formatMoney(summary.totalBought, kpiCurrency)}</strong>
+                </span>
+              </div>
+            </div>
           )}
           {summary.totalSold > 0 && (
-            <span className="text-secondary">
-              📤 Total Vendido:{' '}
-              <strong style={{ color: '#ff3d00' }}>{formatMoney(summary.totalSold, kpiCurrency)}</strong>
-            </span>
+            <div style={{
+              flex: '1 1 200px',
+              padding: '0.75rem 1rem',
+              background: 'linear-gradient(135deg, rgba(255, 61, 0, 0.08) 0%, rgba(0, 0, 0, 0) 100%)',
+              border: '1px solid rgba(255, 61, 0, 0.2)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>📤</span>
+              <div className="flex-col">
+                <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8 }}>
+                  Total Vendido:{' '}
+                  <strong style={{ color: '#ff3d00', fontSize: '1.1rem', fontWeight: 700, display: 'block', marginTop: '0.2rem' }}>{formatMoney(summary.totalSold, kpiCurrency)}</strong>
+                </span>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -333,32 +407,54 @@ export default function TransactionHistory({
                     const isSplit   = tx.type === 'SPLIT' || tx.type === 'REVERSE_SPLIT';
                     const isReverse = tx.type === 'REVERSE_SPLIT';
                     const badge     = getBadge(tx);
+                    const circle    = getTransactionCircleDetails(tx);
 
                     return (
                       <div
                         key={tx.id}
                         style={{
-                          padding: '0.7rem 0.9rem',
-                          background: 'rgba(255,255,255,0.015)',
+                          padding: '1rem 1.25rem',
+                          background: 'rgba(30, 41, 59, 0.35)',
                           border: '1px solid var(--panel-border)',
-                          borderRadius: '8px',
-                          fontSize: '0.8rem',
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '0.35rem',
+                          gap: '0.75rem',
+                          transition: 'transform 0.15s ease, background-color 0.15s ease',
                         }}
                       >
-                        {/* Row 1: icon + badge + ticker + date */}
-                        <div className="flex-row items-center justify-between flex-wrap" style={{ gap: '0.4rem' }}>
-                          <div className="flex-row items-center" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <span title={isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'} style={{ fontSize: '1.1rem', cursor: 'help' }}>
-                              {isRF ? (tx.asset_type === 'TESOURO' ? '🏛️' : '🏦') : '📈'}
-                            </span>
-                            <span className="badge" style={{ color: badge.color, background: badge.bg }}>
-                              {badge.text}
-                            </span>
-                            <span className="font-bold text-primary">{tx.asset_name}</span>
-                            <span className="text-secondary text-xs">{formatDateStr(tx.date)}</span>
+                        {/* Header: Circle + Asset Name + Type badge + Action buttons */}
+                        <div className="flex-row items-center justify-between flex-wrap" style={{ gap: '0.5rem' }}>
+                          <div className="flex-row items-center" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+                            {/* Icon Container with type-based gradient background */}
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              minWidth: '40px',
+                              minHeight: '40px',
+                              borderRadius: '50%',
+                              background: circle.gradient,
+                              border: `1px solid ${circle.borderColor}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '1.25rem',
+                            }} title={isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'}>
+                              {circle.emoji}
+                            </div>
+
+                            <div className="flex-col" style={{ gap: '0.2rem' }}>
+                              <div className="flex-row items-center gap-sm">
+                                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#fff', letterSpacing: '0.5px' }}>{tx.asset_name}</span>
+                                <span className="badge" style={{ color: badge.color, background: badge.bg, fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
+                                  {badge.text}
+                                </span>
+                              </div>
+                              <span className="text-secondary text-xs" style={{ opacity: 0.8 }}>
+                                {isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'} • {formatDateStr(tx.date)}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Action buttons — larger for WCAG accessibility */}
@@ -367,7 +463,16 @@ export default function TransactionHistory({
                               onClick={() => handleEditTransaction(tx)}
                               className="btn-secondary"
                               title="Editar Transação"
-                              style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px' }}
+                              style={{
+                                padding: '0.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minWidth: '36px',
+                                minHeight: '36px',
+                                borderRadius: '8px',
+                                transition: 'all 0.2s',
+                              }}
                             >
                               ✏️
                             </button>
@@ -375,57 +480,140 @@ export default function TransactionHistory({
                               onClick={() => handleDeleteTransaction(tx.id)}
                               className="btn-danger"
                               title="Excluir Transação"
-                              style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', minHeight: '36px' }}
+                              style={{
+                                padding: '0.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minWidth: '36px',
+                                minHeight: '36px',
+                                borderRadius: '8px',
+                                transition: 'all 0.2s',
+                              }}
                             >
                               🗑️
                             </button>
                           </div>
                         </div>
 
-                        {/* Row 2: financial details */}
-                        <div className="flex-row items-center flex-wrap" style={{ gap: '0.5rem', paddingLeft: '0.1rem' }}>
-                          {isRF && tx.asset_type !== 'TESOURO' ? (
-                            <span className="font-bold">{formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}</span>
-                          ) : !isSplit ? (
-                            <>
-                              <span className="text-secondary">
-                                {formatQuantity(tx.quantity ?? 0)} un. × {formatMoney(tx.unit_price ?? 0, tx.currency || 'BRL')}
+                        {/* Details grid */}
+                        {isRF && tx.asset_type !== 'TESOURO' ? (
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                            gap: '0.75rem',
+                            padding: '0.75rem 1rem',
+                            background: 'rgba(0, 0, 0, 0.15)',
+                            border: '1px solid rgba(255, 255, 255, 0.03)',
+                            borderRadius: '8px',
+                            marginTop: '0.25rem',
+                          }}>
+                            <div className="flex-col" style={{ gap: '0.2rem' }}>
+                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Valor da Operação
                               </span>
-                              {kpiCurrency && tx.currency !== kpiCurrency && tx.exchange_rate ? (
-                                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
-                                  (Câmbio: {tx.exchange_rate.toFixed(4)})
+                              <span className="font-bold text-sm" style={{ color: badge.color }}>
+                                {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
+                              </span>
+                            </div>
+                            <div className="flex-col" style={{ gap: '0.2rem' }}>
+                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Módulo
+                              </span>
+                              <span className="font-semibold text-sm">
+                                {tx.asset_type || 'Renda Fixa'}
+                              </span>
+                            </div>
+                          </div>
+                        ) : isSplit ? (
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                            gap: '0.75rem',
+                            padding: '0.75rem 1rem',
+                            background: 'rgba(0, 0, 0, 0.15)',
+                            border: '1px solid rgba(255, 255, 255, 0.03)',
+                            borderRadius: '8px',
+                            marginTop: '0.25rem',
+                          }}>
+                            <div className="flex-col" style={{ gap: '0.2rem' }}>
+                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Proporção
+                              </span>
+                              <span className="font-bold text-sm" style={{ color: badge.color }}>
+                                {isReverse
+                                  ? `${formatQuantity(tx.quantity ?? 0)} para 1`
+                                  : `1 para ${formatQuantity(tx.quantity ?? 0)}`}
+                              </span>
+                            </div>
+                            <div className="flex-col" style={{ gap: '0.2rem' }}>
+                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Saldo de Cotas após
+                              </span>
+                              <span className="font-semibold text-sm" style={{ color: '#00f2fe' }}>
+                                {formatQuantity(tx.resulting_quantity ?? 0)} un.
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                            gap: '0.75rem',
+                            padding: '0.75rem 1rem',
+                            background: 'rgba(0, 0, 0, 0.15)',
+                            border: '1px solid rgba(255, 255, 255, 0.03)',
+                            borderRadius: '8px',
+                            marginTop: '0.25rem',
+                          }}>
+                            <div className="flex-col" style={{ gap: '0.2rem' }}>
+                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Preço & Qtd
+                              </span>
+                              <span className="font-semibold text-sm" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span>
+                                  {formatQuantity(tx.quantity ?? 0)} un. × {formatMoney(tx.unit_price ?? 0, tx.currency || 'BRL')}
                                 </span>
-                              ) : null}
-                              <span className="text-secondary">=</span>
-                              <span className="font-bold">{formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}</span>
-                            </>
-                          ) : (
-                            <span className="font-bold">
-                              Fator: {isReverse
-                                ? `${formatQuantity(tx.quantity ?? 0)} para 1`
-                                : `1 para ${formatQuantity(tx.quantity ?? 0)}`}
-                            </span>
-                          )}
+                                {kpiCurrency && tx.currency !== kpiCurrency && tx.exchange_rate ? (
+                                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 'normal' }}>
+                                    (Câmbio: {tx.exchange_rate.toFixed(4)})
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
 
-                          {(!isRF || tx.asset_type === 'TESOURO') && (
-                            <span style={{
-                              marginLeft: '0.5rem',
-                              borderLeft: '1px solid var(--panel-border)',
-                              paddingLeft: '0.75rem',
-                              fontSize: '0.75rem',
-                              color: 'rgba(255,255,255,0.6)',
-                              display: 'flex',
-                              gap: '0.4rem',
-                              flexWrap: 'wrap',
-                            }}>
-                              Saldo após:{' '}
-                              <strong style={{ color: '#00f2fe' }}>{formatQuantity(tx.resulting_quantity)} un.</strong>
-                              <span style={{ opacity: 0.4 }}>|</span>
-                              Investido:{' '}
-                              <strong style={{ color: '#00e676' }}>{formatMoney(tx.resulting_invested, tx.currency || 'BRL')}</strong>
-                            </span>
-                          )}
-                        </div>
+                            <div className="flex-col" style={{ gap: '0.2rem' }}>
+                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Total da Operação
+                              </span>
+                              <span className="font-bold text-sm" style={{ color: badge.color }}>
+                                {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
+                              </span>
+                            </div>
+
+                            {(!isRF || tx.asset_type === 'TESOURO') && (
+                              <>
+                                <div className="flex-col" style={{ gap: '0.2rem' }}>
+                                  <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    Saldo Pós-Op.
+                                  </span>
+                                  <span className="font-semibold text-sm" style={{ color: '#00f2fe' }}>
+                                    {formatQuantity(tx.resulting_quantity ?? 0)} un.
+                                  </span>
+                                </div>
+
+                                <div className="flex-col" style={{ gap: '0.2rem' }}>
+                                  <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    Total Investido
+                                  </span>
+                                  <span className="font-semibold text-sm" style={{ color: '#00e676' }}>
+                                    {formatMoney(tx.resulting_invested ?? 0, tx.currency || 'BRL')}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
