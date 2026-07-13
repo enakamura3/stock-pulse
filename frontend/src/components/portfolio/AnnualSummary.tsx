@@ -181,10 +181,10 @@ export default function AnnualSummary({
         }
         
         d.byType.forEach(t => {
-          byTypeMap[t.type] = (byTypeMap[t.type] || 0) + t.total;
+          byTypeMap[t.type] = (byTypeMap[t.type] || 0) + t.amount;
         });
         d.topAssets.forEach(a => {
-          byTickerMap[a.ticker] = (byTickerMap[a.ticker] || 0) + a.total;
+          byTickerMap[a.ticker] = (byTickerMap[a.ticker] || 0) + a.amount;
         });
       });
       
@@ -194,8 +194,8 @@ export default function AnnualSummary({
         monthsCount: totalMonths,
         monthlyAverage: totalMonths > 0 ? totalAmount / totalMonths : 0,
         currency: annualData[0].currency,
-        byType: Object.entries(byTypeMap).map(([type, total]) => ({ type, total })).sort((a,b) => b.total - a.total),
-        topAssets: Object.entries(byTickerMap).map(([ticker, total]) => ({ ticker, total })).sort((a,b) => b.total - a.total).slice(0, 5),
+        byType: Object.entries(byTypeMap).map(([type, amt]) => ({ type, amount: amt, pct: totalAmount > 0 ? (amt / totalAmount) * 100 : 0 })).sort((a,b) => b.amount - a.amount),
+        topAssets: Object.entries(byTickerMap).map(([ticker, amt]) => ({ ticker, amount: amt, pct: totalAmount > 0 ? (amt / totalAmount) * 100 : 0 })).sort((a,b) => b.amount - a.amount).slice(0, 5),
         growthPct: null,
         bestMonthStr,
         bestMonthAmount,
