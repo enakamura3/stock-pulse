@@ -24,6 +24,9 @@ export default function AnnualSummary({
       currency: string;
       byType: Record<string, number>;
       byTicker: Record<string, number>;
+      byMonth: Record<string, number>;
+      highestSinglePayment: number;
+      highestSinglePaymentTicker: string;
     }> = {};
 
     dividends.forEach(div => {
@@ -42,6 +45,9 @@ export default function AnnualSummary({
           currency: div.currency || 'BRL',
           byType: {},
           byTicker: {},
+          byMonth: {},
+          highestSinglePayment: 0,
+          highestSinglePaymentTicker: ''
         };
       }
 
@@ -61,6 +67,16 @@ export default function AnnualSummary({
       // Ticker do ativo
       const ticker = div.ticker || 'OUTROS';
       grouped[yearStr].byTicker[ticker] = (grouped[yearStr].byTicker[ticker] || 0) + amount;
+
+      // Controle Mensal
+      const monthStr = dateStr.split('T')[0].split('-')[1];
+      grouped[yearStr].byMonth[monthStr] = (grouped[yearStr].byMonth[monthStr] || 0) + amount;
+
+      // Maior pagamento único
+      if (amount > grouped[yearStr].highestSinglePayment) {
+        grouped[yearStr].highestSinglePayment = amount;
+        grouped[yearStr].highestSinglePaymentTicker = ticker;
+      }
     });
 
     const sortedYears = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
@@ -101,7 +117,7 @@ export default function AnnualSummary({
         }))
         .sort((a, b) => b.amount - a.amount);
 
-      // Tickers ordenados (Top 3)
+      // Tickers ordenados (Top 5)
       const topAssetsList = Object.entries(group.byTicker)
         .map(([ticker, amt]) => ({
           ticker,
@@ -109,7 +125,17 @@ export default function AnnualSummary({
           pct: group.totalAmount > 0 ? (amt / group.totalAmount) * 100 : 0,
         }))
         .sort((a, b) => b.amount - a.amount)
-        .slice(0, 3);
+        .slice(0, 5);
+
+      // Mês Campeão
+      let bestMonthStr = '';
+      let bestMonthAmount = 0;
+      Object.entries(group.byMonth).forEach(([m, amt]) => {
+        if (amt > bestMonthAmount) {
+          bestMonthAmount = amt;
+          bestMonthStr = m;
+        }
+      });
 
       return {
         year: y,
@@ -120,17 +146,62 @@ export default function AnnualSummary({
         monthsCount,
         byType: byTypeList, // Mantemos o nome da prop como byType para minimizar refatoração, mas agora armazena Categoria
         topAssets: topAssetsList,
+        bestMonthStr,
+        bestMonthAmount,
+        highestSinglePayment: group.highestSinglePayment,
+        highestSinglePaymentTicker: group.highestSinglePaymentTicker
       };
     });
   }, [dividends]);
 
-  // Determina o ano ativo selecionado no sumário.
-  // Se o filtro global for 'Todos', usamos o ano mais recente disponível no sumário.
   const activeYearData = useMemo(() => {
     if (annualData.length === 0) return null;
     
     if (selectedYear === 'Todos') {
-      return annualData[0]; // Ano mais recente
+      let totalAmount = 0;
+      let totalMonths = 0;
+      let highestSinglePayment = 0;
+      let highestSinglePaymentTicker = '';
+      let bestMonthAmount = 0;
+      let bestMonthStr = '';
+      const byTypeMap: Record<string, number> = {};
+      const byTickerMap: Record<string, number> = {};
+      
+      annualData.forEach(d => {
+        totalAmount += d.totalAmount;
+        totalMonths += d.monthsCount;
+        
+        if (d.highestSinglePayment > highestSinglePayment) {
+          highestSinglePayment = d.highestSinglePayment;
+          highestSinglePaymentTicker = d.highestSinglePaymentTicker;
+        }
+        if (d.bestMonthAmount > bestMonthAmount) {
+          bestMonthAmount = d.bestMonthAmount;
+          bestMonthStr = d.bestMonthStr;
+        }
+        
+        d.byType.forEach(t => {
+          byTypeMap[t.type] = (byTypeMap[t.type] || 0) + t.amount;
+        });
+        d.topAssets.forEach(a => {
+          byTickerMap[a.ticker] = (byTickerMap[a.ticker] || 0) + a.amount;
+        });
+      });
+      
+      return {
+        year: 'Todos' as any,
+        totalAmount,
+        monthsCount: totalMonths,
+        monthlyAverage: totalMonths > 0 ? totalAmount / totalMonths : 0,
+        currency: annualData[0].currency,
+        byType: Object.entries(byTypeMap).map(([type, amt]) => ({ type, amount: amt, pct: totalAmount > 0 ? (amt / totalAmount) * 100 : 0 })).sort((a,b) => b.amount - a.amount),
+        topAssets: Object.entries(byTickerMap).map(([ticker, amt]) => ({ ticker, amount: amt, pct: totalAmount > 0 ? (amt / totalAmount) * 100 : 0 })).sort((a,b) => b.amount - a.amount).slice(0, 5),
+        growthPct: null,
+        bestMonthStr,
+        bestMonthAmount,
+        highestSinglePayment,
+        highestSinglePaymentTicker
+      };
     }
     
     const yearNum = parseInt(selectedYear, 10);
@@ -229,7 +300,7 @@ export default function AnnualSummary({
             <button
               key={yr}
               className={`summary-tab-btn ${((selectedYear === 'Todos' && activeYearData?.year === parseInt(yr, 10)) || selectedYear === yr) ? 'active' : ''}`}
-              onClick={() => setSelectedYear(yr)}
+              onClick={() => setSelectedYear(selectedYear === yr ? 'Todos' : yr)}
             >
               {yr}
             </button>
@@ -258,37 +329,61 @@ export default function AnnualSummary({
           className="flex-col gap-lg"
         >
           {/* Top KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-md" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div className="flex-row gap-md mb-md flex-wrap">
             {/* Total Recebido */}
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Total Líquido ({activeYearData.year})</span>
-              <div className="flex-row items-baseline gap-sm flex-wrap">
-                <span className="font-bold text-2xl text-primary" style={{ letterSpacing: '-0.5px' }}>
-                  {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
-                </span>
-                
-                {/* YoY Growth */}
-                {activeYearData.growthPct !== null && (
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Total Líquido ({activeYearData.year})</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#00e676', letterSpacing: '-0.5px' }}>
+                {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
+              </div>
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem' }}>
+                {activeYearData.growthPct !== null ? (
                   <span className={`growth-badge ${activeYearData.growthPct >= 0 ? 'positive' : 'negative'}`}>
                     {activeYearData.growthPct >= 0 ? '▲' : '▼'} {Math.abs(activeYearData.growthPct).toFixed(1)}% YoY
                   </span>
+                ) : (
+                  <span style={{ opacity: 0.5 }}>Sem histórico anterior</span>
                 )}
               </div>
             </div>
 
             {/* Média Mensal */}
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Média Mensal</span>
-              <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Média Mensal</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>
                 {formatMoney(activeYearData.monthlyAverage, activeYearData.currency)}
-                <span className="text-secondary font-normal text-xs" style={{ marginLeft: '4px' }}>/mês</span>
-              </span>
-              <span className="text-secondary text-xs mt-xs block opacity-70">
-                {activeYearData.year === new Date().getFullYear() 
-                  ? `Calculado sobre os ${activeYearData.monthsCount} meses decorridos (Jan-${getMonthName(activeYearData.monthsCount)})`
-                  : `Calculado sobre 12 meses`
+                <span className="text-secondary font-normal text-sm" style={{ marginLeft: '4px' }}>/mês</span>
+              </div>
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
+                {activeYearData.year === 'Todos'
+                  ? `Calculado sobre todo o período histórico (${activeYearData.monthsCount} meses)`
+                  : activeYearData.year === new Date().getFullYear() 
+                    ? `Calculado sobre os ${activeYearData.monthsCount} meses decorridos (Jan-${getMonthName(activeYearData.monthsCount)})`
+                    : `Calculado sobre 12 meses`
                 }
-              </span>
+              </div>
+            </div>
+
+            {/* Maior Pagamento Único */}
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Recorde de Pagamento</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>
+                {formatMoney(activeYearData.highestSinglePayment, activeYearData.currency)}
+              </div>
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
+                {activeYearData.highestSinglePaymentTicker !== 'OUTROS' ? `Pago por ${activeYearData.highestSinglePaymentTicker}` : 'Sem dados suficientes'}
+              </div>
+            </div>
+
+            {/* Mês Campeão */}
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-secondary text-sm mb-sm font-bold">Mês Campeão</div>
+              <div className="font-bold text-3xl mb-xs" style={{ color: '#FFB300', letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
+                {activeYearData.bestMonthStr ? getMonthName(parseInt(activeYearData.bestMonthStr, 10)) : '--'}
+              </div>
+              <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
+                {formatMoney(activeYearData.bestMonthAmount, activeYearData.currency)} acumulados no mês
+              </div>
             </div>
           </div>
 
@@ -343,10 +438,10 @@ export default function AnnualSummary({
               </div>
             </div>
 
-            {/* Top 3 Ativos Pagadores */}
+            {/* Top 5 Ativos Pagadores */}
             <div className="flex-col gap-sm">
               <span className="text-secondary text-xs font-bold uppercase tracking-wider mb-sm block">
-                🏆 Top 3 Ativos Pagadores
+                🏆 Top 5 Ativos Pagadores
               </span>
               <div className="flex-col gap-md">
                 {activeYearData.topAssets.length > 0 ? (

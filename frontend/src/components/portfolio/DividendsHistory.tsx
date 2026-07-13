@@ -205,20 +205,25 @@ export default function DividendsHistory({
 
   return (
     <div className="flex-col gap-lg">
+      <AnnualSummary
+        dividends={allDividends.length > 0 ? allDividends : dividends}
+        selectedYear={filterDivYear}
+        setSelectedYear={setFilterDivYear}
+        availableYears={availableYears}
+      />
+
+      <DividendsMatrix 
+        data={allDividends.length > 0 ? allDividends : dividends} 
+        onYearClick={(y) => { setFilterDivYear(y); setFilterDivMonth('Todos'); }}
+        onMonthClick={(y, m) => { setFilterDivYear(y); setFilterDivMonth(m); }}
+        activeYear={filterDivYear}
+        activeMonth={filterDivMonth}
+      />
+
       <div className="card">
         <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
-          <h3 className="card-title">💰 Histórico de Proventos</h3>
+          <h3 className="card-title">🧾 Detalhamento e Lançamentos</h3>
           <div className="flex-row gap-sm">
-            <select
-              value={filterDivYear}
-              onChange={(e) => setFilterDivYear(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
-            >
-              <option value="Todos">Todos os Anos</option>
-              {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
             <select
               value={filterDivMonth}
               onChange={(e) => setFilterDivMonth(e.target.value)}
@@ -263,31 +268,6 @@ export default function DividendsHistory({
                 </div>
               </div>
             </div>
-
-            {/* Sub-cards by Type */}
-            <div className="flex-row gap-sm mb-lg flex-wrap">
-              {Object.entries(stats.types).sort((a, b) => b[1] - a[1]).map(([type, total]) => (
-                <div key={type} style={{ background: 'rgba(255,255,255,0.02)', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', flex: 1, minWidth: '120px' }}>
-                  <span className="text-xs text-secondary mb-xs uppercase tracking-wider">{type}</span>
-                  <span className="font-bold text-md">{formatMoney(total, 'BRL')}</span>
-                </div>
-              ))}
-            </div>
-
-            <AnnualSummary
-              dividends={allDividends.length > 0 ? allDividends : dividends}
-              selectedYear={filterDivYear}
-              setSelectedYear={setFilterDivYear}
-              availableYears={availableYears}
-            />
-
-            <DividendsMatrix 
-              data={allDividends.length > 0 ? allDividends : dividends} 
-              onYearClick={(y) => { setFilterDivYear(y); setFilterDivMonth('Todos'); }}
-              onMonthClick={(y, m) => { setFilterDivYear(y); setFilterDivMonth(m); }}
-              activeYear={filterDivYear}
-              activeMonth={filterDivMonth}
-            />
 
             {/* Table */}
             <div className="table-container mt-lg" style={{ border: '1px solid var(--panel-border)', borderRadius: '12px', overflow: 'hidden' }}>
