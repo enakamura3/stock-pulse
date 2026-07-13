@@ -154,13 +154,54 @@ export default function AnnualSummary({
     });
   }, [dividends]);
 
-  // Determina o ano ativo selecionado no sumário.
-  // Se o filtro global for 'Todos', usamos o ano mais recente disponível no sumário.
   const activeYearData = useMemo(() => {
     if (annualData.length === 0) return null;
     
     if (selectedYear === 'Todos') {
-      return annualData[0]; // Ano mais recente
+      let totalAmount = 0;
+      let totalMonths = 0;
+      let highestSinglePayment = 0;
+      let highestSinglePaymentTicker = '';
+      let bestMonthAmount = 0;
+      let bestMonthStr = '';
+      const byTypeMap: Record<string, number> = {};
+      const byTickerMap: Record<string, number> = {};
+      
+      annualData.forEach(d => {
+        totalAmount += d.totalAmount;
+        totalMonths += d.monthsCount;
+        
+        if (d.highestSinglePayment > highestSinglePayment) {
+          highestSinglePayment = d.highestSinglePayment;
+          highestSinglePaymentTicker = d.highestSinglePaymentTicker;
+        }
+        if (d.bestMonthAmount > bestMonthAmount) {
+          bestMonthAmount = d.bestMonthAmount;
+          bestMonthStr = d.bestMonthStr;
+        }
+        
+        d.byType.forEach(t => {
+          byTypeMap[t.type] = (byTypeMap[t.type] || 0) + t.total;
+        });
+        d.topAssets.forEach(a => {
+          byTickerMap[a.ticker] = (byTickerMap[a.ticker] || 0) + a.total;
+        });
+      });
+      
+      return {
+        year: 'Todos' as any,
+        totalAmount,
+        monthsCount: totalMonths,
+        monthlyAverage: totalMonths > 0 ? totalAmount / totalMonths : 0,
+        currency: annualData[0].currency,
+        byType: Object.entries(byTypeMap).map(([type, total]) => ({ type, total })).sort((a,b) => b.total - a.total),
+        topAssets: Object.entries(byTickerMap).map(([ticker, total]) => ({ ticker, total })).sort((a,b) => b.total - a.total).slice(0, 5),
+        growthPct: null,
+        bestMonthStr,
+        bestMonthAmount,
+        highestSinglePayment,
+        highestSinglePaymentTicker
+      };
     }
     
     const yearNum = parseInt(selectedYear, 10);
@@ -314,9 +355,11 @@ export default function AnnualSummary({
                 <span className="text-secondary font-normal text-sm" style={{ marginLeft: '4px' }}>/mês</span>
               </div>
               <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
-                {activeYearData.year === new Date().getFullYear() 
-                  ? `Calculado sobre ${activeYearData.monthsCount} meses (Jan-${getMonthName(activeYearData.monthsCount)})`
-                  : `Calculado sobre 12 meses`
+                {activeYearData.year === 'Todos'
+                  ? `Calculado sobre todo o período histórico (${activeYearData.monthsCount} meses)`
+                  : activeYearData.year === new Date().getFullYear() 
+                    ? `Calculado sobre ${activeYearData.monthsCount} meses (Jan-${getMonthName(activeYearData.monthsCount)})`
+                    : `Calculado sobre 12 meses`
                 }
               </div>
             </div>
