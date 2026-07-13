@@ -259,7 +259,7 @@ export default function AnnualSummary({
             <button
               key={yr}
               className={`summary-tab-btn ${((selectedYear === 'Todos' && activeYearData?.year === parseInt(yr, 10)) || selectedYear === yr) ? 'active' : ''}`}
-              onClick={() => setSelectedYear(yr)}
+              onClick={() => setSelectedYear(selectedYear === yr ? 'Todos' : yr)}
             >
               {yr}
             </button>
