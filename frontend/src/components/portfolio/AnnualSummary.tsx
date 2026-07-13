@@ -24,6 +24,9 @@ export default function AnnualSummary({
       currency: string;
       byType: Record<string, number>;
       byTicker: Record<string, number>;
+      byMonth: Record<string, number>;
+      highestSinglePayment: number;
+      highestSinglePaymentTicker: string;
     }> = {};
 
     dividends.forEach(div => {
@@ -42,6 +45,9 @@ export default function AnnualSummary({
           currency: div.currency || 'BRL',
           byType: {},
           byTicker: {},
+          byMonth: {},
+          highestSinglePayment: 0,
+          highestSinglePaymentTicker: ''
         };
       }
 
@@ -61,6 +67,16 @@ export default function AnnualSummary({
       // Ticker do ativo
       const ticker = div.ticker || 'OUTROS';
       grouped[yearStr].byTicker[ticker] = (grouped[yearStr].byTicker[ticker] || 0) + amount;
+
+      // Controle Mensal
+      const monthStr = dateStr.split('T')[0].split('-')[1];
+      grouped[yearStr].byMonth[monthStr] = (grouped[yearStr].byMonth[monthStr] || 0) + amount;
+
+      // Maior pagamento único
+      if (amount > grouped[yearStr].highestSinglePayment) {
+        grouped[yearStr].highestSinglePayment = amount;
+        grouped[yearStr].highestSinglePaymentTicker = ticker;
+      }
     });
 
     const sortedYears = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
@@ -101,7 +117,7 @@ export default function AnnualSummary({
         }))
         .sort((a, b) => b.amount - a.amount);
 
-      // Tickers ordenados (Top 3)
+      // Tickers ordenados (Top 5)
       const topAssetsList = Object.entries(group.byTicker)
         .map(([ticker, amt]) => ({
           ticker,
@@ -109,7 +125,17 @@ export default function AnnualSummary({
           pct: group.totalAmount > 0 ? (amt / group.totalAmount) * 100 : 0,
         }))
         .sort((a, b) => b.amount - a.amount)
-        .slice(0, 3);
+        .slice(0, 5);
+
+      // Mês Campeão
+      let bestMonthStr = '';
+      let bestMonthAmount = 0;
+      Object.entries(group.byMonth).forEach(([m, amt]) => {
+        if (amt > bestMonthAmount) {
+          bestMonthAmount = amt;
+          bestMonthStr = m;
+        }
+      });
 
       return {
         year: y,
@@ -120,6 +146,10 @@ export default function AnnualSummary({
         monthsCount,
         byType: byTypeList, // Mantemos o nome da prop como byType para minimizar refatoração, mas agora armazena Categoria
         topAssets: topAssetsList,
+        bestMonthStr,
+        bestMonthAmount,
+        highestSinglePayment: group.highestSinglePayment,
+        highestSinglePaymentTicker: group.highestSinglePaymentTicker
       };
     });
   }, [dividends]);
@@ -258,7 +288,7 @@ export default function AnnualSummary({
           className="flex-col gap-lg"
         >
           {/* Top KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-md" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-md" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             {/* Total Recebido */}
             <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
               <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Total Líquido ({activeYearData.year})</span>
@@ -288,6 +318,28 @@ export default function AnnualSummary({
                   ? `Calculado sobre os ${activeYearData.monthsCount} meses decorridos (Jan-${getMonthName(activeYearData.monthsCount)})`
                   : `Calculado sobre 12 meses`
                 }
+              </span>
+            </div>
+
+            {/* Maior Pagamento Único */}
+            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Recorde de Pagamento</span>
+              <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
+                {formatMoney(activeYearData.highestSinglePayment, activeYearData.currency)}
+              </span>
+              <span className="text-secondary text-xs mt-xs block opacity-70">
+                {activeYearData.highestSinglePaymentTicker !== 'OUTROS' ? `Pago por ${activeYearData.highestSinglePaymentTicker}` : 'Sem dados suficientes'}
+              </span>
+            </div>
+
+            {/* Mês Campeão */}
+            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Mês Campeão</span>
+              <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
+                {activeYearData.bestMonthStr ? getMonthName(parseInt(activeYearData.bestMonthStr, 10)) : '--'}
+              </span>
+              <span className="text-secondary text-xs mt-xs block opacity-70">
+                {formatMoney(activeYearData.bestMonthAmount, activeYearData.currency)} acumulados no mês
               </span>
             </div>
           </div>
@@ -343,10 +395,10 @@ export default function AnnualSummary({
               </div>
             </div>
 
-            {/* Top 3 Ativos Pagadores */}
+            {/* Top 5 Ativos Pagadores */}
             <div className="flex-col gap-sm">
               <span className="text-secondary text-xs font-bold uppercase tracking-wider mb-sm block">
-                🏆 Top 3 Ativos Pagadores
+                🏆 Top 5 Ativos Pagadores
               </span>
               <div className="flex-col gap-md">
                 {activeYearData.topAssets.length > 0 ? (
