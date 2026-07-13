@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CalculatedDividend } from './types';
-import { formatMoney } from './helpers';
-
+import { formatMoney, getAssetCategory } from './helpers';
 interface AnnualSummaryProps {
   dividends: CalculatedDividend[];
   selectedYear: string;
@@ -49,17 +48,15 @@ export default function AnnualSummary({
       const amount = div.net_amount || 0;
       grouped[yearStr].totalAmount += amount;
 
-      // Normalização do tipo
-      const typeStr = div.is_accrued ? 'Renda Fixa' : (div.type || 'Dividendo');
-      let normalizedType = typeStr;
-      const lower = typeStr.toLowerCase();
-      if (lower.includes('jcp')) normalizedType = 'JCP';
-      else if (lower.includes('rendimento')) normalizedType = 'Rendimento';
-      else if (lower.includes('amorti')) normalizedType = 'Amortização';
-      else if (lower.includes('dividendo')) normalizedType = 'Dividendo';
-      else if (lower.includes('renda fixa')) normalizedType = 'Renda Fixa';
+      // Normalização por Categoria (ao invés de Tipo)
+      let category = getAssetCategory(div.asset_type || '');
+      if (div.asset_type === 'TESOURO') {
+        category = 'Tesouro Direto';
+      } else if (category === 'Desconhecido') {
+        category = div.is_accrued ? 'Renda Fixa' : 'Outros';
+      }
 
-      grouped[yearStr].byType[normalizedType] = (grouped[yearStr].byType[normalizedType] || 0) + amount;
+      grouped[yearStr].byType[category] = (grouped[yearStr].byType[category] || 0) + amount;
 
       // Ticker do ativo
       const ticker = div.ticker || 'OUTROS';
@@ -121,7 +118,7 @@ export default function AnnualSummary({
         growthPct,
         monthlyAverage,
         monthsCount,
-        byType: byTypeList,
+        byType: byTypeList, // Mantemos o nome da prop como byType para minimizar refatoração, mas agora armazena Categoria
         topAssets: topAssetsList,
       };
     });
@@ -145,13 +142,19 @@ export default function AnnualSummary({
   // Lista dos anos ordenados
   const yearsList = annualData.map(d => String(d.year));
 
-  const formatTypeColor = (type: string) => {
-    switch (type) {
-      case 'JCP': return '#fbbf24';
-      case 'Rendimento': return '#c084fc';
-      case 'Amortização': return '#f87171';
-      case 'Renda Fixa': return '#22d3ee';
-      default: return '#60a5fa'; // Dividendo
+  const formatTypeColor = (category: string) => {
+    switch (category) {
+      case 'Ações (B3)': return '#60a5fa'; // Azul
+      case 'FIIs': return '#c084fc'; // Roxo
+      case 'FIAGROs': return '#4ade80'; // Verde claro
+      case 'ETFs Nacionais': return '#f472b6'; // Rosa
+      case 'BDRs': return '#fbbf24'; // Amarelo
+      case 'Ações EUA': return '#f87171'; // Vermelho
+      case 'ETF Internacional': return '#818cf8'; // Indigo
+      case 'Cripto': return '#fcd34d'; // Dourado
+      case 'Renda Fixa': return '#22d3ee'; // Ciano
+      case 'Tesouro Direto': return '#34d399'; // Verde esmeralda
+      default: return '#9ca3af'; // Cinza (Outros)
     }
   };
 
@@ -292,10 +295,10 @@ export default function AnnualSummary({
           {/* Details Section: Type Dist and Top Assets */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-xl" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
             
-            {/* Distribuição por Tipo */}
+            {/* Distribuição por Categoria */}
             <div className="flex-col gap-sm">
               <span className="text-secondary text-xs font-bold uppercase tracking-wider mb-sm block">
-                🛠️ Distribuição por Tipo
+                🛠️ Distribuição por Categoria
               </span>
               <div className="flex-col gap-md">
                 {activeYearData.byType.length > 0 ? (

@@ -56,8 +56,38 @@ export default function DividendsHistory({
     }
   };
 
+  const consolidatedDividends = useMemo(() => {
+    const map = new Map<string, CalculatedDividend>();
+    const others: CalculatedDividend[] = [];
+    
+    dividends.forEach(div => {
+      if (div.asset_type === 'TESOURO') {
+        const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
+        const yearMonth = dateStr ? dateStr.substring(0, 7) : 'unknown'; // ex: '2026-03'
+        const key = `${div.ticker}-${yearMonth}`;
+        
+        if (map.has(key)) {
+          const existing = map.get(key)!;
+          existing.gross_amount += (Number(div.gross_amount) || 0);
+          existing.net_amount += (Number(div.net_amount) || 0);
+          if (div.payment_date && new Date(div.payment_date) > new Date(existing.payment_date)) {
+             existing.payment_date = div.payment_date;
+          }
+          if (div.cum_date && new Date(div.cum_date) > new Date(existing.cum_date)) {
+             existing.cum_date = div.cum_date;
+          }
+        } else {
+          map.set(key, { ...div });
+        }
+      } else {
+        others.push(div);
+      }
+    });
+    return [...others, ...Array.from(map.values())];
+  }, [dividends]);
+
   const sortedDividends = useMemo(() => {
-    return [...dividends].sort((a, b) => {
+    return [...consolidatedDividends].sort((a, b) => {
       let valA: any;
       let valB: any;
 
@@ -70,10 +100,19 @@ export default function DividendsHistory({
           valA = a.ticker || '';
           valB = b.ticker || '';
           break;
-        case 'category':
-          valA = a.is_accrued ? 'Renda Fixa' : getAssetCategory(a.asset_type);
-          valB = b.is_accrued ? 'Renda Fixa' : getAssetCategory(b.asset_type);
+        case 'category': {
+          let catA = getAssetCategory(a.asset_type || '');
+          if (a.asset_type === 'TESOURO') catA = 'Tesouro Direto';
+          else if (catA === 'Desconhecido') catA = a.is_accrued ? 'Renda Fixa' : 'Outros';
+          
+          let catB = getAssetCategory(b.asset_type || '');
+          if (b.asset_type === 'TESOURO') catB = 'Tesouro Direto';
+          else if (catB === 'Desconhecido') catB = b.is_accrued ? 'Renda Fixa' : 'Outros';
+          
+          valA = catA;
+          valB = catB;
           break;
+        }
         case 'type':
           valA = formatType(a);
           valB = formatType(b);
@@ -125,7 +164,7 @@ export default function DividendsHistory({
 
       return sortOrder === 'asc' ? valA - valB : valB - valA;
     });
-  }, [dividends, sortField, sortOrder]);
+  }, [consolidatedDividends, sortField, sortOrder]);
 
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
@@ -141,10 +180,13 @@ export default function DividendsHistory({
       types: {} as Record<string, number>
     };
 
-    dividends.forEach(d => {
+    consolidatedDividends.forEach(d => {
       const paid = isPaid(d);
       const amt = d.net_amount;
-      const groupStr = d.is_accrued ? 'Renda Fixa' : getAssetCategory(d.asset_type);
+      
+      let groupStr = getAssetCategory(d.asset_type || '');
+      if (d.asset_type === 'TESOURO') groupStr = 'Tesouro Direto';
+      else if (groupStr === 'Desconhecido') groupStr = d.is_accrued ? 'Renda Fixa' : 'Outros';
 
       if (paid) s.totalPaid += amt; else s.totalPending += amt;
       
@@ -159,7 +201,7 @@ export default function DividendsHistory({
     });
 
     return s;
-  }, [dividends]);
+  }, [consolidatedDividends]);
 
   return (
     <div className="flex-col gap-lg">
@@ -287,7 +329,14 @@ export default function DividendsHistory({
                           )}
                         </td>
                         <td className="text-center font-bold" style={{ color: 'var(--text-primary)' }}>{div.ticker}</td>
-                        <td className="text-center text-secondary">{div.is_accrued ? 'Renda Fixa' : getAssetCategory(div.asset_type)}</td>
+                        <td className="text-center text-secondary">
+                          {(() => {
+                            let cat = getAssetCategory(div.asset_type || '');
+                            if (div.asset_type === 'TESOURO') cat = 'Tesouro Direto';
+                            else if (cat === 'Desconhecido') cat = div.is_accrued ? 'Renda Fixa' : 'Outros';
+                            return cat;
+                          })()}
+                        </td>
                         <td className="text-center">
                           <span className="badge badge-pill" style={{
                             backgroundColor: div.is_accrued ? 'rgba(34, 211, 238, 0.15)' :

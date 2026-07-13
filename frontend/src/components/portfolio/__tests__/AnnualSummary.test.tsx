@@ -33,7 +33,7 @@ describe('AnnualSummary Component', () => {
         type: 'DIVIDENDO',
         quantity: 100,
         per_share_amount: 1.2,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Petroleo Brasileiro'
       },
       {
@@ -47,7 +47,7 @@ describe('AnnualSummary Component', () => {
         type: 'JCP',
         quantity: 100,
         per_share_amount: 0.6,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Vale SA'
       }
     ];
@@ -74,8 +74,8 @@ describe('AnnualSummary Component', () => {
     // YoY Growth contra 2025 (51,00): (100 - 51) / 51 = 96.1%
     expect(screen.getByText(/96\.1% YoY/)).toBeInTheDocument();
 
-    // Tipo de provento (Dividendo)
-    expect(screen.getByText('Dividendo')).toBeInTheDocument();
+    // Tipo de provento (Categoria)
+    expect(screen.getByText('Ações (B3)')).toBeInTheDocument();
 
     // Top pagador: PETR4
     expect(screen.getByText('PETR4')).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('AnnualSummary Component', () => {
         type: 'Rendimento',
         quantity: 100,
         per_share_amount: 1.2,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Petroleo Brasileiro'
       }
     ];
@@ -146,7 +146,7 @@ describe('AnnualSummary Component', () => {
         type: 'Juros Sobre Capital Próprio (JCP)',
         quantity: 100,
         per_share_amount: 0.15,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Alupar'
       },
       {
@@ -160,7 +160,7 @@ describe('AnnualSummary Component', () => {
         type: 'Amortização',
         quantity: 1,
         per_share_amount: 20,
-        asset_type: 'RENDA_FIXA',
+        asset_type: 'TESOURO',
         asset_name: 'CDB',
         is_accrued: true
       }
@@ -175,9 +175,9 @@ describe('AnnualSummary Component', () => {
       />
     );
 
-    expect(screen.getByText('Rendimento')).toBeInTheDocument();
-    expect(screen.getByText('JCP')).toBeInTheDocument();
-    expect(screen.getByText('Renda Fixa')).toBeInTheDocument();
+    expect(screen.getByText('FIIs')).toBeInTheDocument();
+    expect(screen.getByText('Ações (B3)')).toBeInTheDocument();
+    expect(screen.getByText('Tesouro Direto')).toBeInTheDocument();
   });
 
   it('calls setSelectedYear when tab is clicked', () => {
@@ -193,7 +193,7 @@ describe('AnnualSummary Component', () => {
         type: 'DIVIDENDO',
         quantity: 100,
         per_share_amount: 1,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Petroleo Brasileiro'
       },
       {
@@ -207,7 +207,7 @@ describe('AnnualSummary Component', () => {
         type: 'DIVIDENDO',
         quantity: 100,
         per_share_amount: 0.5,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Vale SA'
       }
     ];
@@ -243,7 +243,7 @@ describe('AnnualSummary Component', () => {
         type: 'DIVIDENDO',
         quantity: 100,
         per_share_amount: 1,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Petroleo Brasileiro'
       },
       {
@@ -257,7 +257,7 @@ describe('AnnualSummary Component', () => {
         type: 'DIVIDENDO',
         quantity: 100,
         per_share_amount: 0.5,
-        asset_type: 'AÇÃO',
+        asset_type: 'STOCK_BR',
         asset_name: 'Vale SA'
       }
     ];
