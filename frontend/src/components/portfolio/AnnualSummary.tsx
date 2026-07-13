@@ -288,57 +288,68 @@ export default function AnnualSummary({
           className="flex-col gap-lg"
         >
           {/* Top KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-md" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          {/* Top KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md" style={{ gap: '1rem' }}>
             {/* Total Recebido */}
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Total Líquido ({activeYearData.year})</span>
-              <div className="flex-row items-baseline gap-sm flex-wrap">
-                <span className="font-bold text-2xl text-primary" style={{ letterSpacing: '-0.5px' }}>
-                  {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
-                </span>
-                
-                {/* YoY Growth */}
-                {activeYearData.growthPct !== null && (
+            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <div>
+                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Total Líquido ({activeYearData.year})</span>
+                <div className="flex-row items-baseline gap-sm flex-wrap">
+                  <span className="font-bold text-2xl text-primary" style={{ letterSpacing: '-0.5px' }}>
+                    {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-sm">
+                {activeYearData.growthPct !== null ? (
                   <span className={`growth-badge ${activeYearData.growthPct >= 0 ? 'positive' : 'negative'}`}>
                     {activeYearData.growthPct >= 0 ? '▲' : '▼'} {Math.abs(activeYearData.growthPct).toFixed(1)}% YoY
                   </span>
+                ) : (
+                  <span className="text-secondary text-xs opacity-70">Sem histórico anterior</span>
                 )}
               </div>
             </div>
 
             {/* Média Mensal */}
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Média Mensal</span>
-              <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
-                {formatMoney(activeYearData.monthlyAverage, activeYearData.currency)}
-                <span className="text-secondary font-normal text-xs" style={{ marginLeft: '4px' }}>/mês</span>
-              </span>
-              <span className="text-secondary text-xs mt-xs block opacity-70">
+            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <div>
+                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Média Mensal</span>
+                <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
+                  {formatMoney(activeYearData.monthlyAverage, activeYearData.currency)}
+                  <span className="text-secondary font-normal text-xs" style={{ marginLeft: '4px' }}>/mês</span>
+                </span>
+              </div>
+              <span className="text-secondary text-xs mt-sm block opacity-70" style={{ lineHeight: '1.4' }}>
                 {activeYearData.year === new Date().getFullYear() 
-                  ? `Calculado sobre os ${activeYearData.monthsCount} meses decorridos (Jan-${getMonthName(activeYearData.monthsCount)})`
+                  ? `Calculado sobre ${activeYearData.monthsCount} meses (Jan-${getMonthName(activeYearData.monthsCount)})`
                   : `Calculado sobre 12 meses`
                 }
               </span>
             </div>
 
             {/* Maior Pagamento Único */}
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Recorde de Pagamento</span>
-              <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
-                {formatMoney(activeYearData.highestSinglePayment, activeYearData.currency)}
-              </span>
-              <span className="text-secondary text-xs mt-xs block opacity-70">
+            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <div>
+                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Recorde de Pagamento</span>
+                <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px' }}>
+                  {formatMoney(activeYearData.highestSinglePayment, activeYearData.currency)}
+                </span>
+              </div>
+              <span className="text-secondary text-xs mt-sm block opacity-70" style={{ lineHeight: '1.4' }}>
                 {activeYearData.highestSinglePaymentTicker !== 'OUTROS' ? `Pago por ${activeYearData.highestSinglePaymentTicker}` : 'Sem dados suficientes'}
               </span>
             </div>
 
             {/* Mês Campeão */}
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-              <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-xs">Mês Campeão</span>
-              <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
-                {activeYearData.bestMonthStr ? getMonthName(parseInt(activeYearData.bestMonthStr, 10)) : '--'}
-              </span>
-              <span className="text-secondary text-xs mt-xs block opacity-70">
+            <div className="flex-col justify-between h-full" style={{ background: 'rgba(255,255,255,0.01)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <div>
+                <span className="text-secondary text-xs font-bold uppercase tracking-wider block mb-sm">Mês Campeão</span>
+                <span className="font-bold text-2xl text-primary block" style={{ letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
+                  {activeYearData.bestMonthStr ? getMonthName(parseInt(activeYearData.bestMonthStr, 10)) : '--'}
+                </span>
+              </div>
+              <span className="text-secondary text-xs mt-sm block opacity-70" style={{ lineHeight: '1.4' }}>
                 {formatMoney(activeYearData.bestMonthAmount, activeYearData.currency)} acumulados no mês
               </span>
             </div>
