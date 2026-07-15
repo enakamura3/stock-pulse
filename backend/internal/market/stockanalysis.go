@@ -103,11 +103,17 @@ func (s *StockAnalysisScraper) GetDividends(ctx context.Context, ticker string, 
 			}
 		}
 
+		cleanType := "Dividendo"
+		upperType := strings.ToUpper(assetType)
+		if upperType == "FII" || upperType == "FIAGRO" {
+			cleanType = "Rendimento"
+		}
+
 		events = append(events, DividendEvent{
 			Date:        exDate,
 			PaymentDate: paymentDate,
 			Amount:      amount,
-			Type:        "Dividendo",
+			Type:        cleanType,
 		})
 	})
 
