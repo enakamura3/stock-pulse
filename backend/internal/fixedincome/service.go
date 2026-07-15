@@ -1034,13 +1034,141 @@ func (s *service) CreateTreasuryTransaction(ctx context.Context, portfolioID str
 }
 
 func (s *service) GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error) {
-	points, err := s.repo.GetTreasuryPerformancePoints(ctx, portfolioID)
+	txs, err := s.repo.GetTreasuryTransactionsList(ctx, portfolioID)
 	if err != nil {
 		return nil, err
 	}
-	if points == nil {
-		points = []TreasuryPerfPoint{}
+	if len(txs) == 0 {
+		return []TreasuryPerfPoint{}, nil
 	}
+
+	holidays, err := s.repo.GetAnbimaHolidays(ctx)
+	if err != nil {
+		holidays = make(map[string]bool)
+	}
+
+	selicRates, err := s.repo.GetSelicRates(ctx)
+	if err != nil {
+		selicRates = make(map[string]float64)
+	}
+
+	startDate, err := time.Parse("2006-01-02", txs[0].TransactionDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse start date: %w", err)
+	}
+
+	txsByDate := make(map[string][]TreasuryTxRequest)
+	for _, tx := range txs {
+		txsByDate[tx.TransactionDate] = append(txsByDate[tx.TransactionDate], tx)
+	}
+
+	type activeLot struct {
+		ticker         string
+		treasuryType   string
+		maturityDate   time.Time
+		contractedRate float64
+		unitPrice      float64
+		quantity       float64
+		grossValue     float64
+	}
+
+	var activeLots []*activeLot
+	var points []TreasuryPerfPoint
+
+	today := time.Now()
+	// Normalizar data de hoje para UTC meia-noite para consistência de comparação
+	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+	currDate := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
+
+	for !currDate.After(today) {
+		dateStr := currDate.Format("2006-01-02")
+		isBusDay := currDate.Weekday() != time.Saturday && currDate.Weekday() != time.Sunday && !holidays[dateStr]
+
+		// 1. Rendimento diário para lotes ativos existentes
+		if isBusDay {
+			for _, lot := range activeLots {
+				if !lot.maturityDate.IsZero() && currDate.After(lot.maturityDate) {
+					continue
+				}
+
+				var dailyFactor float64
+				if lot.treasuryType == "SELIC" {
+					rate := 10.75
+					if rVal, exists := selicRates[dateStr]; exists {
+						rate = rVal
+					}
+					dailyRate := math.Pow(1.0+rate/100.0, 1.0/252.0) - 1.0
+					dailySpread := math.Pow(1.0+lot.contractedRate/100.0, 1.0/252.0) - 1.0
+					dailyFactor = 1.0 + dailyRate + dailySpread
+				} else {
+					dailyFactor = math.Pow(1.0+lot.contractedRate/100.0, 1.0/252.0)
+				}
+				lot.grossValue *= dailyFactor
+			}
+		}
+
+		// 2. Processar transações do dia
+		if dayTxs, exists := txsByDate[dateStr]; exists {
+			for _, tx := range dayTxs {
+				matDate, _ := time.Parse("2006-01-02", tx.MaturityDate)
+				if tx.Type == "SUBSCRIPTION" {
+					lotVal := tx.Quantity * tx.UnitPrice
+					activeLots = append(activeLots, &activeLot{
+						ticker:         tx.Ticker,
+						treasuryType:   tx.TreasuryType,
+						maturityDate:   matDate,
+						contractedRate: tx.ContractedRate,
+						unitPrice:      tx.UnitPrice,
+						quantity:       tx.Quantity,
+						grossValue:     lotVal,
+					})
+				} else if tx.Type == "REDEMPTION" {
+					qtyToRedeem := tx.Quantity
+					for i := 0; i < len(activeLots) && qtyToRedeem > 1e-6; i++ {
+						lot := activeLots[i]
+						if lot.ticker == tx.Ticker && lot.quantity > 1e-6 {
+							if lot.quantity >= qtyToRedeem-1e-6 {
+								ratio := (lot.quantity - qtyToRedeem) / lot.quantity
+								lot.quantity -= qtyToRedeem
+								lot.grossValue *= ratio
+								qtyToRedeem = 0.0
+							} else {
+								qtyToRedeem -= lot.quantity
+								lot.quantity = 0.0
+								lot.grossValue = 0.0
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Filtrar lotes zerados
+		var nextActive []*activeLot
+		for _, lot := range activeLots {
+			if lot.quantity > 1e-6 {
+				nextActive = append(nextActive, lot)
+			}
+		}
+		activeLots = nextActive
+
+		// 3. Consolidar valores do dia
+		var dayTotalInvested float64
+		var dayGrossValue float64
+		for _, lot := range activeLots {
+			dayTotalInvested += lot.quantity * lot.unitPrice
+			dayGrossValue += lot.grossValue
+		}
+
+		points = append(points, TreasuryPerfPoint{
+			Date:          dateStr,
+			Value:         dayGrossValue,
+			TotalInvested: dayTotalInvested,
+		})
+
+		currDate = currDate.AddDate(0, 0, 1)
+	}
+
 	return points, nil
 }
 
