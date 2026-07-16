@@ -189,6 +189,54 @@ func TestService_GetDividends_Coverage(t *testing.T) {
 	})
 }
 
+func TestMergeAndDedupDividends(t *testing.T) {
+	t.Run("FII deduplication and type normalization", func(t *testing.T) {
+		date1 := time.Date(2026, 7, 7, 0, 0, 0, 0, time.UTC)
+		date2 := time.Date(2026, 7, 8, 0, 0, 0, 0, time.UTC)
+		dateOlder := time.Date(2026, 6, 8, 0, 0, 0, 0, time.UTC)
+
+		saEvents := []DividendEvent{
+			{Date: date1, PaymentDate: date1.AddDate(0, 0, 7), Amount: 0.101, Type: "Dividendo"},
+		}
+		fundEvents := []DividendEvent{
+			{Date: date2, PaymentDate: date2.AddDate(0, 0, 7), Amount: 0.10, Type: "Rendimento"},
+			{Date: dateOlder, PaymentDate: dateOlder.AddDate(0, 0, 7), Amount: 0.10, Type: "Rendimento"},
+		}
+
+		merged := mergeAndDedupDividends(saEvents, fundEvents, "FII")
+		assert.Len(t, merged, 2)
+
+		// Event 0 should be the July event (from StockAnalysis, precise amount, type Rendimento)
+		assert.Equal(t, 0.101, merged[0].Amount)
+		assert.Equal(t, "Rendimento", merged[0].Type)
+		assert.Equal(t, date1, merged[0].Date)
+
+		// Event 1 should be the June event (from Fundamentus)
+		assert.Equal(t, 0.10, merged[1].Amount)
+		assert.Equal(t, "Rendimento", merged[1].Type)
+		assert.Equal(t, dateOlder, merged[1].Date)
+	})
+
+	t.Run("Stock multiple dividends in same month", func(t *testing.T) {
+		date1 := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+
+		saEvents := []DividendEvent{
+			{Date: date1, Amount: 1.5, Type: "Dividendo"},
+		}
+		fundEvents := []DividendEvent{
+			{Date: date1, Amount: 1.5, Type: "Dividendo"}, // Duplicate
+			{Date: date1, Amount: 2.0, Type: "Dividendo"}, // Different amount in same month
+		}
+
+		merged := mergeAndDedupDividends(saEvents, fundEvents, "STOCK")
+		assert.Len(t, merged, 2)
+
+		// Results sorted by date descending (they have the same date, so order is preserved or based on input)
+		assert.Equal(t, 1.5, merged[0].Amount)
+		assert.Equal(t, 2.0, merged[1].Amount)
+	})
+}
+
 func TestService_GetExchangeRatesMap_Coverage(t *testing.T) {
 	t.Run("Real YahooFinanceProvider", func(t *testing.T) {
 		// Use real provider to cover yp.client.Do(req)
@@ -342,3 +390,61 @@ func TestService_GetExchangeRatesMap_EdgeCases(t *testing.T) {
 		_, _ = s.getExchangeRatesMap(context.Background())
 	})
 }
+
+func TestStockAnalysisScraper_GetDividends(t *testing.T) {
+	t.Run("FII type mapping", func(t *testing.T) {
+		scraper := NewStockAnalysisScraper()
+		scraper.client.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			html := `
+			<table>
+				<tbody>
+					<tr>
+						<td>Jul 8, 2026</td>
+						<td>$0.101</td>
+						<td>Jul 7, 2026</td>
+						<td>Jul 14, 2026</td>
+					</tr>
+				</tbody>
+			</table>
+			`
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(html)),
+			}
+		})
+
+		events, err := scraper.GetDividends(context.Background(), "BTHF11.SA", "FII")
+		assert.NoError(t, err)
+		assert.Len(t, events, 1)
+		assert.Equal(t, "Rendimento", events[0].Type)
+		assert.Equal(t, 0.101, events[0].Amount)
+	})
+
+	t.Run("ETF type mapping", func(t *testing.T) {
+		scraper := NewStockAnalysisScraper()
+		scraper.client.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			html := `
+			<table>
+				<tbody>
+					<tr>
+						<td>Jul 8, 2026</td>
+						<td>$0.101</td>
+						<td>Jul 7, 2026</td>
+						<td>Jul 14, 2026</td>
+					</tr>
+				</tbody>
+			</table>
+			`
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(html)),
+			}
+		})
+
+		events, err := scraper.GetDividends(context.Background(), "VOO", "ETF")
+		assert.NoError(t, err)
+		assert.Len(t, events, 1)
+		assert.Equal(t, "Dividendo", events[0].Type)
+	})
+}
+

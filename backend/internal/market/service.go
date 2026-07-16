@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -101,11 +102,15 @@ func (s *Service) GetDividends(ctx context.Context, symbol string, assetType str
 	var fetchErr error
 
 	if strings.HasSuffix(strings.ToUpper(symbol), ".SA") {
-		events, fetchErr = s.fundamentus.GetDividends(ctx, symbol, assetType)
-		if fetchErr != nil || len(events) == 0 {
-			// Fallback para StockAnalysis caso o Fundamentus falhe (ex: ETFs BR)
-			log.Printf("[Market] Fundamentus falhou para %s. Tentando StockAnalysis...", symbol)
-			events, fetchErr = s.stockAnalysis.GetDividends(ctx, symbol, assetType)
+		// Busca de ambas as fontes para obter dados mais completos e precisos, evitando atrasos e truncamentos.
+		saEvents, saErr := s.stockAnalysis.GetDividends(ctx, symbol, assetType)
+		fundEvents, fundErr := s.fundamentus.GetDividends(ctx, symbol, assetType)
+
+		if saErr != nil && fundErr != nil {
+			fetchErr = fmt.Errorf("ambos os scrapers falharam: sa_err=%v, fund_err=%v", saErr, fundErr)
+		} else {
+			// Prioriza StockAnalysis (passando saEvents primeiro) pela precisão centesimal do valor do provento
+			events = mergeAndDedupDividends(saEvents, fundEvents, assetType)
 		}
 	} else {
 		events, fetchErr = s.stockAnalysis.GetDividends(ctx, symbol, assetType)
@@ -126,6 +131,45 @@ func (s *Service) GetDividends(ctx context.Context, symbol string, assetType str
 	}
 
 	return events, nil
+}
+
+func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType string) []DividendEvent {
+	// Combina ambos os resultados, priorizando StockAnalysis (colocando-o primeiro no slice)
+	// devido à sua maior precisão e ausência de truncamento de valores.
+	combined := append([]DividendEvent{}, saEvents...)
+	combined = append(combined, fundEvents...)
+
+	deduped := make([]DividendEvent, 0, len(combined))
+	seen := make(map[string]bool)
+	isFii := strings.ToUpper(assetType) == "FII" || strings.ToUpper(assetType) == "FIAGRO"
+
+	for _, ev := range combined {
+		var key string
+		if isFii {
+			evType := ev.Type
+			if evType == "Dividendo" {
+				evType = "Rendimento"
+			}
+			key = fmt.Sprintf("fii|%s|%02d|%d", evType, ev.Date.Month(), ev.Date.Year())
+		} else {
+			key = fmt.Sprintf("acao|%s|%.6f|%02d|%d", ev.Type, ev.Amount, ev.Date.Month(), ev.Date.Year())
+		}
+
+		if !seen[key] {
+			seen[key] = true
+			if isFii && ev.Type == "Dividendo" {
+				ev.Type = "Rendimento"
+			}
+			deduped = append(deduped, ev)
+		}
+	}
+
+	// Ordena cronologicamente por data decrescente (mais recentes primeiro)
+	sort.Slice(deduped, func(i, j int) bool {
+		return deduped[i].Date.After(deduped[j].Date)
+	})
+
+	return deduped
 }
 
 // getExchangeRatesMap fetches the 10y history of BRL=X and returns it as a map[string]float64 (date string "YYYY-MM-DD" -> rate).
