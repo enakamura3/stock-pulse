@@ -23,6 +23,9 @@ func TestRepository_CreatePortfolio(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
+	
+	mock.ExpectBegin()
+	
 	countRows := pgxmock.NewRows([]string{"count"}).AddRow(0)
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM portfolio`).WithArgs("u1").WillReturnRows(countRows)
 
@@ -32,6 +35,8 @@ func TestRepository_CreatePortfolio(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO portfolio`).
 		WithArgs("u1", "Main", "USD", true).
 		WillReturnRows(rows)
+
+	mock.ExpectCommit()
 
 	p, err := repo.CreatePortfolio(context.Background(), "u1", "Main", "USD")
 	assert.NoError(t, err)
@@ -44,12 +49,16 @@ func TestRepository_CreatePortfolio_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
+	mock.ExpectBegin()
+
 	countRows := pgxmock.NewRows([]string{"count"}).AddRow(0)
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM portfolio`).WithArgs("u1").WillReturnRows(countRows)
 
 	mock.ExpectQuery(`INSERT INTO portfolio`).
 		WithArgs("u1", "Main", "USD", true).
 		WillReturnError(errors.New("db error"))
+
+	mock.ExpectRollback()
 
 	_, err := repo.CreatePortfolio(context.Background(), "u1", "Main", "USD")
 	assert.ErrorContains(t, err, "erro ao criar portfolio")
@@ -130,6 +139,8 @@ func TestRepository_DeletePortfolio(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
+	mock.ExpectBegin()
+
 	mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
 		WithArgs("p1", "u1").
 		WillReturnRows(pgxmock.NewRows([]string{"is_default"}).AddRow(false))
@@ -137,6 +148,8 @@ func TestRepository_DeletePortfolio(t *testing.T) {
 	mock.ExpectExec(`DELETE FROM portfolio`).
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	mock.ExpectCommit()
 
 	err := repo.DeletePortfolio(context.Background(), "p1", "u1")
 	assert.NoError(t, err)
@@ -147,9 +160,17 @@ func TestRepository_DeletePortfolio_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
+	mock.ExpectBegin()
+
+	mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
+		WithArgs("p1", "u1").
+		WillReturnRows(pgxmock.NewRows([]string{"is_default"}).AddRow(false))
+
 	mock.ExpectExec(`DELETE FROM portfolio`).
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
+		
+	mock.ExpectRollback()
 
 	err := repo.DeletePortfolio(context.Background(), "p1", "u1")
 	assert.ErrorContains(t, err, "não encontrado ou permissão")

@@ -89,8 +89,14 @@ func NewRepository(db DBTX) *Repository {
 
 // CreatePortfolio insere um novo portfólio no banco de dados.
 func (r *Repository) CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
 	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM portfolio WHERE user_id = $1`, userID).Scan(&count)
+	err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM portfolio WHERE user_id = $1`, userID).Scan(&count)
 	if err != nil {
 		count = 0
 	}
@@ -102,7 +108,7 @@ func (r *Repository) CreatePortfolio(ctx context.Context, userID, name, baseCurr
 		RETURNING id, user_id, name, base_currency, is_default, created_at
 	`
 	p := &Portfolio{}
-	err = r.db.QueryRow(ctx, query, userID, name, baseCurrency, isDefault).Scan(
+	err = tx.QueryRow(ctx, query, userID, name, baseCurrency, isDefault).Scan(
 		&p.ID,
 		&p.UserID,
 		&p.Name,
@@ -113,6 +119,11 @@ func (r *Repository) CreatePortfolio(ctx context.Context, userID, name, baseCurr
 	if err != nil {
 		return nil, fmt.Errorf("erro ao criar portfolio: %w", err)
 	}
+	
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("erro ao commitar transação: %w", err)
+	}
+
 	return p, nil
 }
 
@@ -192,14 +203,20 @@ func (r *Repository) SetDefaultPortfolio(ctx context.Context, portfolioID, userI
 
 // DeletePortfolio apaga um portfólio do banco de dados (cascading apaga transações).
 func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
 	var isDefault bool
-	_ = r.db.QueryRow(ctx, `SELECT is_default FROM portfolio WHERE id = $1 AND user_id = $2`, id, userID).Scan(&isDefault)
+	_ = tx.QueryRow(ctx, `SELECT is_default FROM portfolio WHERE id = $1 AND user_id = $2`, id, userID).Scan(&isDefault)
 
 	query := `
 		DELETE FROM portfolio
 		WHERE id = $1 AND user_id = $2
 	`
-	cmd, err := r.db.Exec(ctx, query, id, userID)
+	cmd, err := tx.Exec(ctx, query, id, userID)
 	if err != nil {
 		return err
 	}
@@ -208,16 +225,19 @@ func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) err
 	}
 
 	if isDefault {
-		_, _ = r.db.Exec(ctx, `
+		_, err = tx.Exec(ctx, `
 			UPDATE portfolio
 			SET is_default = true
 			WHERE id = (
 				SELECT id FROM portfolio WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1
 			)
 		`, userID)
+		if err != nil {
+			return fmt.Errorf("erro ao re-eleger carteira padrão: %w", err)
+		}
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }
 
 // CreateTransaction registra uma operação de compra/venda na carteira.

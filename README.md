@@ -183,8 +183,8 @@ A plataforma gerencia a persistência relacional de forma rígida através de **
    - **Colunas Principais:** `id` (UUID, PK), `email` (VARCHAR, UNIQUE), `password_hash` (VARCHAR, contendo hash Argon2id), `name` (VARCHAR), `created_at`, `updated_at`.
 2. **`portfolio`**
    - **Propósito:** Agrupa ativos e transações sob uma determinada carteira pertencente a um usuário.
-   - **Colunas Principais:** `id` (UUID, PK), `user_id` (UUID, FK -> `"user"`), `name` (VARCHAR), `base_currency` (VARCHAR, ex: 'BRL', 'USD'), `created_at`.
-   - **Constraint:** `UNIQUE (user_id, name)` impede carteiras com nomes duplicados para o mesmo usuário.
+   - **Colunas Principais:** `id` (UUID, PK), `user_id` (UUID, FK -> `"user"`), `name` (VARCHAR), `base_currency` (VARCHAR, ex: 'BRL', 'USD'), `is_default` (BOOLEAN), `created_at`.
+   - **Constraint:** `UNIQUE (user_id, name)` impede carteiras com nomes duplicados para o mesmo usuário. `UNIQUE (user_id) WHERE is_default = true` assegura que exista no máximo uma carteira padrão por usuário.
 3. **`asset`**
    - **Propósito:** Cadastro global de ativos e instrumentos de mercado (ações, FIIs, pares cambiais, ETFs).
    - **Colunas Principais:** `id` (UUID, PK), `ticker` (VARCHAR, UNIQUE), `name` (VARCHAR), `asset_type` (VARCHAR, ex: 'STOCK', 'FII', 'CURRENCY'), `currency` (VARCHAR), `is_active` (BOOLEAN), `created_at`, `updated_at`.
