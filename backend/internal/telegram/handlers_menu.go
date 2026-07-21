@@ -95,6 +95,11 @@ func (h *Handlers) resolveActivePortfolio(ctx context.Context, chatID int64, por
 			}
 		}
 	}
-	// Fallback para a primeira
+	// Fallback para a carteira padrão, se definida, ou a primeira
+	for _, p := range portfolios {
+		if p.IsDefault {
+			return p.ID, p.Name
+		}
+	}
 	return portfolios[0].ID, portfolios[0].Name
 }

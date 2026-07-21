@@ -69,6 +69,7 @@ type PortfolioRepository interface {
 	CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error)
 	GetPortfoliosByUserID(ctx context.Context, userID string) ([]Portfolio, error)
 	GetPortfolioByID(ctx context.Context, id, userID string) (*Portfolio, error)
+	SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error
 	DeletePortfolio(ctx context.Context, id, userID string) error
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
 	UpdateTransaction(ctx context.Context, tx Transaction) error
@@ -135,6 +136,14 @@ func (s *Service) CreatePortfolio(ctx context.Context, userID, name, baseCurrenc
 	return s.repo.CreatePortfolio(ctx, userID, name, baseCurrency)
 }
 
+// SetDefaultPortfolio define uma carteira como padrão para o usuário.
+func (s *Service) SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error {
+	if portfolioID == "" || userID == "" {
+		return errors.New("IDs inválidos")
+	}
+	return s.repo.SetDefaultPortfolio(ctx, portfolioID, userID)
+}
+
 // GetPortfolios lista os portfólios do usuário (cria "Principal" padrão se vazio).
 func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio, error) {
 	lists, err := s.repo.GetPortfoliosByUserID(ctx, userID)
@@ -150,6 +159,18 @@ func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio
 			return nil, fmt.Errorf("falha ao criar portfólio de onboarding: %w", err)
 		}
 		lists = append(lists, *p)
+	} else {
+		hasDefault := false
+		for _, p := range lists {
+			if p.IsDefault {
+				hasDefault = true
+				break
+			}
+		}
+		if !hasDefault {
+			_ = s.repo.SetDefaultPortfolio(ctx, lists[0].ID, userID)
+			lists[0].IsDefault = true
+		}
 	}
 
 	return lists, nil

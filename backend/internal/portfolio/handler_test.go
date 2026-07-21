@@ -45,6 +45,10 @@ func (m *MockPortfolioService) GetPortfolioDetails(ctx context.Context, portfoli
 	return nil, nil, args.Error(2)
 }
 
+func (m *MockPortfolioService) SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error {
+	return m.Called(ctx, portfolioID, userID).Error(0)
+}
+
 func (m *MockPortfolioService) AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error) {
 	args := m.Called(ctx, userID, tx)
 	if args.Get(0) != nil {
@@ -608,6 +612,42 @@ func TestHandler_GetDividends(t *testing.T) {
 		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/dividends", nil), "u1", map[string]string{"id": "p1"})
 		rec := httptest.NewRecorder()
 		h.GetDividends(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+func TestHandler_SetDefaultPortfolio(t *testing.T) {
+	t.Run("Unauthorized", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := httptest.NewRequest("PUT", "/portfolios/p1/default", nil)
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Missing Params", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios//default", nil), "u1", map[string]string{"id": ""})
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("SetDefaultPortfolio", mock.Anything, "p1", "u1").Return(errors.New("err"))
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/default", nil), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("SetDefaultPortfolio", mock.Anything, "p1", "u1").Return(nil)
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/default", nil), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
 }

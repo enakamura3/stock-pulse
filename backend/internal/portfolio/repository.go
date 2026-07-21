@@ -15,6 +15,7 @@ type Portfolio struct {
 	UserID       string    `json:"user_id"`
 	Name         string    `json:"name"`
 	BaseCurrency string    `json:"base_currency"`
+	IsDefault    bool      `json:"is_default"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -88,17 +89,25 @@ func NewRepository(db DBTX) *Repository {
 
 // CreatePortfolio insere um novo portfólio no banco de dados.
 func (r *Repository) CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM portfolio WHERE user_id = $1`, userID).Scan(&count)
+	if err != nil {
+		count = 0
+	}
+	isDefault := (count == 0)
+
 	query := `
-		INSERT INTO portfolio (user_id, name, base_currency, created_at)
-		VALUES ($1, $2, $3, NOW())
-		RETURNING id, user_id, name, base_currency, created_at
+		INSERT INTO portfolio (user_id, name, base_currency, is_default, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+		RETURNING id, user_id, name, base_currency, is_default, created_at
 	`
 	p := &Portfolio{}
-	err := r.db.QueryRow(ctx, query, userID, name, baseCurrency).Scan(
+	err = r.db.QueryRow(ctx, query, userID, name, baseCurrency, isDefault).Scan(
 		&p.ID,
 		&p.UserID,
 		&p.Name,
 		&p.BaseCurrency,
+		&p.IsDefault,
 		&p.CreatedAt,
 	)
 	if err != nil {
@@ -110,10 +119,10 @@ func (r *Repository) CreatePortfolio(ctx context.Context, userID, name, baseCurr
 // GetPortfoliosByUserID lista todos os portfólios pertencentes a um usuário.
 func (r *Repository) GetPortfoliosByUserID(ctx context.Context, userID string) ([]Portfolio, error) {
 	query := `
-		SELECT id, user_id, name, base_currency, created_at
+		SELECT id, user_id, name, base_currency, is_default, created_at
 		FROM portfolio
 		WHERE user_id = $1
-		ORDER BY name ASC
+		ORDER BY is_default DESC, name ASC
 	`
 	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
@@ -124,7 +133,7 @@ func (r *Repository) GetPortfoliosByUserID(ctx context.Context, userID string) (
 	var list []Portfolio
 	for rows.Next() {
 		var p Portfolio
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.BaseCurrency, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.BaseCurrency, &p.IsDefault, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, p)
@@ -135,7 +144,7 @@ func (r *Repository) GetPortfoliosByUserID(ctx context.Context, userID string) (
 // GetPortfolioByID recupera um portfólio validando o proprietário (Anti-IDOR).
 func (r *Repository) GetPortfolioByID(ctx context.Context, id, userID string) (*Portfolio, error) {
 	query := `
-		SELECT id, user_id, name, base_currency, created_at
+		SELECT id, user_id, name, base_currency, is_default, created_at
 		FROM portfolio
 		WHERE id = $1 AND user_id = $2
 	`
@@ -145,6 +154,7 @@ func (r *Repository) GetPortfolioByID(ctx context.Context, id, userID string) (*
 		&p.UserID,
 		&p.Name,
 		&p.BaseCurrency,
+		&p.IsDefault,
 		&p.CreatedAt,
 	)
 	if err != nil {
@@ -153,8 +163,38 @@ func (r *Repository) GetPortfolioByID(ctx context.Context, id, userID string) (*
 	return p, nil
 }
 
+// SetDefaultPortfolio marca uma carteira como padrão e desmarca todas as outras do mesmo usuário.
+func (r *Repository) SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var exists bool
+	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM portfolio WHERE id = $1 AND user_id = $2)`, portfolioID, userID).Scan(&exists)
+	if err != nil || !exists {
+		return fmt.Errorf("portfólio não encontrado ou permissão negada")
+	}
+
+	_, err = tx.Exec(ctx, `UPDATE portfolio SET is_default = false WHERE user_id = $1`, userID)
+	if err != nil {
+		return fmt.Errorf("erro ao resetar carteiras padrão: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `UPDATE portfolio SET is_default = true WHERE id = $1 AND user_id = $2`, portfolioID, userID)
+	if err != nil {
+		return fmt.Errorf("erro ao definir carteira padrão: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
 // DeletePortfolio apaga um portfólio do banco de dados (cascading apaga transações).
 func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) error {
+	var isDefault bool
+	_ = r.db.QueryRow(ctx, `SELECT is_default FROM portfolio WHERE id = $1 AND user_id = $2`, id, userID).Scan(&isDefault)
+
 	query := `
 		DELETE FROM portfolio
 		WHERE id = $1 AND user_id = $2
@@ -166,6 +206,17 @@ func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) err
 	if cmd.RowsAffected() == 0 {
 		return fmt.Errorf("portfólio não encontrado ou permissão negada")
 	}
+
+	if isDefault {
+		_, _ = r.db.Exec(ctx, `
+			UPDATE portfolio
+			SET is_default = true
+			WHERE id = (
+				SELECT id FROM portfolio WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1
+			)
+		`, userID)
+	}
+
 	return nil
 }
 

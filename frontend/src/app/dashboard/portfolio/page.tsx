@@ -93,10 +93,11 @@ export default function PortfolioPage() {
     try {
       const res = await fetch(`${API_URL}/portfolios`, { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
-        const data = await res.json();
+        const data: Portfolio[] = await res.json();
         setPortfolios(data || []);
         if (data && data.length > 0) {
-          const nextId = selectId || data[0].id;
+          const defaultP = data.find(p => p.is_default);
+          const nextId = selectId || (defaultP ? defaultP.id : data[0].id);
           setActivePortfolioId(nextId);
         }
       }
@@ -322,6 +323,20 @@ export default function PortfolioPage() {
     try {
       const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
       if (res.ok) await loadPortfolios();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSetDefaultPortfolio = async () => {
+    if (!activePortfolioId) return;
+    try {
+      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/default`, {
+        method: 'PUT', credentials: 'include', cache: 'no-store'
+      });
+      if (res.ok) {
+        await loadPortfolios(activePortfolioId);
+      } else {
+        alert('Erro ao definir carteira padrão.');
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -625,6 +640,7 @@ export default function PortfolioPage() {
         activePortfolioId={activePortfolioId} setActivePortfolioId={setActivePortfolioId} 
         setShowPortfolioModal={setShowPortfolioModal} handleDeletePortfolio={handleDeletePortfolio} 
         handleExportPortfolio={handleExportPortfolio}
+        handleSetDefaultPortfolio={handleSetDefaultPortfolio}
       />
 
       <div className="flex-row gap-sm mb-lg flex-wrap">
