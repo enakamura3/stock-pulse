@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -150,38 +151,52 @@ func (s *Service) GetDividends(ctx context.Context, symbol string, assetType str
 }
 
 func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType string) []DividendEvent {
-	// Combina ambos os resultados, priorizando StockAnalysis (colocando-o primeiro no slice)
-	// devido à sua maior precisão e ausência de truncamento de valores.
-	combined := append([]DividendEvent{}, saEvents...)
-	combined = append(combined, fundEvents...)
-
-	deduped := make([]DividendEvent, 0, len(combined))
-	seen := make(map[string]bool)
 	isFii := strings.ToUpper(assetType) == "FII" || strings.ToUpper(assetType) == "FIAGRO"
 
-	for _, ev := range combined {
-		var key string
-		if isFii {
-			evType := ev.Type
-			if evType == "Dividendo" {
-				evType = "Rendimento"
-			}
-			key = fmt.Sprintf("fii|%s|%02d|%d", evType, ev.Date.Month(), ev.Date.Year())
-		} else {
-			key = fmt.Sprintf("acao|%s|%.6f|%02d|%d", ev.Type, ev.Amount, ev.Date.Month(), ev.Date.Year())
-		}
+	var baseEvents []DividendEvent
+	var secondaryEvents []DividendEvent
 
-		if !seen[key] {
-			seen[key] = true
-			if isFii && ev.Type == "Dividendo" {
-				ev.Type = "Rendimento"
+	if isFii {
+		baseEvents = saEvents
+		secondaryEvents = fundEvents
+	} else {
+		// Prioriza Fundamentus para Ações, para manter JCP e valores brutos corretos
+		baseEvents = fundEvents
+		secondaryEvents = saEvents
+	}
+
+	deduped := append([]DividendEvent{}, baseEvents...)
+
+	for _, sEv := range secondaryEvents {
+		exists := false
+		for _, dEv := range deduped {
+			if isFii {
+				if sEv.Date.Month() == dEv.Date.Month() && sEv.Date.Year() == dEv.Date.Year() {
+					exists = true
+					break
+				}
+			} else {
+				if sEv.Date.Equal(dEv.Date) {
+					diff := math.Abs(sEv.Amount - dEv.Amount)
+					if diff <= 0.05 || (dEv.Amount > 0 && diff/dEv.Amount <= 0.20) {
+						exists = true
+						break
+					}
+				}
 			}
-			deduped = append(deduped, ev)
+		}
+		if !exists {
+			deduped = append(deduped, sEv)
 		}
 	}
 
-	// Ordena cronologicamente por data decrescente (mais recentes primeiro)
-	sort.Slice(deduped, func(i, j int) bool {
+	for i := range deduped {
+		if isFii && deduped[i].Type == "Dividendo" {
+			deduped[i].Type = "Rendimento"
+		}
+	}
+
+	sort.SliceStable(deduped, func(i, j int) bool {
 		return deduped[i].Date.After(deduped[j].Date)
 	})
 
