@@ -3,6 +3,7 @@ export interface Portfolio {
   user_id: string;
   name: string;
   base_currency: string;
+  is_default: boolean;
   created_at: string;
 }
 

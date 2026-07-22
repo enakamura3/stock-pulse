@@ -249,6 +249,7 @@ func main() {
 			r.Get("/portfolios", portfolioHandler.GetPortfolios)
 			r.Post("/portfolios", portfolioHandler.CreatePortfolio)
 			r.Get("/portfolios/{id}", portfolioHandler.GetPortfolio)
+			r.Put("/portfolios/{id}/default", portfolioHandler.SetDefaultPortfolio)
 			r.Delete("/portfolios/{id}", portfolioHandler.DeletePortfolio)
 			r.Get("/portfolios/{id}/transactions", portfolioHandler.GetTransactions)
 			r.Post("/portfolios/{id}/transactions", portfolioHandler.AddTransaction)

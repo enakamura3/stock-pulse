@@ -23,16 +23,25 @@ func TestRepository_CreatePortfolio(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "created_at"}).
-		AddRow("p1", "u1", "Main", "USD", now)
+	
+	mock.ExpectBegin()
+	
+	countRows := pgxmock.NewRows([]string{"count"}).AddRow(0)
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM portfolio`).WithArgs("u1").WillReturnRows(countRows)
+
+	rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "is_default", "created_at"}).
+		AddRow("p1", "u1", "Main", "USD", true, now)
 
 	mock.ExpectQuery(`INSERT INTO portfolio`).
-		WithArgs("u1", "Main", "USD").
+		WithArgs("u1", "Main", "USD", true).
 		WillReturnRows(rows)
+
+	mock.ExpectCommit()
 
 	p, err := repo.CreatePortfolio(context.Background(), "u1", "Main", "USD")
 	assert.NoError(t, err)
 	assert.Equal(t, "p1", p.ID)
+	assert.True(t, p.IsDefault)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -40,9 +49,16 @@ func TestRepository_CreatePortfolio_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
+	mock.ExpectBegin()
+
+	countRows := pgxmock.NewRows([]string{"count"}).AddRow(0)
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM portfolio`).WithArgs("u1").WillReturnRows(countRows)
+
 	mock.ExpectQuery(`INSERT INTO portfolio`).
-		WithArgs("u1", "Main", "USD").
+		WithArgs("u1", "Main", "USD", true).
 		WillReturnError(errors.New("db error"))
+
+	mock.ExpectRollback()
 
 	_, err := repo.CreatePortfolio(context.Background(), "u1", "Main", "USD")
 	assert.ErrorContains(t, err, "erro ao criar portfolio")
@@ -53,16 +69,17 @@ func TestRepository_GetPortfoliosByUserID(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "created_at"}).
-		AddRow("p1", "u1", "Main", "USD", now)
+	rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "is_default", "created_at"}).
+		AddRow("p1", "u1", "Main", "USD", true, now)
 
-	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, created_at`).
+	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, is_default, created_at`).
 		WithArgs("u1").
 		WillReturnRows(rows)
 
 	list, err := repo.GetPortfoliosByUserID(context.Background(), "u1")
 	assert.NoError(t, err)
 	assert.Len(t, list, 1)
+	assert.True(t, list[0].IsDefault)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -70,7 +87,7 @@ func TestRepository_GetPortfoliosByUserID_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, created_at`).
+	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, is_default, created_at`).
 		WithArgs("u1").
 		WillReturnError(errors.New("db error"))
 
@@ -83,16 +100,38 @@ func TestRepository_GetPortfolioByID(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "created_at"}).
-		AddRow("p1", "u1", "Main", "USD", now)
+	rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "is_default", "created_at"}).
+		AddRow("p1", "u1", "Main", "USD", true, now)
 
-	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, created_at`).
+	mock.ExpectQuery(`SELECT id, user_id, name, base_currency, is_default, created_at`).
 		WithArgs("p1", "u1").
 		WillReturnRows(rows)
 
 	p, err := repo.GetPortfolioByID(context.Background(), "p1", "u1")
 	assert.NoError(t, err)
 	assert.Equal(t, "p1", p.ID)
+	assert.True(t, p.IsDefault)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRepository_SetDefaultPortfolio(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM portfolio WHERE id = \$1 AND user_id = \$2\)`).
+		WithArgs("p1", "u1").
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectExec(`UPDATE portfolio SET is_default = false WHERE user_id = \$1`).
+		WithArgs("u1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectExec(`UPDATE portfolio SET is_default = true WHERE id = \$1 AND user_id = \$2`).
+		WithArgs("p1", "u1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectCommit()
+
+	err := repo.SetDefaultPortfolio(context.Background(), "p1", "u1")
+	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -100,9 +139,17 @@ func TestRepository_DeletePortfolio(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
+	mock.ExpectBegin()
+
+	mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
+		WithArgs("p1", "u1").
+		WillReturnRows(pgxmock.NewRows([]string{"is_default"}).AddRow(false))
+
 	mock.ExpectExec(`DELETE FROM portfolio`).
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	mock.ExpectCommit()
 
 	err := repo.DeletePortfolio(context.Background(), "p1", "u1")
 	assert.NoError(t, err)
@@ -113,9 +160,17 @@ func TestRepository_DeletePortfolio_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
+	mock.ExpectBegin()
+
+	mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
+		WithArgs("p1", "u1").
+		WillReturnRows(pgxmock.NewRows([]string{"is_default"}).AddRow(false))
+
 	mock.ExpectExec(`DELETE FROM portfolio`).
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
+		
+	mock.ExpectRollback()
 
 	err := repo.DeletePortfolio(context.Background(), "p1", "u1")
 	assert.ErrorContains(t, err, "não encontrado ou permissão")

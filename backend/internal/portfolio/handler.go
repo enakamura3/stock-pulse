@@ -18,6 +18,7 @@ type PortfolioService interface {
 	CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error)
 	GetPortfolios(ctx context.Context, userID string) ([]Portfolio, error)
 	GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*Portfolio, []Position, error)
+	SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error
 	AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error)
 	UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error
 	BulkAddTransactions(ctx context.Context, userID, portfolioID string, file multipart.File) (*BulkImportResult, error)
@@ -94,6 +95,29 @@ func (h *Handler) CreatePortfolio(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.respondWithJSON(w, http.StatusCreated, p)
+}
+
+// SetDefaultPortfolio define uma carteira como padrão para o usuário.
+func (h *Handler) SetDefaultPortfolio(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserIDKey).(string)
+	if !ok || userID == "" {
+		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	portfolioID := chi.URLParam(r, "id")
+	if portfolioID == "" {
+		h.respondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+		return
+	}
+
+	err := h.service.SetDefaultPortfolio(r.Context(), portfolioID, userID)
+	if err != nil {
+		h.respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	h.respondWithJSON(w, http.StatusOK, map[string]string{"message": "Carteira definida como padrão com sucesso"})
 }
 
 // GetPortfolio retorna o consolidado detalhado (posições e lucratividade) de uma carteira.

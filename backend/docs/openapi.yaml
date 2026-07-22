@@ -320,6 +320,24 @@ paths:
         '201':
           description: Portfólio criado
 
+  /portfolios/{id}/default:
+    put:
+      summary: Definir carteira como padrão do usuário ao fazer login
+      tags:
+        - Portfólios
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Carteira definida como padrão
+
   /portfolios/{id}:
     get:
       summary: Detalhes analíticos consolidados do portfólio (Rentabilidade, Preço Médio)

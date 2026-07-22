@@ -42,6 +42,10 @@ func (m *MockPortfolioRepo) GetPortfolioByID(ctx context.Context, id, userID str
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error {
+	return m.Called(ctx, portfolioID, userID).Error(0)
+}
+
 func (m *MockPortfolioRepo) DeletePortfolio(ctx context.Context, id, userID string) error {
 	return m.Called(ctx, id, userID).Error(0)
 }
@@ -207,11 +211,10 @@ func TestService_CreatePortfolio(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "p2", p.ID)
 }
-
 func TestService_GetPortfolios(t *testing.T) {
 	t.Run("Existing lists", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
-		repo.On("GetPortfoliosByUserID", mock.Anything, "u1").Return([]Portfolio{{ID: "p1"}}, nil)
+		repo.On("GetPortfoliosByUserID", mock.Anything, "u1").Return([]Portfolio{{ID: "p1", IsDefault: true}}, nil)
 
 		lists, err := s.GetPortfolios(context.Background(), "u1")
 		assert.NoError(t, err)
@@ -221,7 +224,7 @@ func TestService_GetPortfolios(t *testing.T) {
 	t.Run("Onboarding create default", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfoliosByUserID", mock.Anything, "u2").Return([]Portfolio{}, nil)
-		repo.On("CreatePortfolio", mock.Anything, "u2", "Principal", "BRL").Return(&Portfolio{ID: "p2"}, nil)
+		repo.On("CreatePortfolio", mock.Anything, "u2", "Principal", "BRL").Return(&Portfolio{ID: "p2", IsDefault: true}, nil)
 
 		lists, err := s.GetPortfolios(context.Background(), "u2")
 		assert.NoError(t, err)
@@ -244,6 +247,21 @@ func TestService_GetPortfolios(t *testing.T) {
 
 		_, err := s.GetPortfolios(context.Background(), "u4")
 		assert.ErrorContains(t, err, "falha ao criar portfólio")
+	})
+}
+
+func TestService_SetDefaultPortfolio(t *testing.T) {
+	t.Run("Invalid IDs", func(t *testing.T) {
+		s, _, _, _ := setupServiceTest()
+		err := s.SetDefaultPortfolio(context.Background(), "", "u1")
+		assert.ErrorContains(t, err, "IDs inválidos")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("SetDefaultPortfolio", mock.Anything, "p1", "u1").Return(nil)
+		err := s.SetDefaultPortfolio(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
 	})
 }
 
