@@ -280,7 +280,7 @@ export default function TransactionHistory({
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="card flex-col gap-md" style={{ flex: '1 1 350px', minHeight: '800px' }}>
+    <div className="card flex-col gap-md" style={{ flex: '1 1 350px' }}>
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex-row justify-between items-center flex-wrap gap-md">
@@ -379,7 +379,7 @@ export default function TransactionHistory({
       )}
 
       {/* ── Transaction List ──────────────────────────────────────────────── */}
-      <div className="flex-col gap-sm" style={{ overflowY: 'auto', flex: 1, maxHeight: '800px' }}>
+      <div className="flex-col gap-sm" style={{ flex: 1 }}>
         {filteredTransactions.length > 0 ? (
           <>
             {grouped.map((group) => (
