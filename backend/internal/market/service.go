@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -20,18 +21,33 @@ type Service struct {
 	fundamentus  *FundamentusScraper
 	stockAnalysis *StockAnalysisScraper
 	rdb          *redis.Client
-	ttl          time.Duration
+	ttlQuotes          time.Duration
+	ttlDividends       time.Duration
+	ttlFundamentals    time.Duration
+	ttlExchangeRates   time.Duration
 }
 
-// NewService cria uma nova instância de Service com o TTL configurado para 60 segundos.
+// NewService cria uma nova instância de Service com TTLs configuráveis.
 func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
+	getDuration := func(key string, defaultVal time.Duration) time.Duration {
+		if val := os.Getenv(key); val != "" {
+			if d, err := time.ParseDuration(val); err == nil {
+				return d
+			}
+		}
+		return defaultVal
+	}
+
 	return &Service{
-		provider:      provider,
-		scraper:       NewScraper(),
-		fundamentus:   NewFundamentusScraper(),
-		stockAnalysis: NewStockAnalysisScraper(),
-		rdb:           rdb,
-		ttl:           60 * time.Second, // Decisão aprovada pelo usuário
+		provider:         provider,
+		scraper:          NewScraper(),
+		fundamentus:      NewFundamentusScraper(),
+		stockAnalysis:    NewStockAnalysisScraper(),
+		rdb:              rdb,
+		ttlQuotes:        getDuration("REDIS_TTL_QUOTES", 60*time.Second),
+		ttlDividends:     getDuration("REDIS_TTL_DIVIDENDS", 12*time.Hour),
+		ttlFundamentals:  getDuration("REDIS_TTL_FUNDAMENTALS", 12*time.Hour),
+		ttlExchangeRates: getDuration("REDIS_TTL_EXCHANGE_RATES", 12*time.Hour),
 	}
 }
 
@@ -61,14 +77,14 @@ func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*
 		return nil, false, err
 	}
 
-	// Serializa e salva no Redis de forma assíncrona (ou imediata) com TTL de 60s
+	// Serializa e salva no Redis
 	quoteJSON, err := json.Marshal(quote)
 	if err == nil {
-		err = s.rdb.Set(ctx, key, quoteJSON, s.ttl).Err()
+		err = s.rdb.Set(ctx, key, quoteJSON, s.ttlQuotes).Err()
 		if err != nil {
 			log.Printf("[Redis] Erro ao salvar cache para %s: %v", symbol, err)
 		} else {
-			log.Printf("[Redis] Novo cache salvo para %s com sucesso (TTL 60s)", symbol)
+			log.Printf("[Redis] Novo cache salvo para %s com sucesso", symbol)
 		}
 	}
 
@@ -125,9 +141,9 @@ func (s *Service) GetDividends(ctx context.Context, symbol string, assetType str
 		}
 	}
 
-	// Cacheia por 12 horas (proventos não mudam com frequência)
+	// Cacheia proventos
 	if data, err := json.Marshal(events); err == nil {
-		s.rdb.Set(ctx, cacheKey, data, 12*time.Hour)
+		s.rdb.Set(ctx, cacheKey, data, s.ttlDividends)
 	}
 
 	return events, nil
@@ -245,7 +261,7 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 
 	if len(rates) > 0 {
 		if cacheData, err := json.Marshal(rates); err == nil {
-			s.rdb.Set(ctx, cacheKey, cacheData, 12*time.Hour)
+			s.rdb.Set(ctx, cacheKey, cacheData, s.ttlExchangeRates)
 		}
 	}
 
@@ -327,8 +343,7 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 
 	fundJSON, err := json.Marshal(fund)
 	if err == nil {
-		// Salva no Redis com TTL de 12 horas
-		err = s.rdb.Set(ctx, key, fundJSON, 12*time.Hour).Err()
+		err = s.rdb.Set(ctx, key, fundJSON, s.ttlFundamentals).Err()
 		if err != nil {
 			log.Printf("[Redis] Erro ao salvar cache de fundamentos para %s: %v", symbol, err)
 		}
