@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -176,12 +175,12 @@ func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType stri
 					break
 				}
 			} else {
+				// Para Ações: se o Fundamentus (base) já reportou QUALQUER provento nesta Data Com,
+				// ignoramos o evento do StockAnalysis (secundário). O StockAnalysis costuma agrupar
+				// JCP + Dividendo do mesmo dia num único valor, o que quebra a conciliação.
 				if sEv.Date.Equal(dEv.Date) {
-					diff := math.Abs(sEv.Amount - dEv.Amount)
-					if diff <= 0.05 || (dEv.Amount > 0 && diff/dEv.Amount <= 0.20) {
-						exists = true
-						break
-					}
+					exists = true
+					break
 				}
 			}
 		}
