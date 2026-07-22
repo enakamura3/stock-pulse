@@ -413,207 +413,186 @@ export default function TransactionHistory({
                       <div
                         key={tx.id}
                         style={{
-                          padding: '1rem 1.25rem',
+                          padding: '0.6rem 1rem',
                           background: 'rgba(30, 41, 59, 0.35)',
                           border: '1px solid var(--panel-border)',
                           borderRadius: '12px',
                           fontSize: '0.85rem',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.75rem',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '1rem',
                           transition: 'transform 0.15s ease, background-color 0.15s ease',
+                          flexWrap: 'nowrap',
+                          overflowX: 'auto',
                         }}
                       >
-                        {/* Header: Circle + Asset Name + Type badge + Action buttons */}
-                        <div className="flex-row items-center justify-between flex-wrap" style={{ gap: '0.5rem' }}>
-                          <div className="flex-row items-center" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
-                            {/* Icon Container with type-based gradient background */}
-                            <div style={{
-                              width: '40px',
-                              height: '40px',
-                              minWidth: '40px',
-                              minHeight: '40px',
-                              borderRadius: '50%',
-                              background: circle.gradient,
-                              border: `1px solid ${circle.borderColor}`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '1.25rem',
-                            }} title={isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'}>
-                              {circle.emoji}
-                            </div>
-
-                            <div className="flex-col" style={{ gap: '0.2rem' }}>
-                              <div className="flex-row items-center gap-sm">
-                                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#fff', letterSpacing: '0.5px' }}>{tx.asset_name}</span>
-                                <span className="badge" style={{ color: badge.color, background: badge.bg, fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
-                                  {badge.text}
-                                </span>
-                              </div>
-                              <span className="text-secondary text-xs" style={{ opacity: 0.8 }}>
-                                {isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'} • {formatDateStr(tx.date)}
-                              </span>
-                            </div>
+                        {/* Header: Circle + Asset Name + Type badge */}
+                        <div className="flex-row items-center" style={{ gap: '0.75rem', minWidth: '220px', flexShrink: 0 }}>
+                          {/* Icon Container with type-based gradient background */}
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            minWidth: '36px',
+                            minHeight: '36px',
+                            borderRadius: '50%',
+                            background: circle.gradient,
+                            border: `1px solid ${circle.borderColor}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.1rem',
+                          }} title={isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'}>
+                            {circle.emoji}
                           </div>
 
-                          {/* Action buttons — larger for WCAG accessibility */}
-                          <div className="flex-row items-center" style={{ gap: '0.4rem' }}>
-                            <button
-                              onClick={() => handleEditTransaction(tx)}
-                              className="btn-secondary"
-                              title="Editar Transação"
-                              style={{
-                                padding: '0.5rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minWidth: '36px',
-                                minHeight: '36px',
-                                borderRadius: '8px',
-                                transition: 'all 0.2s',
-                              }}
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTransaction(tx.id)}
-                              className="btn-danger"
-                              title="Excluir Transação"
-                              style={{
-                                padding: '0.5rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minWidth: '36px',
-                                minHeight: '36px',
-                                borderRadius: '8px',
-                                transition: 'all 0.2s',
-                              }}
-                            >
-                              🗑️
-                            </button>
+                          <div className="flex-col" style={{ gap: '0.1rem' }}>
+                            <div className="flex-row items-center gap-sm">
+                              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', letterSpacing: '0.5px' }}>{tx.asset_name}</span>
+                              <span className="badge" style={{ color: badge.color, background: badge.bg, fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
+                                {badge.text}
+                              </span>
+                            </div>
+                            <span className="text-secondary text-xs" style={{ opacity: 0.8 }}>
+                              {isRF ? (tx.asset_type === 'TESOURO' ? 'Tesouro Direto' : 'Renda Fixa') : 'Renda Variável'} • {formatDateStr(tx.date)}
+                            </span>
                           </div>
                         </div>
 
-                        {/* Details grid */}
-                        {isRF && tx.asset_type !== 'TESOURO' ? (
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                            gap: '0.75rem',
-                            padding: '0.75rem 1rem',
-                            background: 'rgba(0, 0, 0, 0.15)',
-                            border: '1px solid rgba(255, 255, 255, 0.03)',
-                            borderRadius: '8px',
-                            marginTop: '0.25rem',
-                          }}>
-                            <div className="flex-col" style={{ gap: '0.2rem' }}>
-                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                Valor da Operação
-                              </span>
-                              <span className="font-bold text-sm" style={{ color: badge.color }}>
-                                {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
-                              </span>
-                            </div>
-                            <div className="flex-col" style={{ gap: '0.2rem' }}>
-                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                Módulo
-                              </span>
-                              <span className="font-semibold text-sm">
-                                {tx.asset_type || 'Renda Fixa'}
-                              </span>
-                            </div>
-                          </div>
-                        ) : isSplit ? (
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                            gap: '0.75rem',
-                            padding: '0.75rem 1rem',
-                            background: 'rgba(0, 0, 0, 0.15)',
-                            border: '1px solid rgba(255, 255, 255, 0.03)',
-                            borderRadius: '8px',
-                            marginTop: '0.25rem',
-                          }}>
-                            <div className="flex-col" style={{ gap: '0.2rem' }}>
-                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                Proporção
-                              </span>
-                              <span className="font-bold text-sm" style={{ color: badge.color }}>
-                                {isReverse
-                                  ? `${formatQuantity(tx.quantity ?? 0)} para 1`
-                                  : `1 para ${formatQuantity(tx.quantity ?? 0)}`}
-                              </span>
-                            </div>
-                            <div className="flex-col" style={{ gap: '0.2rem' }}>
-                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                Saldo de Cotas após
-                              </span>
-                              <span className="font-semibold text-sm" style={{ color: '#00f2fe' }}>
-                                {formatQuantity(tx.resulting_quantity ?? 0)} un.
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                            gap: '0.75rem',
-                            padding: '0.75rem 1rem',
-                            background: 'rgba(0, 0, 0, 0.15)',
-                            border: '1px solid rgba(255, 255, 255, 0.03)',
-                            borderRadius: '8px',
-                            marginTop: '0.25rem',
-                          }}>
-                            <div className="flex-col" style={{ gap: '0.2rem' }}>
-                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                Preço & Qtd
-                              </span>
-                              <span className="font-semibold text-sm" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span>
-                                  {formatQuantity(tx.quantity ?? 0)} un. × {formatMoney(tx.unit_price ?? 0, tx.currency || 'BRL')}
+                        {/* Details line */}
+                        <div className="flex-row items-center" style={{ gap: '1.5rem', flex: 1, justifyContent: 'flex-start' }}>
+                          {isRF && tx.asset_type !== 'TESOURO' ? (
+                            <>
+                              <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  Valor da Operação
                                 </span>
-                                {kpiCurrency && tx.currency !== kpiCurrency && tx.exchange_rate ? (
-                                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 'normal' }}>
-                                    (Câmbio: {tx.exchange_rate.toFixed(4)})
+                                <span className="font-bold text-sm" style={{ color: badge.color, whiteSpace: 'nowrap' }}>
+                                  {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
+                                </span>
+                              </div>
+                              <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  Módulo
+                                </span>
+                                <span className="font-semibold text-sm" style={{ whiteSpace: 'nowrap' }}>
+                                  {tx.asset_type || 'Renda Fixa'}
+                                </span>
+                              </div>
+                            </>
+                          ) : isSplit ? (
+                            <>
+                              <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  Proporção
+                                </span>
+                                <span className="font-bold text-sm" style={{ color: badge.color, whiteSpace: 'nowrap' }}>
+                                  {isReverse
+                                    ? `${formatQuantity(tx.quantity ?? 0)} para 1`
+                                    : `1 para ${formatQuantity(tx.quantity ?? 0)}`}
+                                </span>
+                              </div>
+                              <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  Saldo de Cotas após
+                                </span>
+                                <span className="font-semibold text-sm" style={{ color: '#00f2fe', whiteSpace: 'nowrap' }}>
+                                  {formatQuantity(tx.resulting_quantity ?? 0)} un.
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  Preço & Qtd
+                                </span>
+                                <span className="font-semibold text-sm" style={{ display: 'flex', flexDirection: 'column', gap: '2px', whiteSpace: 'nowrap' }}>
+                                  <span>
+                                    {formatQuantity(tx.quantity ?? 0)} un. × {formatMoney(tx.unit_price ?? 0, tx.currency || 'BRL')}
                                   </span>
-                                ) : null}
-                              </span>
-                            </div>
+                                  {kpiCurrency && tx.currency !== kpiCurrency && tx.exchange_rate ? (
+                                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 'normal' }}>
+                                      (Câmbio: {tx.exchange_rate.toFixed(4)})
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </div>
 
-                            <div className="flex-col" style={{ gap: '0.2rem' }}>
-                              <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                Total da Operação
-                              </span>
-                              <span className="font-bold text-sm" style={{ color: badge.color }}>
-                                {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
-                              </span>
-                            </div>
+                              <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  Total da Operação
+                                </span>
+                                <span className="font-bold text-sm" style={{ color: badge.color, whiteSpace: 'nowrap' }}>
+                                  {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
+                                </span>
+                              </div>
 
-                            {(!isRF || tx.asset_type === 'TESOURO') && (
-                              <>
-                                <div className="flex-col" style={{ gap: '0.2rem' }}>
-                                  <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    Saldo Pós-Op.
-                                  </span>
-                                  <span className="font-semibold text-sm" style={{ color: '#00f2fe' }}>
-                                    {formatQuantity(tx.resulting_quantity ?? 0)} un.
-                                  </span>
-                                </div>
+                              {(!isRF || tx.asset_type === 'TESOURO') && (
+                                <>
+                                  <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                    <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                      Saldo Pós-Op.
+                                    </span>
+                                    <span className="font-semibold text-sm" style={{ color: '#00f2fe', whiteSpace: 'nowrap' }}>
+                                      {formatQuantity(tx.resulting_quantity ?? 0)} un.
+                                    </span>
+                                  </div>
 
-                                <div className="flex-col" style={{ gap: '0.2rem' }}>
-                                  <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                    Total Investido
-                                  </span>
-                                  <span className="font-semibold text-sm" style={{ color: '#00e676' }}>
-                                    {formatMoney(tx.resulting_invested ?? 0, tx.currency || 'BRL')}
-                                  </span>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
+                                  <div className="flex-col" style={{ gap: '0.1rem' }}>
+                                    <span className="text-secondary text-xs" style={{ opacity: 0.6, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                      Total Investido
+                                    </span>
+                                    <span className="font-semibold text-sm" style={{ color: '#00e676', whiteSpace: 'nowrap' }}>
+                                      {formatMoney(tx.resulting_invested ?? 0, tx.currency || 'BRL')}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Action buttons — larger for WCAG accessibility */}
+                        <div className="flex-row items-center" style={{ gap: '0.4rem', flexShrink: 0, marginLeft: 'auto' }}>
+                          <button
+                            onClick={() => handleEditTransaction(tx)}
+                            className="btn-secondary"
+                            title="Editar Transação"
+                            style={{
+                              padding: '0.4rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: '32px',
+                              minHeight: '32px',
+                              borderRadius: '8px',
+                              transition: 'all 0.2s',
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(tx.id)}
+                            className="btn-danger"
+                            title="Excluir Transação"
+                            style={{
+                              padding: '0.4rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: '32px',
+                              minHeight: '32px',
+                              borderRadius: '8px',
+                              transition: 'all 0.2s',
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
