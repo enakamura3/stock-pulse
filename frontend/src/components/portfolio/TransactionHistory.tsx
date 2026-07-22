@@ -461,7 +461,7 @@ export default function TransactionHistory({
                         </div>
 
                         {/* Details line */}
-                        <div className="flex-row items-center" style={{ gap: '1.5rem', flex: 1, justifyContent: 'flex-start' }}>
+                        <div className="flex-row items-center" style={{ gap: '1rem', flex: 1, justifyContent: 'space-around', padding: '0 1.5rem' }}>
                           {isRF && tx.asset_type !== 'TESOURO' ? (
                             <>
                               <div className="flex-col" style={{ gap: '0.1rem' }}>
