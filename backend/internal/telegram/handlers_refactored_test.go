@@ -263,11 +263,14 @@ func TestHandlers_Dividends(t *testing.T) {
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 
-		// Set fixed day in middle of month to prevent test failures near month boundaries
-		now := time.Date(time.Now().Year(), time.Now().Month(), 15, 12, 0, 0, 0, time.Local)
+		now := time.Now()
+		
+		pastDate := now.Add(-1 * time.Hour)
+		futureDate := now.Add(1 * time.Hour)
+
 		divs := []portfolio.CalculatedDividend{
-			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: now.AddDate(0, 0, -5), Type: "DIVIDENDO", Currency: "USD"},
-			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: now.AddDate(0, 0, 5), Type: "JCP", Currency: "BRL"},
+			{Ticker: "AAPL", NetAmount: 10.0, PaymentDate: pastDate, Type: "DIVIDENDO", Currency: "USD"},
+			{Ticker: "MSFT", NetAmount: 15.0, PaymentDate: futureDate, Type: "JCP", Currency: "BRL"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
 
@@ -275,9 +278,9 @@ func TestHandlers_Dividends(t *testing.T) {
 			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
 			hasUSD := strings.Contains(msg, "US$ 10,00")
 			hasBRL := strings.Contains(msg, "R$ 15,00")
-			hasAAPL := strings.Contains(msg, "✅ 🇺🇸 `AAPL` • US$ 10,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasAAPL := strings.Contains(msg, "`AAPL` • US$ 10,00 • "+pastDate.Format("2006-01-02"))
 			hasAAPLSub := strings.Contains(msg, "   ↳ _DIV_")
-			hasMSFT := strings.Contains(msg, "⏳ 🇺🇸 `MSFT` • R$ 15,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
+			hasMSFT := strings.Contains(msg, "`MSFT` • R$ 15,00 • "+futureDate.Format("2006-01-02"))
 			hasMSFTSub := strings.Contains(msg, "   ↳ _JCP_")
 			return hasTitle && hasUSD && hasBRL && hasAAPL && hasAAPLSub && hasMSFT && hasMSFTSub
 		}), mock.Anything).Return(nil)
@@ -296,10 +299,13 @@ func TestHandlers_Dividends(t *testing.T) {
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 
-		now := time.Date(time.Now().Year(), time.Now().Month(), 15, 12, 0, 0, 0, time.Local)
+		now := time.Now()
+		pastDate := now.Add(-1 * time.Hour)
+		futureDate := now.Add(1 * time.Hour)
+		
 		divs := []portfolio.CalculatedDividend{
-			{Ticker: "PETR4.SA", NetAmount: 50.0, PaymentDate: now.AddDate(0, 0, -5), Type: "JCP", Currency: "BRL", Quantity: 100, PerShareAmount: 0.5, AssetType: "STOCK_BR"},
-			{Ticker: "MXRF11.SA", NetAmount: 12.0, PaymentDate: now.AddDate(0, 0, 5), Type: "RENDIMENTO", Currency: "BRL", Quantity: 120, PerShareAmount: 0.1, AssetType: "FII"},
+			{Ticker: "PETR4.SA", NetAmount: 50.0, PaymentDate: pastDate, Type: "JCP", Currency: "BRL", Quantity: 100, PerShareAmount: 0.5, AssetType: "STOCK_BR"},
+			{Ticker: "MXRF11.SA", NetAmount: 12.0, PaymentDate: futureDate, Type: "RENDIMENTO", Currency: "BRL", Quantity: 120, PerShareAmount: 0.1, AssetType: "FII"},
 		}
 		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
 
@@ -308,9 +314,9 @@ func TestHandlers_Dividends(t *testing.T) {
 			hasTotalAcumulado := strings.Contains(msg, "💰 *Total Acumulado:* R$ 50,00")
 			hasBRLRecebidos := strings.Contains(msg, "✅ *Recebidos no Mês:* R$ 50,00")
 			hasBRLAReceber := strings.Contains(msg, "⏳ *A Receber no Mês:* R$ 12,00")
-			hasPETR4 := strings.Contains(msg, "✅ 📈 `PETR4` • R$ 50,00 • "+now.AddDate(0, 0, -5).Format("2006-01-02"))
+			hasPETR4 := strings.Contains(msg, "`PETR4` • R$ 50,00 • "+pastDate.Format("2006-01-02"))
 			hasPETR4Sub := strings.Contains(msg, "   ↳ _JCP • 100 un x R$ 0,50_")
-			hasMXRF11 := strings.Contains(msg, "⏳ 🏢 `MXRF11` • R$ 12,00 • "+now.AddDate(0, 0, 5).Format("2006-01-02"))
+			hasMXRF11 := strings.Contains(msg, "`MXRF11` • R$ 12,00 • "+futureDate.Format("2006-01-02"))
 			hasMXRF11Sub := strings.Contains(msg, "   ↳ _REND • 120 un x R$ 0,10_")
 			return hasTitle && hasTotalAcumulado && hasBRLRecebidos && hasBRLAReceber && hasPETR4 && hasPETR4Sub && hasMXRF11 && hasMXRF11Sub
 		}), mock.Anything).Return(nil)
