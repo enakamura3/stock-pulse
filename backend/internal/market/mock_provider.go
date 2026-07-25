@@ -2,7 +2,6 @@ package market
 
 import (
 	"context"
-	"time"
 )
 
 // MockProvider implementa a interface QuoteProvider retornando dados constantes
@@ -40,20 +39,4 @@ func (m *MockProvider) SearchAssets(ctx context.Context, query string) ([]Search
 	}, nil
 }
 
-func (m *MockProvider) GetDividends(ctx context.Context, symbol string, assetType string) ([]DividendEvent, error) {
-	// Retorna proventos fixos para facilitar testes de performance do portfólio
-	return []DividendEvent{
-		{
-			Date:        time.Now().Add(-30 * 24 * time.Hour),
-			PaymentDate: time.Now().Add(-15 * 24 * time.Hour),
-			Amount:      1.50,
-			Type:        "Dividendo",
-		},
-		{
-			Date:        time.Now().Add(-90 * 24 * time.Hour),
-			PaymentDate: time.Now().Add(-80 * 24 * time.Hour),
-			Amount:      2.00,
-			Type:        "JCP",
-		},
-	}, nil
-}
+

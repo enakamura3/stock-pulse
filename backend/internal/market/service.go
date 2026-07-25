@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -16,15 +15,13 @@ import (
 
 // Service gerencia cotações de ativos agregando cacheamento Redis de alta performance.
 type Service struct {
-	provider     QuoteProvider
-	scraper      *Scraper
-	fundamentus  *FundamentusScraper
-	stockAnalysis *StockAnalysisScraper
-	rdb          *redis.Client
-	ttlQuotes          time.Duration
-	ttlDividends       time.Duration
-	ttlFundamentals    time.Duration
-	ttlExchangeRates   time.Duration
+	provider         QuoteProvider
+	scraper          *Scraper
+	dividendGateway  *DividendGateway
+	rdb              *redis.Client
+	ttlQuotes        time.Duration
+	ttlFundamentals  time.Duration
+	ttlExchangeRates time.Duration
 }
 
 // NewService cria uma nova instância de Service com TTLs configuráveis.
@@ -38,14 +35,22 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 		return defaultVal
 	}
 
+	fundamentusClient := NewFundamentusClient()
+	stockAnalysisClient := NewStockAnalysisClient()
+	yahooClient := NewYahooClient()
+
+	fundamentusSource := NewFundamentusDividendSource(fundamentusClient)
+	stockAnalysisSource := NewStockAnalysisDividendSource(stockAnalysisClient)
+	yahooSource := NewYahooDividendSource(yahooClient)
+
+	ttlDividends := getDuration("REDIS_TTL_DIVIDENDS", 12*time.Hour)
+
 	return &Service{
 		provider:         provider,
 		scraper:          NewScraper(),
-		fundamentus:      NewFundamentusScraper(),
-		stockAnalysis:    NewStockAnalysisScraper(),
+		dividendGateway:  NewDividendGateway(fundamentusSource, stockAnalysisSource, yahooSource, rdb, ttlDividends),
 		rdb:              rdb,
 		ttlQuotes:        getDuration("REDIS_TTL_QUOTES", 60*time.Second),
-		ttlDividends:     getDuration("REDIS_TTL_DIVIDENDS", 12*time.Hour),
 		ttlFundamentals:  getDuration("REDIS_TTL_FUNDAMENTALS", 12*time.Hour),
 		ttlExchangeRates: getDuration("REDIS_TTL_EXCHANGE_RATES", 12*time.Hour),
 	}
@@ -99,107 +104,7 @@ func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
 
 // GetDividends busca os proventos de um ativo e faz cache.
 func (s *Service) GetDividends(ctx context.Context, symbol string, assetType string) ([]DividendEvent, error) {
-	cacheKey := fmt.Sprintf("dividends:%s", symbol)
-	
-	// Tenta no Redis primeiro
-	val, err := s.rdb.Get(ctx, cacheKey).Result()
-	if err == nil {
-		var cached []DividendEvent
-		if err := json.Unmarshal([]byte(val), &cached); err == nil {
-			log.Printf("[Redis] CACHE HIT proventos para %s", symbol)
-			return cached, nil
-		}
-	}
-
-	log.Printf("[Redis] CACHE MISS proventos para %s. Consultando provedor...", symbol)
-
-	// Roteamento: tenta buscar com o scraper correto
-	var events []DividendEvent
-	var fetchErr error
-
-	if strings.HasSuffix(strings.ToUpper(symbol), ".SA") {
-		// Busca de ambas as fontes para obter dados mais completos e precisos, evitando atrasos e truncamentos.
-		saEvents, saErr := s.stockAnalysis.GetDividends(ctx, symbol, assetType)
-		fundEvents, fundErr := s.fundamentus.GetDividends(ctx, symbol, assetType)
-
-		if saErr != nil && fundErr != nil {
-			fetchErr = fmt.Errorf("ambos os scrapers falharam: sa_err=%v, fund_err=%v", saErr, fundErr)
-		} else {
-			// Prioriza StockAnalysis (passando saEvents primeiro) pela precisão centesimal do valor do provento
-			events = mergeAndDedupDividends(saEvents, fundEvents, assetType)
-		}
-	} else {
-		events, fetchErr = s.stockAnalysis.GetDividends(ctx, symbol, assetType)
-	}
-
-	// Fallback para Yahoo Finance caso dê erro
-	if fetchErr != nil || len(events) == 0 {
-		log.Printf("[Market] Falha no scraper de proventos para %s (%v). Usando fallback do Yahoo Finance.", symbol, fetchErr)
-		events, err = s.provider.GetDividends(ctx, symbol, assetType)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Cacheia proventos
-	if data, err := json.Marshal(events); err == nil {
-		s.rdb.Set(ctx, cacheKey, data, s.ttlDividends)
-	}
-
-	return events, nil
-}
-
-func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType string) []DividendEvent {
-	isFii := strings.ToUpper(assetType) == "FII" || strings.ToUpper(assetType) == "FIAGRO"
-
-	var baseEvents []DividendEvent
-	var secondaryEvents []DividendEvent
-
-	if isFii {
-		baseEvents = saEvents
-		secondaryEvents = fundEvents
-	} else {
-		// Prioriza Fundamentus para Ações, para manter JCP e valores brutos corretos
-		baseEvents = fundEvents
-		secondaryEvents = saEvents
-	}
-
-	deduped := append([]DividendEvent{}, baseEvents...)
-
-	for _, sEv := range secondaryEvents {
-		exists := false
-		for _, dEv := range deduped {
-			if isFii {
-				if sEv.Date.Month() == dEv.Date.Month() && sEv.Date.Year() == dEv.Date.Year() {
-					exists = true
-					break
-				}
-			} else {
-				// Para Ações: se o Fundamentus (base) já reportou QUALQUER provento nesta Data Com,
-				// ignoramos o evento do StockAnalysis (secundário). O StockAnalysis costuma agrupar
-				// JCP + Dividendo do mesmo dia num único valor, o que quebra a conciliação.
-				if sEv.Date.Equal(dEv.Date) {
-					exists = true
-					break
-				}
-			}
-		}
-		if !exists {
-			deduped = append(deduped, sEv)
-		}
-	}
-
-	for i := range deduped {
-		if isFii && deduped[i].Type == "Dividendo" {
-			deduped[i].Type = "Rendimento"
-		}
-	}
-
-	sort.SliceStable(deduped, func(i, j int) bool {
-		return deduped[i].Date.After(deduped[j].Date)
-	})
-
-	return deduped
+	return s.dividendGateway.GetDividends(ctx, symbol, assetType)
 }
 
 // getExchangeRatesMap fetches the 10y history of BRL=X and returns it as a map[string]float64 (date string "YYYY-MM-DD" -> rate).
