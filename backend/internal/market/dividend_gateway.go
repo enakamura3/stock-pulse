@@ -24,6 +24,7 @@ type DividendGateway struct {
 }
 
 func NewDividendGateway(
+	b3 DividendSource,
 	fundamentus DividendSource,
 	stockAnalysis DividendSource,
 	yahoo DividendSource,
@@ -32,23 +33,23 @@ func NewDividendGateway(
 ) *DividendGateway {
 	routes := map[string][]sourceEntry{
 		"STOCK_BR": {
-			{source: fundamentus, role: "primary"},
-			{source: stockAnalysis, role: "secondary"},
+			{source: b3, role: "primary"},
+			{source: fundamentus, role: "secondary"},
 			{source: yahoo, role: "fallback"},
 		},
 		"FII": {
-			{source: stockAnalysis, role: "primary"},
+			{source: b3, role: "primary"},
 			{source: fundamentus, role: "secondary"},
-			{source: yahoo, role: "fallback"},
+			{source: stockAnalysis, role: "fallback"},
 		},
 		"FIAGRO": {
-			{source: stockAnalysis, role: "primary"},
+			{source: b3, role: "primary"},
 			{source: fundamentus, role: "secondary"},
-			{source: yahoo, role: "fallback"},
+			{source: stockAnalysis, role: "fallback"},
 		},
 		"ETF_BR": {
-			{source: stockAnalysis, role: "primary"},
-			{source: fundamentus, role: "secondary"},
+			{source: b3, role: "primary"},
+			{source: stockAnalysis, role: "secondary"},
 			{source: yahoo, role: "fallback"},
 		},
 		"BDR": {

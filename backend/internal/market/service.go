@@ -35,10 +35,12 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 		return defaultVal
 	}
 
+	b3Client := NewB3Client()
 	fundamentusClient := NewFundamentusClient()
 	stockAnalysisClient := NewStockAnalysisClient()
 	yahooClient := NewYahooClient()
 
+	b3Source := NewB3DividendSource(b3Client)
 	fundamentusSource := NewFundamentusDividendSource(fundamentusClient)
 	stockAnalysisSource := NewStockAnalysisDividendSource(stockAnalysisClient)
 	yahooSource := NewYahooDividendSource(yahooClient)
@@ -48,7 +50,7 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 	return &Service{
 		provider:         provider,
 		scraper:          NewScraper(),
-		dividendGateway:  NewDividendGateway(fundamentusSource, stockAnalysisSource, yahooSource, rdb, ttlDividends),
+		dividendGateway:  NewDividendGateway(b3Source, fundamentusSource, stockAnalysisSource, yahooSource, rdb, ttlDividends),
 		rdb:              rdb,
 		ttlQuotes:        getDuration("REDIS_TTL_QUOTES", 60*time.Second),
 		ttlFundamentals:  getDuration("REDIS_TTL_FUNDAMENTALS", 12*time.Hour),
