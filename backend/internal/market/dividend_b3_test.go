@@ -72,4 +72,31 @@ func TestB3DividendSource_GetDividends(t *testing.T) {
 		assert.Equal(t, "Rendimento", events[0].Type)
 		assert.Equal(t, 0.75, events[0].Amount)
 	})
+
+	t.Run("Name and SupportedTypes", func(t *testing.T) {
+		assert.Equal(t, "b3", source.Name())
+		assert.Contains(t, source.SupportedAssetTypes(), "STOCK_BR")
+	})
+	
+	t.Run("Fetch Error", func(t *testing.T) {
+		errClient := NewB3Client()
+		errClient.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			}
+		})
+		errSource := NewB3DividendSource(errClient)
+		
+		res, err := errSource.GetDividends(context.Background(), "PETR4", "STOCK_BR")
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		
+		res, err = errSource.GetDividends(context.Background(), "MXRF11", "FII")
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		
+		_, err = errClient.FetchCompanies(context.Background())
+		assert.Error(t, err)
+	})
 }

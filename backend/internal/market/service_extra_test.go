@@ -157,7 +157,8 @@ func TestService_GetFundamentals(t *testing.T) {
 
 
 func TestService_GetExchangeRatesMap_Coverage(t *testing.T) {
-	t.Run("Real YahooFinanceProvider", func(t *testing.T) {
+	t.Run("Real_YahooFinanceProvider", func(t *testing.T) {
+		t.Skip("Skipping test that hits real Yahoo API to avoid flakiness")
 		// Use real provider to cover yp.client.Do(req)
 		yp := NewYahooFinanceProvider()
 		rdb, rmock := redismock.NewClientMock()
