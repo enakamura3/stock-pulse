@@ -79,9 +79,9 @@ O sistema opera dinamicamente realizando consultas em APIs externas e fazendo ra
 - **Busca de Ativos:** `GET https://query1.finance.yahoo.com/v1/finance/search?q={query}`
 - **Histórico e Preços:** `GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=10y` (busca histórico de até 10 anos).
 
-### 2. Fundamentus (Fundamentos e Proventos da B3)
-- **Fundamentos:** Extração baseada em expressões regulares (regex) de P/VP, P/L, LPA, VPA e Dividend Yield a partir do endpoint `/detalhes.php`.
-- **Histórico de Proventos:** Captura de proventos (dividendos e JCP) a partir do endpoint `/proventos.php` ou `/fii_proventos.php`. Utiliza um algoritmo inteligente de **Fuzzy Matching** na camada de aplicação para identificar e unificar correções de centavos das fontes de dados, garantindo que não ocorram duplicatas indesejadas nem a perda de dividendos extraordinários.
+### 2. Integração B3 e Fundamentus (Proventos e Fundamentos da B3)
+- **Histórico de Proventos:** A fonte primária oficial de dividendos e JCP para ativos nacionais (Ações, FIIs, Fiagros e ETFs) é a própria **B3 (Bolsa de Valores do Brasil)**. O `DividendGateway` orquestra a captura consultando as APIs da B3 e, em caso de indisponibilidade, realiza um fallback transparente para o **Fundamentus**. O gateway utiliza um algoritmo de **Fuzzy Matching** na camada de aplicação para identificar e unificar correções de centavos entre as múltiplas fontes, evitando duplicatas e garantindo precisão na Data Com.
+- **Fundamentos:** Extração baseada em expressões regulares (regex) de P/VP, P/L, LPA, VPA e Dividend Yield a partir do endpoint `/detalhes.php` do Fundamentus.
 
 ### 3. Finviz (Fundamentos do Mercado Internacional)
 - **Raspagem de Indicadores:** `GET https://finviz.com/quote.ashx?t={symbol}` para obter LPA (EPS), valor patrimonial (Book/sh) e dividendos de ativos globais usando expressões regulares.
@@ -169,7 +169,8 @@ graph TD
     
     subgraph Integrações Externas
         GoAPI -->|Cotações| Yahoo[Yahoo Finance API]
-        GoAPI -->|Dados B3| Fundamentus[Fundamentus Scraper]
+        GoAPI -->|Dados Oficiais B3| B3[B3 API]
+        GoAPI -->|Fundamentos B3| Fundamentus[Fundamentus Scraper]
         GoAPI -->|Dados Globais| Finviz[Finviz Scraper]
         GoAPI -->|Telegram| Telegram[Telegram Bot]
     end
@@ -476,9 +477,9 @@ O sistema calcula dinamicamente indicadores fundamentalistas e o preço justo so
     $$\text{Bazin Value} = \frac{\text{Dividendo Anual}}{0.06}$$
     onde o dividendo anual absoluto é calculado a partir de:
     $$\text{Dividendo Anual} = \text{Preço Atual} \times \left(\frac{\text{Dividend Yield}}{100}\right)$$
-- **Scraping e Desduplicação de Dividendos:**
-  - Varre o Fundamentus (`proventos.php` ou `fii_proventos.php` usando decodificação ISO-8859-1) agrupando eventos.
-  - **Filtro de Desduplicação:** Agrupa dividendos de FIIs por mês/ano e ações por valor/mês/ano para evitar registros duplicados vindos de fontes despadronizadas. Em caso de falha, utiliza o StockAnalysis ou Yahoo Finance.
+- **Scraping e Orquestração de Dividendos (`DividendGateway`):**
+  - Integra dados de múltiplas fontes (`B3DividendSource`, `FundamentusDividendSource`, `StockAnalysisDividendSource`, `YahooDividendSource`).
+  - **Filtro de Desduplicação (Fuzzy Matching):** Agrupa dividendos de FIIs e ações para evitar registros duplicados quando combinando fontes diferentes (ex: primária B3 + secundária Fundamentus). Ignora ajustes de diferença absolutas de poucos centavos (≤ R$ 0,05).
 
 #### Endpoints de API:
 - `GET /api/v1/portfolios/{id}` - Retorna a carteira com métricas e múltiplos fundamentalistas integrados.

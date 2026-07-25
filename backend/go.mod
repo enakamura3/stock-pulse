@@ -1,6 +1,6 @@
 module github.com/onigiri/stock-pulse/backend
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.9.2
@@ -17,6 +17,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.41.0
 	golang.org/x/text v0.28.0
+	golang.org/x/time v0.15.0
 	gopkg.in/telebot.v3 v3.3.8
 )
 
