@@ -158,7 +158,7 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 	fallback.On("Name").Return("fallback")
 
 	rdb, rmock := redismock.NewClientMock()
-	gateway := NewDividendGateway(primary, secondary, nil, fallback, rdb, 12*time.Hour)
+	gateway := NewDividendGateway(primary, secondary, fallback, fallback, rdb, 12*time.Hour)
 
 	now := time.Now()
 	currMonthDate := time.Date(now.Year(), now.Month(), 15, 0, 0, 0, 0, time.UTC)
@@ -212,7 +212,7 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 		rmock.ExpectGet("dividends:FALL_ONLY").RedisNil()
 		rmock.ExpectSet("dividends:FALL_ONLY", mock.Anything, 12*time.Hour).SetVal("OK")
 
-		gw := NewDividendGateway(nil, nil, nil, fallback, rdb, 12*time.Hour)
+		gw := NewDividendGateway(nil, nil, fallback, fallback, rdb, 12*time.Hour)
 		fallback.On("GetDividends", mock.Anything, "FALL_ONLY", "CRYPTO").Return([]DividendEvent{evWithCurrDate}, nil).Once()
 
 		res, err := gw.GetDividends(context.Background(), "FALL_ONLY", "CRYPTO")
@@ -235,7 +235,7 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 		myPrimary.On("GetDividends", mock.Anything, "ENRICH_ERR", "STOCK_BR").Return([]DividendEvent{oldEv}, nil).Once()
 		myFallback.On("GetDividends", mock.Anything, "ENRICH_ERR", "STOCK_BR").Return([]DividendEvent{}, errors.New("enrich err")).Once()
 
-		gw := NewDividendGateway(myPrimary, nil, nil, myFallback, rdb, 12*time.Hour)
+		gw := NewDividendGateway(myPrimary, nil, myFallback, myFallback, rdb, 12*time.Hour)
 		res, err := gw.GetDividends(context.Background(), "ENRICH_ERR", "STOCK_BR")
 		assert.NoError(t, err)
 		assert.Len(t, res, 1)
