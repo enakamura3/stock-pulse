@@ -565,7 +565,7 @@ O gateway define as seguintes rotas de prioridade:
 
 | Tipo de Ativo | Primary | Secondary | Fallback |
 |---|---|---|---|
-| **`STOCK_BR`** (Ações BR) | B3 | Fundamentus | Yahoo |
+| **`STOCK_BR`** (Ações BR) | B3 | Fundamentus | StockAnalysis |
 | **`FII`** (Fundos Imobiliários) | B3 | Fundamentus | StockAnalysis |
 | **`FIAGRO`** (Fundos Agro) | B3 | Fundamentus | StockAnalysis |
 | **`ETF_BR`** (ETFs BR) | B3 | StockAnalysis | Yahoo |
@@ -646,6 +646,7 @@ A interface `DividendSource` exige que toda fonte implemente:
   - `"JRS CAP PROPRIO"` / `"JCP"` → `"JCP"`
 - **Secondary (Fundamentus):** Scraping de `proventos.php?papel={TICKER}&tipo=2`. A tabela HTML de ações segue a ordem de colunas: **Data | Valor | Tipo | Data Pagamento**. Mesmos mapeamentos de tipo.
 - **Merge:** Para ações, a deduplicação ocorre por **data exata** (`ExDate`). Fundamentus é priorizado como base do merge para preservar a distinção entre Dividendo e JCP.
+- **Fallback (StockAnalysis):** StockAnalysis foi adotado no lugar do Yahoo Finance, o que unifica o padrão de datas de corte com o Brasil. Utiliza prioritariamente a coluna **Record Date** (que já representa a Data Com sem necessitar de ajustes). Caso a `Record Date` não seja preenchida, o sistema faz fallback para a `Ex-Div Date` americana e aplica a normalização matemática de subtrair 1 dia (24h) para chegar à Data Com real.
 
 ##### Fundos Imobiliários (`FII`) e Fundos Agro (`FIAGRO`)
 - **Primary (B3):** Consulta endpoint dedicado para fundos via `FetchFundDividends` na API `GetListedFundDividends` (endpoint diferente de ações). Mapeia `corporateAction`:
@@ -654,7 +655,7 @@ A interface `DividendSource` exige que toda fonte implemente:
   - Qualquer outro tipo é forçado para `"Rendimento"` quando o `assetType` é FII/FIAGRO.
 - **Secondary (Fundamentus):** Scraping de `fii_proventos.php?papel={TICKER}&tipo=2` — URL diferente da de ações. A tabela HTML de FIIs possui **ordem de colunas diferente**: **Data | Tipo | Data Pagamento | Valor** (vs Data | Valor | Tipo | Data Pagamento para ações).
 - **Deduplicação FII-específica:** FIIs são deduplicados por **mês e ano** (`Month() + Year()`), não por data exata. Isso reflete a regra de negócio de que FIIs distribuem 1 rendimento por mês. Qualquer evento com `Type == "Dividendo"` é automaticamente reescrito para `"Rendimento"` no pós-merge.
-- **Fallback (StockAnalysis):** Scraping via rota BVMF. O sistema subtrai 1 dia (24h) da Data Ex para normalizar a busca pela Data Com. Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO.
+- **Fallback (StockAnalysis):** Scraping via rota BVMF. Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO. Segue a mesma lógica rigorosa de Data Com baseada na `Record Date` ou na subtração de 1 dia na `Ex-Div Date`.
 
 ##### ETFs Brasileiros (`ETF_BR`)
 - **Primary (B3):** Mesma API de ações (`FetchCashDividends`).

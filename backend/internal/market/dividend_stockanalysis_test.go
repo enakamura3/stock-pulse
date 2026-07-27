@@ -44,6 +44,13 @@ func TestStockAnalysisDividendSource_GetDividends(t *testing.T) {
 					<td>Feb 11, 2026</td>
 					<td>Invalid PayDate</td>
 				</tr>
+				<!-- Missing Record Date (Fallback to Ex-Date) -->
+				<tr>
+					<td>Mar 20, 2026</td>
+					<td>$1.50</td>
+					<td>-</td>
+					<td>Mar 30, 2026</td>
+				</tr>
 			</tbody>
 		</table>`
 		
@@ -70,7 +77,7 @@ func TestStockAnalysisDividendSource_GetDividends(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		events, err := source.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
-		assert.Len(t, events, 2)
+		assert.Len(t, events, 3)
 		
 		assert.Equal(t, "Dividendo", events[0].Type)
 		assert.Equal(t, 2.5499, events[0].Amount)
@@ -80,6 +87,13 @@ func TestStockAnalysisDividendSource_GetDividends(t *testing.T) {
 		assert.Equal(t, "Dividendo", events[1].Type)
 		assert.Equal(t, 1.00, events[1].Amount)
 		assert.Equal(t, time.Date(2026, 2, 11, 0, 0, 0, 0, time.UTC), events[1].PaymentDate)
+		
+		// Evento com Record Date faltando usa Ex-Date - 1 dia. ExDate = Mar 20, CumDate = Mar 19
+		assert.Equal(t, "Dividendo", events[2].Type)
+		assert.Equal(t, 1.50, events[2].Amount)
+		assert.Equal(t, time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC), events[2].Date)
+		// O paymentDate se manteve Mar 30
+		assert.Equal(t, time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC), events[2].PaymentDate)
 	})
 
 	t.Run("Error", func(t *testing.T) {
@@ -91,7 +105,7 @@ func TestStockAnalysisDividendSource_GetDividends(t *testing.T) {
 	t.Run("FII Success Normalization", func(t *testing.T) {
 		events, err := source.GetDividends(context.Background(), "MXRF11.SA", "FII")
 		assert.NoError(t, err)
-		assert.Len(t, events, 2)
+		assert.Len(t, events, 3)
 		
 		assert.Equal(t, "Rendimento", events[0].Type)
 		assert.Equal(t, 2.5499, events[0].Amount)
