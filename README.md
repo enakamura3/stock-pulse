@@ -566,8 +566,8 @@ O gateway define as seguintes rotas de prioridade:
 | Tipo de Ativo | Primary | Secondary | Fallback |
 |---|---|---|---|
 | **`STOCK_BR`** (Ações BR) | B3 | Fundamentus | Yahoo |
-| **`FII`** (Fundos Imobiliários) | B3 | Fundamentus | Yahoo |
-| **`FIAGRO`** (Fundos Agro) | B3 | Fundamentus | Yahoo |
+| **`FII`** (Fundos Imobiliários) | B3 | Fundamentus | StockAnalysis |
+| **`FIAGRO`** (Fundos Agro) | B3 | Fundamentus | StockAnalysis |
 | **`ETF_BR`** (ETFs BR) | B3 | StockAnalysis | Yahoo |
 | **`BDR`** (BDRs) | StockAnalysis | Fundamentus | Yahoo |
 | **`STOCK_US`** (Ações US) | StockAnalysis | — | Yahoo |
@@ -654,7 +654,7 @@ A interface `DividendSource` exige que toda fonte implemente:
   - Qualquer outro tipo é forçado para `"Rendimento"` quando o `assetType` é FII/FIAGRO.
 - **Secondary (Fundamentus):** Scraping de `fii_proventos.php?papel={TICKER}&tipo=2` — URL diferente da de ações. A tabela HTML de FIIs possui **ordem de colunas diferente**: **Data | Tipo | Data Pagamento | Valor** (vs Data | Valor | Tipo | Data Pagamento para ações).
 - **Deduplicação FII-específica:** FIIs são deduplicados por **mês e ano** (`Month() + Year()`), não por data exata. Isso reflete a regra de negócio de que FIIs distribuem 1 rendimento por mês. Qualquer evento com `Type == "Dividendo"` é automaticamente reescrito para `"Rendimento"` no pós-merge.
-- **Fallback (Yahoo):** Consulta na API do Yahoo Finance (com sufixo .SA). Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO.
+- **Fallback (StockAnalysis):** Scraping via rota BVMF. O sistema subtrai 1 dia (24h) da Data Ex para normalizar a busca pela Data Com. Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO.
 
 ##### ETFs Brasileiros (`ETF_BR`)
 - **Primary (B3):** Mesma API de ações (`FetchCashDividends`).
