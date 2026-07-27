@@ -20,7 +20,7 @@ func (s *StockAnalysisDividendSource) Name() string {
 }
 
 func (s *StockAnalysisDividendSource) SupportedAssetTypes() []string {
-	return []string{"STOCK_BR", "FII", "FIAGRO", "ETF_BR", "BDR", "STOCK_US", "ETF_US"}
+	return []string{"STOCK_BR", "ETF_BR", "BDR", "STOCK_US", "ETF_US"}
 }
 
 func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
