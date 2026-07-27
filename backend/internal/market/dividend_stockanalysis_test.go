@@ -95,7 +95,7 @@ func TestStockAnalysisDividendSource_GetDividends(t *testing.T) {
 		
 		assert.Equal(t, "Rendimento", events[0].Type)
 		assert.Equal(t, 2.5499, events[0].Amount)
-		// 11 Feb minus 24h = 10 Feb
-		assert.Equal(t, time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC), events[0].Date)
+		// 11 Feb was Record Date, which is exactly the Cum Date. No -24h is applied because Record Date was available.
+		assert.Equal(t, time.Date(2026, 2, 11, 0, 0, 0, 0, time.UTC), events[0].Date)
 	})
 }
