@@ -19,8 +19,9 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
   - [1. Autenticação e Segurança (Auth)](#1-autenticação-e-segurança-auth)
   - [2. Inserção de Transações e Auto-Cura (Transactions, Bulk Import & Backfill)](#2-inserção-de-transações-e-auto-cura-transactions-bulk-import--backfill)
   - [3. Scraping e Motor de Avaliação (Fundamentals & Valuation)](#3-scraping-e-motor-de-avaliação-fundamentals--valuation)
-  - [4. Trabalhadores em Segundo Plano (Background Workers)](#4-trabalhadores-em-segundo-plano-background-workers)
-  - [5. Integração com Bot do Telegram (Telegram Bot)](#5-integração-com-bot-do-telegram-telegram-bot)
+  - [4. Módulo de Proventos (Dividends & Yields)](#4-módulo-de-proventos-dividends--yields)
+  - [5. Trabalhadores em Segundo Plano (Background Workers)](#5-trabalhadores-em-segundo-plano-background-workers)
+  - [6. Integração com Bot do Telegram (Telegram Bot)](#6-integração-com-bot-do-telegram-telegram-bot)
 - [📂 Arquitetura do Repositório (Monorepo Layout)](#arquitetura-do-repositório-monorepo-layout)
 - [⚙️ Configuração e Desenvolvimento Local](#configuração-e-desenvolvimento-local)
 - [🏗️ Migrações de Banco de Dados](#migrações-de-banco-de-dados)
@@ -535,7 +536,216 @@ sequenceDiagram
 
 ---
 
-### 4. Trabalhadores em Segundo Plano (Background Workers)
+### 4. Módulo de Proventos (Dividends & Yields)
+
+O módulo de proventos é responsável pela obtenção, normalização, deduplicação e persistência de eventos corporativos de distribuição de rendimentos (dividendos, JCP, rendimentos de FIIs, amortizações) para todos os tipos de ativos suportados pela plataforma. A arquitetura é baseada em um **Gateway multi-fonte com roteamento por tipo de ativo**, fallback automático e cache Redis.
+
+#### 4.1 Arquitetura do `DividendGateway`
+
+O `DividendGateway` atua como orquestrador central, definindo **rotas específicas por tipo de ativo**. Cada rota configura uma hierarquia de fontes com papéis distintos:
+
+| Papel | Descrição |
+|---|---|
+| **Primary** | Fonte consultada primeiro. Se retornar dados, é usada como base principal. |
+| **Secondary** | Consultada em paralelo à primary para **enriquecimento e merge**. |
+| **Fallback** | Usada apenas se primary e secondary falharem ou retornarem vazio. |
+
+As 4 fontes de dados disponíveis são:
+
+| Fonte | Módulo | Método de Captura | Tipos Suportados |
+|---|---|---|---|
+| **B3** | `B3DividendSource` / `B3Client` | API REST oficial da B3 (JSON + Base64) | Ações BR, FII, FIAGRO, ETF BR |
+| **Fundamentus** | `FundamentusDividendSource` / `FundamentusClient` | Web scraping HTML (goquery + ISO-8859-1) | Ações BR, FII, FIAGRO, ETF BR, BDR |
+| **StockAnalysis** | `StockAnalysisDividendSource` / `StockAnalysisClient` | Web scraping HTML (goquery) | Ações BR, FII, FIAGRO, ETF BR, BDR, Ações US, ETF US |
+| **Yahoo Finance** | `YahooDividendSource` / `YahooClient` | API REST Chart (JSON) | Ações BR, FII, FIAGRO, ETF BR, BDR, Ações US, ETF US, Crypto |
+
+#### 4.2 Tabela de Roteamento por Tipo de Ativo
+
+O gateway define as seguintes rotas de prioridade:
+
+| Tipo de Ativo | Primary | Secondary | Fallback |
+|---|---|---|---|
+| **`STOCK_BR`** (Ações BR) | B3 | Fundamentus | Yahoo |
+| **`FII`** (Fundos Imobiliários) | B3 | Fundamentus | StockAnalysis |
+| **`FIAGRO`** (Fundos Agro) | B3 | Fundamentus | StockAnalysis |
+| **`ETF_BR`** (ETFs BR) | B3 | StockAnalysis | Yahoo |
+| **`BDR`** (BDRs) | StockAnalysis | Fundamentus | Yahoo |
+| **`STOCK_US`** (Ações US) | StockAnalysis | — | Yahoo |
+| **`ETF_US`** (ETFs US) | StockAnalysis | — | Yahoo |
+| **`CRYPTO`** (Criptomoedas) | Yahoo | — | — |
+
+#### 4.3 Fluxo de Obtenção de Proventos
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Caller as DividendWorker / API
+    participant Gateway as DividendGateway
+    participant Redis as Redis (dividends:*)
+    participant Primary as Fonte Primary
+    participant Secondary as Fonte Secondary
+    participant Fallback as Fonte Fallback
+    participant DB as PostgreSQL (asset_event)
+
+    Caller->>Gateway: GetDividends(ctx, ticker, assetType)
+    Gateway->>Redis: GET dividends:<ticker>
+    
+    alt Cache Hit (TTL 12h)
+        Redis-->>Gateway: JSON com eventos
+        Gateway-->>Caller: []DividendEvent (do cache)
+    else Cache Miss
+        Gateway->>Primary: GetDividends(ctx, ticker, assetType)
+        
+        alt Primary retornou dados
+            Primary-->>Gateway: []DividendEvent (primary)
+            
+            alt Secondary configurada
+                Gateway->>Secondary: GetDividends(ctx, ticker, assetType)
+                Secondary-->>Gateway: []DividendEvent (secondary)
+                Note over Gateway: mergeAndDedupDividends(primaryEvents, secondaryEvents)
+            end
+        else Primary falhou ou retornou vazio
+            alt Secondary configurada
+                Gateway->>Secondary: GetDividends(ctx, ticker, assetType)
+                Secondary-->>Gateway: []DividendEvent
+            end
+            alt Ainda sem dados e Fallback configurado
+                Gateway->>Fallback: GetDividends(ctx, ticker, assetType)
+                Fallback-->>Gateway: []DividendEvent
+            end
+        end
+        
+        Gateway->>Redis: SET dividends:<ticker> (TTL 12h)
+        Gateway-->>Caller: []DividendEvent (consolidados)
+    end
+```
+
+#### 4.4 Modelo Canônico: `DividendEvent`
+
+Todas as fontes produzem o modelo canônico `DividendEvent`, definido em `dividend_source.go`:
+
+```go
+type DividendEvent struct {
+    Date        time.Time // Data Com (cum_date) — data de corte para elegibilidade
+    PaymentDate time.Time // Data de Pagamento
+    Amount      float64   // Valor bruto por cota/ação
+    Type        string    // "Dividendo" | "JCP" | "Rendimento" | "Amortização"
+}
+```
+
+A interface `DividendSource` exige que toda fonte implemente:
+- `GetDividends(ctx, ticker, assetType)` — busca e normaliza proventos.
+- `Name()` — identificador da fonte.
+- `SupportedAssetTypes()` — tipos de ativo suportados.
+
+#### 4.5 Obtenção por Tipo de Ativo
+
+##### Ações Brasileiras (`STOCK_BR`)
+- **Primary (B3):** Consulta `FetchCashDividends` na API `GetListedCashDividends`. Mapeia `corporateAction`:
+  - `"DIVIDENDO"` → `"Dividendo"`
+  - `"JRS CAP PROPRIO"` / `"JCP"` → `"JCP"`
+- **Secondary (Fundamentus):** Scraping de `proventos.php?papel={TICKER}&tipo=2`. A tabela HTML de ações segue a ordem de colunas: **Data | Valor | Tipo | Data Pagamento**. Mesmos mapeamentos de tipo.
+- **Merge:** Para ações, a deduplicação ocorre por **data exata** (`ExDate`). Fundamentus é priorizado como base do merge para preservar a distinção entre Dividendo e JCP.
+
+##### Fundos Imobiliários (`FII`) e Fundos Agro (`FIAGRO`)
+- **Primary (B3):** Consulta endpoint dedicado para fundos via `FetchFundDividends` na API `GetListedFundDividends` (endpoint diferente de ações). Mapeia `corporateAction`:
+  - `"RENDIMENTO"` → `"Rendimento"`
+  - `"AMORTIZACAO"` → `"Amortização"`
+  - Qualquer outro tipo é forçado para `"Rendimento"` quando o `assetType` é FII/FIAGRO.
+- **Secondary (Fundamentus):** Scraping de `fii_proventos.php?papel={TICKER}&tipo=2` — URL diferente da de ações. A tabela HTML de FIIs possui **ordem de colunas diferente**: **Data | Tipo | Data Pagamento | Valor** (vs Data | Valor | Tipo | Data Pagamento para ações).
+- **Deduplicação FII-específica:** FIIs são deduplicados por **mês e ano** (`Month() + Year()`), não por data exata. Isso reflete a regra de negócio de que FIIs distribuem 1 rendimento por mês. Qualquer evento com `Type == "Dividendo"` é automaticamente reescrito para `"Rendimento"` no pós-merge.
+- **Fallback (StockAnalysis):** Scraping de `stockanalysis.com/quote/bvmf/{ticker}/dividend/`. Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO.
+
+##### ETFs Brasileiros (`ETF_BR`)
+- **Primary (B3):** Mesma API de ações (`FetchCashDividends`).
+- **Secondary (StockAnalysis):** Scraping via rota BVMF.
+- **Fallback (Yahoo):** API Chart com sufixo `.SA`.
+- **Tributação:** ETFs na B3 sofrem 15% de imposto retido na fonte sobre dividendos, tratado na camada de cálculo (`netAmount = grossAmount * 0.85`).
+
+##### BDRs (`BDR`)
+- **Primary (StockAnalysis):** Fonte principal pois BDRs são recibos de ativos internacionais.
+- **Secondary (Fundamentus):** Fallback via scraping.
+- **Fallback (Yahoo):** API Chart.
+
+##### Ações Americanas (`STOCK_US`) e ETFs Americanos (`ETF_US`)
+- **Primary (StockAnalysis):** Scraping de `stockanalysis.com/stocks/{ticker}/dividend/` ou `/etf/{ticker}/dividend/`.
+- **Fallback (Yahoo):** API Chart sem sufixo `.SA`.
+- **Tributação:** Ativos em USD sofrem 30% de imposto retido na fonte (`netAmount = grossAmount * 0.70`) e são convertidos para BRL na data da `cum_date` usando a taxa histórica `USDBRL=X`.
+
+##### Criptomoedas (`CRYPTO`)
+- **Primary (Yahoo):** Única fonte configurada. Todos os eventos são classificados como `"Dividendo"`.
+
+#### 4.6 Algoritmo de Merge e Deduplicação (`mergeAndDedupDividends`)
+
+Quando primary e secondary retornam dados, o gateway executa um merge inteligente:
+
+1. **Define a base:** Para FIIs/FIAGROs, a base são os eventos da primary (B3). Para ações, a base são os da secondary (Fundamentus), pois preserva a distinção JCP vs Dividendo.
+2. **Itera eventos secundários:** Para cada evento da fonte não-base, verifica se já existe na lista consolidada:
+   - **FII/FIAGRO:** Match por `Month() + Year()` (1 rendimento por mês).
+   - **Ações/ETFs/BDR:** Match por data exata (`Date.Equal()`).
+3. **Se não existe:** Adiciona o evento ao consolidado.
+4. **Pós-processamento FII:** Reescreve `"Dividendo"` → `"Rendimento"` em todos os eventos.
+5. **Ordena** por data decrescente.
+
+#### 4.7 Persistência e Fuzzy Matching (`DividendWorker` + `AssetEventRepo`)
+
+O `DividendWorker` (executado a cada 24h) sincroniza os proventos obtidos para a tabela `asset_event` do PostgreSQL:
+
+1. Busca todos os ativos ativos via `GetAllAssets()`.
+2. Para cada ativo, chama `marketService.GetDividends(ticker, assetType)` (que aciona o gateway).
+3. Para cada `DividendEvent` retornado, aplica o **Fuzzy Matching** antes de persistir:
+
+```mermaid
+flowchart TD
+    A["DividendEvent da fonte"] --> B{"Existe evento no BD com\nmesmo asset_id + cum_date?"}
+    B -- Não --> F["INSERT novo registro"]
+    B -- Sim --> C{"Mesmo type?"}
+    C -- Não --> B2{"Outro match?"}
+    B2 -- Sim --> C
+    B2 -- Não --> F
+    C -- Sim --> D{"|gross_amount diff| ≤ 0,05?"}
+    D -- Não --> B2
+    D -- Sim --> E{"|diff| < 1e-6 E\npayment_date idêntica?"}
+    E -- Sim --> G["⏭️ SKIP — sem escrita no BD"]
+    E -- Não --> H["UPDATE gross_amount + payment_date"]
+
+    style G fill:#ffd60a,color:#000
+    style F fill:#2d6a4f,color:#fff
+    style H fill:#40916c,color:#fff
+```
+
+A chave de unicidade no banco é `(asset_id, cum_date, type, gross_amount)`. O `ON CONFLICT` do `UPSERT` atualiza apenas `payment_date` e `net_amount` quando há conflito exato.
+
+#### 4.8 Cálculo de Proventos por Carteira e Regras Tributárias
+
+O `portfolio.Service.GetPortfolioDividends` calcula os proventos efetivos recebidos por cada carteira:
+
+1. **Posição na Data Com:** Para cada `AssetEvent`, calcula a quantidade de cotas/ações que o usuário detinha na `cum_date`, iterando cronologicamente as transações (`BUY`, `SELL`, `SPLIT`, `REVERSE_SPLIT`, `BONUS`).
+2. **Valor bruto:** `grossAmount = quantity × event.GrossAmount`
+3. **Regras de imposto por tipo:**
+
+| Moeda | Tipo do Provento | Alíquota | Cálculo |
+|---|---|---|---|
+| BRL | Dividendo (Ações) | **0%** | `net = gross` |
+| BRL | Rendimento (FII/FIAGRO) | **0%** | `net = gross` |
+| BRL | Amortização | **0%** | `net = gross` |
+| BRL | JCP | **15%** | `net = gross × 0.85` |
+| BRL | ETF (qualquer tipo) | **15%** | `net = gross × 0.85` |
+| USD | Qualquer tipo | **30%** | `net = gross × 0.70` |
+
+4. **Conversão cambial:** Para ativos em USD, o valor é convertido para BRL usando a taxa histórica `USDBRL=X` da `cum_date` via LOCF.
+
+#### Componentes de Código (Go):
+- **Gateway:** `market.DividendGateway`, `market.DividendSource` (interface), `market.DividendEvent` (modelo canônico)
+- **Fontes:** `market.B3DividendSource`, `market.FundamentusDividendSource`, `market.StockAnalysisDividendSource`, `market.YahooDividendSource`
+- **Clients:** `market.B3Client` (API REST B3), `market.FundamentusClient` (scraping HTML), `market.StockAnalysisClient` (scraping HTML), `market.YahooClient` (API REST Yahoo)
+- **Worker:** `portfolio.DividendWorker.SyncAllDividends`
+- **Repositório:** `portfolio.Repository.UpsertAssetEvent`, `GetAssetEvents`, `GetAssetEventsByDate`, `UpdateAssetEventValueByID`
+- **Serviço:** `portfolio.Service.GetPortfolioDividends`
+
+---
+
+### 5. Trabalhadores em Segundo Plano (Background Workers)
 
 A plataforma executa tarefas periódicas cruciais (como cotações e dividendos) em segundo plano através de um `WorkerManager` centralizado (`backend/internal/worker`). 
 
@@ -605,7 +815,7 @@ sequenceDiagram
 
 ---
 
-### 5. Integração com Bot do Telegram (Telegram Bot)
+### 6. Integração com Bot do Telegram (Telegram Bot)
 O bot do Telegram (`telebot.v3`) atua como uma interface de conversação bidirecional totalmente integrada ao fluxo do stock-pulse.
 - **Emparelhamento Seguro de Contas (Secure Cross-Pairing Flow):**
   1. O usuário autenticado no navegador inicia a integração e faz uma chamada `POST /api/v1/telegram/link`.
