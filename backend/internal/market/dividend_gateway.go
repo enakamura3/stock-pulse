@@ -216,15 +216,7 @@ func enrichWithFallback(baseEvents, fallbackEvents []DividendEvent, assetType st
 					break
 				}
 			} else {
-				// Fuzzy matching para Ações: verifica data exata OU (mesmo mês/ano e valor muito próximo)
-				isSameMonth := fEv.Date.Month() == bEv.Date.Month() && fEv.Date.Year() == bEv.Date.Year()
-				
-				diff := fEv.Amount - bEv.Amount
-				if diff < 0 {
-					diff = -diff
-				}
-
-				if fEv.Date.Equal(bEv.Date) || (isSameMonth && diff <= 0.05) {
+				if fEv.Date.Equal(bEv.Date) {
 					covered = true
 					break
 				}
@@ -275,14 +267,7 @@ func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType stri
 				// Para Ações: se o Fundamentus (base) já reportou QUALQUER provento nesta Data Com,
 				// ignoramos o evento do StockAnalysis (secundário). O StockAnalysis costuma agrupar
 				// JCP + Dividendo do mesmo dia num único valor, o que quebra a conciliação.
-				// Adicionando também fuzzy match para proteger contra desvios de data.
-				isSameMonth := sEv.Date.Month() == dEv.Date.Month() && sEv.Date.Year() == dEv.Date.Year()
-				diff := sEv.Amount - dEv.Amount
-				if diff < 0 {
-					diff = -diff
-				}
-
-				if sEv.Date.Equal(dEv.Date) || (isSameMonth && diff <= 0.05) {
+				if sEv.Date.Equal(dEv.Date) {
 					exists = true
 					break
 				}
