@@ -33,14 +33,22 @@ func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker s
 	layout := "Jan 2, 2006"
 
 	for _, raw := range rawDividends {
-		exDateStr := raw.RecordDate
-		if exDateStr == "-" || exDateStr == "n/a" || exDateStr == "" {
-			exDateStr = raw.ExDivDate // Fallback to Ex-Div Date
+		dateStr := raw.RecordDate
+		usedExDate := false
+		if dateStr == "-" || dateStr == "n/a" || dateStr == "" {
+			dateStr = raw.ExDivDate // Fallback to Ex-Div Date
+			usedExDate = true
 		}
 
-		exDate, err := time.Parse(layout, exDateStr)
+		cumDate, err := time.Parse(layout, dateStr)
 		if err != nil {
 			continue
+		}
+		
+		// A normalização da Data Ex: a Data Com é o dia anterior à Data Ex.
+		// Se já pegamos a RecordDate, ela já é a Data Com. Se usamos a Ex-Div Date, subtraímos 1 dia.
+		if usedExDate {
+			cumDate = cumDate.Add(-24 * time.Hour)
 		}
 
 		amtStr := strings.ReplaceAll(raw.Amount, "$", "")
@@ -51,7 +59,7 @@ func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker s
 			continue
 		}
 
-		paymentDate := exDate
+		paymentDate := cumDate
 		if raw.PayDate != "-" && raw.PayDate != "n/a" && raw.PayDate != "" {
 			pd, err := time.Parse(layout, raw.PayDate)
 			if err == nil {
@@ -63,12 +71,10 @@ func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker s
 		upperType := strings.ToUpper(assetType)
 		if upperType == "FII" || upperType == "FIAGRO" {
 			cleanType = "Rendimento"
-			// Pedido pelo usuário: subtrair 1 dia da data ex
-			exDate = exDate.Add(-24 * time.Hour)
 		}
 
 		events = append(events, DividendEvent{
-			Date:        exDate,
+			Date:        cumDate,
 			PaymentDate: paymentDate,
 			Amount:      amount,
 			Type:        cleanType,

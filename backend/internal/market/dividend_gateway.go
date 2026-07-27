@@ -35,7 +35,7 @@ func NewDividendGateway(
 		"STOCK_BR": {
 			{source: b3, role: "primary"},
 			{source: fundamentus, role: "secondary"},
-			{source: yahoo, role: "fallback"},
+			{source: stockAnalysis, role: "fallback"},
 		},
 		"FII": {
 			{source: b3, role: "primary"},
