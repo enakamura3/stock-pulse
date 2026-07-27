@@ -57,6 +57,12 @@ func TestYahooDividendSource_GetDividends(t *testing.T) {
 		assert.True(t, found15)
 	})
 
+	t.Run("Appends .SA for Brazilian assets", func(t *testing.T) {
+		events, err := source.GetDividends(context.Background(), "VALE3", "STOCK_BR")
+		assert.NoError(t, err)
+		assert.Len(t, events, 2)
+	})
+
 	t.Run("Error", func(t *testing.T) {
 		res, err := source.GetDividends(context.Background(), "ERR", "STOCK_BR")
 		assert.Error(t, err)

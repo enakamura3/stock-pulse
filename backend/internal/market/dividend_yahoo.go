@@ -23,7 +23,13 @@ func (s *YahooDividendSource) SupportedAssetTypes() []string {
 }
 
 func (s *YahooDividendSource) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
-	rawDividends, err := s.client.FetchDividends(ctx, ticker)
+	queryTicker := ticker
+	isBR := assetType == "STOCK_BR" || assetType == "FII" || assetType == "FIAGRO" || assetType == "ETF_BR" || assetType == "BDR"
+	if isBR && len(ticker) > 0 && ticker[len(ticker)-3:] != ".SA" && ticker[len(ticker)-3:] != ".sa" {
+		queryTicker += ".SA"
+	}
+
+	rawDividends, err := s.client.FetchDividends(ctx, queryTicker)
 	if err != nil {
 		return nil, err
 	}
