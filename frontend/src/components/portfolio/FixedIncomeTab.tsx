@@ -25,6 +25,45 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
   const [redeemDate, setRedeemDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isSubmittingRedeem, setIsSubmittingRedeem] = useState(false);
 
+  type SortKey = 'institution' | 'rate' | 'start_date' | 'maturity_date' | 'total_invested' | 'gross_value' | 'net_value' | 'net_return_percent';
+  type SortDir = 'asc' | 'desc';
+
+  const [sortKey, setSortKey] = useState<SortKey>('institution');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const sortedPositions = [...positions].sort((a, b) => {
+    let aVal: number | string = 0;
+    let bVal: number | string = 0;
+    switch (sortKey) {
+      case 'institution': aVal = a.asset?.institution || ''; bVal = b.asset?.institution || ''; break;
+      case 'rate': aVal = a.asset?.rate ?? 0; bVal = b.asset?.rate ?? 0; break;
+      case 'start_date': aVal = a.start_date || ''; bVal = b.start_date || ''; break;
+      case 'maturity_date': aVal = a.asset?.maturity_date || ''; bVal = b.asset?.maturity_date || ''; break;
+      case 'total_invested': aVal = a.total_invested ?? 0; bVal = b.total_invested ?? 0; break;
+      case 'gross_value': aVal = a.gross_value ?? 0; bVal = b.gross_value ?? 0; break;
+      case 'net_value': aVal = a.net_value ?? 0; bVal = b.net_value ?? 0; break;
+      case 'net_return_percent': aVal = a.net_return_percent ?? 0; bVal = b.net_return_percent ?? 0; break;
+    }
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+    return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+  });
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
+    return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -210,19 +249,19 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
           <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>Instituição / Produto</th>
-                <th className="text-right">Taxa</th>
-                <th className="text-right">Aplicação</th>
-                <th className="text-right">Vencimento</th>
-                <th className="text-right">Valor Aplicado</th>
-                <th className="text-right">Valor Bruto</th>
-                <th className="text-right">Valor Líquido</th>
-                <th className="text-right">Rent. (%)</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => handleSort('institution')}>Instituição / Produto {sortIcon('institution')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('rate')}>Taxa {sortIcon('rate')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('start_date')}>Aplicação {sortIcon('start_date')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('maturity_date')}>Vencimento {sortIcon('maturity_date')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('total_invested')}>Valor Aplicado {sortIcon('total_invested')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('gross_value')}>Valor Bruto {sortIcon('gross_value')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_value')}>Valor Líquido {sortIcon('net_value')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_return_percent')}>Rent. (%) {sortIcon('net_return_percent')}</th>
                 <th className="text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {positions.map(pos => {
+              {sortedPositions.map(pos => {
                 const isMatured = pos.is_matured;
                 const isZeroDate = pos.asset.maturity_date && pos.asset.maturity_date.startsWith('0001');
                 const isNearMaturity = !isZeroDate && pos.days_to_maturity <= 30 && !isMatured;
