@@ -86,6 +86,51 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  type SortKey = 'ticker' | 'treasury_type' | 'maturity_date' | 'total_invested' | 'gross_value' | 'net_value' | 'net_return' | 'iof_tax' | 'ir_tax' | 'b3_fee' | 'status';
+  type SortDir = 'asc' | 'desc';
+
+  const [sortKey, setSortKey] = useState<SortKey>('ticker');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const sortedPositions = [...positions].sort((a, b) => {
+    let aVal: number | string = 0;
+    let bVal: number | string = 0;
+    switch (sortKey) {
+      case 'ticker': aVal = a.ticker || ''; bVal = b.ticker || ''; break;
+      case 'treasury_type': aVal = a.treasury_type || ''; bVal = b.treasury_type || ''; break;
+      case 'maturity_date': aVal = a.maturity_date || ''; bVal = b.maturity_date || ''; break;
+      case 'total_invested': aVal = a.total_invested ?? 0; bVal = b.total_invested ?? 0; break;
+      case 'gross_value': aVal = a.gross_value ?? 0; bVal = b.gross_value ?? 0; break;
+      case 'net_value': aVal = a.net_value ?? 0; bVal = b.net_value ?? 0; break;
+      case 'net_return': 
+        aVal = a.total_invested > 0 ? ((a.net_value - a.total_invested) / a.total_invested) : 0;
+        bVal = b.total_invested > 0 ? ((b.net_value - b.total_invested) / b.total_invested) : 0;
+        break;
+      case 'iof_tax': aVal = a.iof_tax ?? 0; bVal = b.iof_tax ?? 0; break;
+      case 'ir_tax': aVal = a.ir_tax ?? 0; bVal = b.ir_tax ?? 0; break;
+      case 'b3_fee': aVal = a.b3_fee ?? 0; bVal = b.b3_fee ?? 0; break;
+      case 'status': aVal = a.is_matured ? 1 : 0; bVal = b.is_matured ? 1 : 0; break;
+    }
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+    return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+  });
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
+    return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   // ── Fetchers ────────────────────────────────────────────────────────────────
 
   const fetchPerformance = useCallback(async () => {
@@ -458,22 +503,22 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
             <table className="data-table" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>Título</th>
-                  <th>Tipo</th>
-                  <th className="text-right">Vencimento</th>
-                  <th className="text-right">Aplicado</th>
-                  <th className="text-right">Bruto</th>
-                  <th className="text-right">Líquido</th>
-                  <th className="text-right">Retorno Líq.</th>
-                  <th className="text-right">IOF</th>
-                  <th className="text-right">IR</th>
-                  <th className="text-right">Taxa B3</th>
-                  <th className="text-center">Status</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('ticker')}>Título {sortIcon('ticker')}</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('treasury_type')}>Tipo {sortIcon('treasury_type')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('maturity_date')}>Vencimento {sortIcon('maturity_date')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('total_invested')}>Aplicado {sortIcon('total_invested')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('gross_value')}>Bruto {sortIcon('gross_value')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_value')}>Líquido {sortIcon('net_value')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_return')}>Retorno Líq. {sortIcon('net_return')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('iof_tax')}>IOF {sortIcon('iof_tax')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('ir_tax')}>IR {sortIcon('ir_tax')}</th>
+                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('b3_fee')}>Taxa B3 {sortIcon('b3_fee')}</th>
+                  <th className="text-center" style={{ cursor: 'pointer' }} onClick={() => handleSort('status')}>Status {sortIcon('status')}</th>
                   <th className="text-center">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {positions.map((pos, i) => {
+                {sortedPositions.map((pos, i) => {
                   const liqReturn = pos.total_invested > 0
                     ? ((pos.net_value - pos.total_invested) / pos.total_invested) * 100
                     : 0;
