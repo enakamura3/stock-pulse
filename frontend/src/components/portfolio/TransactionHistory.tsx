@@ -157,8 +157,8 @@ export default function TransactionHistory({
   onLaunchOperation,
   kpiCurrency,
 }: TransactionHistoryProps) {
-  const [filterTxYear, setFilterTxYear]   = useState<string>('Todos');
-  const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
+  const [filterTxYear, setFilterTxYear]   = useState<string>(() => String(new Date().getFullYear()));
+  const [filterTxMonth, setFilterTxMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [filterTxType, setFilterTxType]   = useState<string>('Todos');
   const [currentPage, setCurrentPage]     = useState<number>(1);
 
@@ -271,10 +271,13 @@ export default function TransactionHistory({
   // ── Derived data for selects ───────────────────────────────────────────────
   const tickers       = useMemo(() => Array.from(new Set(transactions.map((tx) => tx.asset_name))).sort(), [transactions]);
   const availableYears = useMemo(
-    () =>
-      Array.from(new Set(transactions.map((tx) => (tx.date ? tx.date.substring(0, 4) : ''))))
+    () => {
+      const years = new Set(transactions.map((tx) => (tx.date ? tx.date.substring(0, 4) : '')));
+      years.add(String(new Date().getFullYear()));
+      return Array.from(years)
         .filter((y) => y !== '')
-        .sort((a, b) => b.localeCompare(a)),
+        .sort((a, b) => b.localeCompare(a));
+    },
     [transactions]
   );
 
