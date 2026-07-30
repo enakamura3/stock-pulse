@@ -375,7 +375,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 		}
 
 		if tx.Type == "BUY" {
-			if pos.Quantity == 0 {
+			if math.Abs(pos.Quantity) < 1e-6 {
 				pos.Quantity = tx.Quantity
 				pos.TotalCost = tx.Quantity * tx.UnitPrice * tx.ExchangeRate
 				pos.AveragePrice = tx.UnitPrice
@@ -791,7 +791,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				cost := dailyCosts[assetID]
 
 				// Se o preço não for encontrado, usa o custo médio de aquisição como fallback temporário
-				if price == 0 && qty > 0 {
+				if math.Abs(price) < 1e-6 && qty > 0 {
 					price = cost / qty
 				}
 
@@ -799,13 +799,13 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				rate := 1.0
 				if dailyCurrencies[assetID] != p.BaseCurrency && p.BaseCurrency == "BRL" && usdBrlID != "" {
 					rate = getPriceLOCF(usdBrlID, currDate)
-					if rate == 0 {
+					if math.Abs(rate) < 1e-6 {
 						rate = 5.0 // Fallback seguro
 					}
 				}
 
 				adjFactor := dailySplitAdjustments[assetID]
-				if adjFactor == 0 {
+				if math.Abs(adjFactor) < 1e-6 {
 					adjFactor = 1.0
 				}
 				adjustedQty := qty * adjFactor
