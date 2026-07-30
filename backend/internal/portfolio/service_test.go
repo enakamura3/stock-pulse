@@ -86,6 +86,19 @@ func (m *MockPortfolioRepo) GetDailyPrices(ctx context.Context, assetID string, 
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetDailyPricesBatch(ctx context.Context, assetIDs []string, startDate, endDate time.Time) ([]DailyPrice, error) {
+	var allPrices []DailyPrice
+	for _, id := range assetIDs {
+		prices, err := m.GetDailyPrices(ctx, id, startDate, endDate)
+		if err != nil && err.Error() != "ignored" { // Avoid failing immediately if a specific test ignores some errors
+			// Wait, the tests might mock errors. If err is returned, maybe we just return it.
+			return nil, err
+		}
+		allPrices = append(allPrices, prices...)
+	}
+	return allPrices, nil
+}
+
 func (m *MockPortfolioRepo) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
 	args := m.Called(ctx, ticker)
 	return args.String(0), args.Error(1)
