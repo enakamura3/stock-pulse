@@ -77,6 +77,7 @@ type PortfolioRepository interface {
 	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	SaveDailyPrices(ctx context.Context, assetID string, prices []DailyPrice) error
 	GetDailyPrices(ctx context.Context, assetID string, startDate, endDate time.Time) ([]DailyPrice, error)
+	GetDailyPricesBatch(ctx context.Context, assetIDs []string, startDate, endDate time.Time) ([]DailyPrice, error)
 	GetAssetByTicker(ctx context.Context, ticker string) (string, error)
 	GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error)
 	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
@@ -700,13 +701,22 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 
 	// Mapeia preços históricos no formato: pricesMap[asset_id][date_string] = close_price
 	pricesMap := make(map[string]map[string]float64)
+	
+	// Prepara a lista de IDs para buscar em batch
+	var assetIDsToFetch []string
 	for assetID := range assetIDsMap {
 		pricesMap[assetID] = make(map[string]float64)
-		hist, err := s.repo.GetDailyPrices(ctx, assetID, txs[0].ExecutedAt, endDate)
-		if err == nil {
-			for _, dp := range hist {
-				pricesMap[assetID][dp.PriceDate.Format("2006-01-02")] = dp.ClosePrice
+		assetIDsToFetch = append(assetIDsToFetch, assetID)
+	}
+
+	// Faz uma única query (batch) buscando todos os preços históricos da carteira
+	histBatch, err := s.repo.GetDailyPricesBatch(ctx, assetIDsToFetch, txs[0].ExecutedAt, endDate)
+	if err == nil {
+		for _, dp := range histBatch {
+			if pricesMap[dp.AssetID] == nil {
+				pricesMap[dp.AssetID] = make(map[string]float64)
 			}
+			pricesMap[dp.AssetID][dp.PriceDate.Format("2006-01-02")] = dp.ClosePrice
 		}
 	}
 

@@ -380,6 +380,34 @@ func (r *Repository) GetDailyPrices(ctx context.Context, assetID string, startDa
 	return list, nil
 }
 
+// GetDailyPricesBatch busca a série temporal de preços históricos de múltiplos ativos.
+func (r *Repository) GetDailyPricesBatch(ctx context.Context, assetIDs []string, startDate, endDate time.Time) ([]DailyPrice, error) {
+	if len(assetIDs) == 0 {
+		return nil, nil
+	}
+	query := `
+		SELECT asset_id, price_date, close_price
+		FROM asset_daily_price
+		WHERE asset_id = ANY($1) AND price_date BETWEEN $2 AND $3
+		ORDER BY price_date ASC
+	`
+	rows, err := r.db.Query(ctx, query, assetIDs, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []DailyPrice
+	for rows.Next() {
+		var p DailyPrice
+		if err := rows.Scan(&p.AssetID, &p.PriceDate, &p.ClosePrice); err != nil {
+			return nil, err
+		}
+		list = append(list, p)
+	}
+	return list, nil
+}
+
 // GetAssetByTicker busca o ID de um ativo pelo ticker.
 func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
 	var id string
