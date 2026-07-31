@@ -91,7 +91,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const initRef = React.useRef(false);
+
   useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+
     const initAuth = async () => {
       await fetchMe();
       setIsLoading(false);
