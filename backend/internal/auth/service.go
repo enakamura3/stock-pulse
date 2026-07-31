@@ -116,7 +116,7 @@ func comparePasswordAndHash(password, encodedHash string) (bool, error) {
 func (s *Service) Register(ctx context.Context, name, email, password string) (*User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	name = strings.TrimSpace(name)
-	
+
 	if email == "" || name == "" {
 		return nil, errors.New("todos os campos são obrigatórios")
 	}

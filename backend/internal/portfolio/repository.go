@@ -119,7 +119,7 @@ func (r *Repository) CreatePortfolio(ctx context.Context, userID, name, baseCurr
 	if err != nil {
 		return nil, fmt.Errorf("erro ao criar portfolio: %w", err)
 	}
-	
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("erro ao commitar transação: %w", err)
 	}

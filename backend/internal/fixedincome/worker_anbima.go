@@ -12,9 +12,9 @@ import (
 // que cálculos de DU/252 funcionem para compras retroativas.
 // Nas execuções seguintes, garante que o ano corrente e o próximo estejam populados.
 type AnbimaHolidayWorker struct {
-	repo        Repository
-	client      AnbimaClient
-	startYear   int // Ano mínimo do histórico (ex: 2010)
+	repo      Repository
+	client    AnbimaClient
+	startYear int // Ano mínimo do histórico (ex: 2010)
 }
 
 func NewAnbimaHolidayWorker(repo Repository, client AnbimaClient) *AnbimaHolidayWorker {

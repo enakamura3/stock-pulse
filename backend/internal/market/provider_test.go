@@ -14,11 +14,11 @@ import (
 func setupProviderTest(handler http.HandlerFunc) (*YahooFinanceProvider, *httptest.Server) {
 	server := httptest.NewServer(handler)
 	p := NewYahooFinanceProvider()
-	
+
 	// Override the HTTP client transport to route to our test server
 	// Since the URL is hardcoded, we will intercept requests with a custom RoundTripper
 	p.client.Transport = &mockTransport{serverURL: server.URL}
-	
+
 	return p, server
 }
 
@@ -197,7 +197,7 @@ func TestProvider_SearchAssets(t *testing.T) {
 
 func TestProvider_NewRequestError(t *testing.T) {
 	p := NewYahooFinanceProvider()
-	
+
 	// If URL is invalid, NewRequestWithContext fails
 	_, err := p.SearchAssets(nil, "AAPL") // nil context forces error
 	assert.Error(t, err)
@@ -210,7 +210,7 @@ func TestProvider_DoError(t *testing.T) {
 	p := NewYahooFinanceProvider()
 	// No server mock, default client to a bad scheme to force do error
 	p.client.Transport = &mockTransport{serverURL: "http://127.0.0.1:0"} // nothing running on port 0
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 

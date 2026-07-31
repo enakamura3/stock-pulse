@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +17,7 @@ func TestYahooDividendSource_GetDividends(t *testing.T) {
 			"1609459200": {"amount": 0.5, "date": 1609459200},
 			"1625097600": {"amount": 1.5, "date": 1625097600}
 		}}}]}}`
-		
+
 		if strings.Contains(req.URL.String(), "ERR") {
 			return &http.Response{
 				StatusCode: 500,
@@ -43,7 +42,7 @@ func TestYahooDividendSource_GetDividends(t *testing.T) {
 		events, err := source.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
 		assert.Len(t, events, 2)
-		
+
 		var found05, found15 bool
 		for _, e := range events {
 			if e.Amount == 0.5 {

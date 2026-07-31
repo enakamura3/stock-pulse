@@ -28,7 +28,7 @@ func TestB3DividendSource_GetDividends(t *testing.T) {
 				"paymentDate": "10/01/2026"
 			}
 		]}`
-		
+
 		if strings.Contains(req.URL.String(), "GetListedFundDividends") {
 			jsonResp = `{"results": [
 				{
@@ -54,7 +54,7 @@ func TestB3DividendSource_GetDividends(t *testing.T) {
 		events, err := source.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
 		assert.Len(t, events, 2)
-		
+
 		assert.Equal(t, "Dividendo", events[0].Type)
 		assert.Equal(t, 2.5499, events[0].Amount)
 		assert.Equal(t, time.Date(2026, 2, 12, 0, 0, 0, 0, time.UTC), events[0].Date)
@@ -77,7 +77,7 @@ func TestB3DividendSource_GetDividends(t *testing.T) {
 		assert.Equal(t, "b3", source.Name())
 		assert.Contains(t, source.SupportedAssetTypes(), "STOCK_BR")
 	})
-	
+
 	t.Run("Fetch Error", func(t *testing.T) {
 		errClient := NewB3Client()
 		errClient.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
@@ -87,15 +87,15 @@ func TestB3DividendSource_GetDividends(t *testing.T) {
 			}
 		})
 		errSource := NewB3DividendSource(errClient)
-		
+
 		res, err := errSource.GetDividends(context.Background(), "PETR4", "STOCK_BR")
 		assert.Error(t, err)
 		assert.Nil(t, res)
-		
+
 		res, err = errSource.GetDividends(context.Background(), "MXRF11", "FII")
 		assert.Error(t, err)
 		assert.Nil(t, res)
-		
+
 		_, err = errClient.FetchCompanies(context.Background())
 		assert.Error(t, err)
 	})

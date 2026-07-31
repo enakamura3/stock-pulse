@@ -49,11 +49,11 @@ func TestGetUnifiedTransactions_IncludesTreasury(t *testing.T) {
 	maturityDate := time.Date(2028, 12, 31, 0, 0, 0, 0, time.UTC)
 	mockRepo.On("GetTransactionsByPortfolio", ctx, portfolioID).Return([]Transaction{
 		{
-			ID:       "tx-fi-1",
-			AssetID:  "asset-fi-1",
-			Type:     "SUBSCRIPTION",
-			Amount:   5000.0,
-			Date:     time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC),
+			ID:      "tx-fi-1",
+			AssetID: "asset-fi-1",
+			Type:    "SUBSCRIPTION",
+			Amount:  5000.0,
+			Date:    time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC),
 		},
 	}, nil)
 
@@ -150,18 +150,18 @@ func TestGetUnifiedTransactions_Hibrido_OrMissingAsset(t *testing.T) {
 	maturityDate := time.Date(2028, 12, 31, 0, 0, 0, 0, time.UTC)
 	mockRepo.On("GetTransactionsByPortfolio", ctx, portfolioID).Return([]Transaction{
 		{
-			ID:       "tx-fi-1",
-			AssetID:  "asset-fi-1",
-			Type:     "SUBSCRIPTION",
-			Amount:   5000.0,
-			Date:     time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC),
+			ID:      "tx-fi-1",
+			AssetID: "asset-fi-1",
+			Type:    "SUBSCRIPTION",
+			Amount:  5000.0,
+			Date:    time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC),
 		},
 		{
-			ID:       "tx-fi-2",
-			AssetID:  "asset-fi-missing",
-			Type:     "SUBSCRIPTION",
-			Amount:   3000.0,
-			Date:     time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC),
+			ID:      "tx-fi-2",
+			AssetID: "asset-fi-missing",
+			Type:    "SUBSCRIPTION",
+			Amount:  3000.0,
+			Date:    time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC),
 		},
 	}, nil)
 

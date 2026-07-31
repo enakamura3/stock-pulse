@@ -35,7 +35,7 @@ func TestWorkerManager_Trigger(t *testing.T) {
 	job := func(ctx context.Context) {
 		atomic.AddInt32(&counter, 1)
 	}
-	
+
 	w := NewWorker("ManualWorker", "Manual Description", 1*time.Hour, job)
 	m.Register(w)
 

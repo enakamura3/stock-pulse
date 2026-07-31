@@ -63,15 +63,15 @@ func cleanupDB(ctx context.Context, pool *pgxpool.Pool) error {
 // Structs matching requirements for the endpoints
 
 type TxRequest struct {
-	Ticker          string    `json:"ticker"`
-	TreasuryType    string    `json:"treasury_type"` // SELIC, PREFIXADO, IPCA+
-	MaturityDate    string    `json:"maturity_date"`
-	HasCoupons      bool      `json:"has_coupons"`
-	Type            string    `json:"type"` // SUBSCRIPTION, REDEMPTION
-	Quantity        float64   `json:"quantity"`
-	UnitPrice       float64   `json:"unit_price"`
-	ContractedRate  float64   `json:"contracted_rate"`
-	TransactionDate string    `json:"transaction_date"`
+	Ticker          string  `json:"ticker"`
+	TreasuryType    string  `json:"treasury_type"` // SELIC, PREFIXADO, IPCA+
+	MaturityDate    string  `json:"maturity_date"`
+	HasCoupons      bool    `json:"has_coupons"`
+	Type            string  `json:"type"` // SUBSCRIPTION, REDEMPTION
+	Quantity        float64 `json:"quantity"`
+	UnitPrice       float64 `json:"unit_price"`
+	ContractedRate  float64 `json:"contracted_rate"`
+	TransactionDate string  `json:"transaction_date"`
 }
 
 type PositionJSON struct {
@@ -173,7 +173,7 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 		var assetID string
 		err = tx.QueryRow(ctx, "SELECT id FROM asset WHERE ticker = $1", body.Ticker).Scan(&assetID)
 		if err == pgx.ErrNoRows {
-			err = tx.QueryRow(ctx, 
+			err = tx.QueryRow(ctx,
 				"INSERT INTO asset (ticker, name, asset_type, currency) VALUES ($1, $2, 'TREASURY', 'BRL') RETURNING id",
 				body.Ticker, body.Ticker,
 			).Scan(&assetID)
@@ -342,7 +342,7 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 				// B3 Netting daily fee (0.20% a.a.)
 				var b3Fee float64
 				dailyB3Rate := math.Pow(1.0+0.0020, 1.0/252.0) - 1.0
-				
+
 				if body.TreasuryType == "SELIC" {
 					// Selic R$ 10,000 exemption rule
 					exemptFraction := 1.0
@@ -385,7 +385,7 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 
 				// Update lot remaining quantity
 				newRemaining := l.remainingQty - depleteQty
-				_, err = tx.Exec(ctx, 
+				_, err = tx.Exec(ctx,
 					"UPDATE treasury_transactions SET remaining_quantity = $1, updated_at = NOW() WHERE id = $2",
 					newRemaining, l.id,
 				)
@@ -423,12 +423,12 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 			tx.Commit(ctx)
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"id": redemptionTxID,
+				"id":           redemptionTxID,
 				"gross_amount": totalGross,
-				"iof_tax": totalIOF,
-				"ir_tax": totalIR,
-				"b3_fee": totalB3,
-				"net_amount": totalNet,
+				"iof_tax":      totalIOF,
+				"ir_tax":       totalIR,
+				"b3_fee":       totalB3,
+				"net_amount":   totalNet,
 			})
 		}
 	})
@@ -609,7 +609,7 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 		var assetID string
 		err = tx.QueryRow(ctx, "SELECT id FROM asset WHERE ticker = $1", body.Ticker).Scan(&assetID)
 		if err == pgx.ErrNoRows {
-			err = tx.QueryRow(ctx, 
+			err = tx.QueryRow(ctx,
 				"INSERT INTO asset (ticker, name, asset_type, currency) VALUES ($1, $2, 'TREASURY', 'BRL') RETURNING id",
 				body.Ticker, body.Ticker,
 			).Scan(&assetID)
@@ -677,7 +677,7 @@ func setupTestRouter(pool *pgxpool.Pool) chi.Router {
 func TestTreasuryE2E_Tier1(t *testing.T) {
 	pool := getTestDB(t)
 	ctx := context.Background()
-	
+
 	err := cleanupDB(ctx, pool)
 	require.NoError(t, err)
 
@@ -705,13 +705,13 @@ func TestTreasuryE2E_Tier1(t *testing.T) {
 			TransactionDate: "2026-06-01",
 		}
 		jsonBody, _ := json.Marshal(body)
-		
+
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions", portfolioID), bytes.NewBuffer(jsonBody))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
-		
+
 		var resp map[string]interface{}
 		json.Unmarshal(rec.Body.Bytes(), &resp)
 		assert.NotEmpty(t, resp["id"])
@@ -728,12 +728,12 @@ func TestTreasuryE2E_Tier1(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		var positions []PositionJSON
 		json.Unmarshal(rec.Body.Bytes(), &positions)
-		
+
 		require.Len(t, positions, 1)
 		pos := positions[0]
 		assert.Equal(t, "TESOURO SELIC 2029", pos.Ticker)
 		assert.Equal(t, 21000.0, pos.TotalInvested)
-		
+
 		// Ensure that the exemption proportional calculation is evaluated
 		// 10000 / 21000 = 47.61% exempt. Taxable fraction = 52.38%.
 		// Ensure non-zero or verified math runs
@@ -754,7 +754,7 @@ func TestTreasuryE2E_Tier1(t *testing.T) {
 			TransactionDate: "2026-06-01",
 		}
 		jsonSub, _ := json.Marshal(bodySub)
-		
+
 		reqSub := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions", portfolioID), bytes.NewBuffer(jsonSub))
 		recSub := httptest.NewRecorder()
 		router.ServeHTTP(recSub, reqSub)
@@ -794,7 +794,7 @@ func TestTreasuryE2E_Tier1(t *testing.T) {
 func TestTreasuryE2E_Tier2(t *testing.T) {
 	pool := getTestDB(t)
 	ctx := context.Background()
-	
+
 	err := cleanupDB(ctx, pool)
 	require.NoError(t, err)
 
@@ -822,7 +822,7 @@ func TestTreasuryE2E_Tier2(t *testing.T) {
 			TransactionDate: "2026-06-01",
 		}
 		jsonBody, _ := json.Marshal(body)
-		
+
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions", portfolioID), bytes.NewBuffer(jsonBody))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
@@ -835,7 +835,7 @@ func TestTreasuryE2E_Tier2(t *testing.T) {
 
 		var positions []PositionJSON
 		json.Unmarshal(recPos.Body.Bytes(), &positions)
-		
+
 		var testSelicPos *PositionJSON
 		for i := range positions {
 			if positions[i].Ticker == "TESOURO SELIC 2029 EX" {
@@ -850,7 +850,7 @@ func TestTreasuryE2E_Tier2(t *testing.T) {
 	t.Run("Selic Exemption Boundary - R$ 10,000.01", func(t *testing.T) {
 		// Clean up for precision check
 		cleanupDB(ctx, pool)
-		
+
 		// Re-create user and portfolio
 		err = pool.QueryRow(ctx, "INSERT INTO \"user\" (email, password_hash, name) VALUES ('e2e_fi_c@test.com', 'hash', 'Test FI User C') RETURNING id").Scan(&userID)
 		require.NoError(t, err)
@@ -869,7 +869,7 @@ func TestTreasuryE2E_Tier2(t *testing.T) {
 			TransactionDate: "2026-06-01",
 		}
 		jsonBody, _ := json.Marshal(body)
-		
+
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions", portfolioID), bytes.NewBuffer(jsonBody))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
@@ -882,7 +882,7 @@ func TestTreasuryE2E_Tier2(t *testing.T) {
 
 		var positions []PositionJSON
 		json.Unmarshal(recPos.Body.Bytes(), &positions)
-		
+
 		require.Len(t, positions, 1)
 		// The proportion of taxable asset is (10000.01 - 10000) / 10000.01 = 0.0000009999
 		// Because this is positive and we simulate business days, the fee is positive
@@ -895,7 +895,7 @@ func TestTreasuryE2E_Tier2(t *testing.T) {
 func TestTreasuryE2E_Tier3(t *testing.T) {
 	pool := getTestDB(t)
 	ctx := context.Background()
-	
+
 	err := cleanupDB(ctx, pool)
 	require.NoError(t, err)
 
@@ -985,7 +985,7 @@ func TestTreasuryE2E_Tier3(t *testing.T) {
 func TestTreasuryE2E_Tier4(t *testing.T) {
 	pool := getTestDB(t)
 	ctx := context.Background()
-	
+
 	err := cleanupDB(ctx, pool)
 	require.NoError(t, err)
 
@@ -1135,7 +1135,7 @@ func TestTreasuryE2E_Tier4(t *testing.T) {
 func TestTreasuryE2E_Tier5(t *testing.T) {
 	pool := getTestDB(t)
 	ctx := context.Background()
-	
+
 	err := cleanupDB(ctx, pool)
 	require.NoError(t, err)
 
@@ -1164,13 +1164,13 @@ func TestTreasuryE2E_Tier5(t *testing.T) {
 			TransactionDate: "2026-06-01",
 		}
 		jsonBody, _ := json.Marshal(body)
-		
+
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions", portfolioID), bytes.NewBuffer(jsonBody))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
-		
+
 		var resp map[string]interface{}
 		json.Unmarshal(rec.Body.Bytes(), &resp)
 		txID = resp["id"].(string)
@@ -1190,7 +1190,7 @@ func TestTreasuryE2E_Tier5(t *testing.T) {
 			TransactionDate: "2026-06-01",
 		}
 		jsonBody, _ := json.Marshal(body)
-		
+
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/portfolios/%s/treasury/transactions/%s", portfolioID, txID), bytes.NewBuffer(jsonBody))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
@@ -1204,7 +1204,7 @@ func TestTreasuryE2E_Tier5(t *testing.T) {
 		assert.Equal(t, http.StatusOK, recGet.Code)
 		var positions []PositionJSON
 		json.Unmarshal(recGet.Body.Bytes(), &positions)
-		
+
 		require.Len(t, positions, 1)
 		assert.Equal(t, txID, positions[0].TransactionID)
 		assert.Equal(t, 3.0, positions[0].Quantity)

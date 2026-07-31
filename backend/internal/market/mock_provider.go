@@ -38,5 +38,3 @@ func (m *MockProvider) SearchAssets(ctx context.Context, query string) ([]Search
 		},
 	}, nil
 }
-
-

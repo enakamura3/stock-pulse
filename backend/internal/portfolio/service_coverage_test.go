@@ -125,7 +125,7 @@ func TestServiceCoverage_GetPortfolioPerformance_SplitsAndExchange(t *testing.T)
 	assert.NotNil(t, perf)
 }
 
-	// test removed as it cannot be trivially empty
+// test removed as it cannot be trivially empty
 
 func TestServiceCoverage_GetPortfolioDetails_Transactions(t *testing.T) {
 	s, repo, ms, _ := setupServiceTest()
@@ -134,8 +134,8 @@ func TestServiceCoverage_GetPortfolioDetails_Transactions(t *testing.T) {
 		{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1, ExecutedAt: time.Now(), Currency: "USD"},
 		{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 5, UnitPrice: 110, ExchangeRate: 1, ExecutedAt: time.Now().Add(time.Minute), Currency: "USD"}, // second buy!
 		{AssetID: "a1", Ticker: "AAPL", Type: "SPLIT", Quantity: 2, UnitPrice: 0, ExchangeRate: 1, ExecutedAt: time.Now().Add(time.Hour), Currency: "USD"},
-		{AssetID: "a1", Ticker: "AAPL", Type: "REVERSE_SPLIT", Quantity: 2, UnitPrice: 0, ExchangeRate: 1, ExecutedAt: time.Now().Add(2*time.Hour), Currency: "USD"},
-		{AssetID: "a1", Ticker: "AAPL", Type: "BONUS", Quantity: 1, UnitPrice: 0, ExchangeRate: 1, ExecutedAt: time.Now().Add(3*time.Hour), Currency: "USD"},
+		{AssetID: "a1", Ticker: "AAPL", Type: "REVERSE_SPLIT", Quantity: 2, UnitPrice: 0, ExchangeRate: 1, ExecutedAt: time.Now().Add(2 * time.Hour), Currency: "USD"},
+		{AssetID: "a1", Ticker: "AAPL", Type: "BONUS", Quantity: 1, UnitPrice: 0, ExchangeRate: 1, ExecutedAt: time.Now().Add(3 * time.Hour), Currency: "USD"},
 	}, nil)
 	repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
 		{Type: "JCP", GrossAmount: 1, PaymentDate: time.Now(), CumDate: time.Now().AddDate(0, 1, 0)},
@@ -162,7 +162,7 @@ func TestServiceCoverage_GetPortfolioDetails_Transactions(t *testing.T) {
 
 	_, _, err := s.GetPortfolioDetails(context.Background(), "p1", "u1")
 	assert.NoError(t, err)
-	
+
 	_, _, err = s.GetPortfolioDetails(context.Background(), "p2", "u1")
 	assert.NoError(t, err)
 
@@ -181,7 +181,7 @@ func TestServiceCoverage_AddTransaction_Fallback(t *testing.T) {
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
 	mp.On("GetQuote", mock.Anything, "NEW-USD").Return(&market.Quote{Currency: "USD", Name: "New Coin"}, nil)
 	repo.On("CreateAsset", mock.Anything, "NEW-USD", "New Coin", "CRYPTO", "USD").Return("new-a", nil)
-	
+
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 	repo.On("CreateTransaction", mock.Anything, mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
 	// Return oldest date in future so executedAt is BEFORE oldestDate!
@@ -195,7 +195,7 @@ func TestServiceCoverage_AddTransaction_Fallback(t *testing.T) {
 	repo.On("GetDailyPrices", mock.Anything, "usd-brl-id", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
 	repo.On("SaveDailyPrices", mock.Anything, "usd-brl-id", mock.Anything).Return(nil)
 	repo.On("GetExchangeRateByDate", mock.Anything, mock.Anything, mock.Anything).Return(1.5, nil).Once()
-	
+
 	tx := &Transaction{PortfolioID: "p1", Ticker: "NEW-USD", Type: "BUY", Quantity: 10, UnitPrice: 100, ExecutedAt: time.Now()}
 	tx, err := s.AddTransaction(context.Background(), "u1", tx)
 	time.Sleep(200 * time.Millisecond)
@@ -227,7 +227,7 @@ func TestServiceCoverage_BackfillPrices(t *testing.T) {
 	s.httpClient.Transport = &mockTransport{serverURL: server.URL}
 	repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
-	
+
 	_ = s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
 	_ = s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 }
@@ -237,7 +237,7 @@ func TestServiceCoverage_BackfillGap_Errors(t *testing.T) {
 	repo.On("GetAssetByTicker", mock.Anything, "INVALID").Return("", errors.New("err"))
 	repo.On("CreateAsset", mock.Anything, "INVALID", "INVALID", "CURRENCY", "BRL").Return("", errors.New("create err"))
 	_ = s.BackfillGap(context.Background(), "INVALID", time.Now())
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`invalid json`))
@@ -296,7 +296,7 @@ func TestServiceCoverage_GetCurrencyRate(t *testing.T) {
 	s, _, ms, _ := setupServiceTest()
 	ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(nil, errors.New("err")).Once()
 	ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(&market.Quote{Price: 5.5}, nil).Once()
-	
+
 	rate := s.getCurrencyRate(context.Background(), "USD", "BRL")
 	assert.Equal(t, 5.5, rate)
 }
@@ -315,7 +315,7 @@ func TestServiceCoverage_UpdateTransaction_BackfillError(t *testing.T) {
 	repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
 	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
 	repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
-	
+
 	// Add BackfillGap failure and exchange rate fallback for coverage
 	repo.On("GetExchangeRateByDate", mock.Anything, "BRLUSD=X", mock.Anything).Return(0.0, errors.New("err")).Once()
 	repo.On("GetAssetByTicker", mock.Anything, "BRLUSD=X").Return("brlusd-id", nil)
@@ -379,13 +379,13 @@ func TestServiceCoverage_AddTransaction_TotalFail(t *testing.T) {
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
 	mp.On("GetQuote", mock.Anything, "NEW-USD").Return(&market.Quote{Currency: "USD", Name: "New Coin"}, nil)
 	repo.On("CreateAsset", mock.Anything, "NEW-USD", "New Coin", "CRYPTO", "USD").Return("new-a", nil)
-	
+
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 	repo.On("CreateTransaction", mock.Anything, mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "new-a").Return(time.Time{}, errors.New("no price"))
 	repo.On("GetDailyPrices", mock.Anything, "new-a", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
 	repo.On("SaveDailyPrices", mock.Anything, "new-a", mock.Anything).Return(errors.New("db err"))
-	
+
 	// Fail both times for Exchange Rate
 	repo.On("GetExchangeRateByDate", mock.Anything, mock.Anything, mock.Anything).Return(0.0, errors.New("err"))
 	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("usd-brl-id", nil)
@@ -393,7 +393,7 @@ func TestServiceCoverage_AddTransaction_TotalFail(t *testing.T) {
 	repo.On("GetDailyPrices", mock.Anything, "usd-brl-id", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
 	repo.On("SaveDailyPrices", mock.Anything, "usd-brl-id", mock.Anything).Return(nil)
 	repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil) // Goroutine updates tx
-	
+
 	tx := &Transaction{PortfolioID: "p1", Ticker: "NEW-USD", Type: "BUY", Quantity: 10, UnitPrice: 100, ExecutedAt: time.Now()}
 	tx, err := s.AddTransaction(context.Background(), "u1", tx)
 	time.Sleep(200 * time.Millisecond)
@@ -411,7 +411,7 @@ func TestServiceCoverage_BackfillGap_BadURL(t *testing.T) {
 	s, repo, _, _ := setupServiceTest()
 	repo.On("GetAssetByTicker", mock.Anything, mock.Anything).Return("a1", nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now().AddDate(0, 0, 1), nil)
-	
+
 	err := s.BackfillGap(nil, "AAPL", time.Now())
 	assert.Error(t, err)
 }
@@ -426,10 +426,10 @@ func TestServiceCoverage_AddTransaction_BackfillGap(t *testing.T) {
 	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
 	oldestDate := time.Now().AddDate(0, -1, 0)
 	repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(oldestDate, nil)
-	
+
 	// Fail the BackfillGap
 	repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
-	
+
 	s.httpClient = &http.Client{
 		Transport: &MockHTTPTransport{Err: errors.New("http err")},
 	}
@@ -450,15 +450,15 @@ func TestServiceCoverage_UpdateTransaction_ExchangeFallback(t *testing.T) {
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
 	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "BRL", nil)
 	repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
-	
+
 	repo.On("GetExchangeRateByDate", mock.Anything, "BRLUSD=X", mock.Anything).Return(0.0, errors.New("err")).Once()
 	repo.On("GetAssetByTicker", mock.Anything, "BRLUSD=X").Return("brlusd-id", nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "brlusd-id").Return(time.Time{}, errors.New("err"))
 	repo.On("GetDailyPrices", mock.Anything, "brlusd-id", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
 	repo.On("SaveDailyPrices", mock.Anything, "brlusd-id", mock.Anything).Return(nil)
 	// Fail the second time too!
-	repo.On("GetExchangeRateByDate", mock.Anything, "BRLUSD=X", mock.Anything).Return(0.0, errors.New("err2")).Once() 
-	
+	repo.On("GetExchangeRateByDate", mock.Anything, "BRLUSD=X", mock.Anything).Return(0.0, errors.New("err2")).Once()
+
 	// Add mocks for the background backfill check on the asset "a1"
 	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("ignored"))

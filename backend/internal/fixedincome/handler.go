@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -110,7 +111,7 @@ func (h *Handler) getPerformance(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) createAsset(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
-	
+
 	var asset Asset
 	if err := json.NewDecoder(r.Body).Decode(&asset); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -131,7 +132,7 @@ func (h *Handler) createAsset(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteAsset(w http.ResponseWriter, r *http.Request) {
 	assetID := chi.URLParam(r, "assetID")
-	
+
 	err := h.repo.DeleteAsset(r.Context(), assetID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -143,7 +144,7 @@ func (h *Handler) deleteAsset(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) createTransaction(w http.ResponseWriter, r *http.Request) {
 	assetID := chi.URLParam(r, "assetID")
-	
+
 	var tx Transaction
 	if err := json.NewDecoder(r.Body).Decode(&tx); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -165,7 +166,7 @@ func (h *Handler) createTransaction(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	txID := chi.URLParam(r, "txID")
-	
+
 	var payload struct {
 		Type         string     `json:"type"`
 		Amount       float64    `json:"amount"`
@@ -200,7 +201,7 @@ func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) deleteTransaction(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	txID := chi.URLParam(r, "txID")
-	
+
 	err := h.service.DeleteTransaction(r.Context(), portfolioID, txID)
 	if err != nil {
 		if err.Error() == "unauthorized: transaction does not belong to the portfolio" {
@@ -383,4 +384,3 @@ func (h *Handler) getTreasuryMonthlyYields(w http.ResponseWriter, r *http.Reques
 	}
 	json.NewEncoder(w).Encode(yields)
 }
-

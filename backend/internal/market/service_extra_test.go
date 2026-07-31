@@ -34,7 +34,7 @@ func TestService_GetDividends(t *testing.T) {
 		rmock.ExpectGet("dividends:PETR4.SA").RedisNil()
 		// Cache set expectation
 		rmock.ExpectSet("dividends:PETR4.SA", mock.Anything, 12*time.Hour).SetVal("OK")
-		
+
 		res, err := s.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, res)
@@ -44,7 +44,7 @@ func TestService_GetDividends(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()
 		rmock.ExpectGet("dividends:AAPL").RedisNil()
 		rmock.ExpectSet("dividends:AAPL", mock.Anything, 12*time.Hour).SetVal("OK")
-		
+
 		res, err := s.GetDividends(context.Background(), "AAPL", "STOCK_US")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, res)
@@ -129,11 +129,11 @@ func TestService_GetFundamentals(t *testing.T) {
 	t.Run("Cache Miss Scrape Fundamentus and Bazin", func(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
 		rmock.ExpectGet("fundamentals:v2:PETR4.SA").RedisNil()
-		
+
 		rmock.ExpectGet("quote:PETR4.SA").RedisNil()
 		mp.On("GetQuote", mock.Anything, "PETR4.SA").Return(&Quote{Price: 35.0}, nil)
 		rmock.ExpectSet("quote:PETR4.SA", mock.Anything, 60*time.Second).SetVal("OK")
-		
+
 		rmock.ExpectSet("fundamentals:v2:PETR4.SA", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		res, err := s.GetFundamentals(context.Background(), "PETR4.SA")
@@ -152,10 +152,6 @@ func TestService_GetFundamentals(t *testing.T) {
 	})
 }
 
-
-
-
-
 func TestService_GetExchangeRatesMap_Coverage(t *testing.T) {
 	t.Run("Real_YahooFinanceProvider", func(t *testing.T) {
 		t.Skip("Skipping test that hits real Yahoo API to avoid flakiness")
@@ -163,7 +159,7 @@ func TestService_GetExchangeRatesMap_Coverage(t *testing.T) {
 		yp := NewYahooFinanceProvider()
 		rdb, rmock := redismock.NewClientMock()
 		s := NewService(yp, rdb)
-		
+
 		rmock.ExpectGet("fx:BRL=X:10y").RedisNil()
 		rmock.ExpectSet("fx:BRL=X:10y", mock.Anything, 12*time.Hour).SetVal("OK")
 
@@ -181,7 +177,7 @@ func TestService_GetExchangeRatesMap_Coverage(t *testing.T) {
 		// When we do an invalid request (like context cancelled), http will fail
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // immediately cancel
-		
+
 		rate, err := s.GetHistoricalExchangeRate(ctx, time.Now())
 		assert.Error(t, err)
 		assert.Equal(t, 1.0, rate)
@@ -192,7 +188,7 @@ func TestService_GetExchangeRatesMap_Coverage(t *testing.T) {
 		ratesMap := map[string]float64{"2021-01-01": 5.2}
 		val, _ := json.Marshal(ratesMap)
 		rmock.ExpectGet("fx:BRL=X:10y").SetVal(string(val))
-		
+
 		rates, err := s.getExchangeRatesMap(context.Background())
 		assert.NoError(t, err)
 		assert.Equal(t, 5.2, rates["2021-01-01"])
@@ -218,7 +214,7 @@ func TestService_GetExchangeRatesMap_EdgeCases(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
 		s := NewService(yp, rdb)
 		rmock.ExpectGet("fx:BRL=X:10y").RedisNil()
-		
+
 		_, err := s.getExchangeRatesMap(context.Background())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "yahoo finance fx error")
@@ -230,13 +226,13 @@ func TestService_GetExchangeRatesMap_EdgeCases(t *testing.T) {
 			return &http.Response{
 				StatusCode: 200,
 				// Invalid JSON
-				Body:       io.NopCloser(strings.NewReader("{invalid json}")),
+				Body: io.NopCloser(strings.NewReader("{invalid json}")),
 			}
 		})
 		rdb, rmock := redismock.NewClientMock()
 		s := NewService(yp, rdb)
 		rmock.ExpectGet("fx:BRL=X:10y").RedisNil()
-		
+
 		_, err := s.getExchangeRatesMap(context.Background())
 		assert.Error(t, err)
 	})
@@ -252,7 +248,7 @@ func TestService_GetExchangeRatesMap_EdgeCases(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
 		s := NewService(yp, rdb)
 		rmock.ExpectGet("fx:BRL=X:10y").RedisNil()
-		
+
 		rates, err := s.getExchangeRatesMap(context.Background())
 		assert.NoError(t, err)
 		assert.Empty(t, rates)
@@ -269,7 +265,7 @@ func TestService_GetExchangeRatesMap_EdgeCases(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
 		s := NewService(yp, rdb)
 		rmock.ExpectGet("fx:BRL=X:10y").RedisNil()
-		
+
 		rates, err := s.getExchangeRatesMap(context.Background())
 		assert.NoError(t, err)
 		assert.Empty(t, rates)
@@ -286,10 +282,10 @@ func TestService_GetExchangeRatesMap_EdgeCases(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
 		s := NewService(yp, rdb)
 		rmock.ExpectGet("fx:BRL=X:10y").RedisNil()
-		
+
 		// The mock set should be called because len(rates) > 0 (it has 5.2)
 		rmock.ExpectSet("fx:BRL=X:10y", mock.Anything, 12*time.Hour).SetVal("OK")
-		
+
 		rates, err := s.getExchangeRatesMap(context.Background())
 		assert.NoError(t, err)
 		assert.Len(t, rates, 1)
@@ -310,6 +306,3 @@ func TestService_GetExchangeRatesMap_EdgeCases(t *testing.T) {
 		_, _ = s.getExchangeRatesMap(context.Background())
 	})
 }
-
-
-

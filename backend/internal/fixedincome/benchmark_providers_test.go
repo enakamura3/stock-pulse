@@ -231,9 +231,9 @@ func TestYahooProvider_MapIndexerToTicker(t *testing.T) {
 		want    string
 	}{
 		{"IFIX", "IFIX.SA"},
-		{"IBOV", "^BVSP"},  // Yahoo Finance usa "^BVSP" para o Ibovespa
+		{"IBOV", "^BVSP"}, // Yahoo Finance usa "^BVSP" para o Ibovespa
 		{"SP500", "^GSPC"},
-		{"CDI", ""},  // não suportado pelo YahooProvider
+		{"CDI", ""}, // não suportado pelo YahooProvider
 	}
 
 	for _, tc := range tests {

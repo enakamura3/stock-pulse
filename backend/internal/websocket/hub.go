@@ -29,7 +29,7 @@ type Client struct {
 
 // WSMessage representa o formato de mensagem recebido do frontend.
 type WSMessage struct {
-	Action  string   `json:"action"`  // "subscribe" ou "unsubscribe"
+	Action  string   `json:"action"` // "subscribe" ou "unsubscribe"
 	Symbols []string `json:"symbols"`
 }
 

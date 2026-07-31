@@ -1,7 +1,6 @@
 package middleware
 
 import (
-
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -55,42 +54,42 @@ func TestAuthRequired(t *testing.T) {
 		{
 			name:           "Missing cookie",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Sessão ausente. Faça login novamente."}` + "\n",
+			expectedBody:   `{"error":"Sessão ausente. Faça login novamente."}`,
 		},
 		{
 			name:           "Invalid algorithm",
 			cookieName:     "access_token",
 			cookieValue:    invalidAlgTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}` + "\n",
+			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
 		},
 		{
 			name:           "Invalid signature",
 			cookieName:     "access_token",
 			cookieValue:    validTokenStr + "invalid",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}` + "\n",
+			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
 		},
 		{
 			name:           "Missing user_id",
 			cookieName:     "access_token",
 			cookieValue:    missingUserIdTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Erro ao processar as credenciais."}` + "\n",
+			expectedBody:   `{"error":"Erro ao processar as credenciais."}`,
 		},
 		{
 			name:           "Empty user_id",
 			cookieName:     "access_token",
 			cookieValue:    emptyUserIdTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"ID de usuário inválido nas credenciais."}` + "\n",
+			expectedBody:   `{"error":"ID de usuário inválido nas credenciais."}`,
 		},
 		{
 			name:           "Invalid claims type",
 			cookieName:     "access_token",
 			cookieValue:    customClaimsTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Erro ao processar as credenciais."}` + "\n",
+			expectedBody:   `{"error":"Erro ao processar as credenciais."}`,
 		},
 		{
 			name:           "Valid token",

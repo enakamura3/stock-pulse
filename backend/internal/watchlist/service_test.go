@@ -144,7 +144,7 @@ func TestService_GetWatchlists(t *testing.T) {
 		assert.Len(t, lists, 1)
 		assert.Equal(t, "w2", lists[0].ID)
 	})
-	
+
 	t.Run("Repo Error", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetWatchlistsByUserID", mock.Anything, "u3").Return(nil, errors.New("db error"))
@@ -184,7 +184,7 @@ func TestService_GetWatchlist(t *testing.T) {
 	t.Run("Success with Quotes", func(t *testing.T) {
 		s, repo, ms, _ := setupServiceTest()
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{ID: "w1"}, nil)
-		
+
 		items := []Item{{Ticker: "AAPL"}, {Ticker: "INVALID"}}
 		repo.On("GetWatchlistItems", mock.Anything, "w1").Return(items, nil)
 
@@ -265,7 +265,7 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "i2", item.ID)
 	})
-	
+
 	t.Run("New Default Asset - Success", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)
@@ -278,7 +278,7 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "i3", item.ID)
 	})
-	
+
 	t.Run("New Crypto Asset - Crypto Branch", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)

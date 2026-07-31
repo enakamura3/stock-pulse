@@ -57,7 +57,7 @@ func TestTreasuryService_EditDelete(t *testing.T) {
 
 		res, err := s.CreateTreasuryTransaction(ctx, portfolioID, req)
 		require.NoError(t, err)
-		
+
 		resMap, ok := res.(map[string]string)
 		require.True(t, ok)
 		subTxID = resMap["id"]
@@ -254,5 +254,3 @@ func TestTreasuryService_GetTreasuryPerformance(t *testing.T) {
 		assert.True(t, points[1].Value > points[1].TotalInvested, "Value should grow by daily SELIC rate + spread")
 	}
 }
-
-

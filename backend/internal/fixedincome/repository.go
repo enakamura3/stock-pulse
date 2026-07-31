@@ -614,7 +614,7 @@ func (r *repository) GetTreasuryTransactionsList(ctx context.Context, portfolioI
 		var req TreasuryTxRequest
 		var matDate time.Time
 		var txDate time.Time
-		err = rows.Scan(&req.ID, &req.Ticker, &req.TreasuryType, &matDate, &req.HasCoupons, 
+		err = rows.Scan(&req.ID, &req.Ticker, &req.TreasuryType, &matDate, &req.HasCoupons,
 			&req.Type, &req.Quantity, &req.UnitPrice, &req.ContractedRate, &txDate)
 		if err != nil {
 			return nil, err

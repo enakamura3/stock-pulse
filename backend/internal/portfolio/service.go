@@ -701,7 +701,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 
 	// Mapeia preços históricos no formato: pricesMap[asset_id][date_string] = close_price
 	pricesMap := make(map[string]map[string]float64)
-	
+
 	// Prepara a lista de IDs para buscar em batch
 	var assetIDsToFetch []string
 	for assetID := range assetIDsMap {

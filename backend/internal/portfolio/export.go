@@ -9,19 +9,20 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
 // ExportPortfolio gera e baixa um ZIP com o backup completo em CSV (RV e RF).
 func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 	if !ok || userID == "" {
-		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Não autorizado")
 		return
 	}
 
 	portfolioID := chi.URLParam(r, "id")
 	if portfolioID == "" {
-		h.respondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
 		return
 	}
 
@@ -30,14 +31,14 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 	// Anti-IDOR: Garantir que a carteira pertence ao usuário
 	p, _, err := h.service.GetPortfolioDetails(ctx, portfolioID, userID)
 	if err != nil {
-		h.respondWithError(w, http.StatusForbidden, "Carteira não encontrada ou sem acesso")
+		httputils.RespondWithError(w, http.StatusForbidden, "Carteira não encontrada ou sem acesso")
 		return
 	}
 
 	// 1. Buscar transações de Renda Variável
 	rvTxs, err := h.service.GetPortfolioTransactions(ctx, portfolioID, userID)
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao buscar transações de renda variável")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar transações de renda variável")
 		return
 	}
 
@@ -45,13 +46,13 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 	fiSvc := h.service.GetFixedIncomeService()
 	fiTxs, err := fiSvc.GetRawTransactions(ctx, portfolioID)
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao buscar transações de renda fixa")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar transações de renda fixa")
 		return
 	}
-	
+
 	fiAssets, err := fiSvc.GetAssetsByPortfolio(ctx, portfolioID)
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao buscar ativos de renda fixa")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar ativos de renda fixa")
 		return
 	}
 
@@ -68,7 +69,7 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 		if !a.MaturityDate.IsZero() {
 			maturity = a.MaturityDate.Format("2006-01-02")
 		}
-		
+
 		name := a.Institution + " " + a.Type
 		if a.DebtType == "POS" || a.DebtType == "HIBRIDO" {
 			name += fmt.Sprintf(" %.2f%% %s", a.Rate, a.Indexer)
@@ -91,12 +92,12 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 	// --- CSV Renda Variável ---
 	rvFile, err := zipWriter.Create("renda_variavel.csv")
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao criar arquivo ZIP")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao criar arquivo ZIP")
 		return
 	}
 	rvWriter := csv.NewWriter(rvFile)
 	rvWriter.Comma = ';' // Delimitador Ponto e Vírgula
-	
+
 	// Headers RV
 	rvWriter.Write([]string{"Date", "Ticker", "Type", "Quantity", "UnitPrice", "ExchangeRate"})
 	for _, tx := range rvTxs {
@@ -114,12 +115,12 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 	// --- CSV Renda Fixa ---
 	fiFile, err := zipWriter.Create("renda_fixa.csv")
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao criar arquivo ZIP")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao criar arquivo ZIP")
 		return
 	}
 	fiWriter := csv.NewWriter(fiFile)
 	fiWriter.Comma = ';' // Delimitador Ponto e Vírgula
-	
+
 	// Headers RF
 	fiWriter.Write([]string{"Date", "AssetName", "Type", "Value", "Indexer", "Rate", "MaturityDate"})
 	for _, tx := range fiTxs {
@@ -139,7 +140,7 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 	// Fechar ZIP
 	err = zipWriter.Close()
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao finalizar ZIP")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao finalizar ZIP")
 		return
 	}
 

@@ -115,7 +115,7 @@ func TestService_Login(t *testing.T) {
 		s, repo, _ := setupService()
 		hash, _ := hashPassword("right_password", defaultParams)
 		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(&User{PasswordHash: hash}, nil)
-		
+
 		_, _, _, err := s.Login(context.Background(), "test@test.com", "wrong_password")
 		assert.EqualError(t, err, "e-mail ou senha incorretos")
 	})
@@ -125,7 +125,7 @@ func TestService_Login(t *testing.T) {
 		hash, _ := hashPassword("password", defaultParams)
 		user := &User{ID: "1", Email: "test@test.com", PasswordHash: hash}
 		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
-		
+
 		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetVal("OK")
 
 		resUser, access, refresh, err := s.Login(context.Background(), "test@test.com", "password")
@@ -141,7 +141,7 @@ func TestService_Login(t *testing.T) {
 func TestService_GenerateRefreshToken(t *testing.T) {
 	s, _, rdbMock := setupService()
 	rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetErr(errors.New("redis error"))
-	
+
 	_, err := s.GenerateRefreshToken(context.Background(), "1")
 	assert.EqualError(t, err, "redis error")
 }
@@ -149,7 +149,7 @@ func TestService_GenerateRefreshToken(t *testing.T) {
 func TestService_ValidateRefreshToken(t *testing.T) {
 	s, _, rdbMock := setupService()
 	rdbMock.ExpectGet("refresh_token:valid").SetVal("1")
-	
+
 	id, err := s.ValidateRefreshToken(context.Background(), "valid")
 	assert.NoError(t, err)
 	assert.Equal(t, "1", id)
@@ -158,7 +158,7 @@ func TestService_ValidateRefreshToken(t *testing.T) {
 func TestService_RevokeRefreshToken(t *testing.T) {
 	s, _, rdbMock := setupService()
 	rdbMock.ExpectDel("refresh_token:token").SetVal(1)
-	
+
 	err := s.RevokeRefreshToken(context.Background(), "token")
 	assert.NoError(t, err)
 }
@@ -166,7 +166,7 @@ func TestService_RevokeRefreshToken(t *testing.T) {
 func TestService_GetUserByID(t *testing.T) {
 	s, repo, _ := setupService()
 	repo.On("GetUserByID", mock.Anything, "1").Return(&User{ID: "1"}, nil)
-	
+
 	user, err := s.GetUserByID(context.Background(), "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "1", user.ID)

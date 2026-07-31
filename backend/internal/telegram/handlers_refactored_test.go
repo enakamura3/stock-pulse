@@ -264,7 +264,7 @@ func TestHandlers_Dividends(t *testing.T) {
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 
 		now := time.Now()
-		
+
 		pastDate := now.Add(-1 * time.Hour)
 		futureDate := now.Add(1 * time.Hour)
 
@@ -302,7 +302,7 @@ func TestHandlers_Dividends(t *testing.T) {
 		now := time.Now()
 		pastDate := now.Add(-1 * time.Hour)
 		futureDate := now.Add(1 * time.Hour)
-		
+
 		divs := []portfolio.CalculatedDividend{
 			{Ticker: "PETR4.SA", NetAmount: 50.0, PaymentDate: pastDate, Type: "JCP", Currency: "BRL", Quantity: 100, PerShareAmount: 0.5, AssetType: "STOCK_BR"},
 			{Ticker: "MXRF11.SA", NetAmount: 12.0, PaymentDate: futureDate, Type: "RENDIMENTO", Currency: "BRL", Quantity: 120, PerShareAmount: 0.1, AssetType: "FII"},

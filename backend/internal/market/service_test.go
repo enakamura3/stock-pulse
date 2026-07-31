@@ -94,7 +94,7 @@ func TestService_GetQuote(t *testing.T) {
 		assert.Equal(t, 150.0, quote.Price)
 		assert.NoError(t, rmock.ExpectationsWereMet())
 	})
-	
+
 	t.Run("Cache Miss - Set Cache Error (Logs)", func(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
 		rmock.ExpectGet("quote:AAPL").RedisNil()

@@ -1,7 +1,6 @@
 package market
 
 import (
-
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -125,11 +124,11 @@ func (c *B3Client) FetchCompanies(ctx context.Context) ([]B3RawCompany, error) {
 	// Let's assume there is an endpoint for searching companies, e.g., GetListedCompanies or similar.
 	// Actually, we just need the list. Usually it's in an endpoint like /listedCompaniesPage/api/GetListedCompanies/
 	payload := map[string]string{
-		"language": "pt-br",
+		"language":   "pt-br",
 		"pageNumber": "1",
-		"pageSize": "1000",
+		"pageSize":   "1000",
 	}
-	
+
 	urlPrefix := "https://sistemaswebb3-listados.b3.com.br/listedCompaniesPage/api/GetListedCompanies/"
 	body, err := c.fetchBase(ctx, urlPrefix, payload)
 	if err != nil {

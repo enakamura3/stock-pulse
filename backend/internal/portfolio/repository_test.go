@@ -23,9 +23,9 @@ func TestRepository_CreatePortfolio(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	
+
 	mock.ExpectBegin()
-	
+
 	countRows := pgxmock.NewRows([]string{"count"}).AddRow(0)
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM portfolio`).WithArgs("u1").WillReturnRows(countRows)
 
@@ -169,7 +169,7 @@ func TestRepository_DeletePortfolio_Error(t *testing.T) {
 	mock.ExpectExec(`DELETE FROM portfolio`).
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
-		
+
 	mock.ExpectRollback()
 
 	err := repo.DeletePortfolio(context.Background(), "p1", "u1")
