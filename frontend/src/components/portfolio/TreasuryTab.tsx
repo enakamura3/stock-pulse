@@ -5,8 +5,6 @@ import dynamic from 'next/dynamic';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
-
 import { TreasuryPosition, TreasuryPerfPoint } from './types';
 import { apiFetch } from '@/lib/api';
 
@@ -138,9 +136,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
     if (!portfolioId) return;
     setIsLoadingPerf(true);
     try {
-      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/performance`, {,
-        cache: 'no-store',
-      });
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/performance`);
       if (res.ok) {
         const data = await res.json();
         setPerfData(data || []);
@@ -248,8 +244,8 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
 
       const method = editingTxId ? 'PUT' : 'POST';
       const url = editingTxId
-        ? `${API_URL}/portfolios/${portfolioId}/treasury/transactions/${editingTxId}`
-        : `${API_URL}/portfolios/${portfolioId}/treasury/transactions`;
+        ? `/portfolios/${portfolioId}/treasury/transactions/${editingTxId}`
+        : `/portfolios/${portfolioId}/treasury/transactions`;
 
       const res = await apiFetch(url, {
         method: method,
@@ -275,8 +271,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
 
   async function handleExport() {
     try {
-      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`, {,
-      });
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`);
       if (res.ok) {
         const data: NewTreasuryTx[] = await res.json();
         if (!data || data.length === 0) {

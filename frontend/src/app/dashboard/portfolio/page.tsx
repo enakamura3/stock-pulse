@@ -22,8 +22,6 @@ import { apiFetch } from '@/lib/api';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
-
 export default function PortfolioPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
 
@@ -92,7 +90,7 @@ export default function PortfolioPage() {
   const loadPortfolios = useCallback(async (selectId?: string) => {
     setIsLoadingPortfolios(true);
     try {
-      const res = await apiFetch(`/portfolios`, {, cache: 'no-store' });
+      const res = await apiFetch(`/portfolios`, { cache: 'no-store' });
       if (res.ok) {
         const data: Portfolio[] = await res.json();
         setPortfolios(data || []);
@@ -109,7 +107,7 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingTreasury(true);
     try {
-      const res = await apiFetch(`/portfolios/${id}/treasury/positions`, {, cache: 'no-store'
+      const res = await apiFetch(`/portfolios/${id}/treasury/positions`, { cache: 'no-store'
       });
       if (res.ok) setTreasuryPositions(await res.json() || []);
     } catch (e) {
@@ -123,12 +121,12 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingDetails(true);
     try {
-      const resDetails = await apiFetch(`/portfolios/${id}`, {, cache: 'no-store' });
+      const resDetails = await apiFetch(`/portfolios/${id}`, { cache: 'no-store' });
       if (resDetails.ok) setPositions((await resDetails.json()).positions || []);
-      const resTxs = await apiFetch(`/portfolios/${id}/history`, {, cache: 'no-store' });
+      const resTxs = await apiFetch(`/portfolios/${id}/history`, { cache: 'no-store' });
       if (resTxs.ok) setTransactions(await resTxs.json() || []);
       
-      const resFI = await apiFetch(`/portfolios/${id}/fixed-income/positions`, {, cache: 'no-store' });
+      const resFI = await apiFetch(`/portfolios/${id}/fixed-income/positions`, { cache: 'no-store' });
       if (resFI.ok) setFiPositions(await resFI.json() || []);
 
       await loadTreasuryPositions(id);
@@ -139,9 +137,9 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingPerformance(true);
     try {
-      let url = `${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`;
+      let url = `/portfolios/${id}/performance?period=${selectPeriod}`;
       if (filterTickers.length > 0) url += `&tickers=${filterTickers.join(',')}`;
-      const res = await apiFetch(url, {, cache: 'no-store' });
+      const res = await apiFetch(url, { cache: 'no-store' });
       if (res.ok) setPerformanceData(await res.json() || []);
     } catch (e) { console.error('Erro ao buscar série histórica:', e); } finally { setIsLoadingPerformance(false); }
   }, []);
@@ -151,9 +149,9 @@ export default function PortfolioPage() {
     setIsLoadingDividends(true);
     try {
       const [resDivs, resFI, resTD] = await Promise.all([
-        apiFetch(`/portfolios/${id}/dividends`, {, cache: 'no-store' }),
-        apiFetch(`/portfolios/${id}/fixed-income/monthly-yields`, {, cache: 'no-store' }),
-        apiFetch(`/portfolios/${id}/treasury/monthly-yields`, {, cache: 'no-store' })
+        apiFetch(`/portfolios/${id}/dividends`, { cache: 'no-store' }),
+        apiFetch(`/portfolios/${id}/fixed-income/monthly-yields`, { cache: 'no-store' }),
+        apiFetch(`/portfolios/${id}/treasury/monthly-yields`, { cache: 'no-store' })
       ]);
       
       let allDividends: CalculatedDividend[] = [];
@@ -261,7 +259,7 @@ export default function PortfolioPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {, cache: 'no-store' });
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, { cache: 'no-store' });
         if (res.ok) { setSearchResults(await res.json() || []); setShowDropdown(true); }
       } catch (e) { console.error('Erro na busca:', e); } finally { setIsSearching(false); }
     }, 350);
@@ -271,12 +269,12 @@ export default function PortfolioPage() {
   const handleSelectAsset = async (symbol: string) => {
     setTxTicker(symbol); setSearchQuery(symbol); setShowDropdown(false);
     try {
-      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`, {, cache: 'no-store' });
+      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`, { cache: 'no-store' });
       if (res.ok) {
         const quote = await res.json();
         setSelectedAssetCurrency(quote.currency || 'BRL');
         if (quote.currency === 'USD') {
-          const rateRes = await apiFetch(`/quotes/USDBRL=X`, {, cache: 'no-store' });
+          const rateRes = await apiFetch(`/quotes/USDBRL=X`, { cache: 'no-store' });
           if (rateRes.ok) setTxExchangeRate((await rateRes.json()).price || 5.25);
           else setTxExchangeRate(5.25);
         } else { setTxExchangeRate(1.0); }
@@ -356,7 +354,7 @@ export default function PortfolioPage() {
 
     setIsAddingTx(true);
     try {
-      const url = editingTxId ? `${API_URL}/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `${API_URL}/portfolios/${activePortfolioId}/transactions`;
+      const url = editingTxId ? `/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `/portfolios/${activePortfolioId}/transactions`;
       const res = await apiFetch(url, {
         method: editingTxId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -493,16 +491,16 @@ export default function PortfolioPage() {
     if (!confirm('Deseja realmente excluir esta transação?')) return;
     try {
       const tx = transactions.find(t => t.id === txId);
-      let endpoint = `${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`;
+      let endpoint = `/portfolios/${activePortfolioId}/transactions/${txId}`;
       if (tx?.module === 'RF') {
         if (tx.asset_type === 'TESOURO') {
-          endpoint = `${API_URL}/portfolios/${activePortfolioId}/treasury/transactions/${txId}`;
+          endpoint = `/portfolios/${activePortfolioId}/treasury/transactions/${txId}`;
         } else {
-          endpoint = `${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
+          endpoint = `/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
         }
       }
 
-      const res = await fetch(endpoint, { method: 'DELETE', cache: 'no-store' });
+      const res = await apiFetch(endpoint, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
     } catch (e) { console.error(e); }
   };

@@ -4,6 +4,14 @@ import { describe, it, expect, vi } from 'vitest';
 import TransactionHistory from '../TransactionHistory';
 import { UnifiedTransaction } from '../types';
 
+// Helper: gera data no mês/ano corrente no formato YYYY-MM-DD
+const currentDate = (day: number): string => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${d}`;
+};
+
 describe('TransactionHistory Component', () => {
   const mockSetFilterTxTicker = vi.fn();
   const mockHandleEditTransaction = vi.fn();
@@ -30,7 +38,7 @@ describe('TransactionHistory Component', () => {
         id: 'tx-1',
         portfolio_id: 'port-1',
         module: 'RV',
-        date: '2026-06-01',
+        date: currentDate(1),
         asset_name: 'IVV',
         asset_type: 'ETF',
         type: 'BUY',
@@ -84,7 +92,7 @@ describe('TransactionHistory Component', () => {
         id: 'tx-2',
         portfolio_id: 'port-1',
         module: 'RF',
-        date: '2026-06-02',
+        date: currentDate(2),
         asset_name: 'CDB Banco X',
         asset_type: 'CDB',
         type: 'SUBSCRIPTION',
@@ -120,7 +128,7 @@ describe('TransactionHistory Component', () => {
         id: 'tx-3',
         portfolio_id: 'port-1',
         module: 'RV',
-        date: '2026-06-03',
+        date: currentDate(3),
         asset_name: 'PETR4',
         asset_type: 'STOCK_BR',
         type: 'SPLIT',

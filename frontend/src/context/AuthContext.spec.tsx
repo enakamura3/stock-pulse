@@ -8,9 +8,10 @@ import React from 'react';
 global.fetch = vi.fn();
 
 // Mock do useRouter do Next.js
+const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockPush,
     replace: vi.fn(),
     prefetch: vi.fn(),
   })
@@ -146,17 +147,23 @@ describe('AuthContext', () => {
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Not Auth'));
 
-    // Configura Mock do Login
+    // 1º: Mock do POST /auth/login (sucesso)
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ id: '1', name: 'LoginUser' })
+      json: async () => ({ message: 'ok' })
+    });
+    // 2º: Mock do GET /auth/me (fetchMe após login)
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: '1', name: 'LoginUser', email: 'test@test.com', created_at: '', updated_at: '' })
     });
 
     await userEvent.click(screen.getByTestId('btn-login'));
     
     await waitFor(() => {
-      expect(window.location.href).toBe('/dashboard/portfolio');
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
   });
 
@@ -184,9 +191,9 @@ describe('AuthContext', () => {
   });
 
   it('deve efetuar registro via button', async () => {
-    // Estado inicial
-    (global.fetch as any).mockResolvedValue({ ok: false, status: 400 });
-    
+    // 1º mock para initAuth (sem sessão)
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 400 });
+
     render(
       <AuthProvider>
         <TestComponent />
@@ -198,24 +205,31 @@ describe('AuthContext', () => {
     // Reseta mock para o fluxo de registro
     vi.resetAllMocks();
     
-    // 1º: Mock do Register
+    // 1º: Mock do POST /auth/register (sucesso)
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       status: 201,
       json: async () => ({ message: 'Created' })
     });
 
-    // 2º: Mock do Login automático após Register
+    // 2º: Mock do POST /auth/login automático (register chama login)
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ id: '1', name: 'Test' })
+      json: async () => ({ message: 'ok' })
+    });
+
+    // 3º: Mock do GET /auth/me (fetchMe após login)
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: '1', name: 'Test', email: 'test@test.com', created_at: '', updated_at: '' })
     });
 
     await userEvent.click(screen.getByTestId('btn-register'));
     
     await waitFor(() => {
-      expect(window.location.href).toBe('/dashboard/portfolio');
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
   });
 
