@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
@@ -105,10 +106,11 @@ type Service struct {
 	marketProvider market.QuoteProvider
 	fiService      fixedincome.Service
 	httpClient     *http.Client
+	uow            database.UnitOfWork
 }
 
 // NewService cria uma nova instância de Service.
-func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider, fiService fixedincome.Service) *Service {
+func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider, fiService fixedincome.Service, uow database.UnitOfWork) *Service {
 	return &Service{
 		repo:           repo,
 		marketService:  marketService,
@@ -117,6 +119,7 @@ func NewService(repo PortfolioRepository, marketService MarketService, marketPro
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
+		uow: uow,
 	}
 }
 
@@ -142,7 +145,9 @@ func (s *Service) SetDefaultPortfolio(ctx context.Context, portfolioID, userID s
 	if portfolioID == "" || userID == "" {
 		return errors.New("IDs inválidos")
 	}
-	return s.repo.SetDefaultPortfolio(ctx, portfolioID, userID)
+	return s.uow.Do(ctx, func(txCtx context.Context) error {
+		return s.repo.SetDefaultPortfolio(txCtx, portfolioID, userID)
+	})
 }
 
 // GetPortfolios lista os portfólios do usuário (cria "Principal" padrão se vazio).
@@ -169,7 +174,7 @@ func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio
 			}
 		}
 		if !hasDefault {
-			_ = s.repo.SetDefaultPortfolio(ctx, lists[0].ID, userID)
+			_ = s.SetDefaultPortfolio(ctx, lists[0].ID, userID)
 			lists[0].IsDefault = true
 		}
 	}
@@ -601,7 +606,9 @@ func (s *Service) GetPortfolioTransactions(ctx context.Context, portfolioID, use
 
 // DeletePortfolio remove a carteira do banco de dados.
 func (s *Service) DeletePortfolio(ctx context.Context, id, userID string) error {
-	return s.repo.DeletePortfolio(ctx, id, userID)
+	return s.uow.Do(ctx, func(txCtx context.Context) error {
+		return s.repo.DeletePortfolio(txCtx, id, userID)
+	})
 }
 
 // PerformancePoint representa o saldo consolidado de um portfólio em uma data histórica com retornos e benchmarks.

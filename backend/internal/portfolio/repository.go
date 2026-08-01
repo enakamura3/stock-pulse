@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
 // Portfolio representa o agrupamento de ativos pertencente a um usuário.
@@ -69,27 +68,19 @@ type DailyPrice struct {
 	ClosePrice float64   `json:"close_price"`
 }
 
-// DBTX define a interface necessária para realizar queries e abstrair pgxpool.Pool para testes.
-type DBTX interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Begin(ctx context.Context) (pgx.Tx, error)
-}
-
 // Repository lida com as interações de banco de dados do módulo de Portfólio.
 type Repository struct {
-	db DBTX
+	db database.DBTX
 }
 
 // NewRepository cria uma nova instância de Repository.
-func NewRepository(db DBTX) *Repository {
+func NewRepository(db database.DBTX) *Repository {
 	return &Repository{db: db}
 }
 
 // CreatePortfolio insere um novo portfólio no banco de dados.
 func (r *Repository) CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error) {
-	tx, err := r.db.Begin(ctx)
+	tx, err := database.GetDB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +126,7 @@ func (r *Repository) GetPortfoliosByUserID(ctx context.Context, userID string) (
 		WHERE user_id = $1
 		ORDER BY is_default DESC, name ASC
 	`
-	rows, err := r.db.Query(ctx, query, userID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +151,7 @@ func (r *Repository) GetPortfolioByID(ctx context.Context, id, userID string) (*
 		WHERE id = $1 AND user_id = $2
 	`
 	p := &Portfolio{}
-	err := r.db.QueryRow(ctx, query, id, userID).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, userID).Scan(
 		&p.ID,
 		&p.UserID,
 		&p.Name,
@@ -176,47 +167,39 @@ func (r *Repository) GetPortfolioByID(ctx context.Context, id, userID string) (*
 
 // SetDefaultPortfolio marca uma carteira como padrão e desmarca todas as outras do mesmo usuário.
 func (r *Repository) SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
+	db := database.GetDB(ctx, r.db)
 
 	var exists bool
-	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM portfolio WHERE id = $1 AND user_id = $2)`, portfolioID, userID).Scan(&exists)
+	err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM portfolio WHERE id = $1 AND user_id = $2)`, portfolioID, userID).Scan(&exists)
 	if err != nil || !exists {
 		return fmt.Errorf("portfólio não encontrado ou permissão negada")
 	}
 
-	_, err = tx.Exec(ctx, `UPDATE portfolio SET is_default = false WHERE user_id = $1`, userID)
+	_, err = db.Exec(ctx, `UPDATE portfolio SET is_default = false WHERE user_id = $1`, userID)
 	if err != nil {
 		return fmt.Errorf("erro ao resetar carteiras padrão: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, `UPDATE portfolio SET is_default = true WHERE id = $1 AND user_id = $2`, portfolioID, userID)
+	_, err = db.Exec(ctx, `UPDATE portfolio SET is_default = true WHERE id = $1 AND user_id = $2`, portfolioID, userID)
 	if err != nil {
 		return fmt.Errorf("erro ao definir carteira padrão: %w", err)
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 // DeletePortfolio apaga um portfólio do banco de dados (cascading apaga transações).
 func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
+	db := database.GetDB(ctx, r.db)
 
 	var isDefault bool
-	_ = tx.QueryRow(ctx, `SELECT is_default FROM portfolio WHERE id = $1 AND user_id = $2`, id, userID).Scan(&isDefault)
+	_ = db.QueryRow(ctx, `SELECT is_default FROM portfolio WHERE id = $1 AND user_id = $2`, id, userID).Scan(&isDefault)
 
 	query := `
 		DELETE FROM portfolio
 		WHERE id = $1 AND user_id = $2
 	`
-	cmd, err := tx.Exec(ctx, query, id, userID)
+	cmd, err := db.Exec(ctx, query, id, userID)
 	if err != nil {
 		return err
 	}
@@ -225,7 +208,7 @@ func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) err
 	}
 
 	if isDefault {
-		_, err = tx.Exec(ctx, `
+		_, err = db.Exec(ctx, `
 			UPDATE portfolio
 			SET is_default = true
 			WHERE id = (
@@ -237,7 +220,7 @@ func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) err
 		}
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 // CreateTransaction registra uma operação de compra/venda na carteira.
@@ -247,7 +230,7 @@ func (r *Repository) CreateTransaction(ctx context.Context, tx *Transaction) (*T
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
 		RETURNING id, created_at
 	`
-	err := r.db.QueryRow(ctx, query,
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query,
 		tx.PortfolioID,
 		tx.AssetID,
 		tx.Type,
@@ -274,7 +257,7 @@ func (r *Repository) GetTransactionsByPortfolioID(ctx context.Context, portfolio
 		WHERE t.portfolio_id = $1 AND p.user_id = $2
 		ORDER BY t.executed_at DESC, t.created_at DESC
 	`
-	rows, err := r.db.Query(ctx, query, portfolioID, userID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, portfolioID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +300,7 @@ func (r *Repository) DeleteTransaction(ctx context.Context, txID, portfolioID, u
 		AND t.portfolio_id = $2 
 		AND p.user_id = $3
 	`
-	cmd, err := r.db.Exec(ctx, query, txID, portfolioID, userID)
+	cmd, err := database.GetDB(ctx, r.db).Exec(ctx, query, txID, portfolioID, userID)
 	if err != nil {
 		return err
 	}
@@ -333,7 +316,7 @@ func (r *Repository) SaveDailyPrices(ctx context.Context, assetID string, prices
 		return nil
 	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := database.GetDB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -363,7 +346,7 @@ func (r *Repository) GetDailyPrices(ctx context.Context, assetID string, startDa
 		WHERE asset_id = $1 AND price_date BETWEEN $2 AND $3
 		ORDER BY price_date ASC
 	`
-	rows, err := r.db.Query(ctx, query, assetID, startDate, endDate)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, assetID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +374,7 @@ func (r *Repository) GetDailyPricesBatch(ctx context.Context, assetIDs []string,
 		WHERE asset_id = ANY($1) AND price_date BETWEEN $2 AND $3
 		ORDER BY price_date ASC
 	`
-	rows, err := r.db.Query(ctx, query, assetIDs, startDate, endDate)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, assetIDs, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +395,7 @@ func (r *Repository) GetDailyPricesBatch(ctx context.Context, assetIDs []string,
 func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
 	var id string
 	query := `SELECT id FROM asset WHERE UPPER(ticker) = UPPER($1)`
-	err := r.db.QueryRow(ctx, query, ticker).Scan(&id)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -423,7 +406,7 @@ func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (strin
 func (r *Repository) GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error) {
 	var id, currency string
 	query := `SELECT id, currency FROM asset WHERE UPPER(ticker) = UPPER($1)`
-	err := r.db.QueryRow(ctx, query, ticker).Scan(&id, &currency)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id, &currency)
 	if err != nil {
 		return "", "", err
 	}
@@ -438,7 +421,7 @@ func (r *Repository) CreateAsset(ctx context.Context, ticker, name, assetType, c
 		RETURNING id
 	`
 	var id string
-	err := r.db.QueryRow(ctx, query, ticker, name, assetType, currency).Scan(&id)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker, name, assetType, currency).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -455,7 +438,7 @@ type AssetCompact struct {
 
 func (r *Repository) GetAllAssets(ctx context.Context) ([]AssetCompact, error) {
 	query := `SELECT id, ticker, currency, asset_type FROM asset WHERE is_active = true`
-	rows, err := r.db.Query(ctx, query)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +461,7 @@ func (r *Repository) UpdateTransaction(ctx context.Context, tx Transaction) erro
 		SET type = $1, quantity = $2, unit_price = $3, total_cost = $4, exchange_rate = $5, executed_at = $6
 		WHERE id = $7 AND portfolio_id = $8
 	`
-	tag, err := r.db.Exec(ctx, query,
+	tag, err := database.GetDB(ctx, r.db).Exec(ctx, query,
 		tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.ExchangeRate, tx.ExecutedAt,
 		tx.ID, tx.PortfolioID,
 	)
@@ -502,7 +485,7 @@ func (r *Repository) GetExchangeRateByDate(ctx context.Context, currencyPairTick
 		LIMIT 1
 	`
 	var rate float64
-	err := r.db.QueryRow(ctx, query, currencyPairTicker, date).Scan(&rate)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, currencyPairTicker, date).Scan(&rate)
 	if err != nil {
 		return 0, err
 	}
@@ -517,7 +500,7 @@ func (r *Repository) GetOldestPriceDate(ctx context.Context, assetID string) (ti
 		WHERE asset_id = $1
 	`
 	var oldestDate time.Time
-	err := r.db.QueryRow(ctx, query, assetID).Scan(&oldestDate)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, assetID).Scan(&oldestDate)
 	if err != nil {
 		return time.Time{}, err
 	}

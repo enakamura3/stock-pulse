@@ -132,8 +132,9 @@ func main() {
 	fiAnbimaWorker := fixedincome.NewAnbimaHolidayWorker(fiRepo, fiAnbimaClient)
 
 	// Inicialização de Camadas de Portfólio & Daily Worker
+	uow := database.NewUnitOfWork(dbPool)
 	portfolioRepo := portfolio.NewRepository(dbPool)
-	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider, fiService)
+	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider, fiService, uow)
 	portfolioHandler := portfolio.NewHandler(portfolioService)
 	portfolioWorker := portfolio.NewDailyWorker(portfolioRepo, marketProvider)
 	dividendWorker := portfolio.NewDividendWorker(portfolioRepo, marketService)

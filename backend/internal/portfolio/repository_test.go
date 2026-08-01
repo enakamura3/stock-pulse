@@ -118,7 +118,7 @@ func TestRepository_SetDefaultPortfolio(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	mock.ExpectBegin()
+
 	mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM portfolio WHERE id = \$1 AND user_id = \$2\)`).
 		WithArgs("p1", "u1").
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
@@ -128,7 +128,7 @@ func TestRepository_SetDefaultPortfolio(t *testing.T) {
 	mock.ExpectExec(`UPDATE portfolio SET is_default = true WHERE id = \$1 AND user_id = \$2`).
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
-	mock.ExpectCommit()
+
 
 	err := repo.SetDefaultPortfolio(context.Background(), "p1", "u1")
 	assert.NoError(t, err)
@@ -139,7 +139,7 @@ func TestRepository_DeletePortfolio(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	mock.ExpectBegin()
+
 
 	mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
 		WithArgs("p1", "u1").
@@ -149,7 +149,7 @@ func TestRepository_DeletePortfolio(t *testing.T) {
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 1))
 
-	mock.ExpectCommit()
+
 
 	err := repo.DeletePortfolio(context.Background(), "p1", "u1")
 	assert.NoError(t, err)
@@ -160,7 +160,7 @@ func TestRepository_DeletePortfolio_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	mock.ExpectBegin()
+
 
 	mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
 		WithArgs("p1", "u1").
@@ -170,7 +170,7 @@ func TestRepository_DeletePortfolio_Error(t *testing.T) {
 		WithArgs("p1", "u1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
-	mock.ExpectRollback()
+
 
 	err := repo.DeletePortfolio(context.Background(), "p1", "u1")
 	assert.ErrorContains(t, err, "não encontrado ou permissão")

@@ -200,11 +200,18 @@ func (m *MockMarketProvider) GetDividends(ctx context.Context, ticker string, as
 	return nil, args.Error(1)
 }
 
+type dummyUOW struct{}
+
+func (d *dummyUOW) Do(ctx context.Context, fn func(ctx context.Context) error) error {
+	return fn(ctx)
+}
+
 func setupServiceTest() (*Service, *MockPortfolioRepo, *MockMarketService, *MockMarketProvider) {
 	repo := new(MockPortfolioRepo)
 	ms := new(MockMarketService)
 	mp := new(MockMarketProvider)
-	s := NewService(repo, ms, mp, nil)
+	uow := &dummyUOW{}
+	s := NewService(repo, ms, mp, nil, uow)
 	return s, repo, ms, mp
 }
 
