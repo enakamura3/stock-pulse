@@ -63,7 +63,7 @@ export default function SettingsPage() {
   const loadTelegramStatus = async () => {
     setIsLoadingTelegram(true);
     try {
-      const res = await apiFetch(`/telegram/status`, {,
+      const res = await apiFetch(`/telegram/status`, {
       });
       if (res.ok) {
         const data = await res.json();
@@ -83,7 +83,7 @@ export default function SettingsPage() {
     setIsLoadingWorkers(true);
     setWorkersError(null);
     try {
-      const res = await apiFetch(`/workers`, {,
+      const res = await apiFetch(`/workers`, {
       });
       if (res.ok) {
         const data = await res.json();

@@ -102,7 +102,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     const fetchPositions = async () => {
       setIsLoading(true);
       try {
-        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`, {,
+        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`, {
           cache: 'no-store',
         });
         if (res.ok) {
@@ -126,7 +126,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     const fetchPerformance = async () => {
       setIsLoadingPerformance(true);
       try {
-        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`, {,
+        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`, {
         });
         if (res.ok) {
           const data = await res.json();

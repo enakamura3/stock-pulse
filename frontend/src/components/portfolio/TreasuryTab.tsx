@@ -138,7 +138,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
     if (!portfolioId) return;
     setIsLoadingPerf(true);
     try {
-      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/performance`, {,
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/performance`, {
         cache: 'no-store',
       });
       if (res.ok) {
@@ -275,7 +275,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
 
   async function handleExport() {
     try {
-      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`, {,
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`, {
       });
       if (res.ok) {
         const data: NewTreasuryTx[] = await res.json();

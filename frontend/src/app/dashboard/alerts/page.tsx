@@ -52,7 +52,7 @@ export default function AlertsPage() {
   // CARREGAR ALERTAS DO BANCO
   const loadAlerts = useCallback(async () => {
     try {
-      const res = await apiFetch(`/alerts`, {,
+      const res = await apiFetch(`/alerts`, {
       });
       if (res.ok) {
         const data = await res.json();
@@ -82,7 +82,7 @@ export default function AlertsPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {,
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {
         });
         if (res.ok) {
           const data = await res.json();

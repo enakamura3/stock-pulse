@@ -139,7 +139,7 @@ export default function DashboardPage() {
   // 1. CARREGA TODAS AS WATCHLISTS DO USUÁRIO
   const loadWatchlists = useCallback(async (selectId?: string) => {
     try {
-      const res = await apiFetch(`/watchlists`, {,
+      const res = await apiFetch(`/watchlists`, {
       });
       if (res.ok) {
         const data = await res.json();
@@ -158,7 +158,7 @@ export default function DashboardPage() {
   // 2. DETALHA A WATCHLIST ATIVA (E PEGA AS COTAÇÕES ATUALIZADAS DO REDIS/GO)
   const loadWatchlistDetails = async (id: string) => {
     try {
-      const res = await apiFetch(`/watchlists/${id}`, {,
+      const res = await apiFetch(`/watchlists/${id}`, {
       });
       if (res.ok) {
         const data = await res.json();
@@ -300,7 +300,7 @@ export default function DashboardPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {,
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {
         });
         if (res.ok) {
           const data = await res.json();
@@ -326,7 +326,7 @@ export default function DashboardPage() {
     }
     
     try {
-      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`, {,
+      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`, {
       });
       
       const cacheHeader = res.headers.get('X-Cache');
