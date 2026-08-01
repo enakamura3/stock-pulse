@@ -22,8 +22,6 @@ import { apiFetch } from '@/lib/api';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
-
 export default function PortfolioPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
 
@@ -139,7 +137,7 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingPerformance(true);
     try {
-      let url = `${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`;
+      let url = `/portfolios/${id}/performance?period=${selectPeriod}`;
       if (filterTickers.length > 0) url += `&tickers=${filterTickers.join(',')}`;
       const res = await apiFetch(url, { cache: 'no-store' });
       if (res.ok) setPerformanceData(await res.json() || []);
@@ -356,7 +354,7 @@ export default function PortfolioPage() {
 
     setIsAddingTx(true);
     try {
-      const url = editingTxId ? `${API_URL}/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `${API_URL}/portfolios/${activePortfolioId}/transactions`;
+      const url = editingTxId ? `/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `/portfolios/${activePortfolioId}/transactions`;
       const res = await apiFetch(url, {
         method: editingTxId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -493,16 +491,16 @@ export default function PortfolioPage() {
     if (!confirm('Deseja realmente excluir esta transação?')) return;
     try {
       const tx = transactions.find(t => t.id === txId);
-      let endpoint = `${API_URL}/portfolios/${activePortfolioId}/transactions/${txId}`;
+      let endpoint = `/portfolios/${activePortfolioId}/transactions/${txId}`;
       if (tx?.module === 'RF') {
         if (tx.asset_type === 'TESOURO') {
-          endpoint = `${API_URL}/portfolios/${activePortfolioId}/treasury/transactions/${txId}`;
+          endpoint = `/portfolios/${activePortfolioId}/treasury/transactions/${txId}`;
         } else {
-          endpoint = `${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
+          endpoint = `/portfolios/${activePortfolioId}/fixed-income/transactions/${txId}`;
         }
       }
 
-      const res = await fetch(endpoint, { method: 'DELETE', cache: 'no-store' });
+      const res = await apiFetch(endpoint, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
     } catch (e) { console.error(e); }
   };

@@ -26,7 +26,6 @@ interface SearchResult {
   type: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 export default function AlertsPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -52,8 +51,7 @@ export default function AlertsPage() {
   // CARREGAR ALERTAS DO BANCO
   const loadAlerts = useCallback(async () => {
     try {
-      const res = await apiFetch(`/alerts`, {
-      });
+      const res = await apiFetch(`/alerts`);
       if (res.ok) {
         const data = await res.json();
         setAlerts(data || []);
@@ -82,8 +80,7 @@ export default function AlertsPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {
-        });
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data || []);

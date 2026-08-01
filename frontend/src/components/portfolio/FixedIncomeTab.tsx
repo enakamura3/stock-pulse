@@ -11,8 +11,6 @@ interface FixedIncomeTabProps {
   onLaunchOperation: () => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
-
 export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: FixedIncomeTabProps) {
   const [positions, setPositions] = useState<FixedIncomePosition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,9 +100,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     const fetchPositions = async () => {
       setIsLoading(true);
       try {
-        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`, {
-          cache: 'no-store',
-        });
+        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`);
         if (res.ok) {
           const data = await res.json();
           setPositions(data || []);
@@ -126,8 +122,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     const fetchPerformance = async () => {
       setIsLoadingPerformance(true);
       try {
-        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`, {
-        });
+        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`);
         if (res.ok) {
           const data = await res.json();
           setPerformanceData(data || []);

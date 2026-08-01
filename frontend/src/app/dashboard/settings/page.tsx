@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 interface TelegramStatus {
   linked: boolean;
@@ -63,8 +62,7 @@ export default function SettingsPage() {
   const loadTelegramStatus = async () => {
     setIsLoadingTelegram(true);
     try {
-      const res = await apiFetch(`/telegram/status`, {
-      });
+      const res = await apiFetch(`/telegram/status`);
       if (res.ok) {
         const data = await res.json();
         setTelegramStatus(data);
@@ -83,8 +81,7 @@ export default function SettingsPage() {
     setIsLoadingWorkers(true);
     setWorkersError(null);
     try {
-      const res = await apiFetch(`/workers`, {
-      });
+      const res = await apiFetch(`/workers`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {

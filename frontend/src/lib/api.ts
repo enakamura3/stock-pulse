@@ -12,10 +12,12 @@ let refreshPromise: Promise<boolean> | null = null;
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
 
+  const isFormData = options.body instanceof FormData;
+
   const config: RequestInit = {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
     credentials: 'include', // Essencial para HttpOnly cookies (access_token, refresh_token)
