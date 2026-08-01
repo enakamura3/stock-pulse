@@ -3,12 +3,12 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -132,8 +132,8 @@ func TestAuthRequired(t *testing.T) {
 }
 
 func TestCORS(t *testing.T) {
-	os.Setenv("FRONTEND_URL", "http://example.com")
-	defer os.Unsetenv("FRONTEND_URL")
+	config.Envs.FrontendURL = "http://example.com"
+	defer func() { config.Envs.FrontendURL = "" }()
 
 	tests := []struct {
 		name           string
@@ -195,7 +195,7 @@ func TestCORS(t *testing.T) {
 }
 
 func TestCORS_FallbackURL(t *testing.T) {
-	os.Setenv("FRONTEND_URL", "") // ensure it is empty
+	config.Envs.FrontendURL = "" // ensure it is empty
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Origin", "http://localhost:3000")
 

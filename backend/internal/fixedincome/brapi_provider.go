@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 )
 
 // BrapiProvider implementa IndexProvider consumindo dados do brapi.dev
@@ -21,7 +22,7 @@ type BrapiProvider struct {
 func NewBrapiProvider() *BrapiProvider {
 	return &BrapiProvider{
 		client: &http.Client{Timeout: 15 * time.Second},
-		apiKey: os.Getenv("BRAPI_TOKEN"),
+		apiKey: config.Envs.BrapiToken,
 	}
 }
 

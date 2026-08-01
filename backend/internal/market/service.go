@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -26,14 +26,6 @@ type Service struct {
 
 // NewService cria uma nova instância de Service com TTLs configuráveis.
 func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
-	getDuration := func(key string, defaultVal time.Duration) time.Duration {
-		if val := os.Getenv(key); val != "" {
-			if d, err := time.ParseDuration(val); err == nil {
-				return d
-			}
-		}
-		return defaultVal
-	}
 
 	b3Client := NewB3Client()
 	fundamentusClient := NewFundamentusClient()
@@ -45,16 +37,16 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 	stockAnalysisSource := NewStockAnalysisDividendSource(stockAnalysisClient)
 	yahooSource := NewYahooDividendSource(yahooClient)
 
-	ttlDividends := getDuration("REDIS_TTL_DIVIDENDS", 12*time.Hour)
+	ttlDividends := config.Envs.RedisTTLDividends
 
 	return &Service{
 		provider:         provider,
 		scraper:          NewScraper(),
 		dividendGateway:  NewDividendGateway(b3Source, fundamentusSource, stockAnalysisSource, yahooSource, rdb, ttlDividends),
 		rdb:              rdb,
-		ttlQuotes:        getDuration("REDIS_TTL_QUOTES", 60*time.Second),
-		ttlFundamentals:  getDuration("REDIS_TTL_FUNDAMENTALS", 12*time.Hour),
-		ttlExchangeRates: getDuration("REDIS_TTL_EXCHANGE_RATES", 12*time.Hour),
+		ttlQuotes:        config.Envs.RedisTTLQuotes,
+		ttlFundamentals:  config.Envs.RedisTTLFundamentals,
+		ttlExchangeRates: config.Envs.RedisTTLExchangeRates,
 	}
 }
 

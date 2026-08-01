@@ -16,13 +16,14 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/onigiri/stock-pulse/backend/internal/alert"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/docs"
 
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
-	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"github.com/onigiri/stock-pulse/backend/internal/telegram"
 	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
@@ -33,8 +34,12 @@ import (
 )
 
 func main() {
+	if err := config.Load(); err != nil {
+		log.Fatalf("Erro de configuração inicial (Fail-Fast): %v", err)
+	}
+
 	// Inicialização do Logger Estruturado JSON (slog) - Fase 4
-	logLevelStr := os.Getenv("LOG_LEVEL")
+	logLevelStr := config.Envs.LogLevel
 	var level slog.Level
 	switch strings.ToLower(logLevelStr) {
 	case "debug":
@@ -62,7 +67,7 @@ func main() {
 	defer dbPool.Close()
 
 	// Inicialização do Redis (Cache & Session)
-	redisURL := os.Getenv("REDIS_URL")
+	redisURL := config.Envs.RedisURL
 	if redisURL == "" {
 		redisURL = "localhost:6379" // Fallback local de dev
 	}
@@ -77,7 +82,7 @@ func main() {
 	defer rdb.Close()
 
 	// Configuração de Segredos
-	jwtSecret := os.Getenv("JWT_SECRET")
+	jwtSecret := config.Envs.JWTSecret
 	if jwtSecret == "" {
 		log.Fatal("Variável de ambiente JWT_SECRET é obrigatória e não foi configurada.")
 	}
@@ -123,7 +128,6 @@ func main() {
 	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IBOV", PrimaryProvider: brapiProvider, FallbackProvider: yahooProvider})
 	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SP500", PrimaryProvider: yahooProvider})
 
-
 	fiWorker := fixedincome.NewWorker(fiRepo, indexRegistry)
 	fiAnbimaWorker := fixedincome.NewAnbimaHolidayWorker(fiRepo, fiAnbimaClient)
 
@@ -142,7 +146,7 @@ func main() {
 	alertRepo := alert.NewRepository(dbPool)
 	alertService := alert.NewService(alertRepo, marketProvider)
 	alertHandler := alert.NewHandler(alertService)
-	
+
 	historyService := history.NewService(portfolioService, fiService)
 	historyHandler := history.NewHandler(historyService)
 
@@ -150,7 +154,7 @@ func main() {
 	telegramRepo := telegram.NewRepository(dbPool)
 	telegramService := telegram.NewService(telegramRepo, rdb)
 	telegramHandlers := telegram.NewHandlers(telegramService, portfolioService, marketService, fiService)
-	telegramBot, err := telegram.NewBotRunner(os.Getenv("TELEGRAM_BOT_TOKEN"), telegramHandlers)
+	telegramBot, err := telegram.NewBotRunner(config.Envs.TelegramBotToken, telegramHandlers)
 	if err != nil {
 		slog.Error("Failed to start telegram bot", "err", err)
 	}
@@ -178,7 +182,7 @@ func main() {
 	workerManager.Register(worker.NewWorker("FixedIncomeWorker", "Sincroniza taxas e séries históricas de índices de renda fixa (CDI, SELIC, IPCA, etc.)", getInterval("FI_WORKER_INTERVAL", 6*time.Hour), fiWorker.SyncRates))
 	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", "Sincroniza a tabela de feriados nacionais da ANBIMA para cálculos de dias úteis", getInterval("ANBIMA_WORKER_INTERVAL", 6*time.Hour), fiAnbimaWorker.SyncHolidays))
 	workerManager.Register(worker.NewWorker("AlertWorker", "Verifica os alertas de preços ativos e dispara notificações de push/Telegram", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
-	
+
 	workerManager.StartAll(workerCtx)
 	workerHandler := worker.NewHandler(workerManager)
 

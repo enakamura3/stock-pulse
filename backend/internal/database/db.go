@@ -3,15 +3,15 @@ package database
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 )
 
 // NewPool cria e retorna um pool de conexões com o PostgreSQL usando pgxpool
 func NewPool() (*pgxpool.Pool, error) {
-	dbURL := os.Getenv("DB_URL")
+	dbURL := config.Envs.DBURL
 	if dbURL == "" {
 		return nil, fmt.Errorf("variável de ambiente DB_URL não encontrada")
 	}

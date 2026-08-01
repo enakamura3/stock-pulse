@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
@@ -38,7 +38,7 @@ type Handler struct {
 // NewHandler cria uma nova instância de Handler.
 func NewHandler(service AuthService) *Handler {
 	// Em modo de desenvolvimento local, cookieSecure pode ser desativado para permitir testes sem HTTPS
-	cookieSecure := os.Getenv("ENV") != "development"
+	cookieSecure := config.Envs.Env != "development"
 	return &Handler{
 		service:      service,
 		cookieSecure: cookieSecure,

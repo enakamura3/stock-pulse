@@ -77,7 +77,8 @@ func TestMergeAndDedupDividends(t *testing.T) {
 
 func TestIsMissingCurrentMonth(t *testing.T) {
 	now := time.Now()
-	lastMonth := now.AddDate(0, -1, 0)
+	firstOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	lastMonth := firstOfThisMonth.Add(-24 * time.Hour)
 
 	t.Run("vazio retorna true", func(t *testing.T) {
 		assert.True(t, isMissingCurrentMonth([]DividendEvent{}))
@@ -100,7 +101,9 @@ func TestIsMissingCurrentMonth(t *testing.T) {
 
 func TestEnrichWithFallback(t *testing.T) {
 	now := time.Now()
-	lastMonth := now.AddDate(0, -1, 0)
+	// Safely get a date in a previous month by subtracting 25 days from the 1st of the current month
+	firstOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	lastMonth := firstOfThisMonth.Add(-24 * time.Hour)
 
 	t.Run("FII: fallback preenche mês corrente ausente no base", func(t *testing.T) {
 		baseEvents := []DividendEvent{

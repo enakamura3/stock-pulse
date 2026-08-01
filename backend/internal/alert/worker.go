@@ -3,9 +3,9 @@ package alert
 import (
 	"context"
 	"log/slog"
-	"os"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
@@ -24,7 +24,7 @@ type AlertWorker struct {
 
 // NewAlertWorker inicializa o Worker com intervalo customizável (Padrão: 1 minuto).
 func NewAlertWorker(repo AlertRepository, marketService market.QuoteProvider, tgService TelegramProvider) *AlertWorker {
-	intervalStr := os.Getenv("ALERT_CHECK_INTERVAL")
+	intervalStr := config.Envs.AlertCheckInterval
 	interval := 1 * time.Minute // Valor padrão aprovado (Opção 1A)
 
 	if intervalStr != "" {
