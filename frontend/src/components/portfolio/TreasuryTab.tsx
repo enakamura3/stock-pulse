@@ -7,54 +7,8 @@ const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ss
 
 import { TreasuryPosition, TreasuryPerfPoint } from './types';
 import { apiFetch } from '@/lib/api';
-
-interface NewTreasuryTx {
-  ticker: string;
-  treasury_type: string;
-  maturity_date: string;
-  has_coupons: boolean;
-  type: 'SUBSCRIPTION' | 'REDEMPTION';
-  quantity: number | '';
-  unit_price: number | '';
-  contracted_rate: number | '';
-  transaction_date: string;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(value: number, currency = 'BRL'): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function fmtPct(value: number): string {
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}%`;
-}
-
-function getTreasuryTypeLabel(t: string): string {
-  const map: Record<string, string> = {
-    SELIC: '📈 Tesouro Selic',
-    PREFIXADO: '🔒 Prefixado',
-    'IPCA+': '🏷️ IPCA+',
-  };
-  return map[t] || t;
-}
-
-function getTreasuryTypeBadgeColor(t: string): string {
-  const map: Record<string, string> = {
-    SELIC: '#4caf50',
-    PREFIXADO: '#2196f3',
-    'IPCA+': '#ff9800',
-  };
-  return map[t] || '#9e9e9e';
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+import { NewTreasuryTx, SortKey, SortDir, fmt } from './treasury/types';
+import TreasuryPositionTable from './treasury/TreasuryPositionTable';
 
 interface TreasuryTabProps {
   portfolioId: string;
@@ -85,9 +39,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  type SortKey = 'ticker' | 'treasury_type' | 'maturity_date' | 'total_invested' | 'gross_value' | 'net_value' | 'net_return' | 'iof_tax' | 'ir_tax' | 'b3_fee' | 'status';
-  type SortDir = 'asc' | 'desc';
-
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -100,138 +51,71 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
     }
   };
 
-  const sortedPositions = [...positions].sort((a, b) => {
-    let aVal: number | string = 0;
-    let bVal: number | string = 0;
-    switch (sortKey) {
-      case 'ticker': aVal = a.ticker || ''; bVal = b.ticker || ''; break;
-      case 'treasury_type': aVal = a.treasury_type || ''; bVal = b.treasury_type || ''; break;
-      case 'maturity_date': aVal = a.maturity_date || ''; bVal = b.maturity_date || ''; break;
-      case 'total_invested': aVal = a.total_invested ?? 0; bVal = b.total_invested ?? 0; break;
-      case 'gross_value': aVal = a.gross_value ?? 0; bVal = b.gross_value ?? 0; break;
-      case 'net_value': aVal = a.net_value ?? 0; bVal = b.net_value ?? 0; break;
-      case 'net_return': 
-        aVal = a.total_invested > 0 ? ((a.net_value - a.total_invested) / a.total_invested) : 0;
-        bVal = b.total_invested > 0 ? ((b.net_value - b.total_invested) / b.total_invested) : 0;
-        break;
-      case 'iof_tax': aVal = a.iof_tax ?? 0; bVal = b.iof_tax ?? 0; break;
-      case 'ir_tax': aVal = a.ir_tax ?? 0; bVal = b.ir_tax ?? 0; break;
-      case 'b3_fee': aVal = a.b3_fee ?? 0; bVal = b.b3_fee ?? 0; break;
-      case 'status': aVal = a.is_matured ? 1 : 0; bVal = b.is_matured ? 1 : 0; break;
-    }
-    if (typeof aVal === 'string' && typeof bVal === 'string') {
-      return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-    }
-    return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
-  });
-
-  const sortIcon = (key: SortKey) => {
-    if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
-    return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
-  };
-
-  // ── Fetchers ────────────────────────────────────────────────────────────────
-
-  const fetchPerformance = useCallback(async () => {
+  const fetchPerf = useCallback(async () => {
     if (!portfolioId) return;
     setIsLoadingPerf(true);
     try {
-      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/performance`);
-      if (res.ok) {
-        const data = await res.json();
-        setPerfData(data || []);
-      }
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/performance`, { cache: 'no-store' });
+      if (res.ok) setPerfData(await res.json() || []);
     } catch (e) {
-      console.error('Erro ao buscar performance do Tesouro:', e);
+      console.error('Erro ao buscar performance Tesouro:', e);
     } finally {
       setIsLoadingPerf(false);
     }
   }, [portfolioId]);
 
   useEffect(() => {
-    fetchPerformance();
-  }, [fetchPerformance]);
+    fetchPerf();
+  }, [fetchPerf]);
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
-
-  const totalInvested = positions.reduce((s, p) => s + p.total_invested, 0);
-  const totalGross = positions.reduce((s, p) => s + p.gross_value, 0);
-  const totalNet = positions.reduce((s, p) => s + p.net_value, 0);
-  const totalTaxes = positions.reduce((s, p) => s + p.taxes_calculated + p.b3_fee, 0);
-  const grossReturn = totalInvested > 0 ? ((totalGross - totalInvested) / totalInvested) * 100 : 0;
-  const netReturn = totalInvested > 0 ? ((totalNet - totalInvested) / totalInvested) * 100 : 0;
-
-  // ── Form handlers ───────────────────────────────────────────────────────────
-
-  function openModal() {
-    setForm(EMPTY_TX);
+  const openModal = () => {
     setEditingTxId(null);
+    setForm(EMPTY_TX);
     setError(null);
     setShowModal(true);
-  }
+  };
 
-  function closeModal() {
+  const closeModal = () => {
     setShowModal(false);
     setEditingTxId(null);
+    setForm(EMPTY_TX);
     setError(null);
-  }
+  };
 
-  function handleFormChange(field: keyof NewTreasuryTx, value: string | number | boolean) {
-    setForm(prev => ({ ...prev, [field]: value }));
-  }
+  const handleFormChange = (field: keyof NewTreasuryTx, value: any) => {
+    setForm(f => ({ ...f, [field]: value }));
+  };
 
-  function handleEdit(pos: TreasuryPosition) {
-    setEditingTxId(pos.transaction_id);
+  const handleOpenRedemption = (pos: TreasuryPosition) => {
+    setEditingTxId(null);
     setForm({
       ticker: pos.ticker,
       treasury_type: pos.treasury_type,
-      maturity_date: new Date(pos.maturity_date).toISOString().split('T')[0],
+      maturity_date: pos.maturity_date ? pos.maturity_date.split('T')[0] : '',
       has_coupons: pos.has_coupons,
-      type: 'SUBSCRIPTION',
+      type: 'REDEMPTION',
       quantity: pos.quantity,
-      unit_price: pos.unit_price,
-      contracted_rate: pos.contracted_rate,
-      transaction_date: new Date(pos.start_date).toISOString().split('T')[0],
+      unit_price: pos.current_unit_price || pos.average_unit_price,
+      contracted_rate: 0,
+      transaction_date: new Date().toISOString().split('T')[0],
     });
     setError(null);
     setShowModal(true);
-  }
+  };
 
-  async function handleDelete(txId: string) {
-    if (!confirm('Deseja realmente excluir esta operação do Tesouro Direto? Isso irá recalcular o FIFO e o histórico da carteira.')) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.ticker || !form.quantity || !form.unit_price || !form.transaction_date) {
+      setError('Preencha todos os campos obrigatórios.');
       return;
     }
-    try {
-      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions/${txId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        await onRefresh();
-        fetchPerformance();
-      } else {
-        const txt = await res.text();
-        alert(txt || 'Erro ao excluir a operação.');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Erro de conexão. Tente novamente.');
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (!form.ticker.trim()) { setError('Informe o ticker do título (ex: TESOURO SELIC 2027)'); return; }
-    if (!form.maturity_date) { setError('Informe a data de vencimento.'); return; }
-    if (!form.contracted_rate || Number(form.contracted_rate) < 0) { setError('Informe a taxa contratada (% a.a.).'); return; }
-    if (!form.quantity || Number(form.quantity) <= 0) { setError('Informe a quantidade de frações.'); return; }
-    if (!form.unit_price || Number(form.unit_price) <= 0) { setError('Informe o preço unitário.'); return; }
 
     setIsSubmitting(true);
+    setError(null);
+
     try {
       const payload = {
-        ticker: form.ticker.trim().toUpperCase(),
+        ticker: form.ticker.toUpperCase().trim(),
         treasury_type: form.treasury_type,
         maturity_date: form.maturity_date,
         has_coupons: form.has_coupons,
@@ -242,161 +126,118 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
         transaction_date: form.transaction_date,
       };
 
-      const method = editingTxId ? 'PUT' : 'POST';
       const url = editingTxId
         ? `/portfolios/${portfolioId}/treasury/transactions/${editingTxId}`
         : `/portfolios/${portfolioId}/treasury/transactions`;
+      const method = editingTxId ? 'PUT' : 'POST';
 
       const res = await apiFetch(url, {
-        method: method,
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        cache: 'no-store',
       });
 
-      if (res.ok) {
-        closeModal();
-        await onRefresh();
-        fetchPerformance();
-      } else {
-        const txt = await res.text();
-        setError(txt || 'Erro ao salvar a operação.');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Erro ao salvar transação.');
       }
-    } catch {
-      setError('Erro de conexão. Tente novamente.');
+
+      closeModal();
+      await onRefresh();
+      await fetchPerf();
+    } catch (err: any) {
+      setError(err.message || 'Erro inesperado.');
     } finally {
       setIsSubmitting(false);
     }
-  }
-  // ── Import / Export handlers ────────────────────────────────────────────────
+  };
 
-  async function handleExport() {
-    try {
-      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`);
-      if (res.ok) {
-        const data: NewTreasuryTx[] = await res.json();
-        if (!data || data.length === 0) {
-          alert('Não há operações para exportar.');
-          return;
-        }
-
-        const headers = Object.keys(data[0]).join(',');
-        const rows = data.map(op => {
-          return Object.values(op).map(val => {
-            const str = String(val);
-            return str.includes(',') ? `"${str}"` : str;
-          }).join(',');
-        });
-        const csvContent = [headers, ...rows].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `tesouro_direto_${portfolioId}_${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        alert('Erro ao exportar operações.');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Erro de conexão ao exportar.');
-    }
-  }
-
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsImporting(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
     try {
-      const text = await file.text();
-      const lines = text.trim().split('\n');
-      if (lines.length < 2) {
-        alert('Arquivo CSV vazio ou sem dados suficientes.');
-        return;
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/bulk`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        await onRefresh();
+        await fetchPerf();
+      } else {
+        alert('Erro ao importar arquivo CSV.');
       }
-
-      const headers = lines[0].split(',').map(h => h.trim());
-      const operations: NewTreasuryTx[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-        const op: any = {};
-        for (let j = 0; j < headers.length; j++) {
-          const header = headers[j];
-          let val: any = values[j];
-          if (['quantity', 'unit_price', 'contracted_rate'].includes(header)) {
-            val = Number(val);
-          } else if (header === 'has_coupons') {
-            val = val === 'true';
-          }
-          op[header] = val;
-        }
-        operations.push(op as NewTreasuryTx);
-      }
-
-      setIsImporting(true);
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const op of operations) {
-        try {
-          const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(op),
-          });
-          if (res.ok) {
-            successCount++;
-          } else {
-            errorCount++;
-          }
-        } catch {
-          errorCount++;
-        }
-      }
-
-      alert(`Importação concluída: ${successCount} sucesso(s), ${errorCount} erro(s).`);
-      await onRefresh();
-      fetchPerformance();
     } catch (err) {
-      alert('Erro ao processar arquivo CSV. Certifique-se de que é um formato válido.');
+      alert('Erro de conexão ao importar arquivo.');
     } finally {
       setIsImporting(false);
-      e.target.value = ''; // reset
+      e.target.value = '';
     }
-  }
-  // ── Render ──────────────────────────────────────────────────────────────────
+  };
+
+  const handleExport = async () => {
+    try {
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/export`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tesouro-direto-${portfolioId}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert('Erro ao exportar posições.');
+      }
+    } catch (err) {
+      alert('Erro ao exportar posições.');
+    }
+  };
+
+  // Métricas agregadas
+  const totalInvested = positions.reduce((acc, p) => acc + p.total_invested, 0);
+  const totalGross = positions.reduce((acc, p) => acc + p.gross_value, 0);
+  const totalNet = positions.reduce((acc, p) => acc + p.net_value, 0);
+  const totalProfitLoss = totalNet - totalInvested;
+  const returnPct = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
+
+  const totalIOF = positions.reduce((acc, p) => acc + (p.iof_tax || 0), 0);
+  const totalIR = positions.reduce((acc, p) => acc + (p.ir_tax || 0), 0);
+  const totalB3 = positions.reduce((acc, p) => acc + (p.b3_fee || 0), 0);
+
+  const kpis = [
+    { label: 'Total Investido', value: fmt(totalInvested), icon: '💰' },
+    { label: 'Valor Bruto', value: fmt(totalGross), icon: '📊' },
+    {
+      label: 'Valor Líquido',
+      value: fmt(totalNet),
+      icon: '💵',
+      sub: `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}% (${fmt(totalProfitLoss)})`,
+      subColor: returnPct >= 0 ? '#4caf50' : '#f44336',
+    },
+    { label: 'Impostos (IOF + IR)', value: fmt(totalIOF + totalIR), icon: '🏛️', sub: `IOF: ${fmt(totalIOF)} | IR: ${fmt(totalIR)}`, subColor: '#ef5350' },
+    { label: 'Taxa B3 Acumulada', value: fmt(totalB3), icon: '🏷️', sub: '0,20% a.a. pró-rata', subColor: '#ff9800' },
+  ];
 
   return (
-    <div className="flex-col gap-xl w-full">
-
+    <div className="flex-col gap-xl">
       {/* ── KPI Cards ── */}
       <div className="flex-row gap-md flex-wrap">
-        {[
-          { label: 'Total Aplicado', value: fmt(totalInvested), icon: '💰', sub: null },
-          {
-            label: 'Valor Bruto',
-            value: fmt(totalGross),
-            icon: '📈',
-            sub: fmtPct(grossReturn),
-            subColor: grossReturn >= 0 ? '#4caf50' : '#f44336',
-          },
-          {
-            label: 'Valor Líquido',
-            value: fmt(totalNet),
-            icon: '🏦',
-            sub: fmtPct(netReturn),
-            subColor: netReturn >= 0 ? '#4caf50' : '#f44336',
-          },
-          { label: 'Total de Impostos', value: fmt(totalTaxes), icon: '🧾', sub: '(IOF + IR + Taxa B3)' },
-        ].map(card => (
+        {kpis.map((card, idx) => (
           <div
-            key={card.label}
+            key={idx}
             className="card"
             style={{ flex: '1 1 180px', minWidth: 160, padding: '1.25rem 1.5rem' }}
           >
@@ -440,214 +281,35 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
       </div>
 
       {/* ── Positions Table ── */}
-      <div className="card flex-col gap-md" style={{ flex: '2 1 600px', minHeight: '380px' }}>
-        <div className="flex-row justify-between items-center mb-lg">
-          <div>
-            <h3 className="card-title">📋 Posições Ativas</h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              {positions.length} título{positions.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="flex-row gap-sm">
-            <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}>
-              📥 Importar
-              <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
-            </label>
-            <button
-              onClick={handleExport}
-              className="btn-secondary"
-              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-            >
-              📤 Exportar
-            </button>
-            <button
-              id="treasury-add-btn"
-              onClick={openModal}
-              className="primary-button"
-              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-            >
-              + Nova Aplicação
-            </button>
-          </div>
-        </div>
-
-        {(isLoadingPositions || isImporting) ? (
-          <div className="flex-row items-center justify-center" style={{ height: '120px' }}>
-            <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 28, height: 28 }} />
-          </div>
-        ) : positions.length === 0 ? (
-          <div
-            className="flex-col items-center justify-center text-secondary"
-            style={{ height: '120px', border: '1px dashed var(--panel-border)', borderRadius: '10px' }}
-          >
-            <p className="text-sm m-0">Nenhuma posição ativa de Tesouro Direto.</p>
-            <button
-              onClick={openModal}
-              className="btn-secondary mt-md"
-              style={{ fontSize: '0.8rem', padding: '0.4rem 1rem' }}
-            >
-              + Adicionar primeira aplicação
-            </button>
-          </div>
-        ) : (
-          <div className="table-container flex-col" style={{ flex: 1 }}>
-            <table className="data-table" style={{ width: '100%' }}>
-              <thead>
-                <tr>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('ticker')}>Título {sortIcon('ticker')}</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('treasury_type')}>Tipo {sortIcon('treasury_type')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('maturity_date')}>Vencimento {sortIcon('maturity_date')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('total_invested')}>Aplicado {sortIcon('total_invested')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('gross_value')}>Bruto {sortIcon('gross_value')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_value')}>Líquido {sortIcon('net_value')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_return')}>Retorno Líq. {sortIcon('net_return')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('iof_tax')}>IOF {sortIcon('iof_tax')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('ir_tax')}>IR {sortIcon('ir_tax')}</th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('b3_fee')}>Taxa B3 {sortIcon('b3_fee')}</th>
-                  <th className="text-center" style={{ cursor: 'pointer' }} onClick={() => handleSort('status')}>Status {sortIcon('status')}</th>
-                  <th className="text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedPositions.map((pos, i) => {
-                  const liqReturn = pos.total_invested > 0
-                    ? ((pos.net_value - pos.total_invested) / pos.total_invested) * 100
-                    : 0;
-                  const isPositive = liqReturn >= 0;
-                  return (
-                    <tr key={pos.transaction_id}>
-                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {pos.ticker}
-                        {pos.has_coupons && (
-                          <span
-                            title="Paga cupons semestrais"
-                            style={{ marginLeft: 6, fontSize: '0.65rem', color: '#ff9800', fontWeight: 400 }}
-                          >
-                            cupons
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span style={{
-                          padding: '0.2rem 0.55rem',
-                          borderRadius: '12px',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          background: `${getTreasuryTypeBadgeColor(pos.treasury_type)}22`,
-                          color: getTreasuryTypeBadgeColor(pos.treasury_type),
-                          border: `1px solid ${getTreasuryTypeBadgeColor(pos.treasury_type)}44`,
-                        }}>
-                          {pos.treasury_type}
-                        </span>
-                      </td>
-                      <td className="text-right" style={{ color: 'var(--text-secondary)' }}>
-                        {pos.is_matured
-                          ? <span style={{ color: '#f44336', fontWeight: 600 }}>Vencido</span>
-                          : `${new Date(pos.maturity_date).toLocaleDateString('pt-BR')} (${pos.days_to_maturity}d)`}
-                      </td>
-                      <td className="text-right" style={{ fontFamily: 'monospace' }}>{fmt(pos.total_invested)}</td>
-                      <td className="text-right" style={{ fontFamily: 'monospace' }}>{fmt(pos.gross_value)}</td>
-                      <td className="text-right font-semibold" style={{ fontFamily: 'monospace', color: pos.net_value >= pos.total_invested ? '#4caf50' : '#f44336' }}>
-                        {fmt(pos.net_value)}
-                      </td>
-                      <td className="text-right font-semibold" style={{ fontFamily: 'monospace', color: isPositive ? '#4caf50' : '#f44336' }}>
-                        {fmtPct(liqReturn)}
-                      </td>
-                      <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{fmt(pos.iof_tax)}</td>
-                      <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{fmt(pos.ir_tax)}</td>
-                      <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{fmt(pos.b3_fee)}</td>
-                      <td className="text-center">
-                        {pos.is_matured ? (
-                          <span style={{ color: '#f44336', fontSize: '0.7rem', fontWeight: 700 }}>● Vencido</span>
-                        ) : (
-                          <span style={{ color: '#4caf50', fontSize: '0.7rem', fontWeight: 700 }}>● Ativo</span>
-                        )}
-                      </td>
-                      <td className="text-center">
-                        <div className="flex-row justify-center gap-xs">
-                          <button
-                            onClick={() => handleEdit(pos)}
-                            title="Editar"
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '2px 6px',
-                              borderRadius: '4px', color: 'var(--text-secondary)'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDelete(pos.transaction_id)}
-                            title="Apagar"
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '2px 6px',
-                              borderRadius: '4px', color: 'var(--text-secondary)'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#f44336'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── Disclaimer ── */}
-      <div
-        style={{
-          padding: '0.75rem 1rem',
-          borderRadius: '8px',
-          background: 'rgba(255, 152, 0, 0.06)',
-          border: '1px solid rgba(255, 152, 0, 0.2)',
-          fontSize: '0.72rem',
-          color: 'var(--text-secondary)',
-          lineHeight: 1.6,
-        }}
-      >
-        ⚠️ <strong>Nota:</strong> Os valores de impostos (IOF e IR) e Taxa B3 são calculados com base na <strong>Curva Teórica</strong> (taxa contratada + DU/252). 
-        A <strong>Marcação a Mercado</strong> é atualizada diariamente pelo worker com o Preço de Resgate oficial do Tesouro Nacional. 
-        Isenção Selic aplicada sobre posições até R$ 10.000,00.
-      </div>
+      <TreasuryPositionTable
+        positions={positions}
+        isLoadingPositions={isLoadingPositions}
+        isImporting={isImporting}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
+        onOpenModal={openModal}
+        onImport={handleImport}
+        onExport={handleExport}
+        onRedeem={handleOpenRedemption}
+      />
 
       {/* ── Modal ── */}
       {showModal && (
-        <div
-          className="modal-overlay"
-          onClick={e => { if (e.target === e.currentTarget) closeModal(); }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '1rem',
-          }}
-        >
-          <div
-            className="card"
-            style={{ width: '100%', maxWidth: 520, padding: '2rem', position: 'relative' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={closeModal}
-              style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.25rem' }}
-            >
-              ✕
-            </button>
-
-            <h3 className="card-title mb-lg">
-              {editingTxId ? '✏️ Editar Operação — Tesouro Direto' : '🏛️ Registrar Operação — Tesouro Direto'}
-            </h3>
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {editingTxId
+                  ? '✏️ Editar Operação de Tesouro Direto'
+                  : form.type === 'SUBSCRIPTION'
+                  ? '📥 Nova Aplicação — Tesouro Direto'
+                  : '📤 Novo Resgate — Tesouro Direto'}
+              </h3>
+              <button onClick={closeModal} className="btn-close">✕</button>
+            </div>
 
             <form onSubmit={handleSubmit} className="flex-col gap-md">
-
-              {/* Tipo de Operação */}
               <div className="flex-row gap-sm">
                 {(['SUBSCRIPTION', 'REDEMPTION'] as const).map(t => (
                   <button
@@ -667,7 +329,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                 ))}
               </div>
 
-              {/* Tipo de Título */}
               <div>
                 <label className="label-sm">Tipo de Título</label>
                 <select
@@ -682,7 +343,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                 </select>
               </div>
 
-              {/* Ticker */}
               <div>
                 <label className="label-sm">Nome / Ticker do Título</label>
                 <input
@@ -696,7 +356,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                 />
               </div>
 
-              {/* Datas */}
               <div className="flex-row gap-md">
                 <div style={{ flex: 1 }}>
                   <label className="label-sm">Data da Operação</label>
@@ -722,31 +381,13 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                 </div>
               </div>
 
-              {/* Taxa Contratada */}
               <div>
-                <label className="label-sm">
-                  Taxa Contratada (% a.a.)
-                  {form.treasury_type === 'SELIC' && (
-                    <span style={{ fontSize: '0.65rem', color: '#4caf50', marginLeft: 6 }}>
-                      spread sobre a Selic
-                    </span>
-                  )}
-                  {form.treasury_type === 'PREFIXADO' && (
-                    <span style={{ fontSize: '0.65rem', color: '#2196f3', marginLeft: 6 }}>
-                      taxa ao ano
-                    </span>
-                  )}
-                  {form.treasury_type === 'IPCA+' && (
-                    <span style={{ fontSize: '0.65rem', color: '#ff9800', marginLeft: 6 }}>
-                      spread sobre o IPCA
-                    </span>
-                  )}
-                </label>
+                <label className="label-sm">Taxa Contratada (% a.a.)</label>
                 <input
                   id="treasury-contracted-rate"
                   type="number"
                   className="input"
-                  placeholder={form.treasury_type === 'SELIC' ? 'Ex: 0.15 (0.15% a.a. acima da Selic)' : form.treasury_type === 'PREFIXADO' ? 'Ex: 13.25 (13.25% a.a.)' : 'Ex: 6.40 (IPCA + 6.40%)'}
+                  placeholder={form.treasury_type === 'SELIC' ? 'Ex: 0.15' : form.treasury_type === 'PREFIXADO' ? 'Ex: 13.25' : 'Ex: 6.40'}
                   step="0.01"
                   min="0"
                   value={form.contracted_rate}
@@ -755,7 +396,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                 />
               </div>
 
-              {/* Quantidade e Preço */}
               <div className="flex-row gap-md">
                 <div style={{ flex: 1 }}>
                   <label className="label-sm">Quantidade (frações)</label>
@@ -787,7 +427,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                 </div>
               </div>
 
-              {/* Paga Cupons */}
               <label
                 htmlFor="treasury-has-coupons"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
@@ -799,10 +438,9 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                   onChange={e => handleFormChange('has_coupons', e.target.checked)}
                   style={{ width: 16, height: 16, cursor: 'pointer' }}
                 />
-                Paga cupons semestrais (Prefixado com Juros Semestrais / IPCA+ com Juros Semestrais)
+                Paga cupons semestrais
               </label>
 
-              {/* Total estimado */}
               {form.quantity && form.unit_price && (
                 <div
                   style={{
@@ -836,10 +474,8 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
                   style={{ fontSize: '0.85rem', minWidth: '130px' }}
                 >
                   {isSubmitting 
-                    ? (editingTxId ? '⏳ Salvando...' : '⏳ Registrando...') 
-                    : editingTxId 
-                      ? '💾 Salvar Alterações' 
-                      : form.type === 'SUBSCRIPTION' ? '📥 Registrar Aplicação' : '📤 Registrar Resgate'}
+                    ? '⏳ Salvando...' 
+                    : form.type === 'SUBSCRIPTION' ? '📥 Registrar Aplicação' : '📤 Registrar Resgate'}
                 </button>
               </div>
             </form>
