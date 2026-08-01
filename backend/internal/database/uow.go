@@ -6,7 +6,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // DBTX define a interface unificada para interações com o PostgreSQL.
@@ -49,11 +48,11 @@ type UnitOfWork interface {
 }
 
 type uow struct {
-	pool *pgxpool.Pool
+	pool DBTX
 }
 
 // NewUnitOfWork cria um novo gerenciador transacional.
-func NewUnitOfWork(pool *pgxpool.Pool) UnitOfWork {
+func NewUnitOfWork(pool DBTX) UnitOfWork {
 	return &uow{pool: pool}
 }
 
