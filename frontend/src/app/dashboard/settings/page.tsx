@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -62,8 +63,7 @@ export default function SettingsPage() {
   const loadTelegramStatus = async () => {
     setIsLoadingTelegram(true);
     try {
-      const res = await fetch(`${API_URL}/telegram/status`, {
-        credentials: 'include',
+      const res = await apiFetch(`/telegram/status`, {,
       });
       if (res.ok) {
         const data = await res.json();
@@ -83,8 +83,7 @@ export default function SettingsPage() {
     setIsLoadingWorkers(true);
     setWorkersError(null);
     try {
-      const res = await fetch(`${API_URL}/workers`, {
-        credentials: 'include',
+      const res = await apiFetch(`/workers`, {,
       });
       if (res.ok) {
         const data = await res.json();
@@ -110,9 +109,8 @@ export default function SettingsPage() {
     setWorkerSuccess(null);
     setWorkersError(null);
     try {
-      const res = await fetch(`${API_URL}/workers/${name}/trigger`, {
+      const res = await apiFetch(`/workers/${name}/trigger`, {
         method: 'POST',
-        credentials: 'include',
       });
       if (res.ok) {
         setWorkerSuccess(`Worker "${name}" disparado com sucesso!`);
@@ -172,11 +170,10 @@ export default function SettingsPage() {
     setIsSavingProfile(true);
 
     try {
-      const res = await fetch(`${API_URL}/user/profile`, {
+      const res = await apiFetch(`/user/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: profileName, email: profileEmail }),
-        credentials: 'include',
       });
 
       const data = await res.json();
@@ -207,14 +204,13 @@ export default function SettingsPage() {
     setIsSavingPassword(true);
 
     try {
-      const res = await fetch(`${API_URL}/user/password`, {
+      const res = await apiFetch(`/user/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           current_password: currentPassword,
           new_password: newPassword,
         }),
-        credentials: 'include',
       });
 
       const data = await res.json();
@@ -236,9 +232,8 @@ export default function SettingsPage() {
   // Vincular Telegram
   const handleLinkTelegram = async () => {
     try {
-      const res = await fetch(`${API_URL}/telegram/link`, {
+      const res = await apiFetch(`/telegram/link`, {
         method: 'POST',
-        credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
@@ -249,7 +244,7 @@ export default function SettingsPage() {
         let attempts = 0;
         const interval = setInterval(async () => {
           attempts++;
-          const checkRes = await fetch(`${API_URL}/telegram/status`, { credentials: 'include' });
+          const checkRes = await apiFetch(`/telegram/status`, { });
           if (checkRes.ok) {
             const checkData = await checkRes.json();
             if (checkData.linked) {
@@ -275,9 +270,8 @@ export default function SettingsPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/telegram/link`, {
+      const res = await apiFetch(`/telegram/link`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (res.ok) {
         loadTelegramStatus();
@@ -304,9 +298,8 @@ export default function SettingsPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/user`, {
+      const res = await apiFetch(`/user`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       if (res.ok) {

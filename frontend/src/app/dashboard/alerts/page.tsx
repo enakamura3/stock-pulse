@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 
 interface Alert {
   id: string;
@@ -51,8 +52,7 @@ export default function AlertsPage() {
   // CARREGAR ALERTAS DO BANCO
   const loadAlerts = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/alerts`, {
-        credentials: 'include',
+      const res = await apiFetch(`/alerts`, {,
       });
       if (res.ok) {
         const data = await res.json();
@@ -82,8 +82,7 @@ export default function AlertsPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`${API_URL}/assets/search?q=${encodeURIComponent(searchQuery)}`, {
-          credentials: 'include',
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {,
         });
         if (res.ok) {
           const data = await res.json();
@@ -121,7 +120,7 @@ export default function AlertsPage() {
     setFormSuccess(null);
 
     try {
-      const res = await fetch(`${API_URL}/alerts`, {
+      const res = await apiFetch(`/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,7 +128,6 @@ export default function AlertsPage() {
           target_price: parseFloat(targetPrice),
           condition: condition,
         }),
-        credentials: 'include',
       });
 
       const data = await res.json();
@@ -153,9 +151,8 @@ export default function AlertsPage() {
   // TOGGLE STATUS (ATIVE <-> DISABLED)
   const handleToggleStatus = async (id: string) => {
     try {
-      const res = await fetch(`${API_URL}/alerts/${id}/toggle`, {
+      const res = await apiFetch(`/alerts/${id}/toggle`, {
         method: 'PUT',
-        credentials: 'include',
       });
       if (res.ok) {
         // Atualiza status localmente de forma otimista
@@ -173,9 +170,8 @@ export default function AlertsPage() {
   const handleDeleteAlert = async (id: string) => {
     if (!confirm('Deseja realmente excluir permanentemente este alerta?')) return;
     try {
-      const res = await fetch(`${API_URL}/alerts/${id}`, {
+      const res = await apiFetch(`/alerts/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (res.ok) {
         setAlerts((prev) => prev.filter((a) => a.id !== id));

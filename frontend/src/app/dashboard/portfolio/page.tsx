@@ -18,6 +18,7 @@ import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import TreasuryTab from '@/components/portfolio/TreasuryTab';
 import PortfolioAnalysis from '@/components/portfolio/PortfolioAnalysis';
 import Modals from '@/components/portfolio/Modals';
+import { apiFetch } from '@/lib/api';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
@@ -91,7 +92,7 @@ export default function PortfolioPage() {
   const loadPortfolios = useCallback(async (selectId?: string) => {
     setIsLoadingPortfolios(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios`, { credentials: 'include', cache: 'no-store' });
+      const res = await apiFetch(`/portfolios`, {, cache: 'no-store' });
       if (res.ok) {
         const data: Portfolio[] = await res.json();
         setPortfolios(data || []);
@@ -108,8 +109,7 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingTreasury(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${id}/treasury/positions`, {
-        credentials: 'include', cache: 'no-store'
+      const res = await apiFetch(`/portfolios/${id}/treasury/positions`, {, cache: 'no-store'
       });
       if (res.ok) setTreasuryPositions(await res.json() || []);
     } catch (e) {
@@ -123,12 +123,12 @@ export default function PortfolioPage() {
     if (!id) return;
     setIsLoadingDetails(true);
     try {
-      const resDetails = await fetch(`${API_URL}/portfolios/${id}`, { credentials: 'include', cache: 'no-store' });
+      const resDetails = await apiFetch(`/portfolios/${id}`, {, cache: 'no-store' });
       if (resDetails.ok) setPositions((await resDetails.json()).positions || []);
-      const resTxs = await fetch(`${API_URL}/portfolios/${id}/history`, { credentials: 'include', cache: 'no-store' });
+      const resTxs = await apiFetch(`/portfolios/${id}/history`, {, cache: 'no-store' });
       if (resTxs.ok) setTransactions(await resTxs.json() || []);
       
-      const resFI = await fetch(`${API_URL}/portfolios/${id}/fixed-income/positions`, { credentials: 'include', cache: 'no-store' });
+      const resFI = await apiFetch(`/portfolios/${id}/fixed-income/positions`, {, cache: 'no-store' });
       if (resFI.ok) setFiPositions(await resFI.json() || []);
 
       await loadTreasuryPositions(id);
@@ -141,7 +141,7 @@ export default function PortfolioPage() {
     try {
       let url = `${API_URL}/portfolios/${id}/performance?period=${selectPeriod}`;
       if (filterTickers.length > 0) url += `&tickers=${filterTickers.join(',')}`;
-      const res = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const res = await apiFetch(url, {, cache: 'no-store' });
       if (res.ok) setPerformanceData(await res.json() || []);
     } catch (e) { console.error('Erro ao buscar série histórica:', e); } finally { setIsLoadingPerformance(false); }
   }, []);
@@ -151,9 +151,9 @@ export default function PortfolioPage() {
     setIsLoadingDividends(true);
     try {
       const [resDivs, resFI, resTD] = await Promise.all([
-        fetch(`${API_URL}/portfolios/${id}/dividends`, { credentials: 'include', cache: 'no-store' }),
-        fetch(`${API_URL}/portfolios/${id}/fixed-income/monthly-yields`, { credentials: 'include', cache: 'no-store' }),
-        fetch(`${API_URL}/portfolios/${id}/treasury/monthly-yields`, { credentials: 'include', cache: 'no-store' })
+        apiFetch(`/portfolios/${id}/dividends`, {, cache: 'no-store' }),
+        apiFetch(`/portfolios/${id}/fixed-income/monthly-yields`, {, cache: 'no-store' }),
+        apiFetch(`/portfolios/${id}/treasury/monthly-yields`, {, cache: 'no-store' })
       ]);
       
       let allDividends: CalculatedDividend[] = [];
@@ -261,7 +261,7 @@ export default function PortfolioPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`${API_URL}/assets/search?q=${encodeURIComponent(searchQuery)}`, { credentials: 'include', cache: 'no-store' });
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {, cache: 'no-store' });
         if (res.ok) { setSearchResults(await res.json() || []); setShowDropdown(true); }
       } catch (e) { console.error('Erro na busca:', e); } finally { setIsSearching(false); }
     }, 350);
@@ -271,12 +271,12 @@ export default function PortfolioPage() {
   const handleSelectAsset = async (symbol: string) => {
     setTxTicker(symbol); setSearchQuery(symbol); setShowDropdown(false);
     try {
-      const res = await fetch(`${API_URL}/quotes/${encodeURIComponent(symbol)}`, { credentials: 'include', cache: 'no-store' });
+      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`, {, cache: 'no-store' });
       if (res.ok) {
         const quote = await res.json();
         setSelectedAssetCurrency(quote.currency || 'BRL');
         if (quote.currency === 'USD') {
-          const rateRes = await fetch(`${API_URL}/quotes/USDBRL=X`, { credentials: 'include', cache: 'no-store' });
+          const rateRes = await apiFetch(`/quotes/USDBRL=X`, {, cache: 'no-store' });
           if (rateRes.ok) setTxExchangeRate((await rateRes.json()).price || 5.25);
           else setTxExchangeRate(5.25);
         } else { setTxExchangeRate(1.0); }
@@ -286,7 +286,7 @@ export default function PortfolioPage() {
 
   const handleLinkTelegram = async () => {
     try {
-      const res = await fetch(`${API_URL}/telegram/link`, { method: 'POST', credentials: 'include' });
+      const res = await apiFetch(`/telegram/link`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         const botUsername = data.bot_username || 'StockPulseBot';
@@ -305,10 +305,9 @@ export default function PortfolioPage() {
     if (!newPortfolioName.trim()) return;
     setIsCreatingPortfolio(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios`, {
+      const res = await apiFetch(`/portfolios`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newPortfolioName, base_currency: newPortfolioCurrency }),
-        credentials: 'include', cache: 'no-store',
+        body: JSON.stringify({ name: newPortfolioName, base_currency: newPortfolioCurrency }), cache: 'no-store',
       });
       if (res.ok) {
         setNewPortfolioName(''); setShowPortfolioModal(false);
@@ -321,7 +320,7 @@ export default function PortfolioPage() {
     if (portfolios.length <= 1) return alert('Você precisa manter pelo menos uma carteira ativa no sistema.');
     if (!confirm('Deseja realmente apagar esta carteira? Todas as transações serão excluídas.')) return;
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}`, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
+      const res = await apiFetch(`/portfolios/${activePortfolioId}`, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) await loadPortfolios();
     } catch (e) { console.error(e); }
   };
@@ -329,8 +328,8 @@ export default function PortfolioPage() {
   const handleSetDefaultPortfolio = async () => {
     if (!activePortfolioId) return;
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/default`, {
-        method: 'PUT', credentials: 'include', cache: 'no-store'
+      const res = await apiFetch(`/portfolios/${activePortfolioId}/default`, {
+        method: 'PUT', cache: 'no-store'
       });
       if (res.ok) {
         await loadPortfolios(activePortfolioId);
@@ -358,7 +357,7 @@ export default function PortfolioPage() {
     setIsAddingTx(true);
     try {
       const url = editingTxId ? `${API_URL}/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `${API_URL}/portfolios/${activePortfolioId}/transactions`;
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: editingTxId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -366,8 +365,7 @@ export default function PortfolioPage() {
           unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
           exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 0.0 : parsedRate,
           executed_at: txExecutedAt,
-        }),
-        credentials: 'include', cache: 'no-store',
+        }), cache: 'no-store',
       });
 
       if (res.ok) {
@@ -393,19 +391,19 @@ export default function PortfolioPage() {
         assetPayload.maturity_date = new Date(fiMaturityDate).toISOString();
       }
 
-      const assetRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets`, {
+      const assetRes = await apiFetch(`/portfolios/${activePortfolioId}/fixed-income/assets`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assetPayload), credentials: 'include', cache: 'no-store'
+        body: JSON.stringify(assetPayload), cache: 'no-store'
       });
 
       if (!assetRes.ok) throw new Error("Erro ao criar ativo");
       const asset = await assetRes.json();
 
-      const txRes = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/assets/${asset.id}/transactions`, {
+      const txRes = await apiFetch(`/portfolios/${activePortfolioId}/fixed-income/assets/${asset.id}/transactions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
-        }), credentials: 'include', cache: 'no-store'
+        }), cache: 'no-store'
       });
 
       if (!txRes.ok) throw new Error("Erro ao criar transação");
@@ -451,15 +449,14 @@ export default function PortfolioPage() {
     if (!editingTxId || !fiAmount || !fiApplicationDate) return alert('Preencha os campos obrigatórios');
     setIsAddingFI(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/fixed-income/transactions/${editingTxId}`, {
+      const res = await apiFetch(`/portfolios/${activePortfolioId}/fixed-income/transactions/${editingTxId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: fiTxType,
           amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')),
           date: new Date(fiApplicationDate).toISOString(),
           maturity_date: fiMaturityDate ? new Date(fiMaturityDate).toISOString() : undefined
-        }),
-        credentials: 'include', cache: 'no-store'
+        }), cache: 'no-store'
       });
       if (!res.ok) throw new Error("Erro ao atualizar transação");
       
@@ -481,7 +478,7 @@ export default function PortfolioPage() {
     if (!file) return;
     const formData = new FormData(); formData.append("file", file);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/transactions/bulk`, { method: "POST", credentials: "include", body: formData });
+      const res = await apiFetch(`/portfolios/${activePortfolioId}/transactions/bulk`, { method: "POST", body: formData });
       if (res.ok) {
         const data = await res.json();
         if (data.errors?.length > 0) alert(`Importados com sucesso: ${data.success}\nFalhas:\n- ${data.errors.join("\n- ")}`);
@@ -505,16 +502,15 @@ export default function PortfolioPage() {
         }
       }
 
-      const res = await fetch(endpoint, { method: 'DELETE', credentials: 'include', cache: 'no-store' });
+      const res = await fetch(endpoint, { method: 'DELETE', cache: 'no-store' });
       if (res.ok) { await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period); }
     } catch (e) { console.error(e); }
   };
 
   const handleExportPortfolio = async () => {
     try {
-      const res = await fetch(`${API_URL}/portfolios/${activePortfolioId}/export`, {
+      const res = await apiFetch(`/portfolios/${activePortfolioId}/export`, {
         method: 'GET',
-        credentials: 'include',
         cache: 'no-store'
       });
       if (res.ok) {

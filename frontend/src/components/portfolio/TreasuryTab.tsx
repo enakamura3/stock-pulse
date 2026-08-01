@@ -8,6 +8,7 @@ const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ss
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 import { TreasuryPosition, TreasuryPerfPoint } from './types';
+import { apiFetch } from '@/lib/api';
 
 interface NewTreasuryTx {
   ticker: string;
@@ -137,8 +138,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
     if (!portfolioId) return;
     setIsLoadingPerf(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/performance`, {
-        credentials: 'include',
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/performance`, {,
         cache: 'no-store',
       });
       if (res.ok) {
@@ -206,9 +206,8 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/transactions/${txId}`, {
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions/${txId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (res.ok) {
         await onRefresh();
@@ -252,9 +251,8 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
         ? `${API_URL}/portfolios/${portfolioId}/treasury/transactions/${editingTxId}`
         : `${API_URL}/portfolios/${portfolioId}/treasury/transactions`;
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: method,
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -277,8 +275,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
 
   async function handleExport() {
     try {
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/transactions`, {
-        credentials: 'include',
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`, {,
       });
       if (res.ok) {
         const data: NewTreasuryTx[] = await res.json();
@@ -353,9 +350,8 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
 
       for (const op of operations) {
         try {
-          const res = await fetch(`${API_URL}/portfolios/${portfolioId}/treasury/transactions`, {
+          const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`, {
             method: 'POST',
-            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(op),
           });
