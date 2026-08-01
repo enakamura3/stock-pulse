@@ -8,7 +8,6 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -18,13 +17,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
 // DB Helpers
 
 func getTestDB(t *testing.T) *pgxpool.Pool {
-	dbURL := os.Getenv("DB_URL")
+	dbURL := config.Envs.DBURL
 	if dbURL == "" {
 		t.Skip("DB_URL is empty, skipping database integration tests")
 	}

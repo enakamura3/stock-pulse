@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
@@ -58,7 +58,7 @@ func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
 
 // CORS configura as permissões de compartilhamento de recursos entre origens de forma extremamente segura.
 func CORS() func(http.Handler) http.Handler {
-	frontendURL := os.Getenv("FRONTEND_URL")
+	frontendURL := config.Envs.FrontendURL
 	if frontendURL == "" {
 		frontendURL = "http://localhost:3000" // Fallback seguro de desenvolvimento
 	}

@@ -2,16 +2,16 @@ package fixedincome
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTreasuryService_EditDelete(t *testing.T) {
-	dbURL := os.Getenv("DB_URL")
+	dbURL := config.Envs.DBURL
 	if dbURL == "" {
 		t.Skip("DB_URL is empty, skipping service integration tests")
 	}
@@ -125,7 +125,7 @@ func (m *mockBCBClient) FetchRates(ctx context.Context, indexer string, startDat
 }
 
 func TestTreasuryService_MonthlyYields(t *testing.T) {
-	dbURL := os.Getenv("DB_URL")
+	dbURL := config.Envs.DBURL
 	if dbURL == "" {
 		t.Skip("DB_URL is empty, skipping service integration tests")
 	}
@@ -184,7 +184,7 @@ func TestTreasuryService_MonthlyYields(t *testing.T) {
 }
 
 func TestTreasuryService_GetTreasuryPerformance(t *testing.T) {
-	dbURL := os.Getenv("DB_URL")
+	dbURL := config.Envs.DBURL
 	if dbURL == "" {
 		t.Skip("DB_URL is empty, skipping service integration tests")
 	}

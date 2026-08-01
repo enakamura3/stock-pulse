@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redismock/v9"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -42,6 +43,11 @@ func (m *MockQuoteProvider) GetDividends(ctx context.Context, ticker string, ass
 }
 
 func setupServiceTest() (*Service, *MockQuoteProvider, *redis.Client, redismock.ClientMock) {
+	config.Envs.RedisTTLQuotes = 60 * time.Second
+	config.Envs.RedisTTLFundamentals = 12 * time.Hour
+	config.Envs.RedisTTLExchangeRates = 12 * time.Hour
+	config.Envs.RedisTTLDividends = 12 * time.Hour
+
 	mp := new(MockQuoteProvider)
 	rdb, rmock := redismock.NewClientMock()
 	s := NewService(mp, rdb)
