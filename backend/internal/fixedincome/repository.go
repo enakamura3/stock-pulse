@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
 type Repository interface {
@@ -64,10 +64,10 @@ type Repository interface {
 }
 
 type repository struct {
-	db *pgxpool.Pool
+	db database.DBTX
 }
 
-func NewRepository(db *pgxpool.Pool) Repository {
+func NewRepository(db database.DBTX) Repository {
 	return &repository{db: db}
 }
 
@@ -77,7 +77,7 @@ func (r *repository) CreateAsset(ctx context.Context, a *Asset) (*Asset, error) 
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at
 	`
-	err := r.db.QueryRow(ctx, query,
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query,
 		a.PortfolioID, a.Institution, a.Type, a.DebtType, a.Indexer, a.Rate, a.MaturityDate,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
@@ -92,7 +92,7 @@ func (r *repository) GetAssetsByPortfolio(ctx context.Context, portfolioID strin
 		FROM fixed_income_assets
 		WHERE portfolio_id = $1
 	`
-	rows, err := r.db.Query(ctx, query, portfolioID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (r *repository) GetAssetByID(ctx context.Context, assetID string) (*Asset, 
 		WHERE id = $1
 	`
 	var a Asset
-	err := r.db.QueryRow(ctx, query, assetID).Scan(&a.ID, &a.PortfolioID, &a.Institution, &a.Type, &a.DebtType, &a.Indexer, &a.Rate, &a.MaturityDate, &a.CreatedAt, &a.UpdatedAt)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, assetID).Scan(&a.ID, &a.PortfolioID, &a.Institution, &a.Type, &a.DebtType, &a.Indexer, &a.Rate, &a.MaturityDate, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -129,13 +129,13 @@ func (r *repository) UpdateAsset(ctx context.Context, a *Asset) error {
 		SET institution = $1, type = $2, debt_type = $3, indexer = $4, rate = $5, maturity_date = $6, updated_at = NOW()
 		WHERE id = $7
 	`
-	_, err := r.db.Exec(ctx, query, a.Institution, a.Type, a.DebtType, a.Indexer, a.Rate, a.MaturityDate, a.ID)
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, a.Institution, a.Type, a.DebtType, a.Indexer, a.Rate, a.MaturityDate, a.ID)
 	return err
 }
 
 func (r *repository) DeleteAsset(ctx context.Context, assetID string) error {
 	query := `DELETE FROM fixed_income_assets WHERE id = $1`
-	_, err := r.db.Exec(ctx, query, assetID)
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, assetID)
 	return err
 }
 
@@ -145,7 +145,7 @@ func (r *repository) CreateTransaction(ctx context.Context, tx *Transaction) (*T
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at
 	`
-	err := r.db.QueryRow(ctx, query, tx.AssetID, tx.Type, tx.Amount, tx.Date).Scan(&tx.ID, &tx.CreatedAt)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, tx.AssetID, tx.Type, tx.Amount, tx.Date).Scan(&tx.ID, &tx.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (r *repository) GetTransactionsByAsset(ctx context.Context, assetID string)
 		WHERE asset_id = $1
 		ORDER BY date ASC, created_at ASC
 	`
-	rows, err := r.db.Query(ctx, query, assetID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (r *repository) GetTransactionsByPortfolio(ctx context.Context, portfolioID
 		WHERE a.portfolio_id = $1
 		ORDER BY t.date ASC, t.created_at ASC
 	`
-	rows, err := r.db.Query(ctx, query, portfolioID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (r *repository) GetTransactionByID(ctx context.Context, txID string) (*Tran
 		WHERE id = $1
 	`
 	var tx Transaction
-	err := r.db.QueryRow(ctx, query, txID).Scan(&tx.ID, &tx.AssetID, &tx.Type, &tx.Amount, &tx.Date, &tx.CreatedAt)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, txID).Scan(&tx.ID, &tx.AssetID, &tx.Type, &tx.Amount, &tx.Date, &tx.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -221,13 +221,13 @@ func (r *repository) UpdateTransaction(ctx context.Context, txID string, tx *Tra
 		SET type = $1, amount = $2, date = $3
 		WHERE id = $4
 	`
-	_, err := r.db.Exec(ctx, query, tx.Type, tx.Amount, tx.Date, txID)
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, tx.Type, tx.Amount, tx.Date, txID)
 	return err
 }
 
 func (r *repository) DeleteTransaction(ctx context.Context, txID string) error {
 	query := `DELETE FROM fixed_income_transactions WHERE id = $1`
-	_, err := r.db.Exec(ctx, query, txID)
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, txID)
 	return err
 }
 
@@ -241,7 +241,7 @@ func (r *repository) SaveIndexRates(ctx context.Context, rates []IndexRate) erro
 		VALUES ($1, $2, $3)
 		ON CONFLICT (indexer, date) DO UPDATE SET rate = EXCLUDED.rate
 	`
-	tx, err := r.db.Begin(ctx)
+	tx, err := database.GetDB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -263,7 +263,7 @@ func (r *repository) GetIndexRates(ctx context.Context, indexer string, startDat
 		WHERE indexer = $1 AND date >= $2 AND date <= $3
 		ORDER BY date ASC
 	`
-	rows, err := r.db.Query(ctx, query, indexer, startDate, endDate)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, indexer, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func (r *repository) GetLatestIndexRate(ctx context.Context, indexer string) (*I
 		LIMIT 1
 	`
 	var rt IndexRate
-	err := r.db.QueryRow(ctx, query, indexer).Scan(&rt.Indexer, &rt.Date, &rt.Rate)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, indexer).Scan(&rt.Indexer, &rt.Date, &rt.Rate)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -300,7 +300,7 @@ func (r *repository) GetLatestIndexRate(ctx context.Context, indexer string) (*I
 }
 
 func (r *repository) ExecuteInTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
-	tx, err := r.db.Begin(ctx)
+	tx, err := database.GetDB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func (r *repository) GetTreasuryAssetByTicker(ctx context.Context, tx pgx.Tx, ti
 	if tx != nil {
 		err = tx.QueryRow(ctx, query, ticker).Scan(&id)
 	} else {
-		err = r.db.QueryRow(ctx, query, ticker).Scan(&id)
+		err = database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id)
 	}
 	return id, err
 }
@@ -330,7 +330,7 @@ func (r *repository) CreateTreasuryAsset(ctx context.Context, tx pgx.Tx, ticker 
 	if tx != nil {
 		err = tx.QueryRow(ctx, insertAssetQuery, ticker, name).Scan(&id)
 	} else {
-		err = r.db.QueryRow(ctx, insertAssetQuery, ticker, name).Scan(&id)
+		err = database.GetDB(ctx, r.db).QueryRow(ctx, insertAssetQuery, ticker, name).Scan(&id)
 	}
 	if err != nil {
 		return "", err
@@ -339,7 +339,7 @@ func (r *repository) CreateTreasuryAsset(ctx context.Context, tx pgx.Tx, ticker 
 	if tx != nil {
 		_, err = tx.Exec(ctx, insertTreasuryQuery, id, treasuryType, maturityDate, hasCoupons)
 	} else {
-		_, err = r.db.Exec(ctx, insertTreasuryQuery, id, treasuryType, maturityDate, hasCoupons)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, insertTreasuryQuery, id, treasuryType, maturityDate, hasCoupons)
 	}
 	if err != nil {
 		return "", err
@@ -357,7 +357,7 @@ func (r *repository) CreateTreasurySubscription(ctx context.Context, tx pgx.Tx, 
 	if tx != nil {
 		err = tx.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, quantity, transactionDate).Scan(&id)
 	} else {
-		err = r.db.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, quantity, transactionDate).Scan(&id)
+		err = database.GetDB(ctx, r.db).QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, quantity, transactionDate).Scan(&id)
 	}
 	if err != nil {
 		return "", err
@@ -375,7 +375,7 @@ func (r *repository) CreateTreasuryRedemptionPlaceholder(ctx context.Context, tx
 	if tx != nil {
 		err = tx.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, transactionDate).Scan(&id)
 	} else {
-		err = r.db.QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, transactionDate).Scan(&id)
+		err = database.GetDB(ctx, r.db).QueryRow(ctx, query, portfolioID, assetID, quantity, unitPrice, contractedRate, transactionDate).Scan(&id)
 	}
 	if err != nil {
 		return "", err
@@ -394,7 +394,7 @@ func (r *repository) GetActiveLotsForAsset(ctx context.Context, tx pgx.Tx, portf
 	if tx != nil {
 		rows, err = tx.Query(ctx, query, portfolioID, assetID)
 	} else {
-		rows, err = r.db.Query(ctx, query, portfolioID, assetID)
+		rows, err = database.GetDB(ctx, r.db).Query(ctx, query, portfolioID, assetID)
 	}
 	if err != nil {
 		return nil, err
@@ -418,7 +418,7 @@ func (r *repository) UpdateLotRemainingQuantity(ctx context.Context, tx pgx.Tx, 
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, remainingQuantity, lotID)
 	} else {
-		_, err = r.db.Exec(ctx, query, remainingQuantity, lotID)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, remainingQuantity, lotID)
 	}
 	return err
 }
@@ -431,7 +431,7 @@ func (r *repository) CreateDepletionLink(ctx context.Context, tx pgx.Tx, subID s
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, subID, redID, quantity)
 	} else {
-		_, err = r.db.Exec(ctx, query, subID, redID, quantity)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, subID, redID, quantity)
 	}
 	return err
 }
@@ -445,14 +445,14 @@ func (r *repository) UpdateRedemptionFinancials(ctx context.Context, tx pgx.Tx, 
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, grossAmount, iofTax, irTax, b3Fee, netAmount, redemptionID)
 	} else {
-		_, err = r.db.Exec(ctx, query, grossAmount, iofTax, irTax, b3Fee, netAmount, redemptionID)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, grossAmount, iofTax, irTax, b3Fee, netAmount, redemptionID)
 	}
 	return err
 }
 
 func (r *repository) GetAnbimaHolidays(ctx context.Context) (map[string]bool, error) {
 	query := "SELECT holiday_date FROM anbima_holidays"
-	rows, err := r.db.Query(ctx, query)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +470,7 @@ func (r *repository) GetAnbimaHolidays(ctx context.Context) (map[string]bool, er
 
 func (r *repository) GetSeededHolidayYears(ctx context.Context) ([]int, error) {
 	query := "SELECT DISTINCT EXTRACT(YEAR FROM holiday_date)::int FROM anbima_holidays ORDER BY 1"
-	rows, err := r.db.Query(ctx, query)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +490,7 @@ func (r *repository) SaveAnbimaHolidays(ctx context.Context, dates []time.Time) 
 	if len(dates) == 0 {
 		return nil
 	}
-	tx, err := r.db.Begin(ctx)
+	tx, err := database.GetDB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -510,7 +510,7 @@ func (r *repository) SaveAnbimaHolidays(ctx context.Context, dates []time.Time) 
 
 func (r *repository) GetSelicRates(ctx context.Context) (map[string]float64, error) {
 	query := "SELECT date, rate FROM index_rates WHERE indexer = 'SELIC'"
-	rows, err := r.db.Query(ctx, query)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +538,7 @@ func (r *repository) GetTotalSelicInvested(ctx context.Context, tx pgx.Tx, portf
 	if tx != nil {
 		err = tx.QueryRow(ctx, query, portfolioID).Scan(&total)
 	} else {
-		err = r.db.QueryRow(ctx, query, portfolioID).Scan(&total)
+		err = database.GetDB(ctx, r.db).QueryRow(ctx, query, portfolioID).Scan(&total)
 	}
 	return total, err
 }
@@ -548,7 +548,7 @@ func (r *repository) GetActiveSubscriptionLots(ctx context.Context, portfolioID 
 		SELECT id, portfolio_id, asset_id, type, quantity, unit_price, contracted_rate, remaining_quantity, transaction_date
 		FROM treasury_transactions
 		WHERE portfolio_id = $1 AND type = 'SUBSCRIPTION' AND remaining_quantity > 0`
-	rows, err := r.db.Query(ctx, query, portfolioID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +572,7 @@ func (r *repository) GetTreasuryPerformancePoints(ctx context.Context, portfolio
 		JOIN treasury_transactions t ON p.asset_id = t.asset_id
 		WHERE t.portfolio_id = $1
 		GROUP BY price_date ORDER BY price_date ASC`
-	rows, err := r.db.Query(ctx, query, portfolioID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -603,7 +603,7 @@ func (r *repository) GetTreasuryTransactionsList(ctx context.Context, portfolioI
 		JOIN asset a ON ta.id = a.id
 		WHERE t.portfolio_id = $1
 		ORDER BY t.transaction_date ASC, t.created_at ASC`
-	rows, err := r.db.Query(ctx, query, portfolioID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, portfolioID)
 	if err != nil {
 		return nil, err
 	}
@@ -632,7 +632,7 @@ func (r *repository) GetTreasuryAssetDetails(ctx context.Context, assetID string
 		FROM treasury_assets ta
 		JOIN asset a ON ta.id = a.id
 		WHERE ta.id = $1`
-	err = r.db.QueryRow(ctx, query, assetID).Scan(&ticker, &treasuryType, &maturityDate, &hasCoupons)
+	err = database.GetDB(ctx, r.db).QueryRow(ctx, query, assetID).Scan(&ticker, &treasuryType, &maturityDate, &hasCoupons)
 	return
 }
 
@@ -646,7 +646,7 @@ func (r *repository) GetTreasuryTransactionByID(ctx context.Context, tx pgx.Tx, 
 	if tx != nil {
 		err = tx.QueryRow(ctx, query, id).Scan(&t.ID, &t.PortfolioID, &t.AssetID, &t.Type, &t.Quantity, &t.UnitPrice, &t.ContractedRate, &t.RemainingQuantity, &t.TransactionDate, &t.GrossAmount, &t.IOFTax, &t.IRTax, &t.B3Fee, &t.NetAmount, &t.CreatedAt, &t.UpdatedAt)
 	} else {
-		err = r.db.QueryRow(ctx, query, id).Scan(&t.ID, &t.PortfolioID, &t.AssetID, &t.Type, &t.Quantity, &t.UnitPrice, &t.ContractedRate, &t.RemainingQuantity, &t.TransactionDate, &t.GrossAmount, &t.IOFTax, &t.IRTax, &t.B3Fee, &t.NetAmount, &t.CreatedAt, &t.UpdatedAt)
+		err = database.GetDB(ctx, r.db).QueryRow(ctx, query, id).Scan(&t.ID, &t.PortfolioID, &t.AssetID, &t.Type, &t.Quantity, &t.UnitPrice, &t.ContractedRate, &t.RemainingQuantity, &t.TransactionDate, &t.GrossAmount, &t.IOFTax, &t.IRTax, &t.B3Fee, &t.NetAmount, &t.CreatedAt, &t.UpdatedAt)
 	}
 	if err != nil {
 		return nil, err
@@ -663,7 +663,7 @@ func (r *repository) UpdateTreasuryTransaction(ctx context.Context, tx pgx.Tx, t
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, t.AssetID, t.Type, t.Quantity, t.UnitPrice, t.ContractedRate, t.RemainingQuantity, t.TransactionDate, t.ID)
 	} else {
-		_, err = r.db.Exec(ctx, query, t.AssetID, t.Type, t.Quantity, t.UnitPrice, t.ContractedRate, t.RemainingQuantity, t.TransactionDate, t.ID)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, t.AssetID, t.Type, t.Quantity, t.UnitPrice, t.ContractedRate, t.RemainingQuantity, t.TransactionDate, t.ID)
 	}
 	return err
 }
@@ -674,7 +674,7 @@ func (r *repository) DeleteTreasuryTransactionByID(ctx context.Context, tx pgx.T
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, id)
 	} else {
-		_, err = r.db.Exec(ctx, query, id)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, id)
 	}
 	return err
 }
@@ -691,7 +691,7 @@ func (r *repository) DeleteDepletionsByAsset(ctx context.Context, tx pgx.Tx, por
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, portfolioID, assetID)
 	} else {
-		_, err = r.db.Exec(ctx, query, portfolioID, assetID)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, portfolioID, assetID)
 	}
 	return err
 }
@@ -705,7 +705,7 @@ func (r *repository) ResetSubscriptionsRemainingQuantity(ctx context.Context, tx
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, portfolioID, assetID)
 	} else {
-		_, err = r.db.Exec(ctx, query, portfolioID, assetID)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, portfolioID, assetID)
 	}
 	return err
 }
@@ -719,7 +719,7 @@ func (r *repository) ResetRedemptionFinancials(ctx context.Context, tx pgx.Tx, p
 	if tx != nil {
 		_, err = tx.Exec(ctx, query, portfolioID, assetID)
 	} else {
-		_, err = r.db.Exec(ctx, query, portfolioID, assetID)
+		_, err = database.GetDB(ctx, r.db).Exec(ctx, query, portfolioID, assetID)
 	}
 	return err
 }
@@ -735,7 +735,7 @@ func (r *repository) GetRedemptionsForAsset(ctx context.Context, tx pgx.Tx, port
 	if tx != nil {
 		rows, err = tx.Query(ctx, query, portfolioID, assetID)
 	} else {
-		rows, err = r.db.Query(ctx, query, portfolioID, assetID)
+		rows, err = database.GetDB(ctx, r.db).Query(ctx, query, portfolioID, assetID)
 	}
 	if err != nil {
 		return nil, err

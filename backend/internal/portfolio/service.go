@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
@@ -105,10 +106,11 @@ type Service struct {
 	marketProvider market.QuoteProvider
 	fiService      fixedincome.Service
 	httpClient     *http.Client
+	uow            database.UnitOfWork
 }
 
 // NewService cria uma nova instância de Service.
-func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider, fiService fixedincome.Service) *Service {
+func NewService(repo PortfolioRepository, marketService MarketService, marketProvider market.QuoteProvider, fiService fixedincome.Service, uow database.UnitOfWork) *Service {
 	return &Service{
 		repo:           repo,
 		marketService:  marketService,
@@ -117,6 +119,7 @@ func NewService(repo PortfolioRepository, marketService MarketService, marketPro
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
+		uow: uow,
 	}
 }
 

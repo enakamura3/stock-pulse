@@ -313,7 +313,13 @@ func TestHandlers_Dividends(t *testing.T) {
 			hasTitle := strings.Contains(msg, "💸 *Proventos: P1*")
 			hasTotalAcumulado := strings.Contains(msg, "💰 *Total Acumulado:* R$ 50,00")
 			hasBRLRecebidos := strings.Contains(msg, "✅ *Recebidos no Mês:* R$ 50,00")
-			hasBRLAReceber := strings.Contains(msg, "⏳ *A Receber no Mês:* R$ 12,00")
+			
+			expectedFutureStr := "⏳ *A Receber no Mês:* R$ 0,00"
+			if futureDate.Month() == now.Month() && futureDate.Year() == now.Year() {
+				expectedFutureStr = "⏳ *A Receber no Mês:* R$ 12,00"
+			}
+			hasBRLAReceber := strings.Contains(msg, expectedFutureStr)
+			
 			hasPETR4 := strings.Contains(msg, "`PETR4` • R$ 50,00 • "+pastDate.Format("2006-01-02"))
 			hasPETR4Sub := strings.Contains(msg, "   ↳ _JCP • 100 un x R$ 0,50_")
 			hasMXRF11 := strings.Contains(msg, "`MXRF11` • R$ 12,00 • "+futureDate.Format("2006-01-02"))

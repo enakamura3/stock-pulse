@@ -25,7 +25,7 @@ func main() {
 	repo := portfolio.NewRepository(dbPool)
 	provider := market.NewYahooFinanceProvider()
 	marketService := market.NewService(provider, nil) // Não precisa mais do Redis
-	portfolioService := portfolio.NewService(repo, marketService, provider, nil)
+	portfolioService := portfolio.NewService(repo, marketService, provider, nil, nil)
 
 	log.Println("=== Iniciando varredura de Correção Cambial Retroativa ===")
 

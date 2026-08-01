@@ -204,7 +204,7 @@ func setupServiceTest() (*Service, *MockPortfolioRepo, *MockMarketService, *Mock
 	repo := new(MockPortfolioRepo)
 	ms := new(MockMarketService)
 	mp := new(MockMarketProvider)
-	s := NewService(repo, ms, mp, nil)
+	s := NewService(repo, ms, mp, nil, nil)
 	return s, repo, ms, mp
 }
 

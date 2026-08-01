@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
 type AssetEvent struct {
@@ -34,7 +36,7 @@ func (r *Repository) UpsertAssetEvent(ctx context.Context, event AssetEvent) err
 	if event.PaymentDate.IsZero() {
 		paymentDate = nil
 	}
-	_, err := r.db.Exec(ctx, query,
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query,
 		event.AssetID, event.Type, event.GrossAmount, event.NetAmount, event.CumDate, paymentDate,
 	)
 	return err
@@ -47,7 +49,7 @@ func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]Asse
 		WHERE asset_id = $1
 		ORDER BY cum_date DESC
 	`
-	rows, err := r.db.Query(ctx, query, assetID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +76,7 @@ func (r *Repository) GetAssetEventsByDate(ctx context.Context, assetID string, c
 		FROM asset_event
 		WHERE asset_id = $1 AND cum_date = $2
 	`
-	rows, err := r.db.Query(ctx, query, assetID, cumDate)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, assetID, cumDate)
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +108,6 @@ func (r *Repository) UpdateAssetEventValueByID(ctx context.Context, eventID stri
 		paymentDate = nil
 	}
 
-	_, err := r.db.Exec(ctx, query, newGross, newNet, paymentDate, eventID)
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, newGross, newNet, paymentDate, eventID)
 	return err
 }

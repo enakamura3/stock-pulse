@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
 // Watchlist representa o agrupamento de favoritos pertencente a um usuário.
@@ -38,20 +37,13 @@ type Item struct {
 	BazinValue    float64 `json:"bazin_value,omitempty"`
 }
 
-// DBTX define a interface necessária para realizar queries e abstrair pgxpool.Pool para testes.
-type DBTX interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-}
-
 // Repository lida com a persistência das tabelas watchlist, watchlist_item e asset.
 type Repository struct {
-	db DBTX
+	db database.DBTX
 }
 
 // NewRepository cria uma nova instância de Repository.
-func NewRepository(db DBTX) *Repository {
+func NewRepository(db database.DBTX) *Repository {
 	return &Repository{db: db}
 }
 
@@ -63,7 +55,7 @@ func (r *Repository) CreateWatchlist(ctx context.Context, userID, name string) (
 		RETURNING id, user_id, name, created_at
 	`
 	w := &Watchlist{}
-	err := r.db.QueryRow(ctx, query, userID, name).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, userID, name).Scan(
 		&w.ID,
 		&w.UserID,
 		&w.Name,
@@ -83,7 +75,7 @@ func (r *Repository) GetWatchlistsByUserID(ctx context.Context, userID string) (
 		WHERE user_id = $1
 		ORDER BY name ASC
 	`
-	rows, err := r.db.Query(ctx, query, userID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +100,7 @@ func (r *Repository) GetWatchlistByID(ctx context.Context, id, userID string) (*
 		WHERE id = $1 AND user_id = $2
 	`
 	w := &Watchlist{}
-	err := r.db.QueryRow(ctx, query, id, userID).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, userID).Scan(
 		&w.ID,
 		&w.UserID,
 		&w.Name,
@@ -126,7 +118,7 @@ func (r *Repository) DeleteWatchlist(ctx context.Context, id, userID string) err
 		DELETE FROM watchlist
 		WHERE id = $1 AND user_id = $2
 	`
-	cmd, err := r.db.Exec(ctx, query, id, userID)
+	cmd, err := database.GetDB(ctx, r.db).Exec(ctx, query, id, userID)
 	if err != nil {
 		return err
 	}
@@ -141,7 +133,7 @@ func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (strin
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
 	query := `SELECT id FROM asset WHERE UPPER(ticker) = $1`
 	var id string
-	err := r.db.QueryRow(ctx, query, ticker).Scan(&id)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -157,7 +149,7 @@ func (r *Repository) CreateAsset(ctx context.Context, ticker, name, assetType, c
 		RETURNING id
 	`
 	var id string
-	err := r.db.QueryRow(ctx, query, ticker, name, assetType, currency).Scan(&id)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker, name, assetType, currency).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("erro ao inserir ativo: %w", err)
 	}
@@ -173,7 +165,7 @@ func (r *Repository) AddWatchlistItem(ctx context.Context, watchlistID, assetID 
 		RETURNING id, watchlist_id, asset_id, added_at
 	`
 	item := &Item{}
-	err := r.db.QueryRow(ctx, query, watchlistID, assetID).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, watchlistID, assetID).Scan(
 		&item.ID,
 		&item.WatchlistID,
 		&item.AssetID,
@@ -193,7 +185,7 @@ func (r *Repository) RemoveWatchlistItem(ctx context.Context, watchlistID, ticke
 		WHERE watchlist_id = $1 
 		AND asset_id IN (SELECT id FROM asset WHERE UPPER(ticker) = $2)
 	`
-	_, err := r.db.Exec(ctx, query, watchlistID, ticker)
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, watchlistID, ticker)
 	return err
 }
 
@@ -206,7 +198,7 @@ func (r *Repository) GetWatchlistItems(ctx context.Context, watchlistID string) 
 		WHERE wi.watchlist_id = $1
 		ORDER BY wi.added_at DESC
 	`
-	rows, err := r.db.Query(ctx, query, watchlistID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, watchlistID)
 	if err != nil {
 		return nil, err
 	}
