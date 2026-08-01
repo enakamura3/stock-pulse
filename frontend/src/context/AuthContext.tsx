@@ -32,9 +32,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Busca perfil do usuário logado na inicialização para restaurar sessão ativa
   const fetchMe = async (): Promise<boolean> => {
     try {
-      const data = await apiFetch<User>('/auth/me');
-      setUser(data);
-      return true;
+      const res = await apiFetch('/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+        return true;
+      }
+      setUser(null);
+      return false;
     } catch (error) {
       console.error('Erro ao buscar perfil:', error);
       setUser(null);
@@ -60,10 +65,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      await apiFetch('/auth/login', {
+      const res = await apiFetch('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Falha ao efetuar login');
+      }
       await fetchMe();
       router.push('/dashboard');
     } catch (error: any) {
@@ -75,10 +84,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      await apiFetch('/auth/register', {
+      const res = await apiFetch('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ name, email, password }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Falha ao efetuar cadastro');
+      }
 
       // Registro efetuado com sucesso. Vamos automaticamente logar o usuário para melhor UX.
       await login(email, password);
