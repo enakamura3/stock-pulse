@@ -44,7 +44,7 @@ func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker s
 		if err != nil {
 			continue
 		}
-		
+
 		// A normalização da Data Ex: a Data Com é o dia anterior à Data Ex.
 		// Se já pegamos a RecordDate, ela já é a Data Com. Se usamos a Ex-Div Date, subtraímos 1 dia.
 		if usedExDate {

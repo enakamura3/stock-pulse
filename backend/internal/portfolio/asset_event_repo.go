@@ -105,7 +105,7 @@ func (r *Repository) UpdateAssetEventValueByID(ctx context.Context, eventID stri
 	if newPayment.IsZero() {
 		paymentDate = nil
 	}
-	
+
 	_, err := r.db.Exec(ctx, query, newGross, newNet, paymentDate, eventID)
 	return err
 }

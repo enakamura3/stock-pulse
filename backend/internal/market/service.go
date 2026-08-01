@@ -152,7 +152,7 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 	var data struct {
 		Chart struct {
 			Result []struct {
-				Timestamp []int64 `json:"timestamp"`
+				Timestamp  []int64 `json:"timestamp"`
 				Indicators struct {
 					Quote []struct {
 						Close []float64 `json:"close"`
@@ -249,8 +249,8 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 		return nil, err
 	}
 
-	// Calcula Preço Teto de Bazin se soubermos a cotação. 
-	// Para não criar deadlock ou chamadas lentas demais, faremos depois. 
+	// Calcula Preço Teto de Bazin se soubermos a cotação.
+	// Para não criar deadlock ou chamadas lentas demais, faremos depois.
 	// Wait, we can get current price from s.GetQuote(ctx, symbol) to calc Bazin Yield Ceiling
 	quote, errQ := s.GetQuote(ctx, symbol)
 	if errQ == nil && quote != nil && quote.Price > 0 {

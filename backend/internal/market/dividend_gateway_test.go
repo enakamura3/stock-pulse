@@ -226,7 +226,7 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 		rmock.ExpectSet("dividends:ENRICH_ERR", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		oldEv := DividendEvent{Type: "Dividendo", Date: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}
-		
+
 		myPrimary := new(mockDividendSource)
 		myFallback := new(mockDividendSource)
 		myPrimary.On("Name").Return("primary")
@@ -245,15 +245,15 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
 		rmock.ExpectGet("dividends:SEC_SUCC").RedisNil()
 		rmock.ExpectSet("dividends:SEC_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
-		
+
 		myPrimary := new(mockDividendSource)
 		mySecondary := new(mockDividendSource)
 		myPrimary.On("Name").Return("primary")
 		mySecondary.On("Name").Return("secondary")
-		
+
 		myPrimary.On("GetDividends", mock.Anything, "SEC_SUCC", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
 		mySecondary.On("GetDividends", mock.Anything, "SEC_SUCC", "STOCK_BR").Return([]DividendEvent{evWithCurrDate}, nil).Once()
-		
+
 		gw := NewDividendGateway(myPrimary, mySecondary, nil, nil, rdb, 12*time.Hour)
 		res, err := gw.GetDividends(context.Background(), "SEC_SUCC", "STOCK_BR")
 		assert.NoError(t, err)

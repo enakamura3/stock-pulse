@@ -31,7 +31,7 @@ type Alert struct {
 	CreatedAt   time.Time  `json:"created_at"`
 
 	// Dados do usuário injetados na busca do Worker
-	UserName  string `json:"user_name,omitempty"`
+	UserName       string `json:"user_name,omitempty"`
 	TelegramChatID *int64 `json:"telegram_chat_id,omitempty"`
 }
 
@@ -212,4 +212,3 @@ func (r *Repository) CreateAsset(ctx context.Context, ticker, name, assetType, c
 	err := r.db.QueryRow(ctx, query, ticker, name, assetType, currency).Scan(&id)
 	return id, err
 }
-

@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-
 // Quote representa os dados consolidados da cotação em tempo real de um ativo.
 type Quote struct {
 	Symbol        string  `json:"symbol"`
@@ -202,5 +201,3 @@ func (y *YahooFinanceProvider) SearchAssets(ctx context.Context, query string) (
 
 	return results, nil
 }
-
-

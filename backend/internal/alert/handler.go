@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
 // AlertService define a interface para operações de alertas (usada para mocking nos testes).
@@ -40,19 +41,19 @@ type CreateReq struct {
 func (h *Handler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 	if !ok || userID == "" {
-		h.respondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
 		return
 	}
 
 	var req CreateReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		httputils.RespondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
 		return
 	}
 
 	alert, err := h.svc.CreateAlert(r.Context(), userID, req.Ticker, req.TargetPrice, req.Condition)
 	if err != nil {
-		h.respondWithError(w, http.StatusBadRequest, err.Error())
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -65,13 +66,13 @@ func (h *Handler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetAlerts(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 	if !ok || userID == "" {
-		h.respondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
 		return
 	}
 
 	alerts, err := h.svc.GetAlerts(r.Context(), userID)
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Falha ao listar alertas")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Falha ao listar alertas")
 		return
 	}
 
@@ -84,19 +85,19 @@ func (h *Handler) GetAlerts(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ToggleAlert(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 	if !ok || userID == "" {
-		h.respondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
 		return
 	}
 
 	alertID := chi.URLParam(r, "id")
 	if alertID == "" {
-		h.respondWithError(w, http.StatusBadRequest, "ID do alerta inválido")
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID do alerta inválido")
 		return
 	}
 
 	nextStatus, err := h.svc.ToggleAlert(r.Context(), alertID, userID)
 	if err != nil {
-		h.respondWithError(w, http.StatusBadRequest, err.Error())
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -112,27 +113,21 @@ func (h *Handler) ToggleAlert(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteAlert(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 	if !ok || userID == "" {
-		h.respondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão não autorizada ou expirada")
 		return
 	}
 
 	alertID := chi.URLParam(r, "id")
 	if alertID == "" {
-		h.respondWithError(w, http.StatusBadRequest, "ID do alerta inválido")
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID do alerta inválido")
 		return
 	}
 
 	err := h.svc.DeleteAlert(r.Context(), alertID, userID)
 	if err != nil {
-		h.respondWithError(w, http.StatusBadRequest, err.Error())
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *Handler) respondWithError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

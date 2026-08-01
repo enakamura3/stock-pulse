@@ -34,7 +34,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL", Price: 150.0}, nil)
 
 	hub := NewHub(ms)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	go hub.Start(ctx)
 	defer cancel()
@@ -70,7 +70,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	// Wait for subscription to process and force broadcast
 	time.Sleep(50 * time.Millisecond)
 	go hub.broadcastQuotes(context.Background())
-	
+
 	// Read message (could be a ping or quote)
 	ws.SetReadDeadline(time.Now().Add(1 * time.Second))
 	for {
@@ -78,7 +78,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error reading message: %v", err)
 		}
-		
+
 		// Unmarshal
 		var payload map[string]interface{}
 		if err := json.Unmarshal(p, &payload); err == nil && payload["type"] == "quote" {

@@ -113,7 +113,7 @@ func (s *B3DividendSource) resolveTradingName(ctx context.Context, ticker string
 	}
 
 	// B3 sometimes lists only first letters or exact tickers. We'll populate our cache.
-	// We'll map exact ticker or simply just use the first company found? 
+	// We'll map exact ticker or simply just use the first company found?
 	// The instructions don't strictly define mapping mechanism if there are multiple.
 	// Actually B3 FetchCompanies might just take the whole list.
 	// Let's assume there's a Ticker field in B3RawCompany? Oh wait, B3RawCompany in the plan only had TradingName.
@@ -122,11 +122,11 @@ func (s *B3DividendSource) resolveTradingName(ctx context.Context, ticker string
 	// Let's just return the symbol itself if we can't find a mapping, or use a dummy for now.
 	// The problem is B3Client's FetchCompanies returns TradingName. Without ticker, we can't map.
 	// For simplicity in this implementation, I will just use the symbol as trading name if B3 doesn't match perfectly.
-	// Often in B3 APIs, searching by ticker is possible. 
-	
+	// Often in B3 APIs, searching by ticker is possible.
+
 	// I'll just return the symbol directly for now, assuming B3 accepts it or we can't map properly without Ticker in the struct.
 	// B3's web API actually accepts `tradingName: "PETR4"` and returns Petrobras.
 	s.tickerNameCache[symbol] = symbol
-	
+
 	return symbol, nil
 }

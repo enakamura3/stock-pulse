@@ -29,7 +29,7 @@ type Item struct {
 	Type        string    `json:"type"`
 	Currency    string    `json:"currency"`
 	AddedAt     time.Time `json:"added_at"`
-	
+
 	// Campos estendidos para cotações dinâmicas injetadas pelo serviço
 	Price         float64 `json:"price,omitempty"`
 	Change        float64 `json:"change,omitempty"`

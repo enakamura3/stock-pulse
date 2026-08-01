@@ -1040,4 +1040,3 @@ func TestTWRR_NegativeReturn(t *testing.T) {
 	lastPoint := res[len(res)-1]
 	assert.Less(t, lastPoint.ReturnPct, 0.0, "queda de preço deve resultar em ReturnPct negativo")
 }
-

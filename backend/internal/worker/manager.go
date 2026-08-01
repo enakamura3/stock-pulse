@@ -23,11 +23,11 @@ type Worker struct {
 	Interval    time.Duration
 	Job         Job
 
-	lastRun  time.Time
-	nextRun  time.Time
-	status   string
-	mu       sync.Mutex
-	trigger  chan struct{}
+	lastRun time.Time
+	nextRun time.Time
+	status  string
+	mu      sync.Mutex
+	trigger chan struct{}
 }
 
 func NewWorker(name string, description string, interval time.Duration, job Job) *Worker {
@@ -88,7 +88,7 @@ func (w *Worker) Trigger() {
 func (w *Worker) Info() Info {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
+
 	var lr, nr *time.Time
 	if !w.lastRun.IsZero() {
 		last := w.lastRun
@@ -137,7 +137,7 @@ func (m *Manager) StartAll(ctx context.Context) {
 func (m *Manager) GetAll() []Info {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	var infos []Info
 	for _, w := range m.workers {
 		infos = append(infos, w.Info())

@@ -30,15 +30,15 @@ type Transaction struct {
 
 // Position representa a consolidação e os cálculos em tempo real de um ativo.
 type Position struct {
-	Asset             Asset     `json:"asset"`
-	StartDate         time.Time `json:"start_date"`
-	TotalInvested     float64   `json:"total_invested"`
-	GrossValue        float64   `json:"gross_value"`
-	NetValue          float64   `json:"net_value"`
-	NetReturnPercent  float64   `json:"net_return_percent"`
-	IsMatured         bool      `json:"is_matured"`
-	DaysToMaturity    int       `json:"days_to_maturity"`
-	TaxesCalculated   float64   `json:"taxes_calculated"` // IR + IOF deduzidos
+	Asset            Asset     `json:"asset"`
+	StartDate        time.Time `json:"start_date"`
+	TotalInvested    float64   `json:"total_invested"`
+	GrossValue       float64   `json:"gross_value"`
+	NetValue         float64   `json:"net_value"`
+	NetReturnPercent float64   `json:"net_return_percent"`
+	IsMatured        bool      `json:"is_matured"`
+	DaysToMaturity   int       `json:"days_to_maturity"`
+	TaxesCalculated  float64   `json:"taxes_calculated"` // IR + IOF deduzidos
 }
 
 // IndexRate representa o valor do índice (fator diário ou percentual) numa data.
@@ -71,9 +71,9 @@ type TreasuryTxRequest struct {
 	ID              string  `json:"id,omitempty"`
 	Ticker          string  `json:"ticker"`
 	TreasuryType    string  `json:"treasury_type"` // SELIC, PREFIXADO, IPCA+
-	MaturityDate    string  `json:"maturity_date"`  // YYYY-MM-DD
+	MaturityDate    string  `json:"maturity_date"` // YYYY-MM-DD
 	HasCoupons      bool    `json:"has_coupons"`
-	Type            string  `json:"type"`            // SUBSCRIPTION, REDEMPTION
+	Type            string  `json:"type"` // SUBSCRIPTION, REDEMPTION
 	Quantity        float64 `json:"quantity"`
 	UnitPrice       float64 `json:"unit_price"`
 	ContractedRate  float64 `json:"contracted_rate"`
@@ -112,20 +112,20 @@ type TreasuryPerfPoint struct {
 
 // TreasuryTransaction represents a row in the treasury_transactions table.
 type TreasuryTransaction struct {
-	ID                string     `json:"id"`
-	PortfolioID       string     `json:"portfolio_id"`
-	AssetID           string     `json:"asset_id"`
-	Type              string     `json:"type"` // SUBSCRIPTION, REDEMPTION
-	Quantity          float64    `json:"quantity"`
-	UnitPrice         float64    `json:"unit_price"`
-	ContractedRate    float64    `json:"contracted_rate"`
-	RemainingQuantity float64    `json:"remaining_quantity"`
-	TransactionDate   time.Time  `json:"transaction_date"`
-	GrossAmount       *float64   `json:"gross_amount,omitempty"`
-	IOFTax            *float64   `json:"iof_tax,omitempty"`
-	IRTax             *float64   `json:"ir_tax,omitempty"`
-	B3Fee             *float64   `json:"b3_fee,omitempty"`
-	NetAmount         *float64   `json:"net_amount,omitempty"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                string    `json:"id"`
+	PortfolioID       string    `json:"portfolio_id"`
+	AssetID           string    `json:"asset_id"`
+	Type              string    `json:"type"` // SUBSCRIPTION, REDEMPTION
+	Quantity          float64   `json:"quantity"`
+	UnitPrice         float64   `json:"unit_price"`
+	ContractedRate    float64   `json:"contracted_rate"`
+	RemainingQuantity float64   `json:"remaining_quantity"`
+	TransactionDate   time.Time `json:"transaction_date"`
+	GrossAmount       *float64  `json:"gross_amount,omitempty"`
+	IOFTax            *float64  `json:"iof_tax,omitempty"`
+	IRTax             *float64  `json:"ir_tax,omitempty"`
+	B3Fee             *float64  `json:"b3_fee,omitempty"`
+	NetAmount         *float64  `json:"net_amount,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }

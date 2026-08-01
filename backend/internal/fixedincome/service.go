@@ -135,7 +135,7 @@ func (s *service) DeleteTransaction(ctx context.Context, portfolioID, txID strin
 func (s *service) TriggerBackfill(ctx context.Context, indexer string, startDate time.Time) {
 	// Pega até a data atual
 	endDate := time.Now()
-	
+
 	latest, _ := s.repo.GetLatestIndexRate(ctx, indexer)
 	if latest != nil && latest.Date.After(endDate.AddDate(0, 0, -2)) {
 		// Se já temos dado do penultimo dia, e a startDate for mais recente que o histórico?
@@ -298,7 +298,7 @@ func (s *service) getAssetPositionWithHistory(ctx context.Context, assetID strin
 					dailyFactor := 1 + (rate/100)*(asset.Rate/100)
 					grossValue = grossValue * dailyFactor
 				} else if asset.DebtType == "HIBRIDO" {
-					// IPCA + PRE (IPCA costuma ser mensal, exigiria uma lógica de IPCA pro-rata, 
+					// IPCA + PRE (IPCA costuma ser mensal, exigiria uma lógica de IPCA pro-rata,
 					// simplificando aqui para a Taxa PRE ao dia. Num cenario real, teriamos que usar IPCA do mes)
 					dailyFactor := math.Pow(1+(asset.Rate/100), 1.0/252.0)
 					grossValue = grossValue * dailyFactor
@@ -326,7 +326,7 @@ func (s *service) getAssetPositionWithHistory(ctx context.Context, assetID strin
 	}
 
 	daysHeld := int(limitDate.Sub(startDate).Hours() / 24)
-	
+
 	// IR e IOF
 	taxes := 0.0
 	isTaxExempt := asset.Type == "LCI" || asset.Type == "LCA"
@@ -369,7 +369,7 @@ func (s *service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 
 	dailyValues := make(map[string]float64)
 	dailyInvested := make(map[string]float64)
-	
+
 	earliestDate := time.Now()
 	for _, a := range assets {
 		txs, _ := s.repo.GetTransactionsByAsset(ctx, a.ID)
@@ -409,12 +409,12 @@ func (s *service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 
 	var points []PerformancePoint
 	currDate := startDate
-	
+
 	for !currDate.After(endDate) {
 		dateStr := currDate.Format("2006-01-02")
 		val := dailyValues[dateStr]
 		inv := dailyInvested[dateStr]
-		
+
 		if val == 0 && inv == 0 && len(points) > 0 {
 			val = points[len(points)-1].Value
 			inv = points[len(points)-1].TotalInvested
@@ -450,7 +450,7 @@ func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userI
 	if err != nil {
 		return nil, err
 	}
-	
+
 	assetMap := make(map[string]Asset)
 	for _, a := range assets {
 		assetMap[a.ID] = a
@@ -462,7 +462,7 @@ func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userI
 		if !ok {
 			continue // Should not happen with foreign keys, but just in case
 		}
-		
+
 		rateStr := fmt.Sprintf("%.2f%% %s", asset.Rate, asset.Indexer)
 		if asset.DebtType == "PREFIXADO" {
 			rateStr = fmt.Sprintf("%.2f%% a.a.", asset.Rate)
@@ -1505,4 +1505,3 @@ func (s *service) GetTreasuryMonthlyYields(ctx context.Context, portfolioID stri
 
 	return allYields, nil
 }
-

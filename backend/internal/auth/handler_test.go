@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -231,15 +232,15 @@ func TestHandler_Me(t *testing.T) {
 		expectedCode int
 	}{
 		{
-			name:      "No User ID in Context",
-			ctxUserID: nil,
-			mockSetup: func(m *MockAuthService) {},
+			name:         "No User ID in Context",
+			ctxUserID:    nil,
+			mockSetup:    func(m *MockAuthService) {},
 			expectedCode: http.StatusUnauthorized,
 		},
 		{
-			name:      "Empty User ID",
-			ctxUserID: "",
-			mockSetup: func(m *MockAuthService) {},
+			name:         "Empty User ID",
+			ctxUserID:    "",
+			mockSetup:    func(m *MockAuthService) {},
 			expectedCode: http.StatusUnauthorized,
 		},
 		{
@@ -289,13 +290,13 @@ func TestHandler_Refresh(t *testing.T) {
 		expectedCode int
 	}{
 		{
-			name: "No Cookie",
-			cookie: nil,
-			mockSetup: func(m *MockAuthService) {},
+			name:         "No Cookie",
+			cookie:       nil,
+			mockSetup:    func(m *MockAuthService) {},
 			expectedCode: http.StatusUnauthorized,
 		},
 		{
-			name: "Invalid Token",
+			name:   "Invalid Token",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "invalid"},
 			mockSetup: func(m *MockAuthService) {
 				m.On("ValidateRefreshToken", mock.Anything, "invalid").Return("", errors.New("invalid"))
@@ -303,7 +304,7 @@ func TestHandler_Refresh(t *testing.T) {
 			expectedCode: http.StatusUnauthorized,
 		},
 		{
-			name: "User Not Found",
+			name:   "User Not Found",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "valid"},
 			mockSetup: func(m *MockAuthService) {
 				m.On("ValidateRefreshToken", mock.Anything, "valid").Return("1", nil)
@@ -312,7 +313,7 @@ func TestHandler_Refresh(t *testing.T) {
 			expectedCode: http.StatusUnauthorized,
 		},
 		{
-			name: "Failed to generate token",
+			name:   "Failed to generate token",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "valid"},
 			mockSetup: func(m *MockAuthService) {
 				m.On("ValidateRefreshToken", mock.Anything, "valid").Return("1", nil)
@@ -322,7 +323,7 @@ func TestHandler_Refresh(t *testing.T) {
 			expectedCode: http.StatusInternalServerError,
 		},
 		{
-			name: "Success",
+			name:   "Success",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "valid"},
 			mockSetup: func(m *MockAuthService) {
 				m.On("ValidateRefreshToken", mock.Anything, "valid").Return("1", nil)
@@ -366,10 +367,9 @@ func (f failMarshal) MarshalJSON() ([]byte, error) {
 }
 
 func TestHandler_RespondWithJSON_Error(t *testing.T) {
-	h := NewHandler(new(MockAuthService))
 	rec := httptest.NewRecorder()
 
-	h.respondWithJSON(rec, http.StatusOK, failMarshal{})
+	httputils.RespondWithJSON(rec, http.StatusOK, failMarshal{})
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 

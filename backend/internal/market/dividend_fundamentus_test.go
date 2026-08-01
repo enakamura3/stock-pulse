@@ -25,7 +25,7 @@ func TestFundamentusDividendSource_GetDividends(t *testing.T) {
 				</tr>
 			</tbody>
 		</table>`
-		
+
 		if strings.Contains(req.URL.String(), "ERR") {
 			return &http.Response{
 				StatusCode: 500,
@@ -50,7 +50,7 @@ func TestFundamentusDividendSource_GetDividends(t *testing.T) {
 		events, err := source.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
 		assert.Len(t, events, 1)
-		
+
 		assert.Equal(t, "Dividendo", events[0].Type)
 		assert.Equal(t, 2.5499, events[0].Amount)
 		assert.Equal(t, time.Date(2026, 2, 12, 0, 0, 0, 0, time.UTC), events[0].Date)

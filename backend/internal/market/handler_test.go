@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -130,9 +131,8 @@ func (f failMarshal) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("err")
 }
 func TestHandler_RespondWithJSON_Error(t *testing.T) {
-	h, _ := setupHandlerTest()
 	rec := httptest.NewRecorder()
-	h.respondWithJSON(rec, http.StatusOK, failMarshal{})
+	httputils.RespondWithJSON(rec, http.StatusOK, failMarshal{})
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 

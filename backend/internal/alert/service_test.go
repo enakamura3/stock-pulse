@@ -107,7 +107,7 @@ func TestService_CreateAlert(t *testing.T) {
 
 	t.Run("Asset Exists Locally", func(t *testing.T) {
 		svc, repo, _ := setupServiceTest()
-		
+
 		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
 		repo.On("CreateAlert", mock.Anything, mock.MatchedBy(func(a *Alert) bool {
 			return a.AssetID == "a1" && a.TargetPrice == 150.0 && a.Condition == "ABOVE"

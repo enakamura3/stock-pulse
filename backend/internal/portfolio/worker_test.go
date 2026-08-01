@@ -133,4 +133,3 @@ func TestDailyWorker_Run(t *testing.T) {
 		mp.AssertNotCalled(t, "GetQuote")
 	})
 }
-

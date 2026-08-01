@@ -29,7 +29,7 @@ func TestAlertWorker_StartAndStop(t *testing.T) {
 
 	// Setup expectations that might occur during the short run
 	repo.On("GetActiveAlerts", mock.Anything).Return(([]*Alert)(nil), nil).Maybe()
-	
+
 	w.CheckActiveAlerts(context.Background())
 }
 

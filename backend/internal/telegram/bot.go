@@ -100,7 +100,7 @@ func rateLimitMiddleware() telebot.MiddlewareFunc {
 			if sender == nil {
 				return next(c)
 			}
-			
+
 			mu.Lock()
 			l, exists := limiters[sender.ID]
 			if !exists {
@@ -114,7 +114,7 @@ func rateLimitMiddleware() telebot.MiddlewareFunc {
 				slog.Warn("Rate limit exceeded for user", "userID", sender.ID, "username", sender.Username)
 				return c.Send("⚠️ Você está enviando mensagens muito rápido. Por favor, aguarde um momento antes de enviar a próxima.")
 			}
-			
+
 			return next(c)
 		}
 	}

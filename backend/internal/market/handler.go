@@ -2,10 +2,10 @@ package market
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
 // MarketService define a interface que o Handler consome.
@@ -29,13 +29,13 @@ func NewHandler(service MarketService) *Handler {
 func (h *Handler) GetQuote(w http.ResponseWriter, r *http.Request) {
 	ticker := chi.URLParam(r, "ticker")
 	if ticker == "" {
-		h.respondWithError(w, http.StatusBadRequest, "Símbolo do ativo (ticker) é obrigatório")
+		httputils.RespondWithError(w, http.StatusBadRequest, "Símbolo do ativo (ticker) é obrigatório")
 		return
 	}
 
 	quote, hit, err := h.service.GetQuoteWithCacheStatus(r.Context(), ticker)
 	if err != nil {
-		h.respondWithError(w, http.StatusNotFound, err.Error())
+		httputils.RespondWithError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -45,38 +45,22 @@ func (h *Handler) GetQuote(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Cache", "MISS")
 	}
 
-	h.respondWithJSON(w, http.StatusOK, quote)
+	httputils.RespondWithJSON(w, http.StatusOK, quote)
 }
 
 // Search realiza a busca de ativos autocomplete.
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	if query == "" {
-		h.respondWithJSON(w, http.StatusOK, []SearchResult{})
+		httputils.RespondWithJSON(w, http.StatusOK, []SearchResult{})
 		return
 	}
 
 	results, err := h.service.SearchAssets(r.Context(), query)
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao efetuar busca no provedor de mercado")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao efetuar busca no provedor de mercado")
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusOK, results)
-}
-
-func (h *Handler) respondWithError(w http.ResponseWriter, status int, msg string) {
-	h.respondWithJSON(w, status, map[string]string{"error": msg})
-}
-
-func (h *Handler) respondWithJSON(w http.ResponseWriter, status int, payload interface{}) {
-	response, err := json.Marshal(payload)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error": "Erro de serialização JSON interno"}`))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write(response)
+	httputils.RespondWithJSON(w, http.StatusOK, results)
 }
