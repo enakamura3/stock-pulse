@@ -1,44 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { SearchResult } from './types';
+import { usePortfolio } from '@/context/PortfolioContext';
 
-interface ModalsProps {
+export interface ModalsProps {
   // Portfolio Modal
-  showPortfolioModal: boolean;
-  setShowPortfolioModal: (s: boolean) => void;
-  newPortfolioName: string;
-  setNewPortfolioName: (s: string) => void;
-  newPortfolioCurrency: string;
-  setNewPortfolioCurrency: (s: string) => void;
-  isCreatingPortfolio: boolean;
-  handleCreatePortfolio: (e: React.FormEvent) => void;
+  showPortfolioModal?: boolean;
+  setShowPortfolioModal?: (s: boolean) => void;
+  newPortfolioName?: string;
+  setNewPortfolioName?: (s: string) => void;
+  newPortfolioCurrency?: string;
+  setNewPortfolioCurrency?: (s: string) => void;
+  isCreatingPortfolio?: boolean;
+  handleCreatePortfolio?: (e: React.FormEvent) => void;
 
   // Transaction Modal
-  showTxModal: boolean;
-  setShowTxModal: (s: boolean) => void;
-  editingTxId: string | null;
-  setEditingTxId: (id: string | null) => void;
-  txTicker: string;
-  searchQuery: string;
-  setSearchQuery: (s: string) => void;
-  isSearching: boolean;
-  showDropdown: boolean;
-  searchResults: SearchResult[];
-  handleSelectAsset: (s: string) => void;
-  isAddingTx: boolean;
+  showTxModal?: boolean;
+  setShowTxModal?: (s: boolean) => void;
+  editingTxId?: string | null;
+  setEditingTxId?: (id: string | null) => void;
+  txTicker?: string;
+  searchQuery?: string;
+  setSearchQuery?: (s: string) => void;
+  isSearching?: boolean;
+  showDropdown?: boolean;
+  searchResults?: SearchResult[];
+  handleSelectAsset?: (s: string) => void;
+  isAddingTx?: boolean;
   
-  txType: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS';
-  setTxType: (t: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS') => void;
-  txQuantity: string | number;
-  setTxQuantity: (q: string | number) => void;
-  txUnitPrice: string | number;
-  setTxUnitPrice: (p: string | number) => void;
-  txExchangeRate: string | number;
-  setTxExchangeRate: (r: string | number) => void;
-  txExecutedAt: string;
-  setTxExecutedAt: (d: string) => void;
-  selectedAssetCurrency: string;
-  kpiCurrency: string;
-  handleAddTransaction: (e: React.FormEvent) => void;
+  txType?: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS';
+  setTxType?: (t: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS') => void;
+  txQuantity?: string | number;
+  setTxQuantity?: (q: string | number) => void;
+  txUnitPrice?: string | number;
+  setTxUnitPrice?: (p: string | number) => void;
+  txExchangeRate?: string | number;
+  setTxExchangeRate?: (r: string | number) => void;
+  txExecutedAt?: string;
+  setTxExecutedAt?: (d: string) => void;
+  selectedAssetCurrency?: string;
+  kpiCurrency?: string;
+  handleAddTransaction?: (e: React.FormEvent) => void;
 
   // Fixed Income Modal
   showFIModal?: boolean;
@@ -71,11 +72,81 @@ interface ModalsProps {
 }
 
 export default function Modals(props: ModalsProps) {
+  let context: ReturnType<typeof usePortfolio> | undefined;
+  try {
+    context = usePortfolio();
+  } catch (e) {
+    context = undefined;
+  }
+
+  // Resolve each value from props first, then context fallback
+  const showPortfolioModal = props.showPortfolioModal ?? context?.showPortfolioModal ?? false;
+  const setShowPortfolioModal = props.setShowPortfolioModal ?? context?.setShowPortfolioModal ?? (() => {});
+  const newPortfolioName = props.newPortfolioName ?? context?.newPortfolioName ?? '';
+  const setNewPortfolioName = props.setNewPortfolioName ?? context?.setNewPortfolioName ?? (() => {});
+  const newPortfolioCurrency = props.newPortfolioCurrency ?? context?.newPortfolioCurrency ?? 'BRL';
+  const setNewPortfolioCurrency = props.setNewPortfolioCurrency ?? context?.setNewPortfolioCurrency ?? (() => {});
+  const isCreatingPortfolio = props.isCreatingPortfolio ?? context?.isCreatingPortfolio ?? false;
+  const handleCreatePortfolio = props.handleCreatePortfolio ?? context?.handleCreatePortfolio ?? (() => {});
+
+  const showTxModal = props.showTxModal ?? context?.showTxModal ?? false;
+  const setShowTxModal = props.setShowTxModal ?? context?.setShowTxModal ?? (() => {});
+  const editingTxId = props.editingTxId !== undefined ? props.editingTxId : (context?.editingTxId ?? null);
+  const setEditingTxId = props.setEditingTxId ?? context?.setEditingTxId ?? (() => {});
+  const txTicker = props.txTicker ?? context?.txTicker ?? '';
+  const searchQuery = props.searchQuery ?? context?.searchQuery ?? '';
+  const setSearchQuery = props.setSearchQuery ?? context?.setSearchQuery ?? (() => {});
+  const isSearching = props.isSearching ?? context?.isSearching ?? false;
+  const showDropdown = props.showDropdown ?? context?.showDropdown ?? false;
+  const searchResults = props.searchResults ?? context?.searchResults ?? [];
+  const handleSelectAsset = props.handleSelectAsset ?? context?.handleSelectAsset ?? (() => {});
+  const isAddingTx = props.isAddingTx ?? context?.isAddingTx ?? false;
+  const txType = props.txType ?? context?.txType ?? 'BUY';
+  const setTxType = props.setTxType ?? context?.setTxType ?? (() => {});
+  const txQuantity = props.txQuantity ?? context?.txQuantity ?? '';
+  const setTxQuantity = props.setTxQuantity ?? context?.setTxQuantity ?? (() => {});
+  const txUnitPrice = props.txUnitPrice ?? context?.txUnitPrice ?? '';
+  const setTxUnitPrice = props.setTxUnitPrice ?? context?.setTxUnitPrice ?? (() => {});
+  const txExchangeRate = props.txExchangeRate ?? context?.txExchangeRate ?? 1.0;
+  const setTxExchangeRate = props.setTxExchangeRate ?? context?.setTxExchangeRate ?? (() => {});
+  const txExecutedAt = props.txExecutedAt ?? context?.txExecutedAt ?? '';
+  const setTxExecutedAt = props.setTxExecutedAt ?? context?.setTxExecutedAt ?? (() => {});
+  const selectedAssetCurrency = props.selectedAssetCurrency ?? context?.selectedAssetCurrency ?? 'BRL';
+  const kpiCurrency = props.kpiCurrency ?? context?.kpiCurrency ?? 'BRL';
+  const handleAddTransaction = props.handleAddTransaction ?? context?.handleAddTransaction ?? (() => {});
+
+  const showFIModal = props.showFIModal ?? context?.showFIModal ?? false;
+  const setShowFIModal = props.setShowFIModal ?? context?.setShowFIModal ?? (() => {});
+  const showFIEditModal = props.showFIEditModal ?? context?.showFIEditModal ?? false;
+  const setShowFIEditModal = props.setShowFIEditModal ?? context?.setShowFIEditModal ?? (() => {});
+  const fiEditTxAssetName = props.fiEditTxAssetName ?? context?.fiEditTxAssetName ?? '';
+  const setFiEditTxAssetName = props.setFiEditTxAssetName ?? context?.setFiEditTxAssetName ?? (() => {});
+  const handleUpdateFITransaction = props.handleUpdateFITransaction ?? context?.handleUpdateFITransaction ?? (() => {});
+  const fiInstitution = props.fiInstitution ?? context?.fiInstitution ?? '';
+  const setFiInstitution = props.setFiInstitution ?? context?.setFiInstitution ?? (() => {});
+  const fiType = props.fiType ?? context?.fiType ?? 'CDB';
+  const setFiType = props.setFiType ?? context?.setFiType ?? (() => {});
+  const fiDebtType = props.fiDebtType ?? context?.fiDebtType ?? 'POS';
+  const setFiDebtType = props.setFiDebtType ?? context?.setFiDebtType ?? (() => {});
+  const fiIndexer = props.fiIndexer ?? context?.fiIndexer ?? 'CDI';
+  const setFiIndexer = props.setFiIndexer ?? context?.setFiIndexer ?? (() => {});
+  const fiRate = props.fiRate ?? context?.fiRate ?? '';
+  const setFiRate = props.setFiRate ?? context?.setFiRate ?? (() => {});
+  const fiTxType = props.fiTxType ?? context?.fiTxType ?? 'SUBSCRIPTION';
+  const setFiTxType = props.setFiTxType ?? context?.setFiTxType ?? (() => {});
+  const fiAmount = props.fiAmount ?? context?.fiAmount ?? '';
+  const setFiAmount = props.setFiAmount ?? context?.setFiAmount ?? (() => {});
+  const fiApplicationDate = props.fiApplicationDate ?? context?.fiApplicationDate ?? '';
+  const setFiApplicationDate = props.setFiApplicationDate ?? context?.setFiApplicationDate ?? (() => {});
+  const fiMaturityDate = props.fiMaturityDate ?? context?.fiMaturityDate ?? '';
+  const setFiMaturityDate = props.setFiMaturityDate ?? context?.setFiMaturityDate ?? (() => {});
+  const isAddingFI = props.isAddingFI ?? context?.isAddingFI ?? false;
+  const handleAddFixedIncome = props.handleAddFixedIncome ?? context?.handleAddFixedIncome ?? (() => {});
   const [banks, setBanks] = useState<{name: string, ispb: string}[]>([]);
 
   useEffect(() => {
     // Only fetch banks if the FI modal is opened to save resources
-    if (props.showFIModal && banks.length === 0) {
+    if (showFIModal && banks.length === 0) {
       fetch('https://brasilapi.com.br/api/banks/v1')
         .then(res => res.json())
         .then(data => {
@@ -87,11 +158,11 @@ export default function Modals(props: ModalsProps) {
         })
         .catch(e => console.error("Error fetching banks:", e));
     }
-  }, [props.showFIModal, banks.length]);
+  }, [showFIModal, banks.length]);
 
   return (
     <>
-      {props.showPortfolioModal && (
+      {showPortfolioModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h3 className="modal-title mb-lg" style={{ background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
