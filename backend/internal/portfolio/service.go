@@ -145,7 +145,9 @@ func (s *Service) SetDefaultPortfolio(ctx context.Context, portfolioID, userID s
 	if portfolioID == "" || userID == "" {
 		return errors.New("IDs inválidos")
 	}
-	return s.repo.SetDefaultPortfolio(ctx, portfolioID, userID)
+	return s.uow.Do(ctx, func(txCtx context.Context) error {
+		return s.repo.SetDefaultPortfolio(txCtx, portfolioID, userID)
+	})
 }
 
 // GetPortfolios lista os portfólios do usuário (cria "Principal" padrão se vazio).
@@ -172,7 +174,7 @@ func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio
 			}
 		}
 		if !hasDefault {
-			_ = s.repo.SetDefaultPortfolio(ctx, lists[0].ID, userID)
+			_ = s.SetDefaultPortfolio(ctx, lists[0].ID, userID)
 			lists[0].IsDefault = true
 		}
 	}
@@ -604,7 +606,9 @@ func (s *Service) GetPortfolioTransactions(ctx context.Context, portfolioID, use
 
 // DeletePortfolio remove a carteira do banco de dados.
 func (s *Service) DeletePortfolio(ctx context.Context, id, userID string) error {
-	return s.repo.DeletePortfolio(ctx, id, userID)
+	return s.uow.Do(ctx, func(txCtx context.Context) error {
+		return s.repo.DeletePortfolio(txCtx, id, userID)
+	})
 }
 
 // PerformancePoint representa o saldo consolidado de um portfólio em uma data histórica com retornos e benchmarks.
