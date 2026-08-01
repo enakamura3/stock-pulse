@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { createChart, ColorType } from 'lightweight-charts';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 
 interface Item {
   id: string;
@@ -108,7 +109,7 @@ export default function DashboardPage() {
     setAlertSuccessMsg(null);
 
     try {
-      const res = await fetch(`${API_URL}/alerts`, {
+      const res = await apiFetch(`/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +117,6 @@ export default function DashboardPage() {
           target_price: parseFloat(alertTargetPrice),
           condition: alertCondition,
         }),
-        credentials: 'include',
       });
       
       const data = await res.json();
@@ -139,8 +139,7 @@ export default function DashboardPage() {
   // 1. CARREGA TODAS AS WATCHLISTS DO USUÁRIO
   const loadWatchlists = useCallback(async (selectId?: string) => {
     try {
-      const res = await fetch(`${API_URL}/watchlists`, {
-        credentials: 'include',
+      const res = await apiFetch(`/watchlists`, {,
       });
       if (res.ok) {
         const data = await res.json();
@@ -159,8 +158,7 @@ export default function DashboardPage() {
   // 2. DETALHA A WATCHLIST ATIVA (E PEGA AS COTAÇÕES ATUALIZADAS DO REDIS/GO)
   const loadWatchlistDetails = async (id: string) => {
     try {
-      const res = await fetch(`${API_URL}/watchlists/${id}`, {
-        credentials: 'include',
+      const res = await apiFetch(`/watchlists/${id}`, {,
       });
       if (res.ok) {
         const data = await res.json();
@@ -302,8 +300,7 @@ export default function DashboardPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`${API_URL}/assets/search?q=${encodeURIComponent(searchQuery)}`, {
-          credentials: 'include',
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`, {,
         });
         if (res.ok) {
           const data = await res.json();
@@ -329,8 +326,7 @@ export default function DashboardPage() {
     }
     
     try {
-      const res = await fetch(`${API_URL}/quotes/${encodeURIComponent(symbol)}`, {
-        credentials: 'include',
+      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`, {,
       });
       
       const cacheHeader = res.headers.get('X-Cache');
@@ -360,11 +356,10 @@ export default function DashboardPage() {
     if (!newWatchlistName.trim()) return;
     setIsCreatingList(true);
     try {
-      const res = await fetch(`${API_URL}/watchlists`, {
+      const res = await apiFetch(`/watchlists`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newWatchlistName }),
-        credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
@@ -386,9 +381,8 @@ export default function DashboardPage() {
     }
     if (!confirm('Deseja realmente apagar esta lista de favoritos e todos os seus itens?')) return;
     try {
-      const res = await fetch(`${API_URL}/watchlists/${activeWatchlistId}`, {
+      const res = await apiFetch(`/watchlists/${activeWatchlistId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (res.ok) {
         await loadWatchlists();
@@ -412,20 +406,18 @@ export default function DashboardPage() {
     try {
       if (favorited) {
         // Remove dos favoritos
-        const res = await fetch(`${API_URL}/watchlists/${activeWatchlistId}/items/${encodeURIComponent(symbol)}`, {
+        const res = await apiFetch(`/watchlists/${activeWatchlistId}/items/${encodeURIComponent(symbol)}`, {
           method: 'DELETE',
-          credentials: 'include',
         });
         if (res.ok) {
           await loadWatchlistDetails(activeWatchlistId);
         }
       } else {
         // Adiciona aos favoritos (faz auto-onboarding do ativo inédito)
-        const res = await fetch(`${API_URL}/watchlists/${activeWatchlistId}/items`, {
+        const res = await apiFetch(`/watchlists/${activeWatchlistId}/items`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ticker: symbol }),
-          credentials: 'include',
         });
         if (res.ok) {
           await loadWatchlistDetails(activeWatchlistId);
@@ -442,9 +434,8 @@ export default function DashboardPage() {
   const handleRemoveFromSidebar = async (e: React.MouseEvent, ticker: string) => {
     e.stopPropagation(); // Evita carregar a cotação ao clicar em excluir
     try {
-      const res = await fetch(`${API_URL}/watchlists/${activeWatchlistId}/items/${encodeURIComponent(ticker)}`, {
+      const res = await apiFetch(`/watchlists/${activeWatchlistId}/items/${encodeURIComponent(ticker)}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (res.ok) {
         await loadWatchlistDetails(activeWatchlistId);

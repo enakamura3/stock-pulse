@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 import { FixedIncomePosition, PerformancePoint } from './types';
 import { formatMoney, formatPercentage } from './helpers';
+import { apiFetch } from '@/lib/api';
 
 interface FixedIncomeTabProps {
   portfolioId: string;
@@ -72,9 +73,8 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     formData.append("file", file);
     
     try {
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/bulk`, {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/bulk`, {
         method: "POST",
-        credentials: "include",
         body: formData
       });
       
@@ -102,8 +102,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     const fetchPositions = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/positions`, {
-          credentials: 'include',
+        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`, {,
           cache: 'no-store',
         });
         if (res.ok) {
@@ -127,8 +126,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     const fetchPerformance = async () => {
       setIsLoadingPerformance(true);
       try {
-        const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/performance?period=${period}`, {
-          credentials: 'include',
+        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`, {,
         });
         if (res.ok) {
           const data = await res.json();
@@ -161,15 +159,14 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
 
     setIsSubmittingRedeem(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/assets/${redeemTarget.asset.id}/transactions`, {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/assets/${redeemTarget.asset.id}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'REDEMPTION',
           amount: Number(redeemAmount),
           date: new Date(redeemDate).toISOString()
-        }),
-        credentials: 'include'
+        })
       });
 
       if (res.ok) {
