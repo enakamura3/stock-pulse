@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
@@ -22,47 +23,7 @@ import (
 
 // determineAssetType define a categoria oficial do ativo no banco
 func determineAssetType(ticker, name, currency string) string {
-	if strings.Contains(ticker, "-") {
-		return "CRYPTO"
-	}
-
-	if !strings.HasSuffix(ticker, ".SA") {
-		// Internacional
-		lowerName := strings.ToLower(name)
-		if strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "trust") || strings.Contains(lowerName, "fund") {
-			return "ETF_US"
-		}
-		return "STOCK_US"
-	}
-
-	// É do Brasil (.SA)
-	if strings.HasSuffix(ticker, "34.SA") || strings.HasSuffix(ticker, "35.SA") || strings.HasSuffix(ticker, "39.SA") {
-		return "BDR"
-	}
-
-	if strings.HasSuffix(ticker, "11.SA") {
-		lowerName := strings.ToLower(name)
-		isEtf := strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "ishares") || strings.Contains(lowerName, "índice") || strings.Contains(lowerName, "indice")
-		isFiagro := strings.Contains(lowerName, "fiagro") || strings.Contains(lowerName, "agro")
-		isFii := strings.Contains(lowerName, "fii") || strings.Contains(lowerName, "fundo") || strings.Contains(lowerName, "fdo") || strings.Contains(lowerName, "imob") || strings.Contains(lowerName, "lajes") || strings.Contains(lowerName, "shopping")
-
-		if isEtf {
-			return "ETF_BR"
-		}
-		if isFiagro {
-			return "FIAGRO"
-		}
-		// Hardcoded common FIIs if name misses
-		tickerUpper := strings.ToUpper(ticker)
-		if isFii || tickerUpper == "MXRF11.SA" || tickerUpper == "HGLG11.SA" || tickerUpper == "KNRI11.SA" || tickerUpper == "BTLG11.SA" || tickerUpper == "XPML11.SA" || tickerUpper == "VISC11.SA" {
-			return "FII"
-		}
-		if tickerUpper == "SPYI11.SA" || tickerUpper == "QQQI11.SA" || tickerUpper == "IVVB11.SA" || tickerUpper == "NASD11.SA" || tickerUpper == "BOVA11.SA" {
-			return "ETF_BR"
-		}
-	}
-
-	return "STOCK_BR"
+	return calculator.DetermineAssetType(ticker, name, currency)
 }
 
 // PortfolioRepository define as operações de banco de dados para a carteira.
@@ -380,43 +341,10 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 			posMap[tx.AssetID] = pos
 		}
 
-		if tx.Type == "BUY" {
-			if math.Abs(pos.Quantity) < 1e-6 {
-				pos.Quantity = tx.Quantity
-				pos.TotalCost = tx.Quantity * tx.UnitPrice * tx.ExchangeRate
-				pos.AveragePrice = tx.UnitPrice
-			} else {
-				pos.Quantity += tx.Quantity
-				pos.TotalCost += tx.Quantity * tx.UnitPrice * tx.ExchangeRate
-				pos.AveragePrice = pos.TotalCost / (pos.Quantity * tx.ExchangeRate) // Preço na moeda original
-			}
-		} else if tx.Type == "SELL" {
-			if pos.Quantity >= tx.Quantity {
-				pos.Quantity -= tx.Quantity
-				pos.TotalCost = pos.Quantity * pos.AveragePrice * tx.ExchangeRate
-			} else {
-				// Venda acima do saldo zerará a posição
-				pos.Quantity = 0
-				pos.TotalCost = 0
-				pos.AveragePrice = 0
-			}
-		} else if tx.Type == "SPLIT" {
-			if pos.Quantity > 0 && tx.Quantity > 0 {
-				pos.Quantity = pos.Quantity * tx.Quantity
-				pos.AveragePrice = pos.AveragePrice / tx.Quantity
-			}
-		} else if tx.Type == "REVERSE_SPLIT" {
-			if pos.Quantity > 0 && tx.Quantity > 0 {
-				pos.Quantity = math.Floor(pos.Quantity / tx.Quantity)
-				pos.AveragePrice = pos.AveragePrice * tx.Quantity
-			}
-		} else if tx.Type == "BONUS" {
-			pos.Quantity += tx.Quantity
-			pos.TotalCost += tx.Quantity * tx.UnitPrice * tx.ExchangeRate
-			if pos.Quantity > 0 {
-				pos.AveragePrice = pos.TotalCost / (pos.Quantity * tx.ExchangeRate)
-			}
-		}
+		pos.Quantity, pos.TotalCost, pos.AveragePrice = calculator.UpdatePositionOnTransaction(
+			pos.Quantity, pos.TotalCost, pos.AveragePrice,
+			tx.Type, tx.Quantity, tx.UnitPrice, tx.ExchangeRate,
+		)
 	}
 
 	// Filtra apenas posições ativas (quantidade > 0)
@@ -447,26 +375,18 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 				}
 
 				pos.CurrentPrice = quote.Price
-				pos.CurrentValue = pos.Quantity * quote.Price * rate
 				pos.DailyChange = quote.Change
 				pos.DailyChangePercent = quote.ChangePercent
-				pos.ProfitLoss = pos.CurrentValue - pos.TotalCost
-				if pos.TotalCost > 0 {
-					pos.ReturnPercent = (pos.ProfitLoss / pos.TotalCost) * 100
-				}
+				pos.CurrentValue, pos.ProfitLoss, pos.ReturnPercent = calculator.CalculatePositionMetrics(
+					pos.Quantity, quote.Price, pos.TotalCost, rate,
+				)
 
 				// Injeta fundamentos (Graham, Bazin, P/VP, P/L)
 				if f, errF := s.marketService.GetFundamentals(ctx, pos.Ticker); errF == nil && f != nil {
 					pos.GrahamValue = f.GrahamValue
 					pos.BazinValue = f.BazinValue
 					pos.DividendYield = f.DividendYield
-
-					if f.BookValue > 0 {
-						pos.PVP = pos.CurrentPrice / f.BookValue
-					}
-					if f.EPS > 0 {
-						pos.PE = pos.CurrentPrice / f.EPS
-					}
+					pos.PVP, pos.PE = calculator.CalculateValuationRatios(pos.CurrentPrice, f.BookValue, f.EPS)
 				}
 
 				mu.Lock()
