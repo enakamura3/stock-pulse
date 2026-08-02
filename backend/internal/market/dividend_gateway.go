@@ -148,24 +148,7 @@ func (g *DividendGateway) GetDividends(ctx context.Context, ticker string, asset
 		return nil, fmt.Errorf("nenhum provento encontrado para %s: %v", ticker, fetchErr)
 	}
 
-	// 5. Enriquecimento com fallback para o mês corrente.
-	//
-	// Se primary/secondary retornaram dados mas o mês atual está ausente,
-	// consultamos o fallback para preencher a lacuna. O merge usa a mesma
-	// lógica de deduplicação: meses já cobertos pelo primary/secondary têm
-	// prioridade — o fallback só contribui com meses que ainda não existem.
-	if fallback != nil && len(events) > 0 && isMissingCurrentMonth(events) {
-		log.Printf("[Market] %s: mês corrente ausente no resultado primary/secondary. Consultando fallback %s para enriquecer.", ticker, fallback.Name())
-		fallbackEvents, errF := fallback.GetDividends(ctx, ticker, assetType)
-		if errF == nil && len(fallbackEvents) > 0 {
-			events = enrichWithFallback(events, fallbackEvents, assetType)
-			log.Printf("[Market] %s: fallback %s contribuiu com %d evento(s) do mês corrente.", ticker, fallback.Name(), countCurrentMonthEvents(events))
-		} else if errF != nil {
-			log.Printf("[Market] %s: fallback %s falhou ao enriquecer: %v", ticker, fallback.Name(), errF)
-		}
-	}
-
-	// 6. Salvar cache
+	// 5. Salvar cache
 	if data, err := json.Marshal(events); err == nil {
 		g.cache.Set(ctx, cacheKey, data, g.ttl)
 	}
@@ -173,73 +156,19 @@ func (g *DividendGateway) GetDividends(ctx context.Context, ticker string, asset
 	return events, nil
 }
 
-// isMissingCurrentMonth retorna true se nenhum evento da lista pertence ao mês e ano atuais.
-func isMissingCurrentMonth(events []DividendEvent) bool {
-	now := time.Now()
-	for _, ev := range events {
-		if ev.Date.Month() == now.Month() && ev.Date.Year() == now.Year() {
-			return false
-		}
-	}
-	return true
+func isFiiType(assetType string) bool {
+	upper := strings.ToUpper(assetType)
+	return upper == "FII" || upper == "FIAGRO"
 }
 
-// countCurrentMonthEvents conta quantos eventos pertencem ao mês e ano atuais.
-func countCurrentMonthEvents(events []DividendEvent) int {
-	now := time.Now()
-	count := 0
-	for _, ev := range events {
-		if ev.Date.Month() == now.Month() && ev.Date.Year() == now.Year() {
-			count++
-		}
-	}
-	return count
-}
-
-// enrichWithFallback adiciona ao resultado base os eventos do fallback para os quais
-// o base ainda não possui cobertura. Eventos já cobertos pelo base (primary/secondary)
-// são ignorados — preservando a prioridade das fontes principais.
-//
-// Para FIIs/FIAGROs, a cobertura é verificada por mês+ano (1 rendimento/mês).
-// Para outros tipos, a cobertura é verificada por data exata.
-func enrichWithFallback(baseEvents, fallbackEvents []DividendEvent, assetType string) []DividendEvent {
-	isFii := strings.ToUpper(assetType) == "FII" || strings.ToUpper(assetType) == "FIAGRO"
-
-	enriched := append([]DividendEvent{}, baseEvents...)
-
-	for _, fEv := range fallbackEvents {
-		covered := false
-		for _, bEv := range baseEvents {
-			if isFii {
-				if fEv.Date.Month() == bEv.Date.Month() && fEv.Date.Year() == bEv.Date.Year() {
-					covered = true
-					break
-				}
-			} else {
-				if fEv.Date.Equal(bEv.Date) {
-					covered = true
-					break
-				}
-			}
-		}
-		if !covered {
-			// Normaliza o tipo para FIIs caso o fallback retorne "Dividendo"
-			if isFii && fEv.Type == "Dividendo" {
-				fEv.Type = "Rendimento"
-			}
-			enriched = append(enriched, fEv)
-		}
-	}
-
-	sort.SliceStable(enriched, func(i, j int) bool {
-		return enriched[i].Date.After(enriched[j].Date)
-	})
-
-	return enriched
+func isMonthlyYieldAsset(assetType string) bool {
+	upper := strings.ToUpper(assetType)
+	return upper == "FII" || upper == "FIAGRO" || upper == "ETF" || upper == "ETF_BR"
 }
 
 func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType string) []DividendEvent {
-	isFii := strings.ToUpper(assetType) == "FII" || strings.ToUpper(assetType) == "FIAGRO"
+	isMonthly := isMonthlyYieldAsset(assetType)
+	isFii := isFiiType(assetType)
 
 	var baseEvents []DividendEvent
 	var secondaryEvents []DividendEvent
@@ -258,7 +187,7 @@ func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType stri
 	for _, sEv := range secondaryEvents {
 		exists := false
 		for _, dEv := range deduped {
-			if isFii {
+			if isMonthly {
 				if sEv.Date.Month() == dEv.Date.Month() && sEv.Date.Year() == dEv.Date.Year() {
 					exists = true
 					break

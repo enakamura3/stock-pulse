@@ -58,14 +58,17 @@ export default function DividendsHistory({
 
   const consolidatedDividends = useMemo(() => {
     const map = new Map<string, CalculatedDividend>();
+    const monthlyYieldMap = new Map<string, CalculatedDividend>();
     const others: CalculatedDividend[] = [];
     
     dividends.forEach(div => {
+      const typeUpper = (div.asset_type || '').toUpperCase();
+      const isMonthlyYield = typeUpper === 'FII' || typeUpper === 'FIAGRO' || typeUpper === 'ETF' || typeUpper === 'ETF_BR';
+      const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
+      const yearMonth = dateStr ? dateStr.substring(0, 7) : 'unknown'; // ex: '2026-03'
+      const key = `${div.ticker}-${yearMonth}`;
+
       if (div.asset_type === 'TESOURO') {
-        const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
-        const yearMonth = dateStr ? dateStr.substring(0, 7) : 'unknown'; // ex: '2026-03'
-        const key = `${div.ticker}-${yearMonth}`;
-        
         if (map.has(key)) {
           const existing = map.get(key)!;
           existing.gross_amount += (Number(div.gross_amount) || 0);
@@ -79,11 +82,15 @@ export default function DividendsHistory({
         } else {
           map.set(key, { ...div });
         }
+      } else if (isMonthlyYield) {
+        if (!monthlyYieldMap.has(key)) {
+          monthlyYieldMap.set(key, { ...div });
+        }
       } else {
         others.push(div);
       }
     });
-    return [...others, ...Array.from(map.values())];
+    return [...others, ...Array.from(monthlyYieldMap.values()), ...Array.from(map.values())];
   }, [dividends]);
 
   const sortedDividends = useMemo(() => {
