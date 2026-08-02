@@ -225,6 +225,16 @@ export default function DividendsHistory({
           <h3 className="card-title">🧾 Detalhamento e Lançamentos</h3>
           <div className="flex-row gap-sm">
             <select
+              value={filterDivYear}
+              onChange={(e) => setFilterDivYear(e.target.value)}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
+            >
+              <option value="Todos">Todos os Anos</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            <select
               value={filterDivMonth}
               onChange={(e) => setFilterDivMonth(e.target.value)}
               style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
