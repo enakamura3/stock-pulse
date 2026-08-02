@@ -28,8 +28,10 @@ export default function TransactionHistory({
   onLaunchOperation,
   kpiCurrency = 'BRL',
 }: TransactionHistoryProps) {
-  const [filterTxYear, setFilterTxYear] = useState<string>('Todos');
-  const [filterTxMonth, setFilterTxMonth] = useState<string>('Todos');
+  const currentYear = new Date().getFullYear().toString();
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const [filterTxYear, setFilterTxYear] = useState<string>(currentYear);
+  const [filterTxMonth, setFilterTxMonth] = useState<string>(currentMonth);
   const [filterTxType, setFilterTxType] = useState<string>('Todos');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [groupByDate, setGroupByDate] = useState<boolean>(true);
