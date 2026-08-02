@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math"
 	"sort"
@@ -144,10 +145,30 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 		}
 	}
 
+	// Deduplica proventos mensais de FII/FIAGRO/ETF no mesmo mês/ano
+	dedupedResults := make([]CalculatedDividend, 0, len(results))
+	seenMonth := make(map[string]bool)
+
+	for _, res := range results {
+		upperType := strings.ToUpper(res.AssetType)
+		if upperType == "FII" || upperType == "FIAGRO" || upperType == "ETF" || upperType == "ETF_BR" {
+			dateForMonth := res.PaymentDate
+			if dateForMonth.IsZero() {
+				dateForMonth = res.CumDate
+			}
+			key := fmt.Sprintf("%s-%d-%02d", res.Ticker, dateForMonth.Year(), dateForMonth.Month())
+			if seenMonth[key] {
+				continue
+			}
+			seenMonth[key] = true
+		}
+		dedupedResults = append(dedupedResults, res)
+	}
+
 	// Ordena do mais recente para o mais antigo
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].PaymentDate.After(results[j].PaymentDate)
+	sort.Slice(dedupedResults, func(i, j int) bool {
+		return dedupedResults[i].PaymentDate.After(dedupedResults[j].PaymentDate)
 	})
 
-	return results, nil
+	return dedupedResults, nil
 }
