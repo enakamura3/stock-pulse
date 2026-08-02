@@ -186,4 +186,23 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotEmpty(t, res)
 	})
+
+	t.Run("FII Primary and Secondary Success", func(t *testing.T) {
+		rdb, rmock := redismock.NewClientMock()
+		rmock.ExpectGet("dividends:FII_SUCC").RedisNil()
+		rmock.ExpectSet("dividends:FII_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
+
+		myPrimary := new(mockDividendSource)
+		mySecondary := new(mockDividendSource)
+		myPrimary.On("Name").Return("primary")
+		mySecondary.On("Name").Return("secondary")
+
+		myPrimary.On("GetDividends", mock.Anything, "FII_SUCC", "FII").Return([]DividendEvent{evWithCurrDate}, nil).Once()
+		mySecondary.On("GetDividends", mock.Anything, "FII_SUCC", "FII").Return([]DividendEvent{evWithCurrDate}, nil).Once()
+
+		gw := NewDividendGateway(mySecondary, myPrimary, nil, nil, rdb, 12*time.Hour)
+		res, err := gw.GetDividends(context.Background(), "FII_SUCC", "FII")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, res)
+	})
 }
