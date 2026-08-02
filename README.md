@@ -60,7 +60,7 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 - **Segurança e Criptografia:** Hashing de senhas utilizando o algoritmo Argon2id em conformidade com as recomendações do OWASP e tokens de acesso JWT assinados com HMAC-SHA256.
 - **Migrações:** `golang-migrate` para gerenciar a evolução estrutural das tabelas.
 - **Provedores de Mercado:** Yahoo Finance API (Cotações em tempo real e busca autocomplete) e Scraping estruturado de dados (Fundamentus, Finviz e StockAnalysis).
-- **Otimização de Workers (Skip Pattern):** Workers de sincronização ignoram operações de `UPDATE` no banco quando os dados capturados são matematicamente iguais aos existentes, economizando recursos de escrita.
+- **Otimização do `DividendWorker` (Skip Pattern):** O `DividendWorker` (em `portfolio/`) implementa *fuzzy matching* ao sincronizar proventos: se o valor e a data de pagamento forem matematicamente idênticos (diferença `< 1e-6`) ao registro existente, o `UPDATE` é suprimido, evitando escritas desnecessárias no PostgreSQL.
 - **Concorrência:** Uso intenso de Goroutines para gerenciamento do ciclo de vida dos alertas, sincronização de dividendos históricos e backfill de carteiras.
 
 ### Frontend (Next.js 14)
@@ -927,11 +927,12 @@ sequenceDiagram
 │   │   ├── calculator/       # Motor de cálculos financeiros (Graham, Bazin, TWRR, preço médio)
 │   │   ├── fixedincome/      # Gestão de Renda Fixa e Tesouro Direto (treasury_service.go)
 │   │   ├── market/           # Scrapers (Fundamentus, Finviz, StockAnalysis) e DividendGateway
-│   │   ├── portfolio/        # Gestão de carteiras (dividend_service.go, performance_service.go)
+│   │   ├── portfolio/        # Gestão de carteiras (dividend_service.go, performance_service.go, worker_dividend.go)
 │   │   ├── auth/             # Autenticação Argon2id + JWT / Redis
 │   │   ├── alert/            # Motor de alertas de preço em background
+│   │   ├── history/          # Livro de registro unificado (Ledger) de transações de renda variável e fixa
 │   │   ├── telegram/         # Bot do Telegram e FSM de cadastro de operações
-│   │   └── worker/           # Background workers com lógica de Skip para otimização de DB
+│   │   └── worker/           # Orquestrador de workers agendados (AlertWorker, DailyWorker)
 │   ├── migrations/           # Migrações SQL gerenciadas pelo golang-migrate
 │   └── Dockerfile            # Container Go com suporte a hot-reload (Air)
 │
