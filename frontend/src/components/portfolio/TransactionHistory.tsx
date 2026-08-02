@@ -36,6 +36,33 @@ export default function TransactionHistory({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [groupByDate, setGroupByDate] = useState<boolean>(true);
 
+  // Ajusta inteligentes os filtros iniciais para priorizar o mês/ano corrente se houver transações
+  React.useEffect(() => {
+    if (transactions.length === 0) return;
+    const now = new Date();
+    const curY = now.getFullYear().toString();
+    const curM = String(now.getMonth() + 1).padStart(2, '0');
+
+    const hasCurMonth = transactions.some((tx) => {
+      if (!tx.date) return false;
+      return tx.date.substring(0, 4) === curY && tx.date.substring(5, 7) === curM;
+    });
+
+    if (hasCurMonth) {
+      setFilterTxYear(curY);
+      setFilterTxMonth(curM);
+    } else {
+      const hasCurYear = transactions.some((tx) => tx.date && tx.date.substring(0, 4) === curY);
+      if (hasCurYear) {
+        setFilterTxYear(curY);
+        setFilterTxMonth('Todos');
+      } else {
+        setFilterTxYear('Todos');
+        setFilterTxMonth('Todos');
+      }
+    }
+  }, [transactions]);
+
   // Calcula o saldo resultante após cada transação cronológica
   const transactionsWithBalance = useMemo(() => {
     const sorted = [...transactions].sort((a, b) => {
