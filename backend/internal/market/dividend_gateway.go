@@ -38,12 +38,12 @@ func NewDividendGateway(
 			{source: stockAnalysis, role: "fallback"},
 		},
 		"FII": {
-			{source: stockAnalysis, role: "primary"},
-			{source: fundamentus, role: "fallback"},
+			{source: fundamentus, role: "primary"},
+			{source: stockAnalysis, role: "secondary"},
 		},
 		"FIAGRO": {
-			{source: stockAnalysis, role: "primary"},
-			{source: fundamentus, role: "fallback"},
+			{source: fundamentus, role: "primary"},
+			{source: stockAnalysis, role: "secondary"},
 		},
 		"ETF_BR": {
 			{source: b3, role: "primary"},

@@ -578,8 +578,8 @@ O gateway define as seguintes rotas de prioridade:
 | Tipo de Ativo | Primary | Secondary | Fallback |
 |---|---|---|---|
 | **`STOCK_BR`** (Ações BR) | B3 | Fundamentus | StockAnalysis |
-| **`FII`** (Fundos Imobiliários) | StockAnalysis | — | Fundamentus |
-| **`FIAGRO`** (Fundos Agro) | StockAnalysis | — | Fundamentus |
+| **`FII`** (Fundos Imobiliários) | Fundamentus | StockAnalysis | — |
+| **`FIAGRO`** (Fundos Agro) | Fundamentus | StockAnalysis | — |
 | **`ETF_BR`** (ETFs BR) | B3 | StockAnalysis | Yahoo |
 | **`BDR`** (BDRs) | StockAnalysis | Fundamentus | Yahoo |
 | **`STOCK_US`** (Ações US) | StockAnalysis | — | Yahoo |
@@ -661,8 +661,8 @@ A interface `DividendSource` exige que toda fonte implemente:
 - **Fallback (StockAnalysis):** StockAnalysis foi adotado no lugar do Yahoo Finance, o que unifica o padrão de datas de corte com o Brasil. Utiliza prioritariamente a coluna **Record Date** (que já representa a Data Com sem necessitar de ajustes). Caso a `Record Date` não seja preenchida, o sistema faz fallback para a `Ex-Div Date` americana e aplica a normalização matemática de subtrair 1 dia (24h) para chegar à Data Com real.
 
 ##### Fundos Imobiliários (`FII`) e Fundos Agro (`FIAGRO`)
-- **Primary (StockAnalysis):** Scraping via rota BVMF (`stockanalysis.com/quote/bvmf/{ticker}/dividend/`). Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO. Utiliza prioritariamente a coluna **Record Date** (Data Com). Caso não preenchida, faz fallback para `Ex-Div Date` subtraindo 1 dia.
-- **Fallback (Fundamentus):** Scraping de `fii_proventos.php?papel={TICKER}&tipo=2` — URL diferente da de ações. A tabela HTML de FIIs possui **ordem de colunas diferente**: **Data | Tipo | Data Pagamento | Valor** (vs Data | Valor | Tipo | Data Pagamento para ações). Deduplicação interna por `Month() + Year()`, garantindo 1 rendimento por mês.
+- **Primary (Fundamentus):** Scraping de `fii_proventos.php?papel={TICKER}&tipo=2`. A tabela HTML de FIIs possui a ordem de colunas: **Data | Tipo | Data Pagamento | Valor**. Mapeia `Rendimento` e `Amortização` com deduplicação por `Month() + Year()`.
+- **Secondary (StockAnalysis):** Scraping via rota BVMF (`stockanalysis.com/quote/bvmf/{ticker}/dividend/`). Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO. Utilizado em paralelo para merge e enriquecimento de proventos.
 - **Nota:** A API da B3 (`GetListedFundDividends`) foi removida como fonte para FIIs/FIAGROs devido a bloqueios de acesso no endpoint dedicado a fundos.
 
 ##### ETFs Brasileiros (`ETF_BR`)
@@ -689,7 +689,7 @@ A interface `DividendSource` exige que toda fonte implemente:
 
 Quando primary e secondary retornam dados, o gateway executa um merge inteligente:
 
-1. **Define a base:** Para ações, a base são os da secondary (Fundamentus), pois preserva a distinção JCP vs Dividendo. Para FIIs/FIAGROs, o merge não se aplica pois possuem apenas fonte primária (StockAnalysis) com fallback (Fundamentus). Para ETFs mensais, a base são os eventos da primary (B3).
+1. **Define a base:** Para FIIs/FIAGROs, a base são os eventos da primary (Fundamentus), sendo enriquecida com eventos do secundário (StockAnalysis). Para ações, a base são os da secondary (Fundamentus), pois preserva a distinção JCP vs Dividendo. Para ETFs mensais, a base são os eventos da primary (B3).
 2. **Itera eventos secundários:** Para cada evento da fonte não-base, verifica se já existe na lista consolidada:
    - **FII/FIAGRO/ETF Mensal:** Match por `Month() + Year()` (1 rendimento por mês) ou *Fuzzy Matching* por tolerância de valor (≤ R$ 0,05).
    - **Ações/ETFs/BDR:** Match por data exata (`Date.Equal()`) ou aproximação por margem de centavos.
