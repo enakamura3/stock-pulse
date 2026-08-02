@@ -578,8 +578,8 @@ O gateway define as seguintes rotas de prioridade:
 | Tipo de Ativo | Primary | Secondary | Fallback |
 |---|---|---|---|
 | **`STOCK_BR`** (Ações BR) | B3 | Fundamentus | StockAnalysis |
-| **`FII`** (Fundos Imobiliários) | B3 | Fundamentus | StockAnalysis |
-| **`FIAGRO`** (Fundos Agro) | B3 | Fundamentus | StockAnalysis |
+| **`FII`** (Fundos Imobiliários) | StockAnalysis | — | — |
+| **`FIAGRO`** (Fundos Agro) | StockAnalysis | — | — |
 | **`ETF_BR`** (ETFs BR) | B3 | StockAnalysis | Yahoo |
 | **`BDR`** (BDRs) | StockAnalysis | Fundamentus | Yahoo |
 | **`STOCK_US`** (Ações US) | StockAnalysis | — | Yahoo |
