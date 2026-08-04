@@ -163,7 +163,7 @@ describe('AuthContext', () => {
     await userEvent.click(screen.getByTestId('btn-login'));
     
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockPush).toHaveBeenCalledWith('/dashboard/portfolio');
     });
   });
 
@@ -229,7 +229,7 @@ describe('AuthContext', () => {
     await userEvent.click(screen.getByTestId('btn-register'));
     
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockPush).toHaveBeenCalledWith('/dashboard/portfolio');
     });
   });
 
