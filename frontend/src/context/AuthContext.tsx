@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       await fetchMe();
       setIsLoading(false);
-      router.push('/dashboard');
+      router.push('/dashboard/portfolio');
     } catch (error: any) {
       setIsLoading(false);
       throw error;
