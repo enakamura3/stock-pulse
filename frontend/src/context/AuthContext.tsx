@@ -74,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(data.error || 'Falha ao efetuar login');
       }
       await fetchMe();
+      setIsLoading(false);
       router.push('/dashboard');
     } catch (error: any) {
       setIsLoading(false);
