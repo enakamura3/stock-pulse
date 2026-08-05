@@ -47,18 +47,19 @@ export default function TransactionGroupList({
         key={tx.id}
         className="flex-row justify-between items-center flex-wrap gap-md"
         style={{
-          padding: '0.85rem 1.1rem',
+          padding: '1rem 1.25rem',
           background: 'rgba(255, 255, 255, 0.015)',
           border: '1px solid var(--panel-border)',
           borderRadius: '10px',
           transition: 'all 0.15s ease',
         }}
       >
-        <div className="flex-row items-center gap-md" style={{ minWidth: 200 }}>
+        {/* Coluna 1: Ativo, Badge e Data */}
+        <div className="flex-row items-center gap-md" style={{ flex: '1.2 1 220px' }}>
           <div
             style={{
-              width: 40,
-              height: 40,
+              width: 42,
+              height: 42,
               borderRadius: '50%',
               background: circle.gradient,
               border: `1px solid ${circle.borderColor}`,
@@ -72,60 +73,73 @@ export default function TransactionGroupList({
             {circle.emoji}
           </div>
 
-          <div className="flex-col" style={{ gap: '0.15rem' }}>
+          <div className="flex-col" style={{ gap: '0.25rem' }}>
             <div className="flex-row items-center gap-sm">
               <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff' }}>
                 {tx.asset_name}
               </span>
               <span
                 style={{
-                  padding: '0.15rem 0.5rem',
+                  padding: '0.2rem 0.6rem',
                   borderRadius: '4px',
-                  fontSize: '0.65rem',
+                  fontSize: '0.68rem',
                   fontWeight: 700,
                   background: badge.bg,
                   color: badge.color,
+                  letterSpacing: '0.3px',
                 }}
               >
                 {badge.text}
               </span>
             </div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
               {formatDateStr(tx.date)}
             </span>
           </div>
         </div>
 
-        <div className="flex-row gap-lg items-center flex-wrap" style={{ marginLeft: 'auto' }}>
+        {/* Colunas Intermediárias e Valores (Distribuídas no Meio e Direita) */}
+        <div
+          className="flex-row items-center flex-wrap"
+          style={{ flex: '2 1 400px', justifyContent: 'space-between', gap: '1.25rem' }}
+        >
           {isRF ? (
             <>
+              {/* Módulo / Tipo */}
+              <div className="flex-col items-start" style={{ minWidth: 110 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Módulo</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {tx.asset_type || 'Renda Fixa'}
+                </span>
+              </div>
+
+              {/* Saldo Investido Resultante */}
+              <div className="flex-col items-start" style={{ minWidth: 130 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#00f2fe' }}>
+                  {formatMoney(tx.resulting_invested ?? 0, tx.currency || 'BRL')}
+                </span>
+              </div>
+
               {/* Valor da Operação */}
-              <div className="flex-col items-end" style={{ minWidth: 120 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Valor da Operação</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: badge.color }}>
+              <div className="flex-col items-end" style={{ minWidth: 130 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Valor da Operação</span>
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: badge.color }}>
                   {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
                 </span>
                 {hasFx && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 'normal' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
                     (Câmbio: {tx.exchange_rate!.toFixed(4)})
                   </span>
                 )}
-              </div>
-
-              {/* Módulo */}
-              <div className="flex-col items-end" style={{ minWidth: 100 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Módulo</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {tx.asset_type || 'Renda Fixa'}
-                </span>
               </div>
             </>
           ) : isSplit ? (
             <>
               {/* Proporção */}
-              <div className="flex-col items-end" style={{ minWidth: 90 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Proporção</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: badge.color }}>
+              <div className="flex-col items-start" style={{ minWidth: 110 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Proporção</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: badge.color }}>
                   {tx.type === 'REVERSE_SPLIT'
                     ? `${formatQuantity(tx.quantity ?? 0)} para 1`
                     : `1 para ${formatQuantity(tx.quantity ?? 0)}`}
@@ -133,44 +147,47 @@ export default function TransactionGroupList({
               </div>
 
               {/* Saldo de Cotas após */}
-              <div className="flex-col items-end" style={{ minWidth: 100 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Saldo de Cotas após</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#00f2fe' }}>
+              <div className="flex-col items-start" style={{ minWidth: 120 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#00f2fe' }}>
                   {formatQuantity(tx.resulting_quantity ?? 0)} un.
                 </span>
               </div>
+
+              {/* Espaçador neutro */}
+              <div style={{ minWidth: 135 }} />
             </>
           ) : (
             <>
-              {/* Quantidade */}
-              <div className="flex-col items-end" style={{ minWidth: 90 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Quantidade</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {formatQuantity(tx.quantity || 0)}
-                </span>
-              </div>
-
-              {/* Preço Unitário */}
-              <div className="flex-col items-end" style={{ minWidth: 100 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Preço Unit.</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
+              {/* Quantidade e Preço Unitário (Operados) */}
+              <div className="flex-col items-start" style={{ minWidth: 120 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Qtd. & Preço</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {formatQuantity(tx.quantity || 0)} un. a {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
                 </span>
                 {hasFx && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 'normal' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
                     {`(Câmbio: ${tx.exchange_rate!.toFixed(4)})`}
                   </span>
                 )}
               </div>
 
-              {/* Valor Total */}
-              <div className="flex-col items-end" style={{ minWidth: 120 }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Valor Total</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: badge.color }}>
+              {/* Saldo Resultante de Papéis / Cotas após a compra */}
+              <div className="flex-col items-start" style={{ minWidth: 110 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#00f2fe' }}>
+                  {formatQuantity(tx.resulting_quantity ?? 0)} un.
+                </span>
+              </div>
+
+              {/* Valor Total & Taxas */}
+              <div className="flex-col items-end" style={{ minWidth: 135 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Valor Total</span>
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: badge.color }}>
                   {formatMoney(totalValConverted, kpiCurrency || tx.currency || 'BRL')}
                 </span>
                 {Boolean(tx.fee) && tx.fee! > 0 && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 'normal' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
                     {`(Taxas: ${formatMoney(tx.fee!, tx.currency || 'BRL')})`}
                   </span>
                 )}
@@ -178,12 +195,12 @@ export default function TransactionGroupList({
             </>
           )}
 
-          {/* Ações */}
-          <div className="flex-row gap-xs items-center" style={{ marginLeft: '0.5rem' }}>
+          {/* Botões de Ação */}
+          <div className="flex-row gap-sm items-center" style={{ gap: '0.5rem', marginLeft: '0.5rem' }}>
             <button
               onClick={() => handleEditTransaction(tx)}
               className="btn-secondary"
-              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
               title="Editar operação"
             >
               ✏️
@@ -191,7 +208,7 @@ export default function TransactionGroupList({
             <button
               onClick={() => handleDeleteTransaction(tx.id)}
               className="btn-secondary"
-              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: '#ff3d00' }}
+              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#ff3d00' }}
               title="Excluir operação"
             >
               🗑️
@@ -204,13 +221,32 @@ export default function TransactionGroupList({
 
   if (groupByDate) {
     return (
-      <div className="flex-col gap-lg">
+      <div className="flex-col" style={{ gap: '1.75rem' }}>
         {grouped.map((group) => (
-          <div key={group.date} className="flex-col gap-xs">
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)', paddingLeft: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {group.label}
+          <div key={group.date} className="flex-col">
+            {/* Cabeçalho do Grupo de Data */}
+            <div
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: 'var(--accent-color)',
+                padding: '0.25rem 0.4rem',
+                marginBottom: '0.6rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                paddingBottom: '0.4rem',
+              }}
+            >
+              <span>📅</span>
+              <span>{group.label}</span>
             </div>
-            <div className="flex-col gap-xs">
+
+            {/* Lista de Transações da Data */}
+            <div className="flex-col gap-sm">
               {group.txs.map((tx) => renderItem(tx))}
             </div>
           </div>
@@ -220,7 +256,7 @@ export default function TransactionGroupList({
   }
 
   return (
-    <div className="flex-col gap-xs">
+    <div className="flex-col gap-sm">
       {pagedTxs.map((tx) => renderItem(tx))}
     </div>
   );

@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { UnifiedTransaction } from './types';
 import { formatMoney } from './helpers';
 import {
   TransactionWithBalance,
   PAGE_SIZE,
   formatDateGroupLabel,
+  getMacroAssetCategory,
 } from './transactions/types';
 import TransactionFilterBar from './transactions/TransactionFilterBar';
 import TransactionGroupList from './transactions/TransactionGroupList';
@@ -33,11 +34,17 @@ export default function TransactionHistory({
   const [filterTxYear, setFilterTxYear] = useState<string>(currentYear);
   const [filterTxMonth, setFilterTxMonth] = useState<string>(currentMonth);
   const [filterTxType, setFilterTxType] = useState<string>('Todos');
+  const [filterTxCategory, setFilterTxCategory] = useState<string>('Todos');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [groupByDate, setGroupByDate] = useState<boolean>(true);
 
-  // Ajusta inteligentes os filtros iniciais para priorizar o mês/ano corrente se houver transações
-  React.useEffect(() => {
+  // Reset de paginação sempre que qualquer filtro for alterado
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterTxTicker, filterTxYear, filterTxMonth, filterTxType, filterTxCategory]);
+
+  // Ajusta inteligentemente os filtros iniciais para priorizar o mês/ano corrente se houver transações
+  useEffect(() => {
     if (transactions.length === 0) return;
     const now = new Date();
     const curY = now.getFullYear().toString();
@@ -115,8 +122,8 @@ export default function TransactionHistory({
     return enriched.reverse();
   }, [transactions]);
 
-  // Filtragem
-  const filteredTransactions = useMemo(() => {
+  // Transações filtradas por período, ticker e tipo (sem filtro de categoria)
+  const baseFilteredTransactions = useMemo(() => {
     return transactionsWithBalance.filter((tx) => {
       if (filterTxTicker !== '' && tx.asset_name !== filterTxTicker) return false;
       const year = tx.date ? tx.date.substring(0, 4) : '';
@@ -134,25 +141,101 @@ export default function TransactionHistory({
     });
   }, [transactionsWithBalance, filterTxTicker, filterTxYear, filterTxMonth, filterTxType]);
 
-  // Resumo financeiro
+  // Transações finais exibidas na tabela (aplicando filtro de categoria)
+  const filteredTransactions = useMemo(() => {
+    if (filterTxCategory === 'Todos') return baseFilteredTransactions;
+    return baseFilteredTransactions.filter((tx) => {
+      const cat = getMacroAssetCategory(tx);
+      return cat.id === filterTxCategory;
+    });
+  }, [baseFilteredTransactions, filterTxCategory]);
+
+  // Resumo financeiro e distribuição detalhada de aquisições por classe e por ativo
   const summary = useMemo(() => {
     let totalBought = 0;
     let totalSold = 0;
-    filteredTransactions.forEach((tx) => {
+    const catMap: Record<
+      string,
+      {
+        id: string;
+        name: string;
+        emoji: string;
+        color: string;
+        total: number;
+        assetMap: Record<string, number>;
+      }
+    > = {};
+
+    baseFilteredTransactions.forEach((tx) => {
       let val = tx.total_value ?? 0;
       if (kpiCurrency && tx.currency && tx.currency !== kpiCurrency) {
         if (tx.exchange_rate && tx.exchange_rate > 0) {
           val = val * tx.exchange_rate;
         }
       }
-      if (tx.type === 'BUY' || tx.type === 'BONUS' || (tx.module === 'RF' && tx.type === 'SUBSCRIPTION')) {
+
+      const isBuy = tx.type === 'BUY' || tx.type === 'BONUS' || (tx.module === 'RF' && tx.type === 'SUBSCRIPTION');
+      const isSell = tx.type === 'SELL' || (tx.module === 'RF' && tx.type !== 'SUBSCRIPTION');
+
+      if (isBuy) {
         totalBought += val;
-      } else if (tx.type === 'SELL' || (tx.module === 'RF' && tx.type !== 'SUBSCRIPTION')) {
+        const cat = getMacroAssetCategory(tx);
+        if (!catMap[cat.id]) {
+          catMap[cat.id] = { ...cat, total: 0, assetMap: {} };
+        }
+        catMap[cat.id].total += val;
+
+        const ticker = tx.asset_name;
+        if (!catMap[cat.id].assetMap[ticker]) {
+          catMap[cat.id].assetMap[ticker] = 0;
+        }
+        catMap[cat.id].assetMap[ticker] += val;
+      } else if (isSell) {
         totalSold += val;
       }
     });
-    return { totalBought, totalSold };
-  }, [filteredTransactions, kpiCurrency]);
+
+    const netContribution = totalBought - totalSold;
+    const categoryBreakdown = Object.values(catMap)
+      .map((cat) => {
+        const assets = Object.entries(cat.assetMap)
+          .map(([ticker, assetTotal]) => ({
+            ticker,
+            total: assetTotal,
+            categoryPercentage: cat.total > 0 ? (assetTotal / cat.total) * 100 : 0,
+            totalPercentage: totalBought > 0 ? (assetTotal / totalBought) * 100 : 0,
+          }))
+          .sort((a, b) => b.total - a.total);
+
+        return {
+          id: cat.id,
+          name: cat.name,
+          emoji: cat.emoji,
+          color: cat.color,
+          total: cat.total,
+          percentage: totalBought > 0 ? (cat.total / totalBought) * 100 : 0,
+          assets,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    return { totalBought, totalSold, netContribution, categoryBreakdown };
+  }, [baseFilteredTransactions, kpiCurrency]);
+
+  const hasActiveFilters =
+    filterTxTicker !== '' ||
+    filterTxType !== 'Todos' ||
+    filterTxCategory !== 'Todos' ||
+    filterTxYear !== 'Todos' ||
+    filterTxMonth !== 'Todos';
+
+  const handleClearFilters = () => {
+    setFilterTxTicker('');
+    setFilterTxType('Todos');
+    setFilterTxCategory('Todos');
+    setFilterTxYear('Todos');
+    setFilterTxMonth('Todos');
+  };
 
   // Paginação
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
@@ -212,6 +295,8 @@ export default function TransactionHistory({
         setFilterTxTicker={setFilterTxTicker}
         filterType={filterTxType}
         setFilterType={setFilterTxType}
+        filterCategory={filterTxCategory}
+        setFilterCategory={setFilterTxCategory}
         filterYear={filterTxYear}
         setFilterYear={setFilterTxYear}
         filterMonth={filterTxMonth}
@@ -222,62 +307,169 @@ export default function TransactionHistory({
         availableTickers={tickers}
         totalFilteredCount={filteredTransactions.length}
         onLaunchOperation={onLaunchOperation || (() => {})}
+        onClearFilters={handleClearFilters}
+        hasActiveFilters={hasActiveFilters}
       />
 
-      {/* ── Cards de Resumo ── */}
-      {(summary.totalBought > 0 || summary.totalSold > 0) && (
-        <div className="flex-row gap-md flex-wrap" style={{ width: '100%' }}>
-          {summary.totalBought > 0 && (
-            <div
-              style={{
-                flex: '1 1 200px',
-                padding: '0.75rem 1rem',
-                background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.08) 0%, rgba(0, 0, 0, 0) 100%)',
-                border: '1px solid rgba(0, 230, 118, 0.2)',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-              }}
-            >
-              <div style={{ fontSize: '1.5rem' }}>📥</div>
-              <div className="flex-col">
-                <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Total Comprado:{' '}
-                  <strong style={{ color: '#00e676', fontSize: '1.05rem', fontWeight: 700, display: 'block', marginTop: '0.2rem' }}>
-                    {formatMoney(summary.totalBought, kpiCurrency)}
-                  </strong>
-                </span>
-              </div>
+      {/* ── Painel de Resumo do Período Filtrado ── */}
+      <div
+        className="card flex-col gap-lg"
+        style={{
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid var(--panel-border)',
+          borderRadius: '12px',
+          padding: '1.25rem 1.5rem',
+        }}
+      >
+        {/* KPIs Principais */}
+        <div className="flex-row gap-lg flex-wrap items-center justify-between" style={{ paddingBottom: '0.5rem' }}>
+          <div className="flex-row items-center gap-md">
+            <span style={{ fontSize: '1.5rem' }}>📥</span>
+            <div className="flex-col" style={{ gap: '0.15rem' }}>
+              <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Total Comprado
+              </span>
+              <strong style={{ color: '#00e676', fontSize: '1.1rem', fontWeight: 700 }}>
+                {formatMoney(summary.totalBought, kpiCurrency)}
+              </strong>
             </div>
-          )}
+          </div>
 
-          {summary.totalSold > 0 && (
-            <div
-              style={{
-                flex: '1 1 200px',
-                padding: '0.75rem 1rem',
-                background: 'linear-gradient(135deg, rgba(255, 61, 0, 0.08) 0%, rgba(0, 0, 0, 0) 100%)',
-                border: '1px solid rgba(255, 61, 0, 0.2)',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-              }}
-            >
-              <div style={{ fontSize: '1.5rem' }}>📤</div>
-              <div className="flex-col">
-                <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Total Vendido:{' '}
-                  <strong style={{ color: '#ff3d00', fontSize: '1.05rem', fontWeight: 700, display: 'block', marginTop: '0.2rem' }}>
-                    {formatMoney(summary.totalSold, kpiCurrency)}
-                  </strong>
-                </span>
-              </div>
+          <div className="flex-row items-center gap-md">
+            <span style={{ fontSize: '1.5rem' }}>📤</span>
+            <div className="flex-col" style={{ gap: '0.15rem' }}>
+              <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Total Vendido
+              </span>
+              <strong style={{ color: '#ff3d00', fontSize: '1.1rem', fontWeight: 700 }}>
+                {formatMoney(summary.totalSold, kpiCurrency)}
+              </strong>
+            </div>
+          </div>
+
+          <div className="flex-row items-center gap-md">
+            <span style={{ fontSize: '1.5rem' }}>💰</span>
+            <div className="flex-col" style={{ gap: '0.15rem' }}>
+              <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Aporte Líquido
+              </span>
+              <strong
+                style={{
+                  color: summary.netContribution >= 0 ? '#00f2fe' : '#ffc107',
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                }}
+              >
+                {formatMoney(summary.netContribution, kpiCurrency)}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Breakdown de Aquisições no Período */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+          <div className="flex-row justify-between items-center mb-sm">
+            <span className="text-xs font-bold text-secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              📊 Aquisições por Classe de Ativo (Clique para filtrar)
+            </span>
+          </div>
+
+          {summary.categoryBreakdown.length > 0 ? (
+            <div className="flex-row flex-wrap gap-md mt-xs">
+              {summary.categoryBreakdown.map((cat) => {
+                const isSelected = filterTxCategory === cat.id;
+                return (
+                  <div
+                    key={cat.id}
+                    onClick={() => setFilterTxCategory(isSelected ? 'Todos' : cat.id)}
+                    style={{
+                      flex: '1 1 210px',
+                      padding: '0.85rem 1rem',
+                      borderRadius: '10px',
+                      background: isSelected ? 'rgba(0, 242, 254, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                      border: isSelected ? `1.5px solid ${cat.color}` : '1px solid var(--panel-border)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                    }}
+                  >
+                    <div className="flex-row justify-between items-center" style={{ fontSize: '0.8rem' }}>
+                      <span className="font-bold text-primary">
+                        {cat.emoji} {cat.name}
+                      </span>
+                      <span style={{ color: cat.color, fontWeight: 700 }}>
+                        {cat.percentage.toFixed(1)}%
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-secondary font-semibold" style={{ fontSize: '0.82rem' }}>
+                      {formatMoney(cat.total, kpiCurrency)}
+                    </div>
+
+                    {/* Barra de Progresso */}
+                    <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden', marginTop: '0.1rem', marginBottom: '0.25rem' }}>
+                      <div
+                        style={{
+                          width: `${Math.min(100, Math.max(2, cat.percentage))}%`,
+                          height: '100%',
+                          background: cat.color,
+                          borderRadius: '3px',
+                          transition: 'width 0.4s ease',
+                        }}
+                      />
+                    </div>
+
+                    {/* Detalhamento dos Ativos que Compõem a Classe */}
+                    {cat.assets.length > 0 && (
+                      <div
+                        className="flex-col gap-xs mt-xs pt-xs"
+                        style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}
+                      >
+                        {cat.assets.map((ast) => (
+                          <div
+                            key={ast.ticker}
+                            className="flex-row justify-between items-center text-xs"
+                            style={{
+                              fontSize: '0.74rem',
+                              padding: '0.25rem 0.4rem',
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            <span className="font-semibold text-primary">
+                              • {ast.ticker}
+                            </span>
+                            <div className="flex-row items-center gap-xs">
+                              <span className="text-secondary" style={{ fontSize: '0.72rem' }}>
+                                {formatMoney(ast.total, kpiCurrency)}
+                              </span>
+                              <span style={{ color: cat.color, fontWeight: 700, fontSize: '0.7rem' }}>
+                                ({ast.categoryPercentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-xs text-secondary italic text-center py-xs">
+              Nenhuma aquisição no período filtrado.
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* ── Lista de Transações ── */}
       <TransactionGroupList

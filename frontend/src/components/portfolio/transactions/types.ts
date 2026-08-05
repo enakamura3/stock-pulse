@@ -34,12 +34,12 @@ export const TX_TYPES = [
 export const PAGE_SIZE = 20;
 
 export const SELECT_STYLE: React.CSSProperties = {
-  padding: '0.3rem 0.6rem',
+  padding: '0.4rem 0.75rem',
   borderRadius: '6px',
   border: '1px solid var(--panel-border)',
   background: '#1E293B',
   color: '#FFFFFF',
-  fontSize: '0.8rem',
+  fontSize: '0.82rem',
   outline: 'none',
   cursor: 'pointer',
 };
@@ -134,4 +134,32 @@ export function getTransactionCircleDetails(tx: UnifiedTransaction): {
         borderColor: 'rgba(255,255,255,0.15)',
       };
   }
+}
+
+export function getMacroAssetCategory(tx: UnifiedTransaction): {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+} {
+  if (tx.module === 'RF') {
+    return { id: 'RF', name: 'Renda Fixa & Tesouro', emoji: '💵', color: '#2196F3' };
+  }
+  const type = (tx.asset_type || '').toUpperCase();
+  if (type.includes('STOCK') || type === 'EQUITY' || type === 'EQUITY_BR' || type === 'EQUITY_US') {
+    return { id: 'STOCK', name: 'Ações', emoji: '📈', color: '#00e676' };
+  }
+  if (type.includes('FII') || type.includes('REAL_ESTATE')) {
+    return { id: 'FII', name: 'FIIs', emoji: '🏢', color: '#00f2fe' };
+  }
+  if (type.includes('ETF')) {
+    return { id: 'ETF', name: 'ETFs', emoji: '🌐', color: '#e040fb' };
+  }
+  if (type.includes('CRYPTO')) {
+    return { id: 'CRYPTO', name: 'Cripto', emoji: '₿', color: '#ff9800' };
+  }
+  if (type.includes('BDR')) {
+    return { id: 'BDR', name: 'BDRs', emoji: '📦', color: '#ffc107' };
+  }
+  return { id: 'OTHER', name: 'Outros', emoji: '🎯', color: '#9e9e9e' };
 }
