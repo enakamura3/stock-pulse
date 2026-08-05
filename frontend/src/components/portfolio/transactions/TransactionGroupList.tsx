@@ -180,11 +180,11 @@ export default function TransactionGroupList({
           )}
 
           {/* Ações */}
-          <div className="flex-row gap-xs items-center" style={{ marginLeft: '0.5rem' }}>
+          <div className="flex-row gap-sm items-center" style={{ marginLeft: '1rem', gap: '0.5rem' }}>
             <button
               onClick={() => handleEditTransaction(tx)}
               className="btn-secondary"
-              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
               title="Editar operação"
             >
               ✏️
@@ -192,7 +192,7 @@ export default function TransactionGroupList({
             <button
               onClick={() => handleDeleteTransaction(tx.id)}
               className="btn-secondary"
-              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: '#ff3d00' }}
+              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#ff3d00' }}
               title="Excluir operação"
             >
               🗑️
