@@ -82,8 +82,42 @@ describe('TransactionHistory Component', () => {
       />
     );
 
-    // Não deve exibir o câmbio quando kpiCurrency é igual a currency
+    // Não deve exibir o câmbio quando kpiCurrency é igual à moeda do ativo
     expect(screen.queryByText('(Câmbio: 5.2500)')).not.toBeInTheDocument();
+  });
+
+  it('renders brokerage fee when present', () => {
+    const mockTransactions: UnifiedTransaction[] = [
+      {
+        id: 'tx-fee',
+        portfolio_id: 'port-1',
+        module: 'RV',
+        date: currentDate(1),
+        asset_name: 'PETR4',
+        asset_type: 'STOCK',
+        type: 'BUY',
+        quantity: 100,
+        unit_price: 30,
+        fee: 10.5,
+        exchange_rate: 1,
+        total_value: 3010,
+        currency: 'BRL'
+      }
+    ];
+
+    render(
+      <TransactionHistory
+        transactions={mockTransactions}
+        filterTxTicker=""
+        setFilterTxTicker={mockSetFilterTxTicker}
+        handleEditTransaction={mockHandleEditTransaction}
+        handleDeleteTransaction={mockHandleDeleteTransaction}
+        onLaunchOperation={mockOnLaunchOperation}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('(Taxas: R$ 10,50)')).toBeInTheDocument();
   });
 
   it('renders fixed income transactions correctly without quantity and unit price', () => {

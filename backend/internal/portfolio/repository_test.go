@@ -446,3 +446,54 @@ func TestRepository_ScanErrors(t *testing.T) {
 	_, err = repo.GetAllAssets(context.Background())
 	assert.Error(t, err)
 }
+
+func TestRepository_UpdateTransaction(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	now := time.Now()
+	tx := Transaction{
+		ID:           "tx1",
+		PortfolioID:  "p1",
+		Type:         "BUY",
+		Quantity:     10,
+		UnitPrice:    100,
+		TotalCost:    1010,
+		Fee:          10,
+		ExchangeRate: 1.0,
+		ExecutedAt:   now,
+	}
+
+	mock.ExpectExec(`UPDATE transaction`).
+		WithArgs(tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee, tx.ExchangeRate, tx.ExecutedAt, tx.ID, tx.PortfolioID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	err := repo.UpdateTransaction(context.Background(), tx)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRepository_UpdateTransaction_NotFound(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	now := time.Now()
+	tx := Transaction{
+		ID:           "tx1",
+		PortfolioID:  "p1",
+		Type:         "BUY",
+		Quantity:     10,
+		UnitPrice:    100,
+		TotalCost:    1010,
+		Fee:          10,
+		ExchangeRate: 1.0,
+		ExecutedAt:   now,
+	}
+
+	mock.ExpectExec(`UPDATE transaction`).
+		WithArgs(tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee, tx.ExchangeRate, tx.ExecutedAt, tx.ID, tx.PortfolioID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	err := repo.UpdateTransaction(context.Background(), tx)
+	assert.ErrorContains(t, err, "não encontrada")
+}

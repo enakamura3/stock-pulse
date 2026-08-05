@@ -230,6 +230,15 @@ func TestHandler_AddTransaction(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 
+	t.Run("Negative Fee", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "fee": -5}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("AddTransaction", mock.Anything, "u1", mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
