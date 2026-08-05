@@ -196,7 +196,7 @@ func TestRepository_CreateTransaction(t *testing.T) {
 		AddRow("tx1", now)
 
 	mock.ExpectQuery(`INSERT INTO transaction`).
-		WithArgs(tx.PortfolioID, tx.AssetID, tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.ExchangeRate, tx.ExecutedAt).
+		WithArgs(tx.PortfolioID, tx.AssetID, tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee, tx.ExchangeRate, tx.ExecutedAt).
 		WillReturnRows(rows)
 
 	res, err := repo.CreateTransaction(context.Background(), tx)
@@ -211,10 +211,10 @@ func TestRepository_GetTransactionsByPortfolioID(t *testing.T) {
 
 	now := time.Now()
 	rows := pgxmock.NewRows([]string{
-		"id", "portfolio_id", "asset_id", "type", "quantity", "unit_price", "total_cost", "exchange_rate", "executed_at", "created_at",
+		"id", "portfolio_id", "asset_id", "type", "quantity", "unit_price", "total_cost", "fee", "exchange_rate", "executed_at", "created_at",
 		"ticker", "name", "asset_type", "currency",
 	}).
-		AddRow("tx1", "p1", "a1", "BUY", 10.0, 150.0, 1500.0, 1.0, now, now, "AAPL", "Apple", "EQUITY_US", "USD")
+		AddRow("tx1", "p1", "a1", "BUY", 10.0, 150.0, 1500.0, 0.0, 1.0, now, now, "AAPL", "Apple", "EQUITY_US", "USD")
 
 	mock.ExpectQuery(`SELECT t.id`).
 		WithArgs("p1", "u1").

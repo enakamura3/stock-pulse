@@ -64,6 +64,7 @@ func UpdatePositionOnTransaction(
 	currentQty, currentTotalCost, currentAvgPrice float64,
 	txType string,
 	txQty, txUnitPrice, fxRate float64,
+	txFee float64,
 ) (newQty, newTotalCost, newAvgPrice float64) {
 	if FloatIsZero(fxRate) {
 		fxRate = 1.0
@@ -71,13 +72,14 @@ func UpdatePositionOnTransaction(
 
 	switch txType {
 	case "BUY":
+		txCost := ((txQty * txUnitPrice) + txFee) * fxRate
 		if FloatIsZero(currentQty) {
 			newQty = txQty
-			newTotalCost = txQty * txUnitPrice * fxRate
-			newAvgPrice = txUnitPrice
+			newTotalCost = txCost
+			newAvgPrice = newTotalCost / (newQty * fxRate)
 		} else {
 			newQty = currentQty + txQty
-			newTotalCost = currentTotalCost + (txQty * txUnitPrice * fxRate)
+			newTotalCost = currentTotalCost + txCost
 			newAvgPrice = newTotalCost / (newQty * fxRate)
 		}
 
@@ -116,8 +118,9 @@ func UpdatePositionOnTransaction(
 		}
 
 	case "BONUS":
+		txCost := (txQty * txUnitPrice * fxRate)
 		newQty = currentQty + txQty
-		newTotalCost = currentTotalCost + (txQty * txUnitPrice * fxRate)
+		newTotalCost = currentTotalCost + txCost
 		if newQty > 0 {
 			newAvgPrice = newTotalCost / (newQty * fxRate)
 		} else {

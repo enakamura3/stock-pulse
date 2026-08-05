@@ -41,6 +41,7 @@ export interface Transaction {
   quantity: number;
   unit_price: number;
   total_cost: number;
+  fee?: number;
   exchange_rate: number;
   executed_at: string;
   created_at: string;
@@ -132,6 +133,7 @@ export interface UnifiedTransaction {
   type: string;
   quantity: number | null;
   unit_price: number | null;
+  fee?: number | null;
   exchange_rate: number | null;
   total_value: number;
   currency: string;

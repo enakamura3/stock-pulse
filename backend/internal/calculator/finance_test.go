@@ -47,38 +47,39 @@ func TestDetermineAssetType(t *testing.T) {
 }
 
 func TestUpdatePositionOnTransaction(t *testing.T) {
-	// 1. Initial Buy
-	qty, totalCost, avgPrice := UpdatePositionOnTransaction(0, 0, 0, "BUY", 100, 30.0, 1.0)
+	// 1. Initial Buy without fee
+	qty, totalCost, avgPrice := UpdatePositionOnTransaction(0, 0, 0, "BUY", 100, 30.0, 1.0, 0.0)
 	if qty != 100 || totalCost != 3000.0 || avgPrice != 30.0 {
 		t.Errorf("Buy 1 failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}
 
-	// 2. Second Buy at higher price
-	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "BUY", 100, 40.0, 1.0)
-	if qty != 200 || totalCost != 7000.0 || avgPrice != 35.0 {
-		t.Errorf("Buy 2 failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
+	// 2. Second Buy at higher price with R$ 10.00 fee
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "BUY", 100, 40.0, 1.0, 10.0)
+	// cost = 3000 + (100 * 40 + 10) = 7010.0; avgPrice = 7010 / 200 = 35.05
+	if qty != 200 || totalCost != 7010.0 || avgPrice != 35.05 {
+		t.Errorf("Buy 2 with fee failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}
 
-	// 3. Partial Sell (Average price should remain 35.0)
-	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SELL", 50, 45.0, 1.0)
-	if qty != 150 || !FloatEquals(totalCost, 5250.0) || !FloatEquals(avgPrice, 35.0) {
+	// 3. Partial Sell (Average price should remain 35.05)
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SELL", 50, 45.0, 1.0, 5.0)
+	if qty != 150 || !FloatEquals(totalCost, 5257.5) || !FloatEquals(avgPrice, 35.05) {
 		t.Errorf("Sell failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}
 
 	// 4. Split 2:1 (Quantity doubles, avg price halves)
-	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SPLIT", 2.0, 0, 1.0)
-	if qty != 300 || !FloatEquals(totalCost, 5250.0) || !FloatEquals(avgPrice, 17.5) {
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SPLIT", 2.0, 0, 1.0, 0.0)
+	if qty != 300 || !FloatEquals(totalCost, 5257.5) || !FloatEquals(avgPrice, 17.525) {
 		t.Errorf("Split failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}
 
 	// 5. Reverse Split 10:1 (300 -> 30)
-	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "REVERSE_SPLIT", 10.0, 0, 1.0)
-	if qty != 30 || !FloatEquals(totalCost, 5250.0) || !FloatEquals(avgPrice, 175.0) {
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "REVERSE_SPLIT", 10.0, 0, 1.0, 0.0)
+	if qty != 30 || !FloatEquals(totalCost, 5257.5) || !FloatEquals(avgPrice, 175.25) {
 		t.Errorf("Reverse Split failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}
 
 	// 6. Over-Sell zapping position to zero
-	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SELL", 500, 200.0, 1.0)
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SELL", 500, 200.0, 1.0, 0.0)
 	if qty != 0 || totalCost != 0 || avgPrice != 0 {
 		t.Errorf("Over-sell failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}

@@ -37,6 +37,8 @@ export interface ModalsProps {
   setTxQuantity?: (q: string | number) => void;
   txUnitPrice?: string | number;
   setTxUnitPrice?: (p: string | number) => void;
+  txFee?: string | number;
+  setTxFee?: (f: string | number) => void;
   txExchangeRate?: string | number;
   setTxExchangeRate?: (r: string | number) => void;
   txExecutedAt?: string;
@@ -111,6 +113,8 @@ export default function Modals(props: ModalsProps) {
   const setTxQuantity = props.setTxQuantity ?? context?.setTxQuantity ?? (() => {});
   const txUnitPrice = props.txUnitPrice ?? context?.txUnitPrice ?? '';
   const setTxUnitPrice = props.setTxUnitPrice ?? context?.setTxUnitPrice ?? (() => {});
+  const txFee = props.txFee ?? context?.txFee ?? '';
+  const setTxFee = props.setTxFee ?? context?.setTxFee ?? (() => {});
   const txExchangeRate = props.txExchangeRate ?? context?.txExchangeRate ?? 1.0;
   const setTxExchangeRate = props.setTxExchangeRate ?? context?.setTxExchangeRate ?? (() => {});
   const txExecutedAt = props.txExecutedAt ?? context?.txExecutedAt ?? '';
@@ -178,6 +182,8 @@ export default function Modals(props: ModalsProps) {
         setTxQuantity={setTxQuantity}
         txUnitPrice={txUnitPrice}
         setTxUnitPrice={setTxUnitPrice}
+        txFee={txFee}
+        setTxFee={setTxFee}
         txExchangeRate={txExchangeRate}
         setTxExchangeRate={setTxExchangeRate}
         txExecutedAt={txExecutedAt}

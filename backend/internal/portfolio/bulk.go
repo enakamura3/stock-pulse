@@ -95,12 +95,23 @@ func (s *Service) BulkAddTransactions(ctx context.Context, userID, portfolioID s
 			}
 		}
 
+		fee := 0.0
+		if len(row) >= 7 {
+			feeStr := strings.TrimSpace(row[6])
+			if feeStr != "" {
+				if parsedFee, err := strconv.ParseFloat(feeStr, 64); err == nil && parsedFee >= 0 {
+					fee = parsedFee
+				}
+			}
+		}
+
 		tx := &Transaction{
 			PortfolioID:  portfolioID,
 			Ticker:       ticker,
 			Type:         txType,
 			Quantity:     qty,
 			UnitPrice:    price,
+			Fee:          fee,
 			ExchangeRate: exchangeRate,
 			ExecutedAt:   execTime.UTC(),
 		}

@@ -77,6 +77,8 @@ interface PortfolioContextType {
   setTxQuantity: (q: string | number) => void;
   txUnitPrice: string | number;
   setTxUnitPrice: (p: string | number) => void;
+  txFee: string | number;
+  setTxFee: (f: string | number) => void;
   txExchangeRate: string | number;
   setTxExchangeRate: (r: string | number) => void;
   txExecutedAt: string;
@@ -182,6 +184,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [txType, setTxType] = useState<'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS'>('BUY');
   const [txQuantity, setTxQuantity] = useState<string | number>('');
   const [txUnitPrice, setTxUnitPrice] = useState<string | number>('');
+  const [txFee, setTxFee] = useState<string | number>('');
   const [txExchangeRate, setTxExchangeRate] = useState<string | number>(1.0);
   const [txExecutedAt, setTxExecutedAt] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isAddingTx, setIsAddingTx] = useState(false);
@@ -458,6 +461,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     e.preventDefault();
     const parsedQty = parseFloat(txQuantity.toString());
     const parsedPrice = parseFloat(txUnitPrice.toString());
+    const parsedFee = parseFloat(txFee.toString());
     const parsedRate = parseFloat(txExchangeRate.toString());
 
     if (!txTicker || isNaN(parsedQty) || parsedQty <= 0 || (txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 0))) {
@@ -478,13 +482,14 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           ticker: txTicker, type: txType, quantity: parsedQty,
           unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
+          fee: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT' || txType === 'BONUS' || isNaN(parsedFee) || parsedFee < 0) ? 0.0 : parsedFee,
           exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 0.0 : parsedRate,
           executed_at: txExecutedAt,
         }), cache: 'no-store',
       });
 
       if (res.ok) {
-        setTxTicker(''); setSearchQuery(''); setTxQuantity(''); setTxUnitPrice(''); setTxExchangeRate(1.0);
+        setTxTicker(''); setSearchQuery(''); setTxQuantity(''); setTxUnitPrice(''); setTxFee(''); setTxExchangeRate(1.0);
         setEditingTxId(null); setSelectedAssetCurrency('BRL'); setShowTxModal(false);
         await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period);
       } else { alert((await res.json()).error || 'Erro ao cadastrar transação.'); }
@@ -552,7 +557,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     }
     
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxType(tx.type as any);
-    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxExchangeRate(tx.exchange_rate || 0);
+    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxFee(tx.fee || 0); setTxExchangeRate(tx.exchange_rate || 0);
     setSelectedAssetCurrency(tx.currency || 'BRL');
     setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
   };
@@ -700,21 +705,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         newPortfolioCurrency,
         setNewPortfolioCurrency,
         isCreatingPortfolio,
-        txTicker,
-        setTxTicker,
-        txType,
-        setTxType,
-        txQuantity,
-        setTxQuantity,
-        txUnitPrice,
-        setTxUnitPrice,
-        txExchangeRate,
-        setTxExchangeRate,
-        txExecutedAt,
-        setTxExecutedAt,
-        isAddingTx,
-        editingTxId,
-        setEditingTxId,
+        txTicker, setTxTicker, txType, setTxType, txQuantity, setTxQuantity, txUnitPrice, setTxUnitPrice, txFee, setTxFee, txExchangeRate, setTxExchangeRate, txExecutedAt, setTxExecutedAt, isAddingTx, editingTxId, setEditingTxId,
         searchQuery,
         setSearchQuery,
         searchResults,
