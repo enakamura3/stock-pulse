@@ -51,7 +51,7 @@ export default function TransactionFilterBar({
         </span>
       </div>
 
-      <div className="flex-row gap-sm flex-wrap items-center">
+      <div className="flex-row gap-md flex-wrap items-center">
         {/* Agrupamento */}
         <div
           style={{

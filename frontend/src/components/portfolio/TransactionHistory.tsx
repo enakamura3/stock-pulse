@@ -313,50 +313,50 @@ export default function TransactionHistory({
 
       {/* ── Painel de Resumo do Período Filtrado ── */}
       <div
-        className="card flex-col gap-md"
+        className="card flex-col gap-lg"
         style={{
           background: 'rgba(255, 255, 255, 0.02)',
           border: '1px solid var(--panel-border)',
           borderRadius: '12px',
-          padding: '1rem 1.25rem',
+          padding: '1.25rem 1.5rem',
         }}
       >
         {/* KPIs Principais */}
-        <div className="flex-row gap-md flex-wrap items-center justify-between">
-          <div className="flex-row items-center gap-sm">
-            <span style={{ fontSize: '1.4rem' }}>📥</span>
-            <div className="flex-col">
+        <div className="flex-row gap-lg flex-wrap items-center justify-between" style={{ paddingBottom: '0.5rem' }}>
+          <div className="flex-row items-center gap-md">
+            <span style={{ fontSize: '1.5rem' }}>📥</span>
+            <div className="flex-col" style={{ gap: '0.15rem' }}>
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Comprado
               </span>
-              <strong style={{ color: '#00e676', fontSize: '1.05rem', fontWeight: 700 }}>
+              <strong style={{ color: '#00e676', fontSize: '1.1rem', fontWeight: 700 }}>
                 {formatMoney(summary.totalBought, kpiCurrency)}
               </strong>
             </div>
           </div>
 
-          <div className="flex-row items-center gap-sm">
-            <span style={{ fontSize: '1.4rem' }}>📤</span>
-            <div className="flex-col">
+          <div className="flex-row items-center gap-md">
+            <span style={{ fontSize: '1.5rem' }}>📤</span>
+            <div className="flex-col" style={{ gap: '0.15rem' }}>
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Vendido
               </span>
-              <strong style={{ color: '#ff3d00', fontSize: '1.05rem', fontWeight: 700 }}>
+              <strong style={{ color: '#ff3d00', fontSize: '1.1rem', fontWeight: 700 }}>
                 {formatMoney(summary.totalSold, kpiCurrency)}
               </strong>
             </div>
           </div>
 
-          <div className="flex-row items-center gap-sm">
-            <span style={{ fontSize: '1.4rem' }}>💰</span>
-            <div className="flex-col">
+          <div className="flex-row items-center gap-md">
+            <span style={{ fontSize: '1.5rem' }}>💰</span>
+            <div className="flex-col" style={{ gap: '0.15rem' }}>
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Aporte Líquido
               </span>
               <strong
                 style={{
                   color: summary.netContribution >= 0 ? '#00f2fe' : '#ffc107',
-                  fontSize: '1.05rem',
+                  fontSize: '1.1rem',
                   fontWeight: 700,
                 }}
               >
@@ -367,15 +367,15 @@ export default function TransactionHistory({
         </div>
 
         {/* Breakdown de Aquisições no Período */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem' }}>
-          <div className="flex-row justify-between items-center mb-xs">
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+          <div className="flex-row justify-between items-center mb-sm">
             <span className="text-xs font-bold text-secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               📊 Aquisições por Classe de Ativo (Clique para filtrar)
             </span>
           </div>
 
           {summary.categoryBreakdown.length > 0 ? (
-            <div className="flex-row flex-wrap gap-xs mt-xs">
+            <div className="flex-row flex-wrap gap-md mt-xs">
               {summary.categoryBreakdown.map((cat) => {
                 const isSelected = filterTxCategory === cat.id;
                 return (
@@ -383,13 +383,16 @@ export default function TransactionHistory({
                     key={cat.id}
                     onClick={() => setFilterTxCategory(isSelected ? 'Todos' : cat.id)}
                     style={{
-                      flex: '1 1 180px',
-                      padding: '0.5rem 0.75rem',
-                      borderRadius: '8px',
+                      flex: '1 1 210px',
+                      padding: '0.85rem 1rem',
+                      borderRadius: '10px',
                       background: isSelected ? 'rgba(0, 242, 254, 0.12)' : 'rgba(255, 255, 255, 0.03)',
                       border: isSelected ? `1.5px solid ${cat.color}` : '1px solid var(--panel-border)',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem',
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
@@ -398,7 +401,7 @@ export default function TransactionHistory({
                       if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                     }}
                   >
-                    <div className="flex-row justify-between items-center mb-xs" style={{ fontSize: '0.75rem' }}>
+                    <div className="flex-row justify-between items-center" style={{ fontSize: '0.8rem' }}>
                       <span className="font-bold text-primary">
                         {cat.emoji} {cat.name}
                       </span>
@@ -407,18 +410,18 @@ export default function TransactionHistory({
                       </span>
                     </div>
 
-                    <div className="text-xs text-secondary font-semibold mb-xs">
+                    <div className="text-xs text-secondary font-semibold" style={{ fontSize: '0.82rem' }}>
                       {formatMoney(cat.total, kpiCurrency)}
                     </div>
 
                     {/* Barra de Progresso */}
-                    <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden', marginTop: '0.1rem', marginBottom: '0.25rem' }}>
                       <div
                         style={{
                           width: `${Math.min(100, Math.max(2, cat.percentage))}%`,
                           height: '100%',
                           background: cat.color,
-                          borderRadius: '2px',
+                          borderRadius: '3px',
                           transition: 'width 0.4s ease',
                         }}
                       />
@@ -428,22 +431,27 @@ export default function TransactionHistory({
                     {cat.assets.length > 0 && (
                       <div
                         className="flex-col gap-xs mt-xs pt-xs"
-                        style={{ borderTop: '1px dashed rgba(255,255,255,0.08)' }}
+                        style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}
                       >
                         {cat.assets.map((ast) => (
                           <div
                             key={ast.ticker}
                             className="flex-row justify-between items-center text-xs"
-                            style={{ fontSize: '0.72rem', padding: '0.1rem 0' }}
+                            style={{
+                              fontSize: '0.74rem',
+                              padding: '0.25rem 0.4rem',
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              borderRadius: '4px',
+                            }}
                           >
                             <span className="font-semibold text-primary">
                               • {ast.ticker}
                             </span>
                             <div className="flex-row items-center gap-xs">
-                              <span className="text-secondary">
+                              <span className="text-secondary" style={{ fontSize: '0.72rem' }}>
                                 {formatMoney(ast.total, kpiCurrency)}
                               </span>
-                              <span style={{ color: cat.color, fontWeight: 700, fontSize: '0.68rem' }}>
+                              <span style={{ color: cat.color, fontWeight: 700, fontSize: '0.7rem' }}>
                                 ({ast.categoryPercentage.toFixed(1)}%)
                               </span>
                             </div>

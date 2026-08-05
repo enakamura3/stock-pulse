@@ -34,12 +34,12 @@ export const TX_TYPES = [
 export const PAGE_SIZE = 20;
 
 export const SELECT_STYLE: React.CSSProperties = {
-  padding: '0.3rem 0.6rem',
+  padding: '0.4rem 0.75rem',
   borderRadius: '6px',
   border: '1px solid var(--panel-border)',
   background: '#1E293B',
   color: '#FFFFFF',
-  fontSize: '0.8rem',
+  fontSize: '0.82rem',
   outline: 'none',
   cursor: 'pointer',
 };
