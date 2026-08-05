@@ -236,6 +236,8 @@ describe('TransactionHistory Component', () => {
     expect(screen.getByText(/Aquisições por Classe de Ativo/i)).toBeInTheDocument();
     expect(screen.getByText(/📈 Ações/i)).toBeInTheDocument();
     expect(screen.getByText(/🏢 FIIs/i)).toBeInTheDocument();
+    expect(screen.getByText('• PETR4')).toBeInTheDocument();
+    expect(screen.getByText('• HGLG11')).toBeInTheDocument();
   });
 });
 

@@ -122,8 +122,8 @@ export default function TransactionHistory({
     return enriched.reverse();
   }, [transactions]);
 
-  // Filtragem principal
-  const filteredTransactions = useMemo(() => {
+  // Transações filtradas por período, ticker e tipo (sem filtro de categoria)
+  const baseFilteredTransactions = useMemo(() => {
     return transactionsWithBalance.filter((tx) => {
       if (filterTxTicker !== '' && tx.asset_name !== filterTxTicker) return false;
       const year = tx.date ? tx.date.substring(0, 4) : '';
@@ -137,21 +137,36 @@ export default function TransactionHistory({
           if (tx.type !== filterTxType) return false;
         }
       }
-      if (filterTxCategory !== 'Todos') {
-        const cat = getMacroAssetCategory(tx);
-        if (cat.id !== filterTxCategory) return false;
-      }
       return true;
     });
-  }, [transactionsWithBalance, filterTxTicker, filterTxYear, filterTxMonth, filterTxType, filterTxCategory]);
+  }, [transactionsWithBalance, filterTxTicker, filterTxYear, filterTxMonth, filterTxType]);
 
-  // Resumo financeiro e distribuição de aquisições por classe
+  // Transações finais exibidas na tabela (aplicando filtro de categoria)
+  const filteredTransactions = useMemo(() => {
+    if (filterTxCategory === 'Todos') return baseFilteredTransactions;
+    return baseFilteredTransactions.filter((tx) => {
+      const cat = getMacroAssetCategory(tx);
+      return cat.id === filterTxCategory;
+    });
+  }, [baseFilteredTransactions, filterTxCategory]);
+
+  // Resumo financeiro e distribuição detalhada de aquisições por classe e por ativo
   const summary = useMemo(() => {
     let totalBought = 0;
     let totalSold = 0;
-    const catMap: Record<string, { id: string; name: string; emoji: string; color: string; total: number }> = {};
+    const catMap: Record<
+      string,
+      {
+        id: string;
+        name: string;
+        emoji: string;
+        color: string;
+        total: number;
+        assetMap: Record<string, number>;
+      }
+    > = {};
 
-    filteredTransactions.forEach((tx) => {
+    baseFilteredTransactions.forEach((tx) => {
       let val = tx.total_value ?? 0;
       if (kpiCurrency && tx.currency && tx.currency !== kpiCurrency) {
         if (tx.exchange_rate && tx.exchange_rate > 0) {
@@ -166,9 +181,15 @@ export default function TransactionHistory({
         totalBought += val;
         const cat = getMacroAssetCategory(tx);
         if (!catMap[cat.id]) {
-          catMap[cat.id] = { ...cat, total: 0 };
+          catMap[cat.id] = { ...cat, total: 0, assetMap: {} };
         }
         catMap[cat.id].total += val;
+
+        const ticker = tx.asset_name;
+        if (!catMap[cat.id].assetMap[ticker]) {
+          catMap[cat.id].assetMap[ticker] = 0;
+        }
+        catMap[cat.id].assetMap[ticker] += val;
       } else if (isSell) {
         totalSold += val;
       }
@@ -176,14 +197,30 @@ export default function TransactionHistory({
 
     const netContribution = totalBought - totalSold;
     const categoryBreakdown = Object.values(catMap)
-      .map((item) => ({
-        ...item,
-        percentage: totalBought > 0 ? (item.total / totalBought) * 100 : 0,
-      }))
+      .map((cat) => {
+        const assets = Object.entries(cat.assetMap)
+          .map(([ticker, assetTotal]) => ({
+            ticker,
+            total: assetTotal,
+            categoryPercentage: cat.total > 0 ? (assetTotal / cat.total) * 100 : 0,
+            totalPercentage: totalBought > 0 ? (assetTotal / totalBought) * 100 : 0,
+          }))
+          .sort((a, b) => b.total - a.total);
+
+        return {
+          id: cat.id,
+          name: cat.name,
+          emoji: cat.emoji,
+          color: cat.color,
+          total: cat.total,
+          percentage: totalBought > 0 ? (cat.total / totalBought) * 100 : 0,
+          assets,
+        };
+      })
       .sort((a, b) => b.total - a.total);
 
     return { totalBought, totalSold, netContribution, categoryBreakdown };
-  }, [filteredTransactions, kpiCurrency]);
+  }, [baseFilteredTransactions, kpiCurrency]);
 
   const hasActiveFilters =
     filterTxTicker !== '' ||
@@ -386,6 +423,34 @@ export default function TransactionHistory({
                         }}
                       />
                     </div>
+
+                    {/* Detalhamento dos Ativos que Compõem a Classe */}
+                    {cat.assets.length > 0 && (
+                      <div
+                        className="flex-col gap-xs mt-xs pt-xs"
+                        style={{ borderTop: '1px dashed rgba(255,255,255,0.08)' }}
+                      >
+                        {cat.assets.map((ast) => (
+                          <div
+                            key={ast.ticker}
+                            className="flex-row justify-between items-center text-xs"
+                            style={{ fontSize: '0.72rem', padding: '0.1rem 0' }}
+                          >
+                            <span className="font-semibold text-primary">
+                              • {ast.ticker}
+                            </span>
+                            <div className="flex-row items-center gap-xs">
+                              <span className="text-secondary">
+                                {formatMoney(ast.total, kpiCurrency)}
+                              </span>
+                              <span style={{ color: cat.color, fontWeight: 700, fontSize: '0.68rem' }}>
+                                ({ast.categoryPercentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
