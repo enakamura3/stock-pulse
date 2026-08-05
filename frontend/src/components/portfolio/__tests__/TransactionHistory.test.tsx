@@ -67,7 +67,7 @@ describe('TransactionHistory Component', () => {
 
     // O total comprado deve ser convertido de 5000 USD para 26250 BRL (R$ 26.250,00)
     const totalCompradoElement = screen.getByText(/Total Comprado/i);
-    expect(totalCompradoElement).toHaveTextContent(/26\.250,00/);
+    expect(totalCompradoElement.parentElement).toHaveTextContent(/26\.250,00/);
 
     // Re-renderizar com kpiCurrency igual à moeda do ativo (USD)
     rerender(
@@ -189,6 +189,53 @@ describe('TransactionHistory Component', () => {
     expect(screen.getAllByText('PETR4')[0]).toBeInTheDocument();
     expect(screen.getByText('Proporção')).toBeInTheDocument();
     expect(screen.getByText('1 para 2')).toBeInTheDocument();
+  });
+
+  it('renders acquisition breakdown by macro asset class and allows filtering by category', () => {
+    const mockTransactions: UnifiedTransaction[] = [
+      {
+        id: 'tx-1',
+        portfolio_id: 'port-1',
+        module: 'RV',
+        date: currentDate(1),
+        asset_name: 'PETR4',
+        asset_type: 'STOCK_BR',
+        type: 'BUY',
+        quantity: 10,
+        unit_price: 30,
+        total_value: 300,
+        currency: 'BRL'
+      },
+      {
+        id: 'tx-2',
+        portfolio_id: 'port-1',
+        module: 'RV',
+        date: currentDate(2),
+        asset_name: 'HGLG11',
+        asset_type: 'FII',
+        type: 'BUY',
+        quantity: 5,
+        unit_price: 160,
+        total_value: 800,
+        currency: 'BRL'
+      }
+    ];
+
+    render(
+      <TransactionHistory
+        transactions={mockTransactions}
+        filterTxTicker=""
+        setFilterTxTicker={mockSetFilterTxTicker}
+        handleEditTransaction={mockHandleEditTransaction}
+        handleDeleteTransaction={mockHandleDeleteTransaction}
+        onLaunchOperation={mockOnLaunchOperation}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText(/Aquisições por Classe de Ativo/i)).toBeInTheDocument();
+    expect(screen.getByText(/📈 Ações/i)).toBeInTheDocument();
+    expect(screen.getByText(/🏢 FIIs/i)).toBeInTheDocument();
   });
 });
 

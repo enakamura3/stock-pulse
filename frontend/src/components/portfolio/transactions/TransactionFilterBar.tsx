@@ -6,6 +6,8 @@ interface TransactionFilterBarProps {
   setFilterTxTicker: (t: string) => void;
   filterType: string;
   setFilterType: (t: string) => void;
+  filterCategory: string;
+  setFilterCategory: (c: string) => void;
   filterYear: string;
   setFilterYear: (y: string) => void;
   filterMonth: string;
@@ -16,6 +18,8 @@ interface TransactionFilterBarProps {
   availableTickers: string[];
   totalFilteredCount: number;
   onLaunchOperation: () => void;
+  onClearFilters: () => void;
+  hasActiveFilters: boolean;
 }
 
 export default function TransactionFilterBar({
@@ -23,6 +27,8 @@ export default function TransactionFilterBar({
   setFilterTxTicker,
   filterType,
   setFilterType,
+  filterCategory,
+  setFilterCategory,
   filterYear,
   setFilterYear,
   filterMonth,
@@ -33,11 +39,13 @@ export default function TransactionFilterBar({
   availableTickers,
   totalFilteredCount,
   onLaunchOperation,
+  onClearFilters,
+  hasActiveFilters,
 }: TransactionFilterBarProps) {
   return (
     <div className="flex-row justify-between items-center flex-wrap gap-md">
       <div>
-        <h3 className="card-title">📜 Histórico de Operações</h3>
+        <h3 className="card-title" style={{ margin: 0 }}>📜 Histórico de Operações</h3>
         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
           {totalFilteredCount} registro{totalFilteredCount !== 1 ? 's' : ''} encontrado{totalFilteredCount !== 1 ? 's' : ''}
         </span>
@@ -109,7 +117,7 @@ export default function TransactionFilterBar({
           ))}
         </select>
 
-        {/* Filtro Ano */}
+        {/* Filtro Período (Ano & Mês) */}
         <select
           value={filterYear}
           onChange={(e) => setFilterYear(e.target.value)}
@@ -121,7 +129,6 @@ export default function TransactionFilterBar({
           ))}
         </select>
 
-        {/* Filtro Mês */}
         <select
           value={filterMonth}
           onChange={(e) => setFilterMonth(e.target.value)}
@@ -132,6 +139,23 @@ export default function TransactionFilterBar({
             <option key={m.value} value={m.value} style={OPTION_STYLE}>{m.label}</option>
           ))}
         </select>
+
+        {/* Limpar Filtros */}
+        {hasActiveFilters && (
+          <button
+            onClick={onClearFilters}
+            className="btn-secondary"
+            style={{
+              padding: '0.3rem 0.6rem',
+              fontSize: '0.75rem',
+              color: '#ffc107',
+              borderColor: 'rgba(255, 193, 7, 0.4)',
+              background: 'rgba(255, 193, 7, 0.08)',
+            }}
+          >
+            🧹 Limpar Filtros
+          </button>
+        )}
 
         {/* Botão Nova Operação */}
         <button
