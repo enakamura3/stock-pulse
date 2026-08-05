@@ -163,7 +163,7 @@ export default function TransactionGroupList({
               <div className="flex-col items-start" style={{ minWidth: 120 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Qtd. & Preço</span>
                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {formatQuantity(tx.quantity || 0)} un. @ {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
+                  {formatQuantity(tx.quantity || 0)} un. a {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
                 </span>
                 {hasFx && (
                   <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
