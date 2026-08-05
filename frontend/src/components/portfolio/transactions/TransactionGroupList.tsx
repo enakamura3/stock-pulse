@@ -54,7 +54,8 @@ export default function TransactionGroupList({
           transition: 'all 0.15s ease',
         }}
       >
-        <div className="flex-row items-center gap-md" style={{ minWidth: 220 }}>
+        {/* Coluna 1: Ativo, Badge e Data */}
+        <div className="flex-row items-center gap-md" style={{ flex: '1.2 1 220px' }}>
           <div
             style={{
               width: 42,
@@ -97,9 +98,29 @@ export default function TransactionGroupList({
           </div>
         </div>
 
-        <div className="flex-row gap-lg items-center flex-wrap" style={{ marginLeft: 'auto', gap: '1.5rem' }}>
+        {/* Colunas Intermediárias e Valores (Distribuídas no Meio e Direita) */}
+        <div
+          className="flex-row items-center flex-wrap"
+          style={{ flex: '2 1 400px', justifyContent: 'space-between', gap: '1.25rem' }}
+        >
           {isRF ? (
             <>
+              {/* Módulo / Tipo */}
+              <div className="flex-col items-start" style={{ minWidth: 110 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Módulo</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {tx.asset_type || 'Renda Fixa'}
+                </span>
+              </div>
+
+              {/* Saldo Investido Resultante */}
+              <div className="flex-col items-start" style={{ minWidth: 130 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#00f2fe' }}>
+                  {formatMoney(tx.resulting_invested ?? 0, tx.currency || 'BRL')}
+                </span>
+              </div>
+
               {/* Valor da Operação */}
               <div className="flex-col items-end" style={{ minWidth: 130 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Valor da Operação</span>
@@ -112,19 +133,11 @@ export default function TransactionGroupList({
                   </span>
                 )}
               </div>
-
-              {/* Módulo */}
-              <div className="flex-col items-end" style={{ minWidth: 110 }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Módulo</span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {tx.asset_type || 'Renda Fixa'}
-                </span>
-              </div>
             </>
           ) : isSplit ? (
             <>
               {/* Proporção */}
-              <div className="flex-col items-end" style={{ minWidth: 100 }}>
+              <div className="flex-col items-start" style={{ minWidth: 110 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Proporção</span>
                 <span style={{ fontSize: '0.88rem', fontWeight: 700, color: badge.color }}>
                   {tx.type === 'REVERSE_SPLIT'
@@ -134,28 +147,23 @@ export default function TransactionGroupList({
               </div>
 
               {/* Saldo de Cotas após */}
-              <div className="flex-col items-end" style={{ minWidth: 110 }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Saldo de Cotas após</span>
+              <div className="flex-col items-start" style={{ minWidth: 120 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#00f2fe' }}>
                   {formatQuantity(tx.resulting_quantity ?? 0)} un.
                 </span>
               </div>
+
+              {/* Espaçador neutro */}
+              <div style={{ minWidth: 135 }} />
             </>
           ) : (
             <>
-              {/* Quantidade */}
-              <div className="flex-col items-end" style={{ minWidth: 100 }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Quantidade</span>
+              {/* Quantidade e Preço Unitário (Operados) */}
+              <div className="flex-col items-start" style={{ minWidth: 120 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Qtd. & Preço</span>
                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {formatQuantity(tx.quantity || 0)}
-                </span>
-              </div>
-
-              {/* Preço Unitário */}
-              <div className="flex-col items-end" style={{ minWidth: 120 }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Preço Unit.</span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
+                  {formatQuantity(tx.quantity || 0)} un. @ {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
                 </span>
                 {hasFx && (
                   <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
@@ -164,7 +172,15 @@ export default function TransactionGroupList({
                 )}
               </div>
 
-              {/* Valor Total */}
+              {/* Saldo Resultante de Papéis / Cotas após a compra */}
+              <div className="flex-col items-start" style={{ minWidth: 110 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#00f2fe' }}>
+                  {formatQuantity(tx.resulting_quantity ?? 0)} un.
+                </span>
+              </div>
+
+              {/* Valor Total & Taxas */}
               <div className="flex-col items-end" style={{ minWidth: 135 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Valor Total</span>
                 <span style={{ fontSize: '0.92rem', fontWeight: 700, color: badge.color }}>
@@ -179,8 +195,8 @@ export default function TransactionGroupList({
             </>
           )}
 
-          {/* Ações */}
-          <div className="flex-row gap-sm items-center" style={{ marginLeft: '1rem', gap: '0.5rem' }}>
+          {/* Botões de Ação */}
+          <div className="flex-row gap-sm items-center" style={{ gap: '0.5rem', marginLeft: '0.5rem' }}>
             <button
               onClick={() => handleEditTransaction(tx)}
               className="btn-secondary"
