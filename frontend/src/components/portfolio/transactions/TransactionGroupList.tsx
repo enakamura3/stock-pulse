@@ -205,13 +205,32 @@ export default function TransactionGroupList({
 
   if (groupByDate) {
     return (
-      <div className="flex-col gap-lg">
+      <div className="flex-col" style={{ gap: '1.75rem' }}>
         {grouped.map((group) => (
-          <div key={group.date} className="flex-col gap-xs">
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-color)', paddingLeft: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {group.label}
+          <div key={group.date} className="flex-col">
+            {/* Cabeçalho do Grupo de Data */}
+            <div
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: 'var(--accent-color)',
+                padding: '0.25rem 0.4rem',
+                marginBottom: '0.6rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                paddingBottom: '0.4rem',
+              }}
+            >
+              <span>📅</span>
+              <span>{group.label}</span>
             </div>
-            <div className="flex-col gap-xs">
+
+            {/* Lista de Transações da Data */}
+            <div className="flex-col gap-sm">
               {group.txs.map((tx) => renderItem(tx))}
             </div>
           </div>
@@ -221,7 +240,7 @@ export default function TransactionGroupList({
   }
 
   return (
-    <div className="flex-col gap-xs">
+    <div className="flex-col gap-sm">
       {pagedTxs.map((tx) => renderItem(tx))}
     </div>
   );
