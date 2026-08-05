@@ -54,6 +54,7 @@ type transactionPayload struct {
 	Type         string  `json:"type"` // "BUY" ou "SELL"
 	Quantity     float64 `json:"quantity"`
 	UnitPrice    float64 `json:"unit_price"`
+	Fee          float64 `json:"fee"`
 	ExchangeRate float64 `json:"exchange_rate"`
 	ExecutedAt   string  `json:"executed_at"` // formato "YYYY-MM-DD"
 }
@@ -224,6 +225,16 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.Fee < 0 {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Taxa/Corretagem não pode ser negativa")
+		return
+	}
+
+	fee := payload.Fee
+	if payload.Type == "SPLIT" || payload.Type == "REVERSE_SPLIT" || payload.Type == "BONUS" {
+		fee = 0
+	}
+
 	// Trata parsing de datas históricas com fallback seguro
 	execTime, err := time.Parse("2006-01-02", payload.ExecutedAt)
 	if err != nil {
@@ -242,6 +253,7 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		Type:         payload.Type,
 		Quantity:     payload.Quantity,
 		UnitPrice:    payload.UnitPrice,
+		Fee:          fee,
 		ExchangeRate: rate,
 		ExecutedAt:   execTime.UTC(),
 	}
@@ -351,6 +363,16 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.Fee < 0 {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Taxa/Corretagem não pode ser negativa")
+		return
+	}
+
+	fee := payload.Fee
+	if payload.Type == "SPLIT" || payload.Type == "REVERSE_SPLIT" || payload.Type == "BONUS" {
+		fee = 0
+	}
+
 	execTime, err := time.Parse("2006-01-02", payload.ExecutedAt)
 	if err != nil {
 		execTime, err = time.Parse(time.RFC3339, payload.ExecutedAt)
@@ -366,6 +388,7 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		Type:         payload.Type,
 		Quantity:     payload.Quantity,
 		UnitPrice:    payload.UnitPrice,
+		Fee:          fee,
 		ExchangeRate: rate,
 		ExecutedAt:   execTime.UTC(),
 	}

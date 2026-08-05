@@ -201,7 +201,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 
 		pos.Quantity, pos.TotalCost, pos.AveragePrice = calculator.UpdatePositionOnTransaction(
 			pos.Quantity, pos.TotalCost, pos.AveragePrice,
-			tx.Type, tx.Quantity, tx.UnitPrice, tx.ExchangeRate,
+			tx.Type, tx.Quantity, tx.UnitPrice, tx.ExchangeRate, tx.Fee,
 		)
 	}
 
@@ -324,7 +324,11 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		}
 	}
 
-	tx.TotalCost = tx.Quantity * tx.UnitPrice
+	if tx.Type == "SELL" {
+		tx.TotalCost = (tx.Quantity * tx.UnitPrice) - tx.Fee
+	} else {
+		tx.TotalCost = (tx.Quantity * tx.UnitPrice) + tx.Fee
+	}
 	savedTx, err := s.repo.CreateTransaction(ctx, tx)
 	if err != nil {
 		return nil, err
@@ -552,7 +556,11 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 
 	tx.ID = txID
 	tx.PortfolioID = portfolioID
-	tx.TotalCost = tx.Quantity * tx.UnitPrice
+	if tx.Type == "SELL" {
+		tx.TotalCost = (tx.Quantity * tx.UnitPrice) - tx.Fee
+	} else {
+		tx.TotalCost = (tx.Quantity * tx.UnitPrice) + tx.Fee
+	}
 
 	// Executa atualização no banco
 	err = s.repo.UpdateTransaction(ctx, *tx)

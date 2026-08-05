@@ -31,6 +31,7 @@ type Transaction struct {
 	Quantity     float64   `json:"quantity"`
 	UnitPrice    float64   `json:"unit_price"`
 	TotalCost    float64   `json:"total_cost"`
+	Fee          float64   `json:"fee"`
 	ExchangeRate float64   `json:"exchange_rate"`
 	ExecutedAt   time.Time `json:"executed_at"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -226,8 +227,8 @@ func (r *Repository) DeletePortfolio(ctx context.Context, id, userID string) err
 // CreateTransaction registra uma operação de compra/venda na carteira.
 func (r *Repository) CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error) {
 	query := `
-		INSERT INTO transaction (portfolio_id, asset_id, type, quantity, unit_price, total_cost, exchange_rate, executed_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+		INSERT INTO transaction (portfolio_id, asset_id, type, quantity, unit_price, total_cost, fee, exchange_rate, executed_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 		RETURNING id, created_at
 	`
 	err := database.GetDB(ctx, r.db).QueryRow(ctx, query,
@@ -237,6 +238,7 @@ func (r *Repository) CreateTransaction(ctx context.Context, tx *Transaction) (*T
 		tx.Quantity,
 		tx.UnitPrice,
 		tx.TotalCost,
+		tx.Fee,
 		tx.ExchangeRate,
 		tx.ExecutedAt,
 	).Scan(&tx.ID, &tx.CreatedAt)
@@ -249,7 +251,7 @@ func (r *Repository) CreateTransaction(ctx context.Context, tx *Transaction) (*T
 // GetTransactionsByPortfolioID lista as transações de um portfólio validando a posse (Anti-IDOR).
 func (r *Repository) GetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
 	query := `
-		SELECT t.id, t.portfolio_id, t.asset_id, t.type, t.quantity, t.unit_price, t.total_cost, t.exchange_rate, t.executed_at, t.created_at,
+		SELECT t.id, t.portfolio_id, t.asset_id, t.type, t.quantity, t.unit_price, t.total_cost, t.fee, t.exchange_rate, t.executed_at, t.created_at,
 		       a.ticker, a.name, a.asset_type, a.currency
 		FROM transaction t
 		INNER JOIN asset a ON t.asset_id = a.id
@@ -274,6 +276,7 @@ func (r *Repository) GetTransactionsByPortfolioID(ctx context.Context, portfolio
 			&tx.Quantity,
 			&tx.UnitPrice,
 			&tx.TotalCost,
+			&tx.Fee,
 			&tx.ExchangeRate,
 			&tx.ExecutedAt,
 			&tx.CreatedAt,
@@ -458,11 +461,11 @@ func (r *Repository) GetAllAssets(ctx context.Context) ([]AssetCompact, error) {
 func (r *Repository) UpdateTransaction(ctx context.Context, tx Transaction) error {
 	query := `
 		UPDATE transaction
-		SET type = $1, quantity = $2, unit_price = $3, total_cost = $4, exchange_rate = $5, executed_at = $6
-		WHERE id = $7 AND portfolio_id = $8
+		SET type = $1, quantity = $2, unit_price = $3, total_cost = $4, fee = $5, exchange_rate = $6, executed_at = $7
+		WHERE id = $8 AND portfolio_id = $9
 	`
 	tag, err := database.GetDB(ctx, r.db).Exec(ctx, query,
-		tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.ExchangeRate, tx.ExecutedAt,
+		tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee, tx.ExchangeRate, tx.ExecutedAt,
 		tx.ID, tx.PortfolioID,
 	)
 	if err != nil {

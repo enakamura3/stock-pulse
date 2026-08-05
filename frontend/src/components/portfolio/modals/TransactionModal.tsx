@@ -20,6 +20,8 @@ export interface TransactionModalProps {
   setTxQuantity: (q: string | number) => void;
   txUnitPrice: string | number;
   setTxUnitPrice: (p: string | number) => void;
+  txFee: string | number;
+  setTxFee: (f: string | number) => void;
   txExchangeRate: string | number;
   setTxExchangeRate: (r: string | number) => void;
   txExecutedAt: string;
@@ -48,6 +50,8 @@ export default function TransactionModal({
   setTxQuantity,
   txUnitPrice,
   setTxUnitPrice,
+  txFee,
+  setTxFee,
   txExchangeRate,
   setTxExchangeRate,
   txExecutedAt,
@@ -57,6 +61,15 @@ export default function TransactionModal({
   handleAddTransaction,
 }: TransactionModalProps) {
   if (!showTxModal) return null;
+
+  const parsedQty = parseFloat(txQuantity.toString()) || 0;
+  const parsedPrice = parseFloat(txUnitPrice.toString()) || 0;
+  const parsedFee = parseFloat(txFee.toString()) || 0;
+
+  const grossTotal = parsedQty * parsedPrice;
+  const netTotal = txType === 'SELL' ? grossTotal - parsedFee : grossTotal + parsedFee;
+
+  const currencySymbol = selectedAssetCurrency === 'USD' ? '$' : 'R$';
 
   return (
     <div className="modal-overlay">
@@ -197,6 +210,7 @@ export default function TransactionModal({
                 onClick={() => {
                   setTxType('SPLIT');
                   setTxUnitPrice(0);
+                  setTxFee(0);
                 }}
                 disabled={isAddingTx}
                 className="flex-row justify-center items-center font-bold text-sm"
@@ -217,6 +231,7 @@ export default function TransactionModal({
                 onClick={() => {
                   setTxType('REVERSE_SPLIT');
                   setTxUnitPrice(0);
+                  setTxFee(0);
                 }}
                 disabled={isAddingTx}
                 className="flex-row justify-center items-center font-bold text-sm"
@@ -276,6 +291,22 @@ export default function TransactionModal({
             )}
           </div>
 
+          {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && txType !== 'BONUS' && (
+            <div className="form-group">
+              <label className="form-label">Corretagem / Taxas ({selectedAssetCurrency})</label>
+              <input
+                className="form-input"
+                type="number"
+                step="any"
+                min="0"
+                value={txFee}
+                onChange={(e) => setTxFee(e.target.value)}
+                placeholder="0.00"
+                disabled={isAddingTx}
+              />
+            </div>
+          )}
+
           {selectedAssetCurrency && kpiCurrency && selectedAssetCurrency !== kpiCurrency && (
             <div className="form-group">
               <label className="form-label text-warning" style={{ color: '#ffc107' }}>
@@ -308,6 +339,35 @@ export default function TransactionModal({
               disabled={isAddingTx}
             />
           </div>
+
+          {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && grossTotal > 0 && (
+            <div
+              className="card"
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid var(--panel-border)',
+              }}
+            >
+              <div className="flex-row justify-between text-xs text-secondary">
+                <span>Valor dos Ativos:</span>
+                <span>{currencySymbol} {grossTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              {parsedFee > 0 && (
+                <div className="flex-row justify-between text-xs text-secondary mt-xs">
+                  <span>Taxas / Corretagem:</span>
+                  <span>{currencySymbol} {parsedFee.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              <div className="flex-row justify-between text-sm font-bold mt-xs" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem', color: 'var(--text-primary)' }}>
+                <span>Total Operação:</span>
+                <span style={{ color: txType === 'BUY' ? '#00e676' : '#ff3d00' }}>
+                  {currencySymbol} {netTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="flex-row gap-md mt-sm">
             <button

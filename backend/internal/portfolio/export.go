@@ -99,7 +99,7 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 	rvWriter.Comma = ';' // Delimitador Ponto e Vírgula
 
 	// Headers RV
-	rvWriter.Write([]string{"Date", "Ticker", "Type", "Quantity", "UnitPrice", "ExchangeRate"})
+	rvWriter.Write([]string{"Date", "Ticker", "Type", "Quantity", "UnitPrice", "ExchangeRate", "Fee"})
 	for _, tx := range rvTxs {
 		rvWriter.Write([]string{
 			tx.ExecutedAt.Format("2006-01-02"),
@@ -108,6 +108,7 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("%.6f", tx.Quantity),
 			fmt.Sprintf("%.6f", tx.UnitPrice),
 			fmt.Sprintf("%.4f", tx.ExchangeRate),
+			fmt.Sprintf("%.6f", tx.Fee),
 		})
 	}
 	rvWriter.Flush()

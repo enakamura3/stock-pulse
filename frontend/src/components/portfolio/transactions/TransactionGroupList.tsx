@@ -169,6 +169,11 @@ export default function TransactionGroupList({
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: badge.color }}>
                   {formatMoney(totalValConverted, kpiCurrency || tx.currency || 'BRL')}
                 </span>
+                {Boolean(tx.fee) && tx.fee! > 0 && (
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 'normal' }}>
+                    {`(Taxas: ${formatMoney(tx.fee!, tx.currency || 'BRL')})`}
+                  </span>
+                )}
               </div>
             </>
           )}
