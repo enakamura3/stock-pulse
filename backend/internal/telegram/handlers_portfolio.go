@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
@@ -83,6 +84,63 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	}
 	msg += p.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
 
+	// Consolidação de Alocação Patrimonial por Classe de Ativo
+	catTotals := make(map[string]float64)
+	catNames := map[string]string{
+		"STOCK":  "Ações",
+		"FII":    "FIIs",
+		"ETF":    "ETFs",
+		"RF":     "Renda Fixa & Tesouro",
+		"CRYPTO": "Cripto",
+		"BDR":    "BDRs",
+		"OTHER":  "Outros",
+	}
+	catEmojis := map[string]string{
+		"STOCK":  "📈",
+		"FII":    "🏢",
+		"ETF":    "🌐",
+		"RF":     "💵",
+		"CRYPTO": "₿",
+		"BDR":    "📦",
+		"OTHER":  "🎯",
+	}
+
+	for _, pos := range positions {
+		catID := getMacroCategoryKey(pos.Type, pos.Ticker)
+		catTotals[catID] += pos.CurrentValue
+	}
+	if totalFIValue > 0 {
+		catTotals["RF"] += totalFIValue
+	}
+
+	if totalValue > 0 && len(catTotals) > 0 {
+		msg += "\n🧱 *Alocação Patrimonial*\n"
+		type catItem struct {
+			key   string
+			total float64
+			pct   float64
+		}
+		var catList []catItem
+		for k, val := range catTotals {
+			if val > 0 {
+				catList = append(catList, catItem{
+					key:   k,
+					total: val,
+					pct:   (val / totalValue) * 100,
+				})
+			}
+		}
+		sort.Slice(catList, func(i, j int) bool {
+			return catList[i].total > catList[j].total
+		})
+
+		for _, item := range catList {
+			name := catNames[item.key]
+			emoji := catEmojis[item.key]
+			msg += p.Sprintf("• %s %s: *R$ %.2f* (%.2f%%)\n", emoji, name, item.total, item.pct)
+		}
+	}
+
 	if len(nearMaturity) > 0 {
 		msg += "\n⚠️ *Vencimentos Próximos (Renda Fixa)*\n"
 		for _, pos := range nearMaturity {
@@ -90,13 +148,8 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		}
 	}
 
-	sortedPos := make([]portfolio.Position, 0, len(positions))
-	for _, pos := range positions {
-		if pos.DailyChangePercent != 0 {
-			sortedPos = append(sortedPos, pos)
-		}
-	}
-
+	sortedPos := make([]portfolio.Position, len(positions))
+	copy(sortedPos, positions)
 	sort.Slice(sortedPos, func(i, j int) bool {
 		return sortedPos[i].DailyChangePercent > sortedPos[j].DailyChangePercent
 	})
@@ -107,11 +160,8 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	for _, pos := range sortedPos {
 		if pos.DailyChangePercent > 0 {
 			risers = append(risers, pos)
-		}
-	}
-	for i := len(sortedPos) - 1; i >= 0; i-- {
-		if sortedPos[i].DailyChangePercent < 0 {
-			fallers = append(fallers, sortedPos[i])
+		} else if pos.DailyChangePercent < 0 {
+			fallers = append(fallers, pos)
 		}
 	}
 
@@ -132,14 +182,20 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		if len(fallers) < 5 {
 			limit = len(fallers)
 		}
-		for i := 0; i < limit; i++ {
+		for i := len(fallers) - 1; i >= len(fallers)-limit; i-- {
 			msg += p.Sprintf("• `%s`: %.2f%%\n", fallers[i].Ticker, fallers[i].DailyChangePercent)
 		}
 	}
 
-	if len(sortedPos) > 0 {
+	if len(positions) > 0 {
 		msg += p.Sprintf("\n📋 *Resumo Completo (Ativos)*\n")
-		for _, pos := range sortedPos {
+		posByValue := make([]portfolio.Position, len(positions))
+		copy(posByValue, positions)
+		sort.Slice(posByValue, func(i, j int) bool {
+			return posByValue[i].CurrentValue > posByValue[j].CurrentValue
+		})
+
+		for _, pos := range posByValue {
 			var symbol string
 			if pos.DailyChangePercent > 0 {
 				symbol = "🟢"
@@ -148,13 +204,8 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			} else {
 				symbol = "⚪"
 			}
-			rate := 1.0
-			if pos.CurrentPrice > 0 && pos.Quantity > 0 {
-				rate = pos.CurrentValue / (pos.CurrentPrice * pos.Quantity)
-			}
-			varBRL := pos.DailyChange * pos.Quantity * rate
 
-			msg += p.Sprintf("%s `%s`: %+.2f%% (R$ %+.2f)\n", symbol, pos.Ticker, pos.DailyChangePercent, varBRL)
+			msg += p.Sprintf("%s `%s`: *R$ %.2f* (%+.2f%%)\n", symbol, pos.Ticker, pos.CurrentValue, pos.DailyChangePercent)
 		}
 	}
 
@@ -163,6 +214,28 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	menu.Inline(menu.Row(btnBack))
 
 	return c.Edit(msg, telebot.ModeMarkdown, menu)
+}
+
+func getMacroCategoryKey(assetType, ticker string) string {
+	tUpper := strings.ToUpper(ticker)
+	typeUpper := strings.ToUpper(assetType)
+
+	if strings.Contains(typeUpper, "ETF") {
+		return "ETF"
+	}
+	if strings.Contains(typeUpper, "CRYPTO") {
+		return "CRYPTO"
+	}
+	if strings.Contains(typeUpper, "BDR") {
+		return "BDR"
+	}
+	if strings.Contains(typeUpper, "RF") || strings.Contains(typeUpper, "FIXED") {
+		return "RF"
+	}
+	if typeUpper == "FII" || strings.HasSuffix(tUpper, "11.SA") || strings.HasSuffix(tUpper, "11") {
+		return "FII"
+	}
+	return "STOCK"
 }
 
 func (h *Handlers) HandleChangePortfolio(c telebot.Context) error {

@@ -945,3 +945,46 @@ func TestSortCurrencies(t *testing.T) {
 		assert.Equal(t, tc.expected, inputCopy)
 	}
 }
+
+func TestGetMacroCategoryKey(t *testing.T) {
+	assert.Equal(t, "FII", getMacroCategoryKey("FII", "HGLG11"))
+	assert.Equal(t, "FII", getMacroCategoryKey("OTHER", "KNRI11.SA"))
+	assert.Equal(t, "ETF", getMacroCategoryKey("ETF_BR", "BOVA11"))
+	assert.Equal(t, "CRYPTO", getMacroCategoryKey("CRYPTO", "BTC-USD"))
+	assert.Equal(t, "BDR", getMacroCategoryKey("BDR", "AAPL34"))
+	assert.Equal(t, "RF", getMacroCategoryKey("RF", "CDB Banco X"))
+	assert.Equal(t, "STOCK", getMacroCategoryKey("STOCK_BR", "PETR4"))
+}
+
+func TestHandleHistory_WithFee(t *testing.T) {
+	h, svc, portSvc, _, _ := setupHandlersTest()
+
+	t.Run("renders transaction history with fee when fee > 0", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Data").Return("0")
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Carteira 1", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		now := time.Now()
+		txs := []portfolio.Transaction{
+			{ID: "t1", Ticker: "PETR4", Type: "BUY", ExecutedAt: now, Quantity: 10, UnitPrice: 30, TotalCost: 300, Fee: 10.5},
+		}
+		portSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(txs, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Taxas: R$ 10,50")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleHistory(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "Taxas: R$ 10,50")
+	})
+}

@@ -59,7 +59,11 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 
 		msg += p.Sprintf("%s | `%s`\n", tipoStr, tx.Ticker)
 		msg += p.Sprintf("Data: %s\n", tx.ExecutedAt.Format("2006-01-02"))
-		msg += p.Sprintf("Qtd: %.4f | Preço: %.2f | Total: %.2f\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost)
+		if tx.Fee > 0 {
+			msg += p.Sprintf("Qtd: %.4f | Preço: %.2f | Total: %.2f (Taxas: R$ %.2f)\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee)
+		} else {
+			msg += p.Sprintf("Qtd: %.4f | Preço: %.2f | Total: %.2f\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost)
+		}
 	}
 
 	menu := &telebot.ReplyMarkup{}
