@@ -438,6 +438,37 @@ func TestHandlers_HistoryAndFixedIncome(t *testing.T) {
 		err := h.HandleFixedIncome(mCtx)
 		assert.NoError(t, err)
 	})
+
+	t.Run("HandleFixedIncome - with treasury and matured positions", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
+			{ID: "p1", Name: "P1"},
+		}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		fiPositions := []fixedincome.Position{
+			{GrossValue: 1050, NetValue: 1000, TotalInvested: 950, DaysToMaturity: 15, IsMatured: true, Asset: fixedincome.Asset{Institution: "Banco Y", Type: "LCI", Rate: 100, DebtType: "POS", Indexer: "CDI"}},
+		}
+		trPositions := []fixedincome.TreasuryPosition{
+			{TreasuryType: "SELIC", GrossValue: 5200, NetValue: 5000, TotalInvested: 4500, Quantity: 0.5, DaysToMaturity: 10, IsMatured: true},
+		}
+
+		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return(trPositions, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Tesouro SELIC")
+		}), mock.Anything).Return(nil).Once()
+
+		err := h.HandleFixedIncome(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "Tesouro SELIC")
+	})
 }
 
 func TestHandlers_Operations(t *testing.T) {
