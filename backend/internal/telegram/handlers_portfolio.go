@@ -220,9 +220,6 @@ func getMacroCategoryKey(assetType, ticker string) string {
 	tUpper := strings.ToUpper(ticker)
 	typeUpper := strings.ToUpper(assetType)
 
-	if typeUpper == "FII" || strings.HasSuffix(tUpper, "11.SA") || strings.HasSuffix(tUpper, "11") {
-		return "FII"
-	}
 	if strings.Contains(typeUpper, "ETF") {
 		return "ETF"
 	}
@@ -234,6 +231,9 @@ func getMacroCategoryKey(assetType, ticker string) string {
 	}
 	if strings.Contains(typeUpper, "RF") || strings.Contains(typeUpper, "FIXED") {
 		return "RF"
+	}
+	if typeUpper == "FII" || strings.HasSuffix(tUpper, "11.SA") || strings.HasSuffix(tUpper, "11") {
+		return "FII"
 	}
 	return "STOCK"
 }
