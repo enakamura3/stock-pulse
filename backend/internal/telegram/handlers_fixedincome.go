@@ -22,13 +22,15 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	}
 
 	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
-	positions, err := h.fiSvc.GetPortfolioPositions(context.Background(), portfolioID)
-	if err != nil {
+	positions, err1 := h.fiSvc.GetPortfolioPositions(context.Background(), portfolioID)
+	treasuryPositions, err2 := h.fiSvc.GetTreasuryPositions(context.Background(), portfolioID)
+
+	if (err1 != nil && err2 != nil) || (err1 != nil && len(treasuryPositions) == 0) {
 		return c.Edit("❌ Erro ao buscar posições de Renda Fixa.")
 	}
 
-	if len(positions) == 0 {
-		return c.Edit("🏛️ Você ainda não possui ativos de Renda Fixa cadastrados.")
+	if len(positions) == 0 && len(treasuryPositions) == 0 {
+		return c.Edit("🏛️ Você ainda não possui ativos de Renda Fixa ou Tesouro Direto cadastrados.")
 	}
 
 	var totalBruto, totalLiquido, totalCusto float64
@@ -37,9 +39,14 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 		totalLiquido += pos.NetValue
 		totalCusto += pos.TotalInvested
 	}
+	for _, pos := range treasuryPositions {
+		totalBruto += pos.GrossValue
+		totalLiquido += pos.NetValue
+		totalCusto += pos.TotalInvested
+	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("🏛️ *Renda Fixa: %s*\n\n", portfolioName)
+	msg := p.Sprintf("🏛️ *Renda Fixa & Tesouro: %s*\n\n", portfolioName)
 	msg += p.Sprintf("💰 Valor Líquido: *R$ %.2f*\n", totalLiquido)
 	msg += p.Sprintf("📈 Valor Bruto: R$ %.2f\n", totalBruto)
 
@@ -68,6 +75,23 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 
 		msg += p.Sprintf("• `%s %s` - %s\n", pos.Asset.Institution, pos.Asset.Type, taxa)
 		msg += p.Sprintf("  Líquido: R$ %.2f (+%.2f%%)%s\n", pos.NetValue, pos.NetReturnPercent, status)
+	}
+
+	for _, pos := range treasuryPositions {
+		status := ""
+		if pos.IsMatured {
+			status = " *(VENCIDO)*"
+		} else if pos.DaysToMaturity <= 30 {
+			status = " *(Vence logo!)*"
+		}
+
+		netReturnPct := 0.0
+		if pos.TotalInvested > 0 {
+			netReturnPct = ((pos.NetValue - pos.TotalInvested) / pos.TotalInvested) * 100
+		}
+
+		msg += p.Sprintf("• `Tesouro %s` (%.4f un.)\n", pos.TreasuryType, pos.Quantity)
+		msg += p.Sprintf("  Líquido: R$ %.2f (%+.2f%%)%s\n", pos.NetValue, netReturnPct, status)
 	}
 
 	menu := &telebot.ReplyMarkup{}

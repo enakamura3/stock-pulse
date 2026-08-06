@@ -166,6 +166,14 @@ func (m *MockFixedIncomeSvc) GetPortfolioPositions(ctx context.Context, portfoli
 	return nil, args.Error(1)
 }
 
+func (m *MockFixedIncomeSvc) GetTreasuryPositions(ctx context.Context, portfolioID string) ([]fixedincome.TreasuryPosition, error) {
+	args := m.Called(ctx, portfolioID)
+	if args.Get(0) != nil {
+		return args.Get(0).([]fixedincome.TreasuryPosition), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func setupHandlersTest() (*Handlers, *MockService, *MockPortfolioService, *MockMarketSvc, *MockFixedIncomeSvc) {
 	svc := new(MockService)
 	pSvc := new(MockPortfolioService)

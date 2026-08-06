@@ -205,6 +205,7 @@ func TestHandlers_PortfolioSummaryAndSelection(t *testing.T) {
 			{GrossValue: 1050, NetValue: 1000, TotalInvested: 950, DaysToMaturity: 15, IsMatured: false, Asset: fixedincome.Asset{Institution: "Banco X", Type: "CDB", Rate: 12.5, DebtType: "PRE"}},
 		}
 		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
 
 		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
 
@@ -431,6 +432,7 @@ func TestHandlers_HistoryAndFixedIncome(t *testing.T) {
 			{GrossValue: 1050, NetValue: 1000, TotalInvested: 950, DaysToMaturity: 15, IsMatured: false, Asset: fixedincome.Asset{Institution: "Banco X", Type: "CDB", Rate: 12.5, DebtType: "PRE"}},
 		}
 		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
 		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
 
 		err := h.HandleFixedIncome(mCtx)
@@ -738,6 +740,7 @@ func TestHandlers_ExtraErrors(t *testing.T) {
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return([]fixedincome.Position{}, errors.New("db error")).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Maybe()
 		mCtx.On("Edit", "❌ Erro ao buscar posições de Renda Fixa.", mock.Anything).Return(nil)
 
 		err := h.HandleFixedIncome(mCtx)
@@ -751,7 +754,8 @@ func TestHandlers_ExtraErrors(t *testing.T) {
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return([]fixedincome.Position{}, nil).Once()
-		mCtx.On("Edit", "🏛️ Você ainda não possui ativos de Renda Fixa cadastrados.", mock.Anything).Return(nil)
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
+		mCtx.On("Edit", "🏛️ Você ainda não possui ativos de Renda Fixa ou Tesouro Direto cadastrados.", mock.Anything).Return(nil)
 
 		err := h.HandleFixedIncome(mCtx)
 		assert.NoError(t, err)
@@ -986,5 +990,46 @@ func TestHandleHistory_WithFee(t *testing.T) {
 		err := h.HandleHistory(mCtx)
 		assert.NoError(t, err)
 		assert.Contains(t, sentMsg, "Taxas: R$ 10,50")
+	})
+}
+
+func TestHandlePortfolioSummary_IncludesTreasury(t *testing.T) {
+	h, svc, portSvc, _, fiSvc := setupHandlersTest()
+
+	t.Run("includes treasury positions in portfolio total value and breakdown", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Minha Carteira", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		positions := []portfolio.Position{
+			{Ticker: "PETR4", Quantity: 100, CurrentPrice: 30, CurrentValue: 3000, TotalCost: 2500, Type: "STOCK_BR"},
+		}
+		portSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolios[0], positions, nil).Once()
+
+		fiPositions := []fixedincome.Position{
+			{GrossValue: 2100, NetValue: 2000, TotalInvested: 1900, Asset: fixedincome.Asset{Institution: "Banco Y", Type: "CDB"}},
+		}
+		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+
+		trPositions := []fixedincome.TreasuryPosition{
+			{TreasuryType: "SELIC", GrossValue: 5100, NetValue: 5000, TotalInvested: 4800, Quantity: 0.5},
+		}
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return(trPositions, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "10.000,00") // 3000 (stock) + 2000 (cdb) + 5000 (treasury) = 10000
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandlePortfolioSummary(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "10.000,00")
 	})
 }

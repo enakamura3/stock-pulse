@@ -56,6 +56,25 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 				}
 			}
 		}
+
+		trPos, err := h.fiSvc.GetTreasuryPositions(context.Background(), portfolioID)
+		if err == nil {
+			for _, pos := range trPos {
+				totalFIValue += pos.NetValue
+				totalValue += pos.NetValue
+				totalCost += pos.TotalInvested
+
+				if pos.DaysToMaturity <= 30 && !pos.IsMatured {
+					nearMaturity = append(nearMaturity, fixedincome.Position{
+						Asset: fixedincome.Asset{
+							Institution: "Tesouro Direto",
+							Type:        pos.TreasuryType,
+						},
+						DaysToMaturity: pos.DaysToMaturity,
+					})
+				}
+			}
+		}
 	}
 
 	totalProfitLoss := totalValue - totalCost
