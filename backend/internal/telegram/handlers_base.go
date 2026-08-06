@@ -23,6 +23,7 @@ type MarketService interface {
 
 type FixedIncomeService interface {
 	GetPortfolioPositions(ctx context.Context, portfolioID string) ([]fixedincome.Position, error)
+	GetTreasuryPositions(ctx context.Context, portfolioID string) ([]fixedincome.TreasuryPosition, error)
 }
 
 type Handlers struct {
