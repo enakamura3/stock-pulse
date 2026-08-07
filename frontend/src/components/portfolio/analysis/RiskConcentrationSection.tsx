@@ -213,12 +213,36 @@ export default function RiskConcentrationSection({
       .slice(0, 3);
   }, [assetProfitLoss]);
 
+  const performanceAttribution = useMemo(() => {
+    return assetProfitLoss
+      .map(item => ({
+        ...item,
+        contribution: (item.returnPercent * item.weight) / 100,
+      }))
+      .sort((a, b) => b.contribution - a.contribution);
+  }, [assetProfitLoss]);
+
+  const topContributors = useMemo(() => {
+    return performanceAttribution.filter(item => item.contribution > 0).slice(0, 5);
+  }, [performanceAttribution]);
+
+  const topDetractors = useMemo(() => {
+    return [...performanceAttribution]
+      .filter(item => item.contribution < 0)
+      .sort((a, b) => a.contribution - b.contribution)
+      .slice(0, 5);
+  }, [performanceAttribution]);
+
+  const totalContribution = useMemo(() => {
+    return performanceAttribution.reduce((sum, item) => sum + item.contribution, 0);
+  }, [performanceAttribution]);
+
   return (
     <AnalysisCard id="section-risk">
       <SectionTitle
         emoji="🌡️"
         title="Termômetro de Risco"
-        subtitle="Indicadores-chave de risco e eficiência da carteira"
+        subtitle="Indicadores-chave de risco, eficiência e atribuição de performance da carteira"
       />
 
       {riskMetrics.sharpe !== null ? (
@@ -287,6 +311,79 @@ export default function RiskConcentrationSection({
               {topGainers.length === 0 && topLosers.length === 0 && (
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
                   Nenhum ativo com ganhos ou perdas significativos.
+                </div>
+              )}
+            </div>
+          </KPIScorecard>
+
+          {/* Atribuição de Performance */}
+          <KPIScorecard
+            icon="🎯"
+            label="Atribuição de Performance"
+            value={`${totalContribution >= 0 ? '+' : ''}${totalContribution.toFixed(2)}pp`}
+            subtitle="Contribuição ponderada de cada ativo para o retorno da carteira"
+            description={
+              totalContribution >= 0
+                ? `A carteira acumula resultado positivo com contribuição líquida de +${totalContribution.toFixed(2)}pp decorrente da alocação ponderada dos seus ativos.`
+                : `A carteira acumula resultado negativo de ${totalContribution.toFixed(2)}pp influenciada pela alocação em ativos detratores.`
+            }
+            color={totalContribution >= 0 ? '#4ade80' : '#f87171'}
+            alertLevel={totalContribution >= 0 ? 'safe' : 'danger'}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {topContributors.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: '#4ade80', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span>📈</span> Maiores Contribuidores (pp)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    {topContributors.map(item => {
+                      const maxContrib = topContributors[0]?.contribution || 1;
+                      const barPct = Math.min(100, Math.abs(item.contribution / maxContrib) * 100);
+                      return (
+                        <AssetRiskDetailRow
+                          key={item.ticker}
+                          ticker={item.ticker}
+                          subText={`Peso: ${item.weight.toFixed(1)}% · Retorno: ${item.returnPercent.toFixed(1)}%`}
+                          valueText={`+${item.contribution.toFixed(2)}pp`}
+                          valueColor="#4ade80"
+                          barPct={barPct}
+                          barColor="#4ade80"
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {topDetractors.length > 0 && (
+                <div style={{ marginTop: '0.25rem' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: '#f87171', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span>📉</span> Maiores Detratores (pp)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    {topDetractors.map(item => {
+                      const maxDetract = Math.abs(topDetractors[0]?.contribution || 1);
+                      const barPct = Math.min(100, Math.abs(item.contribution / maxDetract) * 100);
+                      return (
+                        <AssetRiskDetailRow
+                          key={item.ticker}
+                          ticker={item.ticker}
+                          subText={`Peso: ${item.weight.toFixed(1)}% · Retorno: ${item.returnPercent.toFixed(1)}%`}
+                          valueText={`${item.contribution.toFixed(2)}pp`}
+                          valueColor="#f87171"
+                          barPct={barPct}
+                          barColor="#f87171"
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {topContributors.length === 0 && topDetractors.length === 0 && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                  Sem dados suficientes para calcular a contribuição individual dos ativos.
                 </div>
               )}
             </div>
@@ -442,3 +539,4 @@ export default function RiskConcentrationSection({
     </AnalysisCard>
   );
 }
+
