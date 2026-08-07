@@ -7,6 +7,7 @@ import RiskConcentrationSection from './analysis/RiskConcentrationSection';
 import PerformanceBenchmarkSection from './analysis/PerformanceBenchmarkSection';
 import PassiveIncomeSection from './analysis/PassiveIncomeSection';
 import FundamentalHealthSection from './analysis/FundamentalHealthSection';
+import TaxEfficiencySection from './analysis/TaxEfficiencySection';
 
 interface PortfolioAnalysisProps {
   positions: Position[];
@@ -72,6 +73,16 @@ export default function PortfolioAnalysis({
         treasuryPositions={treasuryPositions}
         kpiCurrency={kpiCurrency}
       />
+
+      {/* 💸 SEÇÃO 6: Eficiência Tributária */}
+      <TaxEfficiencySection
+        positions={positions}
+        dividends={dividends}
+        fiPositions={fiPositions}
+        treasuryPositions={treasuryPositions}
+        kpiCurrency={kpiCurrency}
+      />
     </div>
   );
 }
+
