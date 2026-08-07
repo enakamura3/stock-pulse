@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Position, TreasuryPosition } from './types';
+import { Position, FixedIncomePosition, TreasuryPosition } from './types';
 import { formatMoney, formatPercentage } from './helpers';
 
 interface DailyReportProps {
   positions: Position[];
+  fiPositions?: FixedIncomePosition[];
   treasuryPositions?: TreasuryPosition[];
   kpiCurrency: string;
 }
@@ -32,8 +33,8 @@ function getAssetTypeBadge(pos: Position): { label: string; color: string } | nu
   return null;
 }
 
-export default function DailyReport({ positions, treasuryPositions = [], kpiCurrency }: DailyReportProps) {
-  const [sortKey, setSortKey] = useState<SortKey>('daily_change_percent');
+export default function DailyReport({ positions, fiPositions = [], treasuryPositions = [], kpiCurrency }: DailyReportProps) {
+  const [sortKey, setSortKey] = useState<SortKey>('impact');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const now = new Date();
@@ -51,8 +52,9 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
     totalPortfolioValue += (pos.current_value ?? 0);
   });
 
-  const totalTreasuryValue = treasuryPositions.reduce((s, p) => s + p.net_value, 0);
-  totalPortfolioValue += totalTreasuryValue;
+  const totalFIPrivateValue = fiPositions.reduce((s, p) => s + (p.net_value ?? 0), 0);
+  const totalTreasuryValue = treasuryPositions.reduce((s, p) => s + (p.net_value ?? 0), 0);
+  totalPortfolioValue += totalFIPrivateValue + totalTreasuryValue;
 
   // Variação % total ponderada = totalDailyChange / (valor_anterior = totalPortfolioValue - totalDailyChange)
   const previousTotalValue = totalPortfolioValue - totalDailyChange;
@@ -62,22 +64,20 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
 
   const isDailyPos = totalDailyChange >= 0;
 
-  // Filtra posições com dado de variação e enriquece com campos calculados
-  const enrichedPositions = positions
-    .filter(p => p.daily_change_percent !== undefined)
-    .map(pos => {
-      const percent = pos.daily_change_percent ?? 0;
-      const absChange = pos.daily_change ?? 0;
-      const currentPrice = pos.current_price ?? 0;
-      const previousClose = currentPrice - absChange;
-      const qty = pos.quantity ?? 0;
-      const rate = getExchangeRate(pos);
-      const impact = absChange * qty * rate;
-      const portfolioWeight = totalPortfolioValue > 1e-6
-        ? ((pos.current_value ?? 0) / totalPortfolioValue) * 100
-        : 0;
-      return { pos, percent, absChange, currentPrice, previousClose, qty, rate, impact, portfolioWeight };
-    });
+  // Enriquece todas as posições com campos calculados para o resumo
+  const enrichedPositions = positions.map(pos => {
+    const percent = pos.daily_change_percent ?? 0;
+    const absChange = pos.daily_change ?? 0;
+    const currentPrice = pos.current_price ?? 0;
+    const previousClose = currentPrice - absChange;
+    const qty = pos.quantity ?? 0;
+    const rate = getExchangeRate(pos);
+    const impact = absChange * qty * rate;
+    const portfolioWeight = totalPortfolioValue > 1e-6
+      ? ((pos.current_value ?? 0) / totalPortfolioValue) * 100
+      : 0;
+    return { pos, percent, absChange, currentPrice, previousClose, qty, rate, impact, portfolioWeight };
+  });
 
   // Ordenação interativa
   const handleSort = (key: SortKey) => {
@@ -112,9 +112,6 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
   const topRisers = sortedByPercent.filter(r => r.percent > 0).slice(0, 5);
   const topFallers = [...sortedByPercent].reverse().filter(r => r.percent < 0).slice(0, 5);
 
-  // Totais da tabela
-  const totalImpact = sortedRows.reduce((acc, r) => acc + r.impact, 0);
-
   // Helper para ícone de ordenação
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
@@ -125,7 +122,7 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
     <div className="flex-col gap-xl w-full">
 
       {/* Card principal: Variação Total */}
-      {positions.length > 0 && (
+      {(positions.length > 0 || fiPositions.length > 0 || treasuryPositions.length > 0) && (
         <div className="card flex-col items-center justify-center text-center w-full" style={{ padding: '1.5rem', gap: '0.25rem' }}>
           <span className="text-secondary text-sm font-semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Variação Total Diária da Carteira
@@ -213,7 +210,7 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
 
       {/* Tabela: Resumo Completo */}
       <div className="card flex-col gap-md w-full">
-        <h3 className="card-title">📊 Resumo Diário Completo</h3>
+        <h3 className="card-title">📊 Resumo Diário Completo (Renda Variável)</h3>
         <div className="table-container flex-col">
           {positions.length > 0 ? (
             <table className="data-table">
@@ -291,7 +288,6 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
                   );
                 })}
               </tbody>
-
             </table>
           ) : (
             <div className="flex-col items-center justify-center py-xl text-secondary" style={{ gap: '0.75rem' }}>
@@ -303,6 +299,65 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
         </div>
       </div>
 
+      {/* Renda Fixa Privada (CDB, LCI, LCA, Debêntures) */}
+      {fiPositions.length > 0 && (
+        <div className="card flex-col gap-md w-full">
+          <h3 className="card-title">🏛️ Posição Atualizada: Renda Fixa Privada (CDB/LCI/LCA)</h3>
+          <p className="text-xs text-secondary">
+            Títulos de renda fixa privada são atualizados diariamente com a rentabilidade acumulada de acordo com o indexador contratado.
+          </p>
+          <div className="table-container flex-col">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Instituição & Ativo</th>
+                  <th>Tipo / Taxa</th>
+                  <th className="text-right">Vencimento</th>
+                  <th className="text-right">Total Investido</th>
+                  <th className="text-right">Valor Líquido</th>
+                  <th className="text-right">Rentabilidade Acumulada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fiPositions.map(p => {
+                  const returnPct = p.net_return_percent ?? 0;
+                  const taxa = p.asset.debt_type === 'POS'
+                    ? `${p.asset.rate.toFixed(2)}% ${p.asset.indexer}`
+                    : `${p.asset.rate.toFixed(2)}% a.a.`;
+                  const badgeColor = '#38bdf8';
+
+                  return (
+                    <tr key={p.asset.id}>
+                      <td>
+                        <div className="flex-col">
+                          <span className="font-bold">{p.asset.institution}</span>
+                          <span className="text-xs text-secondary">{p.asset.type}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex-row items-center gap-sm">
+                          <span style={{ background: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}`, fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                            {p.asset.type}
+                          </span>
+                          <span className="text-xs">{taxa}</span>
+                        </div>
+                      </td>
+                      <td className="text-right">{new Date(p.asset.maturity_date).toLocaleDateString('pt-BR')}</td>
+                      <td className="text-right">{formatMoney(p.total_invested, kpiCurrency)}</td>
+                      <td className="text-right" style={{ fontWeight: 600 }}>{formatMoney(p.net_value, kpiCurrency)}</td>
+                      <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(2)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tesouro Direto */}
       {treasuryPositions.length > 0 && (
         <div className="card flex-col gap-md w-full">
           <h3 className="card-title">🏛️ Posição Atualizada: Tesouro Direto</h3>
@@ -354,3 +409,4 @@ export default function DailyReport({ positions, treasuryPositions = [], kpiCurr
     </div>
   );
 }
+

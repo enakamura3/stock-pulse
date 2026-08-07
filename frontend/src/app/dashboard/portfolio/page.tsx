@@ -275,7 +275,7 @@ function PortfolioContent() {
           )}
 
           {activeTab === 'diario' && (
-            <DailyReport positions={filteredPositions} treasuryPositions={treasuryPositions} kpiCurrency={kpiCurrency} />
+            <DailyReport positions={filteredPositions} fiPositions={filteredFI} treasuryPositions={filteredTreasury} kpiCurrency={kpiCurrency} />
           )}
 
           {activeTab === 'renda-fixa' && (
