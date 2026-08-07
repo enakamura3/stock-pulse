@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { PerformancePoint } from '../types';
 import { BENCHMARK_COLORS } from './constants';
@@ -10,6 +10,8 @@ interface PerformanceBenchmarkSectionProps {
 }
 
 export default function PerformanceBenchmarkSection({ performanceData }: PerformanceBenchmarkSectionProps) {
+  const [showReal, setShowReal] = useState(false);
+
   const benchmarkData = useMemo((): BenchmarkPoint[] => {
     if (!performanceData || performanceData.length === 0) return [];
 
@@ -32,6 +34,27 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
       };
     });
   }, [performanceData]);
+
+  const chartData = useMemo(() => {
+    if (!showReal) return benchmarkData;
+    return benchmarkData.map((p) => {
+      const ipcaFactor = 1 + p.ipca / 100;
+      const deflate = (v: number): number => {
+        if (Math.abs(ipcaFactor) < 1e-6) return v;
+        const real = ((1 + v / 100) / ipcaFactor - 1) * 100;
+        return Number(real.toFixed(2));
+      };
+
+      return {
+        ...p,
+        portfolio: deflate(p.portfolio),
+        cdi: deflate(p.cdi),
+        ifix: deflate(p.ifix),
+        ibov: deflate(p.ibov),
+        sp500: deflate(p.sp500),
+      };
+    });
+  }, [benchmarkData, showReal]);
 
   const BenchmarkTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
@@ -57,16 +80,40 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
 
   return (
     <AnalysisCard id="section-benchmarks">
-      <SectionTitle
-        emoji="📈"
-        title="Comparação com Benchmarks"
-        subtitle="Rentabilidade acumulada da carteira vs principais indicadores do mercado"
-      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <SectionTitle
+          emoji="📈"
+          title="Comparação com Benchmarks"
+          subtitle={
+            showReal
+              ? 'Rentabilidade real acumulada descontando a inflação (IPCA)'
+              : 'Rentabilidade nominal acumulada da carteira vs principais indicadores do mercado'
+          }
+        />
+        {benchmarkData.length > 0 && (
+          <button
+            onClick={() => setShowReal(!showReal)}
+            style={{
+              background: showReal ? 'rgba(0,242,254,0.15)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${showReal ? 'rgba(0,242,254,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: '8px',
+              padding: '0.4rem 0.85rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: showReal ? '#00f2fe' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {showReal ? '📊 Retorno Real (IPCA)' : '📊 Retorno Nominal'}
+          </button>
+        )}
+      </div>
 
       {benchmarkData.length > 0 ? (
         <>
           <ResponsiveContainer width="100%" height={340}>
-            <LineChart data={benchmarkData} margin={{ top: 10, right: 15, left: 5, bottom: 20 }}>
+            <LineChart data={chartData} margin={{ top: 10, right: 15, left: 5, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -92,7 +139,9 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
               />
               <Line type="monotone" dataKey="portfolio" name="Carteira" stroke={BENCHMARK_COLORS.portfolio} strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
               <Line type="monotone" dataKey="cdi" name="CDI" stroke={BENCHMARK_COLORS.cdi} strokeWidth={1.5} dot={false} strokeDasharray="6 3" opacity={0.7} />
-              <Line type="monotone" dataKey="ipca" name="IPCA+" stroke={BENCHMARK_COLORS.ipca} strokeWidth={1.5} dot={false} strokeDasharray="4 4" opacity={0.6} />
+              {!showReal && (
+                <Line type="monotone" dataKey="ipca" name="IPCA+" stroke={BENCHMARK_COLORS.ipca} strokeWidth={1.5} dot={false} strokeDasharray="4 4" opacity={0.6} />
+              )}
               <Line type="monotone" dataKey="ifix" name="IFIX" stroke={BENCHMARK_COLORS.ifix} strokeWidth={1.5} dot={false} strokeDasharray="8 4" opacity={0.6} />
               <Line type="monotone" dataKey="ibov" name="Ibovespa" stroke={BENCHMARK_COLORS.ibov} strokeWidth={1.5} dot={false} strokeDasharray="5 5" opacity={0.6} />
               <Line type="monotone" dataKey="sp500" name="S&P 500" stroke={BENCHMARK_COLORS.sp500} strokeWidth={1.5} dot={false} strokeDasharray="3 6" opacity={0.6} />
@@ -109,7 +158,7 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
           }}>
-            💡 <strong style={{ color: 'var(--text-primary)' }}>Nota:</strong> Os benchmarks utilizam dados históricos reais obtidos da B3 (IFIX e Ibovespa), Banco Central (CDI e IPCA) e S&P 500 (com câmbio ajustado para BRL se a moeda base da carteira for Real).
+            💡 <strong style={{ color: 'var(--text-primary)' }}>Nota:</strong> Os benchmarks utilizam dados históricos reais obtidos da B3 (IFIX e Ibovespa), Banco Central (CDI e IPCA) e S&P 500 (com câmbio ajustado para BRL se a moeda base da carteira for Real). {showReal && 'No modo Retorno Real, os valores são deflacionados pelo IPCA acumulado do período.'}
           </div>
         </>
       ) : (
@@ -121,3 +170,4 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
     </AnalysisCard>
   );
 }
+
