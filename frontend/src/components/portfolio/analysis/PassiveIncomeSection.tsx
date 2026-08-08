@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Position, CalculatedDividend } from '../types';
+
 import { formatMoney } from '../helpers';
 import { DIVIDENDS_COLORS } from './constants';
 import { SectionTitle, AnalysisCard, StatPill, AlertBadge, ProgressBar } from './sharedComponents';
@@ -22,13 +23,26 @@ export default function PassiveIncomeSection({
   const [goalInput, setGoalInput] = useState<string>('');
   const [editingGoal, setEditingGoal] = useState<boolean>(false);
 
+  const [monthlyContribution, setMonthlyContribution] = useState<number>(1000);
+  const [contributionInput, setContributionInput] = useState<string>('1.000,00');
+  const [editingContribution, setEditingContribution] = useState<boolean>(false);
+
   useEffect(() => {
-    const saved = localStorage.getItem('stockpulse_monthly_goal');
-    if (saved) {
-      const parsed = parseFloat(saved);
+    const savedGoal = localStorage.getItem('stockpulse_monthly_goal');
+    if (savedGoal) {
+      const parsed = parseFloat(savedGoal);
       if (!isNaN(parsed)) {
         setMonthlyGoal(parsed);
         setGoalInput(parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+      }
+    }
+
+    const savedContrib = localStorage.getItem('stockpulse_monthly_contribution');
+    if (savedContrib) {
+      const parsed = parseFloat(savedContrib);
+      if (!isNaN(parsed)) {
+        setMonthlyContribution(parsed);
+        setContributionInput(parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
       }
     }
   }, []);
@@ -41,6 +55,16 @@ export default function PassiveIncomeSection({
       localStorage.setItem('stockpulse_monthly_goal', String(parsed));
     }
     setEditingGoal(false);
+  };
+
+  const saveContribution = () => {
+    const raw = contributionInput.replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setMonthlyContribution(parsed);
+      localStorage.setItem('stockpulse_monthly_contribution', String(parsed));
+    }
+    setEditingContribution(false);
   };
 
   const upcomingDividends = useMemo(() => {
@@ -231,10 +255,60 @@ export default function PassiveIncomeSection({
       totalDiv12m,
       dy: Number(dy.toFixed(2)),
       yoc: Number(yoc.toFixed(2)),
+      totalEquityValue,
     };
   }, [dividends, positions]);
 
   const avgMonthly = incomeKPIs.totalDiv12m / MONTHS_FOR_YIELD;
+
+  // Projeção do Efeito Bola de Neve (Juros Compostos)
+  const snowballProjection = useMemo(() => {
+    const monthlyDY = (incomeKPIs.dy > 0 ? incomeKPIs.dy : 8) / 12 / 100;
+    const startValue = incomeKPIs.totalEquityValue;
+
+    const simulateMonths = (targetMonths: number) => {
+      let portfolio = startValue;
+      for (let m = 0; m < targetMonths; m++) {
+        const monthIncome = portfolio * monthlyDY;
+        portfolio += monthIncome + monthlyContribution;
+      }
+      const projectedIncome = portfolio * monthlyDY;
+      return { portfolio, projectedIncome };
+    };
+
+    const targetYears = [1, 3, 5, 10];
+    const targets = targetYears.map(years => {
+      const res = simulateMonths(years * 12);
+      return {
+        label: `${years} ano${years > 1 ? 's' : ''}`,
+        years,
+        projectedPortfolio: res.portfolio,
+        projectedMonthlyIncome: res.projectedIncome,
+      };
+    });
+
+    // Série temporal mensal para o gráfico (60 meses = 5 anos)
+    const timeline: { label: string; portfolio: number; monthlyIncome: number }[] = [];
+    let runningPortfolio = startValue;
+    for (let m = 1; m <= 60; m++) {
+      const mIncome = runningPortfolio * monthlyDY;
+      runningPortfolio += mIncome + monthlyContribution;
+      if (m % 6 === 0) {
+        const yearLabel = (m / 12).toFixed(1).replace('.0', '');
+        timeline.push({
+          label: `${yearLabel}a`,
+          portfolio: Number(runningPortfolio.toFixed(2)),
+          monthlyIncome: Number((runningPortfolio * monthlyDY).toFixed(2)),
+        });
+      }
+    }
+
+    return {
+      targets,
+      timeline,
+      monthlyDY,
+    };
+  }, [incomeKPIs.dy, incomeKPIs.totalEquityValue, monthlyContribution]);
 
   const DividendBarTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
@@ -259,6 +333,31 @@ export default function PassiveIncomeSection({
           <span>Total:</span>
           <span>R$ {total.toFixed(2)}</span>
         </div>
+      </div>
+    );
+  };
+
+  const ProjectionTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const item = payload[0].payload;
+    return (
+      <div style={{
+        background: 'rgba(15, 23, 42, 0.95)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        padding: '0.85rem 1rem',
+        borderRadius: '10px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+        backdropFilter: 'blur(12px)',
+      }}>
+        <p style={{ margin: '0 0 0.4rem 0', fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>Projeção em {label}</p>
+        <p style={{ margin: '0.2rem 0', fontSize: '0.8rem', color: '#4ade80', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+          <span>Renda Mensal Projetada:</span>
+          <span style={{ fontWeight: 700 }}>{formatMoney(item.monthlyIncome, 'BRL')}</span>
+        </p>
+        <p style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+          <span>Patrimônio Acumulado:</span>
+          <span style={{ fontWeight: 600 }}>{formatMoney(item.portfolio, 'BRL')}</span>
+        </p>
       </div>
     );
   };
@@ -384,6 +483,104 @@ export default function PassiveIncomeSection({
         )}
       </AnalysisCard>
 
+      {/* ❄️ SEÇÃO: Efeito Bola de Neve & Projeção de Renda */}
+      <AnalysisCard id="section-snowball">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+          <SectionTitle
+            emoji="❄️"
+            title="Efeito Bola de Neve & Projeção de Renda"
+            subtitle="Simulação de juros compostos considerando reinvestimento de proventos e aportes mensais"
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Aporte Mensal Estimado:</span>
+            {editingContribution ? (
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={contributionInput}
+                  onChange={e => setContributionInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveContribution()}
+                  placeholder="1.000,00"
+                  autoFocus
+                  style={{
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(0,242,254,0.4)',
+                    borderRadius: '6px', padding: '0.25rem 0.5rem', color: '#00f2fe',
+                    fontSize: '0.8rem', width: '100px', textAlign: 'right', fontWeight: 700,
+                  }}
+                />
+                <button onClick={saveContribution} style={{ background: 'rgba(0,242,254,0.15)', border: '1px solid rgba(0,242,254,0.3)', borderRadius: '6px', padding: '0.25rem 0.5rem', color: '#00f2fe', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}>OK</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#00f2fe', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatMoney(monthlyContribution, 'BRL')}
+                </span>
+                <button onClick={() => setEditingContribution(true)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '0.2rem 0.5rem', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.72rem' }}>
+                  ✏️ Alterar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 4 StatPills: Projeção de Renda Mensal em 1, 3, 5, 10 anos */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          {snowballProjection.targets.map(target => (
+            <StatPill
+              key={target.years}
+              label={`Renda em ${target.label}`}
+              value={`${formatMoney(target.projectedMonthlyIncome, 'BRL')}/mês`}
+              color={target.years === 5 ? '#4ade80' : target.years === 10 ? '#00f2fe' : '#fbbf24'}
+            />
+          ))}
+        </div>
+
+        {/* AreaChart: Evolução da Renda Mensal em 5 anos */}
+        <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+          Evolução da Renda Mensal Projetada (Próximos 5 Anos)
+        </p>
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={snowballProjection.timeline} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+            <defs>
+              <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#4ade80" stopOpacity={0.4} />
+                <stop offset="95%" stopColor="#4ade80" stopOpacity={0.0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis
+              dataKey="label"
+              stroke="rgba(255,255,255,0.4)"
+              fontSize={11}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              stroke="rgba(255,255,255,0.4)"
+              fontSize={11}
+              tickFormatter={(v) => `R$ ${v}`}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip content={<ProjectionTooltip />} />
+            <Area
+              type="monotone"
+              dataKey="monthlyIncome"
+              name="Renda Mensal Projetada"
+              stroke="#4ade80"
+              strokeWidth={2.5}
+              fillOpacity={1}
+              fill="url(#colorIncome)"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+
+        <AlertBadge
+          type="info"
+          message={`❄️ Efeito Bola de Neve: Com aportes mensais de ${formatMoney(monthlyContribution, 'BRL')} e DY médio de ${incomeKPIs.dy > 0 ? incomeKPIs.dy.toFixed(2) : '8.00'}% a.a., sua renda passiva mensal poderá saltar de ${formatMoney(avgMonthly, 'BRL')} para ${formatMoney(snowballProjection.targets[2].projectedMonthlyIncome, 'BRL')} em 5 anos devido ao reinvestimento composto dos proventos.`}
+        />
+      </AnalysisCard>
+
       {/* Sazonalidade de Proventos */}
       <AnalysisCard>
         <SectionTitle emoji="🗓️" title="Sazonalidade de Proventos" subtitle="Mapa de calor do fluxo de caixa (12 meses + próximos)" />
@@ -446,3 +643,4 @@ export default function PassiveIncomeSection({
     </>
   );
 }
+
