@@ -6,6 +6,7 @@ import StrategicAllocationSection from './analysis/StrategicAllocationSection';
 import RiskConcentrationSection from './analysis/RiskConcentrationSection';
 import PerformanceBenchmarkSection from './analysis/PerformanceBenchmarkSection';
 import PassiveIncomeSection from './analysis/PassiveIncomeSection';
+import DividendsCalendarSection from './analysis/DividendsCalendarSection';
 import FundamentalHealthSection from './analysis/FundamentalHealthSection';
 import TaxEfficiencySection from './analysis/TaxEfficiencySection';
 
@@ -66,7 +67,13 @@ export default function PortfolioAnalysis({
         kpiCurrency={kpiCurrency}
       />
 
-      {/* 🏛️ SEÇÃO 5: Fundamentos, Valuation e Liquidez */}
+      {/* 📅 SEÇÃO 5: Calendário de Proventos Diário */}
+      <DividendsCalendarSection
+        dividends={dividends}
+        kpiCurrency={kpiCurrency}
+      />
+
+      {/* 🏛️ SEÇÃO 6: Fundamentos, Valuation e Liquidez */}
       <FundamentalHealthSection
         positions={positions}
         fiPositions={fiPositions}
@@ -74,7 +81,7 @@ export default function PortfolioAnalysis({
         kpiCurrency={kpiCurrency}
       />
 
-      {/* 💸 SEÇÃO 6: Eficiência Tributária */}
+      {/* 💸 SEÇÃO 7: Eficiência Tributária */}
       <TaxEfficiencySection
         positions={positions}
         dividends={dividends}
@@ -85,4 +92,5 @@ export default function PortfolioAnalysis({
     </div>
   );
 }
+
 
