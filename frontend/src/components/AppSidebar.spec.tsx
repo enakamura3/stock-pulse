@@ -4,14 +4,17 @@ import AppSidebar from './AppSidebar';
 import { ThemeProvider } from './ThemeProvider';
 import userEvent from '@testing-library/user-event';
 
+let mockPathname = '/dashboard/portfolio';
+
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/dashboard/portfolio',
+  usePathname: () => mockPathname,
 }));
 
 describe('AppSidebar Component', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
+    mockPathname = '/dashboard/portfolio';
   });
 
   it('renders brand logo, main nav links, portfolio sub-tabs, user name, and logout button', async () => {
@@ -65,5 +68,18 @@ describe('AppSidebar Component', () => {
     await user.click(toggleBtn);
     const aside = container.querySelector('aside');
     expect(aside).toHaveClass('open');
+  });
+
+  it('hides portfolio sub-tabs when on non-portfolio route like /dashboard/alerts', () => {
+    mockPathname = '/dashboard/alerts';
+
+    render(
+      <ThemeProvider>
+        <AppSidebar userName="Maria Souza" onSelectTab={vi.fn()} />
+      </ThemeProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: /Renda Variável/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Proventos/i })).not.toBeInTheDocument();
   });
 });
