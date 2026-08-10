@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import AppSidebar from '@/components/AppSidebar';
 import { apiFetch } from '@/lib/api';
 
 interface Alert {
@@ -25,7 +26,6 @@ interface SearchResult {
   exchange: string;
   type: string;
 }
-
 
 export default function AlertsPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -186,16 +186,6 @@ export default function AlertsPage() {
     }).format(val);
   };
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}/${mm}/${dd} às ${hh}:${min}`;
-  };
-
   if (authLoading) {
     return (
       <main className="container">
@@ -215,44 +205,14 @@ export default function AlertsPage() {
   const disabledAlerts = alerts.filter((a) => a.status === 'DISABLED');
 
   return (
-    <main className="container" style={{ maxWidth: 1100 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800 }}>stock-pulse</h1>
-          
-          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}>
-            <Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              💼 Minha Carteira
-            </Link>
-            <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              📊 Monitoramento
-            </Link>
-            <Link href="/dashboard/alerts" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              🔔 Meus Alertas
-            </Link>
-            <Link href="/dashboard/settings" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              ⚙️ Configurações
-            </Link>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>{user.name}</span>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sessão Segura</span>
-          </div>
-          <button className="primary-button" onClick={logout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
-            Sair
-          </button>
-        </div>
-      </div>
+    <div className="app-layout">
+      <AppSidebar userName={user.name} onLogout={logout} />
 
-      {/* Grid Central */}
-      <div style={{ display: 'flex', flexFlow: 'row wrap', gap: '2rem', alignItems: 'stretch' }}>
-        
-        {/* Painel Esquerdo: Criar Alerta */}
-        <div style={{ flex: '1 1 350px' }}>
+      <main className="app-main-content">
+        {/* Grid Central */}
+        <div style={{ display: 'flex', flexFlow: 'row wrap', gap: '2rem', alignItems: 'stretch' }}>
+          {/* Painel Esquerdo: Criar Alerta */}
+          <div style={{ flex: '1 1 350px' }}>
           <div className="glass-panel" style={{ padding: '2rem', textAlign: 'left', height: '100%' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', margin: '0 0 1.5rem 0' }}>
               Novo Alerta
@@ -597,5 +557,6 @@ export default function AlertsPage() {
 
       </div>
     </main>
+    </div>
   );
 }

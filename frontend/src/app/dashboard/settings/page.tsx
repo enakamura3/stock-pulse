@@ -303,8 +303,16 @@ export default function SettingsPage() {
         alert('Sua conta foi excluída com sucesso. Lamentamos ver você partir.');
         logout();
       } else {
+    if (!confirm('ATENÇÃO: Deseja realmente excluir sua conta e todos os seus dados? Esta ação é irreversível!')) return;
+    try {
+      const res = await apiFetch('/user/account', {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        deleteAccount();
+      } else {
         const data = await res.json();
-        alert(data.error || 'Erro ao excluir a conta.');
+        alert(`Erro ao excluir conta: ${data.error}`);
       }
     } catch (err) {
       console.error(err);
@@ -312,41 +320,25 @@ export default function SettingsPage() {
     }
   };
 
-  return (
-    <main className="container" style={{ maxWidth: 900 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800 }}>stock-pulse</h1>
-          
-          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}>
-            <Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              💼 Minha Carteira
-            </Link>
-            <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              📊 Monitoramento
-            </Link>
-            <Link href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              🔔 Meus Alertas
-            </Link>
-            <Link href="/dashboard/settings" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              ⚙️ Configurações
-            </Link>
-          </div>
+  if (authLoading) {
+    return (
+      <main className="container">
+        <div className="glass-panel">
+          <span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}></span>
+          <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}>Carregando sua sessão segura...</p>
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>{user.name}</span>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sessão Segura</span>
-          </div>
-          <button className="btn-secondary" onClick={logout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
-            Sair
-          </button>
-        </div>
-      </div>
+      </main>
+    );
+  }
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+  if (!user) return null;
+
+  return (
+    <div className="app-layout">
+      <AppSidebar userName={user.name} onLogout={logout} />
+
+      <main className="app-main-content">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
         {/* Seção 1: Dados Cadastrais */}
         <section className="card">
@@ -597,5 +589,6 @@ export default function SettingsPage() {
 
       </div>
     </main>
+    </div>
   );
 }

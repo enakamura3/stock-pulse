@@ -3,6 +3,7 @@ import DashboardPage from './page';
 import React from 'react';
 import { vi } from 'vitest';
 import { useAuth } from '@/context/AuthContext';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -28,7 +29,11 @@ describe('DashboardPage', () => {
   });
 
   it('renders dashboard layout and fetches watchlists', async () => {
-    render(<DashboardPage />);
+    render(
+      <ThemeProvider>
+        <DashboardPage />
+      </ThemeProvider>
+    );
     
     expect(screen.getByText('stock-pulse')).toBeInTheDocument();
     
