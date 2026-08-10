@@ -20,6 +20,8 @@ import Modals from '@/components/portfolio/Modals';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
+import AppSidebar from '@/components/AppSidebar';
+
 function PortfolioContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const portfolio = usePortfolio();
@@ -147,60 +149,42 @@ function PortfolioContent() {
   }
 
   return (
-    <main className="container" style={{ maxWidth: 1400 }}>
-      <PortfolioHeader userName={user?.name || 'Investidor'} onLogout={logout} />
-
-      <PortfolioTabs 
-        portfolios={portfolios} 
-        activePortfolioId={activePortfolioId} setActivePortfolioId={setActivePortfolioId} 
-        setShowPortfolioModal={setShowPortfolioModal} handleDeletePortfolio={handleDeletePortfolio} 
-        handleExportPortfolio={handleExportPortfolio}
-        handleSetDefaultPortfolio={handleSetDefaultPortfolio}
+    <div className="app-layout">
+      <AppSidebar
+        userName={user?.name || 'Investidor'}
+        onLogout={logout}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
       />
 
-      <div className="flex-row gap-sm mb-lg flex-wrap">
-        {filterCategories.map(cat => (
-          <button
-            key={cat} onClick={() => setActiveCategoryFilter(cat)}
-            className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
-            style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)', color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)' }}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
+      <main className="app-main-content">
+        <PortfolioTabs 
+          portfolios={portfolios} 
+          activePortfolioId={activePortfolioId} setActivePortfolioId={setActivePortfolioId} 
+          setShowPortfolioModal={setShowPortfolioModal} handleDeletePortfolio={handleDeletePortfolio} 
+          handleExportPortfolio={handleExportPortfolio}
+          handleSetDefaultPortfolio={handleSetDefaultPortfolio}
+        />
 
-      {isLoadingDetails ? (
-        <div className="glass-panel flex-row items-center justify-center" style={{ minHeight: '300px' }}>
-          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 35, height: 35 }}></span>
+        <div className="flex-row gap-sm mb-lg flex-wrap">
+          {filterCategories.map(cat => (
+            <button
+              key={cat} onClick={() => setActiveCategoryFilter(cat)}
+              className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
+              style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)', color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)' }}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-      ) : (
-        <div className="flex-col gap-xl">
-          <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} />
 
-          <div className="flex-row gap-md mt-xl mb-lg" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <button onClick={() => setActiveTab('ativos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'ativos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'ativos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'ativos' ? 700 : 500, fontSize: '0.9rem' }}>
-              📊 Renda Variável
-            </button>
-            <button onClick={() => setActiveTab('renda-fixa')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'renda-fixa' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'renda-fixa' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'renda-fixa' ? 700 : 500, fontSize: '0.9rem' }}>
-              🏛️ Renda Fixa
-            </button>
-            <button onClick={() => setActiveTab('tesouro')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'tesouro' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'tesouro' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'tesouro' ? 700 : 500, fontSize: '0.9rem' }}>
-              🏛️ Tesouro Direto
-            </button>
-            <button onClick={() => setActiveTab('operacoes')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'operacoes' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'operacoes' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'operacoes' ? 700 : 500, fontSize: '0.9rem' }}>
-              📜 Histórico de Operações
-            </button>
-            <button onClick={() => setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}>
-              💰 Proventos
-            </button>
-            <button onClick={() => setActiveTab('analise')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'analise' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'analise' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'analise' ? 700 : 500, fontSize: '0.9rem' }}>
-              🔬 Análise da Carteira
-            </button>
-            <button onClick={() => setActiveTab('diario')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'diario' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'diario' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'diario' ? 700 : 500, fontSize: '0.9rem' }}>
-              📈 Resumo Diário
-            </button>
+        {isLoadingDetails ? (
+          <div className="glass-panel flex-row items-center justify-center" style={{ minHeight: '300px' }}>
+            <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 35, height: 35 }}></span>
           </div>
+        ) : (
+          <div className="flex-col gap-xl">
+            <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} />
 
           {activeTab === 'ativos' && (
             <div className="flex-col gap-xl w-full">
@@ -295,7 +279,8 @@ function PortfolioContent() {
 
       {/* Renderizado sem prop drilling! Todos os modais consomem o PortfolioContext */}
       <Modals />
-    </main>
+      </main>
+    </div>
   );
 }
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/api';
 import { Item, Watchlist, SearchResult, Quote } from '@/components/dashboard/types';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import AppSidebar from '@/components/AppSidebar';
 import AssetSearch from '@/components/dashboard/AssetSearch';
 import ActiveQuoteCard from '@/components/dashboard/ActiveQuoteCard';
 import WatchlistSidebar from '@/components/dashboard/WatchlistSidebar';
@@ -429,13 +429,14 @@ export default function DashboardPage() {
   const activeFavorited = activeQuote ? isAssetFavorited(activeQuote.symbol) : false;
 
   return (
-    <main className="container" style={{ maxWidth: 1400 }}>
-      {/* Header */}
-      <DashboardHeader
+    <div className="app-layout">
+      <AppSidebar
         userName={user.name}
         wsConnected={wsConnected}
         onLogout={logout}
       />
+
+      <main className="app-main-content">
 
       {/* Main Grid responsiva em Flexbox */}
       <div style={{ display: 'flex', gap: '2rem', flexFlow: 'row wrap', alignItems: 'stretch' }}>
@@ -507,6 +508,7 @@ export default function DashboardPage() {
           onClose={() => setShowAlertModal(false)}
         />
       )}
-    </main>
+      </main>
+    </div>
   );
 }

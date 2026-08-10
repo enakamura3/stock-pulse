@@ -451,18 +451,55 @@ body {
   animation: pulse 1.5s infinite ease-in-out;
 }
 
-@keyframes pulse {
-  0% {
-    transform: scale(0.85);
-    opacity: 0.6;
+/* Regras do AppSidebar e Responsividade Mobile */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.app-main-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1400px;
+  padding: 2rem;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
   }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-    box-shadow: 0 0 12px #00ff88;
+  .app-sidebar.open {
+    transform: translateX(0) !important;
   }
-  100% {
-    transform: scale(0.85);
-    opacity: 0.6;
+  .mobile-menu-toggle {
+    display: flex !important;
+  }
+  .app-main-content {
+    padding: 1rem;
+    padding-top: 4.5rem;
   }
 }
+
+.sidebar-link:hover, .sidebar-sublink:hover {
+  color: var(--text-primary) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.sidebar-link.active:hover, .sidebar-sublink.active:hover {
+  background: rgba(0, 242, 254, 0.12) !important;
+}
+
+.sidebar-link:focus-visible, .sidebar-sublink:focus-visible {
+  outline: 2px solid var(--accent-color);
+}
+
+.sidebar-link:focus:not(:focus-visible), .sidebar-sublink:focus:not(:focus-visible) {
+  outline: none;
+}
+
