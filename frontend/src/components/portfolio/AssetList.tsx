@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Position } from './types';
 import { formatMoney, formatPercentage, formatQuantity } from './helpers';
+import { TrendingUpIcon, ReceiptIcon, WalletIcon } from '@/components/ui/icons';
 
 interface AssetListProps {
   positions: Position[];
@@ -56,10 +57,12 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
   return (
     <div className="card flex-col gap-md" style={{ width: '100%' }}>
       <div className="flex-row justify-between items-center mb-lg">
-        <h3 className="card-title">📦 Posições Ativas</h3>
+        <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <TrendingUpIcon size={20} /> Posições Ativas
+        </h3>
         <div className="flex-row gap-sm">
-          <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
-            📥 Importar CSV
+          <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <ReceiptIcon size={14} /> Importar CSV
             <input 
               type="file" accept=".csv,.txt" style={{ display: 'none' }}
               onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
@@ -99,31 +102,31 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
                     <td title={pos.name} style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'help' }}>
                       <span className="font-bold text-accent">{pos.ticker}</span>
                     </td>
-                    <td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{formatQuantity(pos.quantity)}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{formatMoney(pos.average_price, pos.currency)}</td>
-                    <td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{formatMoney(pos.total_cost, kpiCurrency)}</td>
-                    <td className="text-right font-bold text-primary" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}</td>
-                    <td className="text-right font-bold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', color: isPos ? '#00e676' : '#ff3d00' }}>
+                    <td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{formatQuantity(pos.quantity)}</td>
+                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{formatMoney(pos.average_price, pos.currency)}</td>
+                    <td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}</td>
+                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{formatMoney(pos.total_cost, kpiCurrency)}</td>
+                    <td className="text-right font-bold text-primary" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}</td>
+                    <td className="text-right font-bold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', color: isPos ? 'var(--color-success)' : 'var(--color-danger)' }}>
                       {pos.return_percent !== undefined ? formatPercentage(pos.return_percent) : '--'}
                     </td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
                       {pos.graham_value ? (
-                        <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.graham_value ? '#00e676' : '#ff3d00' }}>
+                        <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.graham_value ? 'var(--color-success)' : 'var(--color-danger)' }}>
                           {formatMoney(pos.graham_value, pos.currency)}
                         </span>
                       ) : '--'}
                     </td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
                       {pos.bazin_value ? (
-                        <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.bazin_value ? '#00e676' : '#ff3d00' }}>
+                        <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.bazin_value ? 'var(--color-success)' : 'var(--color-danger)' }}>
                           {formatMoney(pos.bazin_value, pos.currency)}
                         </span>
                       ) : '--'}
                     </td>
-                    <td className="text-right font-semibold text-success" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{pos.pe ? pos.pe.toFixed(2) : '--'}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace', color: pos.pvp && pos.pvp < 1.0 ? '#00e676' : 'inherit' }}>{pos.pvp ? pos.pvp.toFixed(2) : '--'}</td>
+                    <td className="text-right font-semibold text-success" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}</td>
+                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.pe ? pos.pe.toFixed(2) : '--'}</td>
+                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', color: pos.pvp && pos.pvp < 1.0 ? 'var(--color-success)' : 'inherit' }}>{pos.pvp ? pos.pvp.toFixed(2) : '--'}</td>
                   </tr>
                 );
               })}
@@ -131,8 +134,8 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
           </table>
         ) : (
           <div className="flex-col items-center justify-center text-secondary" style={{ height: '240px' }}>
-            <span className="text-2xl mb-sm">📁</span>
-            <p className="text-sm">Esta carteira ainda não possui ativos ativos.</p>
+            <WalletIcon size={32} />
+            <p className="text-sm mt-sm">Esta carteira ainda não possui ativos ativos.</p>
           </div>
         )}
       </div>

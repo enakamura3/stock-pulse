@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { useTheme } from '@/components/ThemeProvider';
 
 interface CalculatedDividend {
   asset_id: string;
@@ -28,6 +29,11 @@ interface DividendsChartProps {
 }
 
 export default function DividendsChart({ data }: DividendsChartProps) {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+  const strokeColor = isLight ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.4)';
+  const gridColor = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)';
+
   const chartData = useMemo(() => {
     // Agrupa por mês (YYYY-MM) usando a data de pagamento
     const grouped = data.reduce((acc, div) => {
@@ -72,21 +78,21 @@ export default function DividendsChart({ data }: DividendsChartProps) {
       const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
       return (
         <div style={{
-          background: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          background: 'var(--panel-bg)',
+          border: '1px solid var(--panel-border)',
           padding: '1rem',
           borderRadius: '8px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
           backdropFilter: 'blur(10px)'
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: '#fff' }}>{label}</p>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: 'var(--text-primary)' }}>{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} style={{ margin: '0.25rem 0', fontSize: '0.85rem', color: entry.color, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
               <span>{entry.name}:</span>
               <span style={{ fontWeight: 700 }}>R$ {entry.value.toFixed(2)}</span>
             </p>
           ))}
-          <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 700, color: '#fff' }}>
+          <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
             <span>Total:</span>
             <span>R$ {total.toFixed(2)}</span>
           </div>
@@ -102,26 +108,26 @@ export default function DividendsChart({ data }: DividendsChartProps) {
         data={chartData}
         margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
         <XAxis 
           dataKey="name" 
-          stroke="rgba(255,255,255,0.4)" 
+          stroke={strokeColor} 
           fontSize={12} 
           tickMargin={10}
           axisLine={false}
           tickLine={false}
         />
         <YAxis 
-          stroke="rgba(255,255,255,0.4)" 
+          stroke={strokeColor} 
           fontSize={12}
           tickFormatter={(value) => `R$ ${value}`}
           axisLine={false}
           tickLine={false}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.02)' }} />
         <Legend wrapperStyle={{ paddingTop: '20px' }} />
-        <Bar dataKey="Nacionais (R$)" stackId="a" fill="#00e676" radius={[0, 0, 4, 4]} barSize={40} />
-        <Bar dataKey="Internacionais (R$)" stackId="a" fill="#00f2fe" radius={[0, 0, 0, 0]} barSize={40} />
+        <Bar dataKey="Nacionais (R$)" stackId="a" fill="var(--color-success)" radius={[0, 0, 4, 4]} barSize={40} />
+        <Bar dataKey="Internacionais (R$)" stackId="a" fill="var(--accent-color)" radius={[0, 0, 0, 0]} barSize={40} />
         <Bar dataKey="Renda Fixa (R$)" stackId="a" fill="#FFB300" radius={[4, 4, 0, 0]} barSize={40} />
       </BarChart>
     </ResponsiveContainer>

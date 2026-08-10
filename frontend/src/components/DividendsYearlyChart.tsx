@@ -9,12 +9,18 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { CalculatedDividend } from './portfolio/types';
+import { useTheme } from '@/components/ThemeProvider';
 
 interface DividendsYearlyChartProps {
   data: CalculatedDividend[];
 }
 
 export default function DividendsYearlyChart({ data }: DividendsYearlyChartProps) {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+  const strokeColor = isLight ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)';
+  const gridColor = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)';
+
   const chartData = useMemo(() => {
     const grouped = data.reduce((acc, div) => {
       // Use payment date if available, else cum_date
@@ -44,15 +50,15 @@ export default function DividendsYearlyChart({ data }: DividendsYearlyChartProps
     if (active && payload && payload.length) {
       return (
         <div style={{
-          background: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          background: 'var(--panel-bg)',
+          border: '1px solid var(--panel-border)',
           padding: '1rem',
           borderRadius: '8px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
           backdropFilter: 'blur(10px)'
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: '#fff' }}>Ano: {label}</p>
-          <p style={{ margin: '0', color: '#3b82f6', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: 'var(--text-primary)' }}>Ano: {label}</p>
+          <p style={{ margin: '0', color: 'var(--accent-color)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
             <span>Total:</span>
             <span>R$ {payload[0].value.toFixed(2)}</span>
           </p>
@@ -65,11 +71,11 @@ export default function DividendsYearlyChart({ data }: DividendsYearlyChartProps
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-        <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" fontSize={12} tickLine={false} axisLine={false} />
-        <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-        <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+        <XAxis dataKey="name" stroke={strokeColor} fontSize={12} tickLine={false} axisLine={false} />
+        <YAxis stroke={strokeColor} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)' }} />
+        <Bar dataKey="total" fill="var(--accent-color)" radius={[4, 4, 0, 0]} maxBarSize={40} />
       </BarChart>
     </ResponsiveContainer>
   );

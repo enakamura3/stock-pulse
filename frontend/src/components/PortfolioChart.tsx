@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType, IChartApi, ISeriesApi, AreaSeries, LineSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi, AreaSeries } from 'lightweight-charts';
+import { useTheme } from '@/components/ThemeProvider';
 
 interface ChartPoint {
   date: string;
@@ -14,6 +15,7 @@ interface PortfolioChartProps {
 }
 
 export default function PortfolioChart({ data }: PortfolioChartProps) {
+  const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const valueSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
@@ -31,16 +33,20 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       chartRef.current.remove();
     }
 
+    const isLight = theme === 'light';
+    const textColor = isLight ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.45)';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)';
+
     // Configuração do container do gráfico
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'rgba(255, 255, 255, 0.45)',
+        textColor,
         fontSize: 10,
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.02)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.02)' },
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor },
       },
       width: containerRef.current.clientWidth,
       height: 300,
@@ -120,7 +126,7 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [data, showValue, showInvested, viewMode]);
+  }, [data, showValue, showInvested, viewMode, theme]);
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
