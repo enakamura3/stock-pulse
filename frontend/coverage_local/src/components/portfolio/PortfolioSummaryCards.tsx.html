@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/69</span>
+                <span class='fraction'>0/70</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/69</span>
+                <span class='fraction'>0/70</span>
             </div>
         
             
@@ -132,7 +132,9 @@
 <a name='L67'></a><a href='#L67'>67</a>
 <a name='L68'></a><a href='#L68'>68</a>
 <a name='L69'></a><a href='#L69'>69</a>
-<a name='L70'></a><a href='#L70'>70</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -203,6 +205,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import React from 'react';</span></span></span>
 <span class="cstat-no" title="statement not covered" >import { formatMoney, formatPercentage } from './helpers';</span>
+<span class="cstat-no" title="statement not covered" >import { WalletIcon, TrendingUpIcon, TrendingDownIcon, CoinsIcon, BankIcon } from '@/components/ui/icons';</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >interface PortfolioSummaryCardsProps {</span>
 <span class="cstat-no" title="statement not covered" >  totalCost: number;</span>
@@ -223,36 +226,36 @@
 <span class="cstat-no" title="statement not covered" >    &lt;div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.25rem' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >      &lt;div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;span&gt;💰&lt;/span&gt; Patrimônio Atual</span>
+<span class="cstat-no" title="statement not covered" >          &lt;WalletIcon size={16} /&gt; Patrimônio Atual</span>
 <span class="cstat-no" title="statement not covered" >          {isLoadingTreasury &amp;&amp; (</span>
 <span class="cstat-no" title="statement not covered" >            &lt;span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginLeft: '6px' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >              ⟳ Tesouro...</span>
 <span class="cstat-no" title="statement not covered" >            &lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >          )}</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/span&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;span className="text-2xl font-bold mt-sm" style={{ color: '#fff', letterSpacing: '-0.02em' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;span className="text-2xl font-bold mt-sm" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >          {formatMoney(currentValue, kpiCurrency)}</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
 <span class="cstat-no" title="statement not covered" >      </span>
 <span class="cstat-no" title="statement not covered" >      &lt;div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;span&gt;📥&lt;/span&gt; Total Investido</span>
+<span class="cstat-no" title="statement not covered" >          &lt;BankIcon size={16} /&gt; Total Investido</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/span&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;span className="text-2xl font-bold mt-sm" style={{ color: '#fff', letterSpacing: '-0.02em' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;span className="text-2xl font-bold mt-sm" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >          {formatMoney(totalCost, kpiCurrency)}</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >      &lt;div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;span&gt;{isPos ? '📈' : '📉'}&lt;/span&gt; Lucro / Prejuízo</span>
+<span class="cstat-no" title="statement not covered" >          {isPos ? &lt;TrendingUpIcon size={16} color="var(--color-success)" /&gt; : &lt;TrendingDownIcon size={16} color="var(--color-danger)" /&gt;} Lucro / Prejuízo</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div className="flex-col gap-xs mt-sm"&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;span className="text-2xl font-bold" style={{ color: isPos ? '#00e676' : '#ff3d00', letterSpacing: '-0.02em', wordBreak: 'break-word', lineHeight: 1.1 }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;span className="text-2xl font-bold" style={{ color: isPos ? 'var(--color-success)' : 'var(--color-danger)', letterSpacing: '-0.02em', wordBreak: 'break-word', lineHeight: 1.1 }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >            {isPos ? '+' : ''}{formatMoney(profitLoss, kpiCurrency)}</span>
 <span class="cstat-no" title="statement not covered" >          &lt;/span&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;span style={{ fontSize: '0.9rem', color: isPos ? '#00e676' : '#ff3d00', opacity: 0.9, fontWeight: 600 }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;span style={{ fontSize: '0.9rem', color: isPos ? 'var(--color-success)' : 'var(--color-danger)', opacity: 0.9, fontWeight: 600 }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >            {formatPercentage(returnPercent)}</span>
 <span class="cstat-no" title="statement not covered" >          &lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
@@ -260,9 +263,9 @@
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >      &lt;div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;span&gt;💸&lt;/span&gt; Média de Proventos (12m)</span>
+<span class="cstat-no" title="statement not covered" >          &lt;CoinsIcon size={16} /&gt; Média de Proventos (12m)</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/span&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;span className="text-2xl font-bold mt-sm" style={{ color: '#00f2fe', letterSpacing: '-0.02em' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;span className="text-2xl font-bold mt-sm" style={{ color: 'var(--accent-color)', letterSpacing: '-0.02em' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >          {formatMoney(avgDividends12m, kpiCurrency)}</span>
 <span class="cstat-no" title="statement not covered" >          &lt;span style={{ fontSize: '0.8rem', opacity: 0.7, fontWeight: 500, marginLeft: '4px' }}&gt;/mês&lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/span&gt;</span>
@@ -277,7 +280,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-10T03:13:40.168Z
+                at 2026-08-10T13:55:22.634Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

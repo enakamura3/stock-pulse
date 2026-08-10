@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/76</span>
+                <span class='fraction'>0/82</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/76</span>
+                <span class='fraction'>0/82</span>
             </div>
         
             
@@ -139,7 +139,19 @@
 <a name='L74'></a><a href='#L74'>74</a>
 <a name='L75'></a><a href='#L75'>75</a>
 <a name='L76'></a><a href='#L76'>76</a>
-<a name='L77'></a><a href='#L77'>77</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -226,12 +238,18 @@
 <span class="cstat-no" title="statement not covered" >  ResponsiveContainer</span>
 <span class="cstat-no" title="statement not covered" >} from 'recharts';</span>
 <span class="cstat-no" title="statement not covered" >import { CalculatedDividend } from './portfolio/types';</span>
+<span class="cstat-no" title="statement not covered" >import { useTheme } from '@/components/ThemeProvider';</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >interface DividendsYearlyChartProps {</span>
 <span class="cstat-no" title="statement not covered" >  data: CalculatedDividend[];</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >export default function DividendsYearlyChart({ data }: DividendsYearlyChartProps) {</span>
+<span class="cstat-no" title="statement not covered" >  const { theme } = useTheme();</span>
+<span class="cstat-no" title="statement not covered" >  const isLight = theme === 'light';</span>
+<span class="cstat-no" title="statement not covered" >  const strokeColor = isLight ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)';</span>
+<span class="cstat-no" title="statement not covered" >  const gridColor = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)';</span>
+<span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >  const chartData = useMemo(() =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    const grouped = data.reduce((acc, div) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >      // Use payment date if available, else cum_date</span>
@@ -261,15 +279,15 @@
 <span class="cstat-no" title="statement not covered" >    if (active &amp;&amp; payload &amp;&amp; payload.length) {</span>
 <span class="cstat-no" title="statement not covered" >      return (</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div style={{</span>
-<span class="cstat-no" title="statement not covered" >          background: 'rgba(15, 23, 42, 0.95)',</span>
-<span class="cstat-no" title="statement not covered" >          border: '1px solid rgba(255,255,255,0.1)',</span>
+<span class="cstat-no" title="statement not covered" >          background: 'var(--panel-bg)',</span>
+<span class="cstat-no" title="statement not covered" >          border: '1px solid var(--panel-border)',</span>
 <span class="cstat-no" title="statement not covered" >          padding: '1rem',</span>
 <span class="cstat-no" title="statement not covered" >          borderRadius: '8px',</span>
-<span class="cstat-no" title="statement not covered" >          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',</span>
+<span class="cstat-no" title="statement not covered" >          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',</span>
 <span class="cstat-no" title="statement not covered" >          backdropFilter: 'blur(10px)'</span>
 <span class="cstat-no" title="statement not covered" >        }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: '#fff' }}&gt;Ano: {label}&lt;/p&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;p style={{ margin: '0', color: '#3b82f6', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: 'var(--text-primary)' }}&gt;Ano: {label}&lt;/p&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;p style={{ margin: '0', color: 'var(--accent-color)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >            &lt;span&gt;Total:&lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >            &lt;span&gt;R$ {payload[0].value.toFixed(2)}&lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >          &lt;/p&gt;</span>
@@ -282,11 +300,11 @@
 <span class="cstat-no" title="statement not covered" >  return (</span>
 <span class="cstat-no" title="statement not covered" >    &lt;ResponsiveContainer width="100%" height="100%"&gt;</span>
 <span class="cstat-no" title="statement not covered" >      &lt;BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} /&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" fontSize={12} tickLine={false} axisLine={false} /&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) =&gt; `R$${val}`} /&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;Tooltip content={&lt;CustomTooltip /&gt;} cursor={{ fill: 'rgba(255,255,255,0.05)' }} /&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;XAxis dataKey="name" stroke={strokeColor} fontSize={12} tickLine={false} axisLine={false} /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;YAxis stroke={strokeColor} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) =&gt; `R$${val}`} /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;Tooltip content={&lt;CustomTooltip /&gt;} cursor={{ fill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)' }} /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;Bar dataKey="total" fill="var(--accent-color)" radius={[4, 4, 0, 0]} maxBarSize={40} /&gt;</span>
 <span class="cstat-no" title="statement not covered" >      &lt;/BarChart&gt;</span>
 <span class="cstat-no" title="statement not covered" >    &lt;/ResponsiveContainer&gt;</span>
 <span class="cstat-no" title="statement not covered" >  );</span>
@@ -298,7 +316,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-10T03:13:40.168Z
+                at 2026-08-10T13:55:22.634Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

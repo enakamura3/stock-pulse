@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/141</span>
+                <span class='fraction'>0/144</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/141</span>
+                <span class='fraction'>0/144</span>
             </div>
         
             
@@ -204,7 +204,13 @@
 <a name='L139'></a><a href='#L139'>139</a>
 <a name='L140'></a><a href='#L140'>140</a>
 <a name='L141'></a><a href='#L141'>141</a>
-<a name='L142'></a><a href='#L142'>142</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -348,6 +354,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import React, { useState } from 'react';</span></span></span>
 <span class="cstat-no" title="statement not covered" >import { Position } from './types';</span>
 <span class="cstat-no" title="statement not covered" >import { formatMoney, formatPercentage, formatQuantity } from './helpers';</span>
+<span class="cstat-no" title="statement not covered" >import { TrendingUpIcon, ReceiptIcon, WalletIcon } from '@/components/ui/icons';</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >interface AssetListProps {</span>
 <span class="cstat-no" title="statement not covered" >  positions: Position[];</span>
@@ -403,10 +410,12 @@
 <span class="cstat-no" title="statement not covered" >  return (</span>
 <span class="cstat-no" title="statement not covered" >    &lt;div className="card flex-col gap-md" style={{ width: '100%' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >      &lt;div className="flex-row justify-between items-center mb-lg"&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;h3 className="card-title"&gt;📦 Posições Ativas&lt;/h3&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;TrendingUpIcon size={20} /&gt; Posições Ativas</span>
+<span class="cstat-no" title="statement not covered" >        &lt;/h3&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div className="flex-row gap-sm"&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >            📥 Importar CSV</span>
+<span class="cstat-no" title="statement not covered" >          &lt;label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >            &lt;ReceiptIcon size={14} /&gt; Importar CSV</span>
 <span class="cstat-no" title="statement not covered" >            &lt;input </span>
 <span class="cstat-no" title="statement not covered" >              type="file" accept=".csv,.txt" style={{ display: 'none' }}</span>
 <span class="cstat-no" title="statement not covered" >              onClick={(e) =&gt; { (e.target as HTMLInputElement).value = ''; }}</span>
@@ -446,31 +455,31 @@
 <span class="cstat-no" title="statement not covered" >                    &lt;td title={pos.name} style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'help' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >                      &lt;span className="font-bold text-accent"&gt;{pos.ticker}&lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >                    &lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;{formatQuantity(pos.quantity)}&lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;{formatMoney(pos.average_price, pos.currency)}&lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}&lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;{formatMoney(pos.total_cost, kpiCurrency)}&lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-bold text-primary" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;{pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}&lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-bold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', color: isPos ? '#00e676' : '#ff3d00' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;{formatQuantity(pos.quantity)}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;{formatMoney(pos.average_price, pos.currency)}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;{formatMoney(pos.total_cost, kpiCurrency)}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-bold text-primary" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;{pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-bold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', color: isPos ? 'var(--color-success)' : 'var(--color-danger)' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >                      {pos.return_percent !== undefined ? formatPercentage(pos.return_percent) : '--'}</span>
 <span class="cstat-no" title="statement not covered" >                    &lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >                      {pos.graham_value ? (</span>
-<span class="cstat-no" title="statement not covered" >                        &lt;span className="font-semibold" style={{ color: pos.current_price &amp;&amp; pos.current_price &lt; pos.graham_value ? '#00e676' : '#ff3d00' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >                        &lt;span className="font-semibold" style={{ color: pos.current_price &amp;&amp; pos.current_price &lt; pos.graham_value ? 'var(--color-success)' : 'var(--color-danger)' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >                          {formatMoney(pos.graham_value, pos.currency)}</span>
 <span class="cstat-no" title="statement not covered" >                        &lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >                      ) : '--'}</span>
 <span class="cstat-no" title="statement not covered" >                    &lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >                      {pos.bazin_value ? (</span>
-<span class="cstat-no" title="statement not covered" >                        &lt;span className="font-semibold" style={{ color: pos.current_price &amp;&amp; pos.current_price &lt; pos.bazin_value ? '#00e676' : '#ff3d00' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >                        &lt;span className="font-semibold" style={{ color: pos.current_price &amp;&amp; pos.current_price &lt; pos.bazin_value ? 'var(--color-success)' : 'var(--color-danger)' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >                          {formatMoney(pos.bazin_value, pos.currency)}</span>
 <span class="cstat-no" title="statement not covered" >                        &lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >                      ) : '--'}</span>
 <span class="cstat-no" title="statement not covered" >                    &lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-semibold text-success" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;{pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}&lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}&gt;{pos.pe ? pos.pe.toFixed(2) : '--'}&lt;/td&gt;</span>
-<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace', color: pos.pvp &amp;&amp; pos.pvp &lt; 1.0 ? '#00e676' : 'inherit' }}&gt;{pos.pvp ? pos.pvp.toFixed(2) : '--'}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right font-semibold text-success" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;{pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}&gt;{pos.pe ? pos.pe.toFixed(2) : '--'}&lt;/td&gt;</span>
+<span class="cstat-no" title="statement not covered" >                    &lt;td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', color: pos.pvp &amp;&amp; pos.pvp &lt; 1.0 ? 'var(--color-success)' : 'inherit' }}&gt;{pos.pvp ? pos.pvp.toFixed(2) : '--'}&lt;/td&gt;</span>
 <span class="cstat-no" title="statement not covered" >                  &lt;/tr&gt;</span>
 <span class="cstat-no" title="statement not covered" >                );</span>
 <span class="cstat-no" title="statement not covered" >              })}</span>
@@ -478,8 +487,8 @@
 <span class="cstat-no" title="statement not covered" >          &lt;/table&gt;</span>
 <span class="cstat-no" title="statement not covered" >        ) : (</span>
 <span class="cstat-no" title="statement not covered" >          &lt;div className="flex-col items-center justify-center text-secondary" style={{ height: '240px' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;span className="text-2xl mb-sm"&gt;📁&lt;/span&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;p className="text-sm"&gt;Esta carteira ainda não possui ativos ativos.&lt;/p&gt;</span>
+<span class="cstat-no" title="statement not covered" >            &lt;WalletIcon size={32} /&gt;</span>
+<span class="cstat-no" title="statement not covered" >            &lt;p className="text-sm mt-sm"&gt;Esta carteira ainda não possui ativos ativos.&lt;/p&gt;</span>
 <span class="cstat-no" title="statement not covered" >          &lt;/div&gt;</span>
 <span class="cstat-no" title="statement not covered" >        )}</span>
 <span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
@@ -493,7 +502,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-10T03:13:40.168Z
+                at 2026-08-10T13:55:22.634Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
