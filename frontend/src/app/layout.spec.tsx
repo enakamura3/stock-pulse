@@ -2,6 +2,11 @@ import { render } from '@testing-library/react';
 import RootLayout from './layout';
 import React from 'react';
 
+vi.mock('next/font/google', () => ({
+  Inter: () => ({ variable: '--font-inter' }),
+  JetBrains_Mono: () => ({ variable: '--font-mono' }),
+}));
+
 vi.mock('@/context/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="auth-provider">{children}</div>,
 }));

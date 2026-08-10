@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
 
 interface PortfolioHeaderProps {
   userName: string;
@@ -31,6 +32,7 @@ export default function PortfolioHeader({ userName, onLogout }: PortfolioHeaderP
       </div>
       
       <div className="flex-row items-center gap-lg">
+        <ThemeToggle />
         <div className="text-right text-xs">
           <span className="font-semibold" style={{ display: 'block' }}>{userName}</span>
           <span className="text-secondary" style={{ fontSize: '0.7rem' }}>Sessão Segura</span>

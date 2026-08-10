@@ -1,12 +1,71 @@
 :root {
+  /* Fontes carregadas via next/font/google */
+  --font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-mono: var(--font-mono), 'JetBrains Mono', monospace;
+
+  /* Escala de Z-Index */
+  --z-header: 40;
+  --z-drawer: 50;
+  --z-modal: 60;
+  --z-tooltip: 70;
+
+  /* Tema Escuro (Padrão) */
   --bg-color: #0f1115;
   --panel-bg: rgba(255, 255, 255, 0.05);
+  --panel-bg-hover: rgba(255, 255, 255, 0.08);
   --panel-border: rgba(255, 255, 255, 0.1);
+  --panel-border-strong: rgba(255, 255, 255, 0.18);
+  --input-bg: rgba(255, 255, 255, 0.03);
+
   --text-primary: #f8f9fa;
   --text-secondary: #adb5bd;
+  --text-muted: #6c757d;
+
   --accent-color: #00f2fe;
   --accent-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  --font-family: 'Inter', system-ui, sans-serif;
+  --shadow-glow: 0 0 30px rgba(0, 242, 254, 0.1);
+
+  /* Cores Unificadas de Lucro / Prejuízo */
+  --color-success: #00e676;
+  --color-success-bg: rgba(0, 230, 118, 0.1);
+  --color-danger: #ff5252;
+  --color-danger-bg: rgba(255, 82, 82, 0.1);
+  --color-warning: #ffc107;
+  --color-warning-bg: rgba(255, 193, 7, 0.1);
+
+  --scrollbar-track: #1a1d23;
+  --scrollbar-thumb: #2a2d35;
+  --option-bg: #1c1f24;
+  --option-color: #ffffff;
+}
+
+[data-theme="light"] {
+  --bg-color: #f8fafc;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-hover: rgba(241, 245, 249, 0.95);
+  --panel-border: rgba(0, 0, 0, 0.08);
+  --panel-border-strong: rgba(0, 0, 0, 0.15);
+  --input-bg: rgba(0, 0, 0, 0.03);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --accent-color: #0284c7;
+  --accent-gradient: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
+  --shadow-glow: 0 0 30px rgba(2, 132, 199, 0.08);
+
+  --color-success: #16a34a;
+  --color-success-bg: rgba(22, 163, 74, 0.08);
+  --color-danger: #dc2626;
+  --color-danger-bg: rgba(220, 38, 38, 0.08);
+  --color-warning: #d97706;
+  --color-warning-bg: rgba(217, 119, 6, 0.08);
+
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --option-bg: #ffffff;
+  --option-color: #0f172a;
 }
 
 * {
