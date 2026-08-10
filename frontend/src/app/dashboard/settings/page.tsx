@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import AppSidebar from '@/components/AppSidebar';
 import { apiFetch } from '@/lib/api';
 
 
@@ -283,6 +284,7 @@ export default function SettingsPage() {
 
   // Excluir Conta
   const handleDeleteAccount = async () => {
+    if (!user) return;
     const doubleConfirm = prompt(
       '⚠️ ATENÇÃO: Esta ação é irreversível e excluirá permanentemente todos os seus dados, incluindo carteiras, transações e alertas. Para confirmar, digite seu e-mail abaixo:'
     );
@@ -295,7 +297,7 @@ export default function SettingsPage() {
     }
 
     try {
-      const res = await apiFetch(`/user`, {
+      const res = await apiFetch('/user', {
         method: 'DELETE',
       });
 
@@ -303,16 +305,8 @@ export default function SettingsPage() {
         alert('Sua conta foi excluída com sucesso. Lamentamos ver você partir.');
         logout();
       } else {
-    if (!confirm('ATENÇÃO: Deseja realmente excluir sua conta e todos os seus dados? Esta ação é irreversível!')) return;
-    try {
-      const res = await apiFetch('/user/account', {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        deleteAccount();
-      } else {
         const data = await res.json();
-        alert(`Erro ao excluir conta: ${data.error}`);
+        alert(data.error || 'Erro ao excluir a conta.');
       }
     } catch (err) {
       console.error(err);

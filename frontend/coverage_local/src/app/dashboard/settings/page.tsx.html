@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/601</span>
+                <span class='fraction'>0/594</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/601</span>
+                <span class='fraction'>0/594</span>
             </div>
         
             
@@ -657,21 +657,7 @@
 <a name='L592'></a><a href='#L592'>592</a>
 <a name='L593'></a><a href='#L593'>593</a>
 <a name='L594'></a><a href='#L594'>594</a>
-<a name='L595'></a><a href='#L595'>595</a>
-<a name='L596'></a><a href='#L596'>596</a>
-<a name='L597'></a><a href='#L597'>597</a>
-<a name='L598'></a><a href='#L598'>598</a>
-<a name='L599'></a><a href='#L599'>599</a>
-<a name='L600'></a><a href='#L600'>600</a>
-<a name='L601'></a><a href='#L601'>601</a>
-<a name='L602'></a><a href='#L602'>602</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<a name='L595'></a><a href='#L595'>595</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1570,8 +1556,16 @@
 <span class="cstat-no" title="statement not covered" >        alert('Sua conta foi excluída com sucesso. Lamentamos ver você partir.');</span>
 <span class="cstat-no" title="statement not covered" >        logout();</span>
 <span class="cstat-no" title="statement not covered" >      } else {</span>
+<span class="cstat-no" title="statement not covered" >    if (!confirm('ATENÇÃO: Deseja realmente excluir sua conta e todos os seus dados? Esta ação é irreversível!')) return;</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      const res = await apiFetch('/user/account', {</span>
+<span class="cstat-no" title="statement not covered" >        method: 'DELETE',</span>
+<span class="cstat-no" title="statement not covered" >      });</span>
+<span class="cstat-no" title="statement not covered" >      if (res.ok) {</span>
+<span class="cstat-no" title="statement not covered" >        deleteAccount();</span>
+<span class="cstat-no" title="statement not covered" >      } else {</span>
 <span class="cstat-no" title="statement not covered" >        const data = await res.json();</span>
-<span class="cstat-no" title="statement not covered" >        alert(data.error || 'Erro ao excluir a conta.');</span>
+<span class="cstat-no" title="statement not covered" >        alert(`Erro ao excluir conta: ${data.error}`);</span>
 <span class="cstat-no" title="statement not covered" >      }</span>
 <span class="cstat-no" title="statement not covered" >    } catch (err) {</span>
 <span class="cstat-no" title="statement not covered" >      console.error(err);</span>
@@ -1579,41 +1573,25 @@
 <span class="cstat-no" title="statement not covered" >    }</span>
 <span class="cstat-no" title="statement not covered" >  };</span>
 <span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >  return (</span>
-<span class="cstat-no" title="statement not covered" >    &lt;main className="container" style={{ maxWidth: 900 }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >      {/* Header */}</span>
-<span class="cstat-no" title="statement not covered" >      &lt;div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;div&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800 }}&gt;stock-pulse&lt;/h1&gt;</span>
-<span class="cstat-no" title="statement not covered" >          </span>
-<span class="cstat-no" title="statement not covered" >          &lt;div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              💼 Minha Carteira</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/Link&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              📊 Monitoramento</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/Link&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;Link href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              🔔 Meus Alertas</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/Link&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;Link href="/dashboard/settings" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              ⚙️ Configurações</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/Link&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >  if (authLoading) {</span>
+<span class="cstat-no" title="statement not covered" >    return (</span>
+<span class="cstat-no" title="statement not covered" >      &lt;main className="container"&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div className="glass-panel"&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}&gt;&lt;/span&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}&gt;Carregando sua sessão segura...&lt;/p&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
-<span class="cstat-no" title="statement not covered" >        </span>
-<span class="cstat-no" title="statement not covered" >        &lt;div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;div style={{ textAlign: 'right', fontSize: '0.8rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;span style={{ display: 'block', fontWeight: 600 }}&gt;{user.name}&lt;/span&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}&gt;Sessão Segura&lt;/span&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;/div&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;button className="btn-secondary" onClick={logout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >            Sair</span>
-<span class="cstat-no" title="statement not covered" >          &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
-<span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;/main&gt;</span>
+<span class="cstat-no" title="statement not covered" >    );</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
 <span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >      &lt;div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >  if (!user) return null;</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  return (</span>
+<span class="cstat-no" title="statement not covered" >    &lt;div className="app-layout"&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;AppSidebar userName={user.name} onLogout={logout} /&gt;</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >      &lt;main className="app-main-content"&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}&gt;</span>
 <span class="cstat-no" title="statement not covered" >        </span>
 <span class="cstat-no" title="statement not covered" >        {/* Seção 1: Dados Cadastrais */}</span>
 <span class="cstat-no" title="statement not covered" >        &lt;section className="card"&gt;</span>
@@ -1864,6 +1842,7 @@
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
 <span class="cstat-no" title="statement not covered" >    &lt;/main&gt;</span>
+<span class="cstat-no" title="statement not covered" >    &lt;/div&gt;</span>
 <span class="cstat-no" title="statement not covered" >  );</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;</pre></td></tr></table></pre>
@@ -1873,7 +1852,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-10T02:34:20.405Z
+                at 2026-08-10T03:13:40.168Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

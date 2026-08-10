@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>55/55</span>
+                <span class='fraction'>0/55</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">25% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/4</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>55/55</span>
+                <span class='fraction'>0/55</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -118,116 +118,116 @@
 <a name='L53'></a><a href='#L53'>53</a>
 <a name='L54'></a><a href='#L54'>54</a>
 <a name='L55'></a><a href='#L55'>55</a>
-<a name='L56'></a><a href='#L56'>56</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React from 'react';
-import Link from 'next/link';
-&nbsp;
-interface DashboardHeaderProps {
-  userName: string;
-  wsConnected: boolean;
-  onLogout: () =&gt; void;
-}
-&nbsp;
-export default function DashboardHeader({ userName, wsConnected, onLogout }: DashboardHeaderProps) {
-  return (
-    &lt;div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}&gt;
-      &lt;div&gt;
-        &lt;h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '10px' }}&gt;
-          stock-pulse
-          &lt;span style={{ 
-            width: 8, 
-            height: 8, 
-            borderRadius: '50%', 
-            backgroundColor: <span class="branch-0 cbranch-no" title="branch not covered" >wsConnected ? '#00e676' : '</span>#ff3d00', 
-            boxShadow: <span class="branch-0 cbranch-no" title="branch not covered" >wsConnected ? '0 0 10px #00e676' : '</span>0 0 10px #ff3d00',
-            display: 'inline-block',
-            transition: 'all 0.3s ease'
-          }} title={<span class="branch-0 cbranch-no" title="branch not covered" >wsConnected ? 'Conexão em Tempo Real Ativa' : '</span>Desconectado da cotação tempo real'} /&gt;
-        &lt;/h1&gt;
-        
-        {/* Navegação entre telas do Dashboard */}
-        &lt;div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}&gt;
-          &lt;Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;
-            💼 Minha Carteira
-          &lt;/Link&gt;
-          &lt;Link href="/dashboard" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}&gt;
-            📊 Monitoramento
-          &lt;/Link&gt;
-          &lt;Link href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;
-            🔔 Meus Alertas
-          &lt;/Link&gt;
-          &lt;Link href="/dashboard/settings" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;
-            ⚙️ Configurações
-          &lt;/Link&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
-      
-      &lt;div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}&gt;
-        &lt;div style={{ textAlign: 'right', fontSize: '0.8rem' }}&gt;
-          &lt;span style={{ display: 'block', fontWeight: 600 }}&gt;{userName}&lt;/span&gt;
-          &lt;span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}&gt;Sessão Segura&lt;/span&gt;
-        &lt;/div&gt;
-        &lt;button className="primary-button" onClick={onLogout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}&gt;
-          Sair
-        &lt;/button&gt;
-      &lt;/div&gt;
-    &lt;/div&gt;
-  );
-}
+<a name='L56'></a><a href='#L56'>56</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import React from 'react';</span></span></span>
+<span class="cstat-no" title="statement not covered" >import Link from 'next/link';</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >interface DashboardHeaderProps {</span>
+<span class="cstat-no" title="statement not covered" >  userName: string;</span>
+<span class="cstat-no" title="statement not covered" >  wsConnected: boolean;</span>
+<span class="cstat-no" title="statement not covered" >  onLogout: () =&gt; void;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >export default function DashboardHeader({ userName, wsConnected, onLogout }: DashboardHeaderProps) {</span>
+<span class="cstat-no" title="statement not covered" >  return (</span>
+<span class="cstat-no" title="statement not covered" >    &lt;div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;div&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '10px' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          stock-pulse</span>
+<span class="cstat-no" title="statement not covered" >          &lt;span style={{ </span>
+<span class="cstat-no" title="statement not covered" >            width: 8, </span>
+<span class="cstat-no" title="statement not covered" >            height: 8, </span>
+<span class="cstat-no" title="statement not covered" >            borderRadius: '50%', </span>
+<span class="cstat-no" title="statement not covered" >            backgroundColor: wsConnected ? '#00e676' : '#ff3d00', </span>
+<span class="cstat-no" title="statement not covered" >            boxShadow: wsConnected ? '0 0 10px #00e676' : '0 0 10px #ff3d00',</span>
+<span class="cstat-no" title="statement not covered" >            display: 'inline-block',</span>
+<span class="cstat-no" title="statement not covered" >            transition: 'all 0.3s ease'</span>
+<span class="cstat-no" title="statement not covered" >          }} title={wsConnected ? 'Conexão em Tempo Real Ativa' : 'Desconectado da cotação tempo real'} /&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;/h1&gt;</span>
+<span class="cstat-no" title="statement not covered" >        </span>
+<span class="cstat-no" title="statement not covered" >        {/* Navegação entre telas do Dashboard */}</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >            💼 Minha Carteira</span>
+<span class="cstat-no" title="statement not covered" >          &lt;/Link&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;Link href="/dashboard" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >            📊 Monitoramento</span>
+<span class="cstat-no" title="statement not covered" >          &lt;/Link&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;Link href="/dashboard/alerts" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >            🔔 Meus Alertas</span>
+<span class="cstat-no" title="statement not covered" >          &lt;/Link&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;Link href="/dashboard/settings" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >            ⚙️ Configurações</span>
+<span class="cstat-no" title="statement not covered" >          &lt;/Link&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >      </span>
+<span class="cstat-no" title="statement not covered" >      &lt;div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div style={{ textAlign: 'right', fontSize: '0.8rem' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;span style={{ display: 'block', fontWeight: 600 }}&gt;{userName}&lt;/span&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}&gt;Sessão Segura&lt;/span&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;button className="primary-button" onClick={onLogout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >          Sair</span>
+<span class="cstat-no" title="statement not covered" >        &lt;/button&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >    &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >  );</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -235,7 +235,7 @@ export default function DashboardHeader({ userName, wsConnected, onLogout }: Das
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-10T02:34:20.405Z
+                at 2026-08-10T03:13:40.168Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

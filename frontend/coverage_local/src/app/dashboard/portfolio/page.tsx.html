@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/308</span>
+                <span class='fraction'>0/293</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/308</span>
+                <span class='fraction'>0/293</span>
             </div>
         
             
@@ -356,37 +356,7 @@
 <a name='L291'></a><a href='#L291'>291</a>
 <a name='L292'></a><a href='#L292'>292</a>
 <a name='L293'></a><a href='#L293'>293</a>
-<a name='L294'></a><a href='#L294'>294</a>
-<a name='L295'></a><a href='#L295'>295</a>
-<a name='L296'></a><a href='#L296'>296</a>
-<a name='L297'></a><a href='#L297'>297</a>
-<a name='L298'></a><a href='#L298'>298</a>
-<a name='L299'></a><a href='#L299'>299</a>
-<a name='L300'></a><a href='#L300'>300</a>
-<a name='L301'></a><a href='#L301'>301</a>
-<a name='L302'></a><a href='#L302'>302</a>
-<a name='L303'></a><a href='#L303'>303</a>
-<a name='L304'></a><a href='#L304'>304</a>
-<a name='L305'></a><a href='#L305'>305</a>
-<a name='L306'></a><a href='#L306'>306</a>
-<a name='L307'></a><a href='#L307'>307</a>
-<a name='L308'></a><a href='#L308'>308</a>
-<a name='L309'></a><a href='#L309'>309</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<a name='L294'></a><a href='#L294'>294</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -701,6 +671,8 @@
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >const PortfolioChart = dynamic(() =&gt; import('@/components/PortfolioChart'), { ssr: false });</span>
 <span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >import AppSidebar from '@/components/AppSidebar';</span>
+<span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >function PortfolioContent() {</span>
 <span class="cstat-no" title="statement not covered" >  const { user, logout, isLoading: authLoading } = useAuth();</span>
 <span class="cstat-no" title="statement not covered" >  const portfolio = usePortfolio();</span>
@@ -828,60 +800,42 @@
 <span class="cstat-no" title="statement not covered" >  }</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >  return (</span>
-<span class="cstat-no" title="statement not covered" >    &lt;main className="container" style={{ maxWidth: 1400 }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >      &lt;PortfolioHeader userName={user?.name || 'Investidor'} onLogout={logout} /&gt;</span>
-<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >      &lt;PortfolioTabs </span>
-<span class="cstat-no" title="statement not covered" >        portfolios={portfolios} </span>
-<span class="cstat-no" title="statement not covered" >        activePortfolioId={activePortfolioId} setActivePortfolioId={setActivePortfolioId} </span>
-<span class="cstat-no" title="statement not covered" >        setShowPortfolioModal={setShowPortfolioModal} handleDeletePortfolio={handleDeletePortfolio} </span>
-<span class="cstat-no" title="statement not covered" >        handleExportPortfolio={handleExportPortfolio}</span>
-<span class="cstat-no" title="statement not covered" >        handleSetDefaultPortfolio={handleSetDefaultPortfolio}</span>
+<span class="cstat-no" title="statement not covered" >    &lt;div className="app-layout"&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;AppSidebar</span>
+<span class="cstat-no" title="statement not covered" >        userName={user?.name || 'Investidor'}</span>
+<span class="cstat-no" title="statement not covered" >        onLogout={logout}</span>
+<span class="cstat-no" title="statement not covered" >        activeTab={activeTab}</span>
+<span class="cstat-no" title="statement not covered" >        onSelectTab={setActiveTab}</span>
 <span class="cstat-no" title="statement not covered" >      /&gt;</span>
 <span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >      &lt;div className="flex-row gap-sm mb-lg flex-wrap"&gt;</span>
-<span class="cstat-no" title="statement not covered" >        {filterCategories.map(cat =&gt; (</span>
-<span class="cstat-no" title="statement not covered" >          &lt;button</span>
-<span class="cstat-no" title="statement not covered" >            key={cat} onClick={() =&gt; setActiveCategoryFilter(cat)}</span>
-<span class="cstat-no" title="statement not covered" >            className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}</span>
-<span class="cstat-no" title="statement not covered" >            style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)', color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)' }}</span>
-<span class="cstat-no" title="statement not covered" >          &gt;</span>
-<span class="cstat-no" title="statement not covered" >            {cat}</span>
-<span class="cstat-no" title="statement not covered" >          &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >        ))}</span>
-<span class="cstat-no" title="statement not covered" >      &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;main className="app-main-content"&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;PortfolioTabs </span>
+<span class="cstat-no" title="statement not covered" >          portfolios={portfolios} </span>
+<span class="cstat-no" title="statement not covered" >          activePortfolioId={activePortfolioId} setActivePortfolioId={setActivePortfolioId} </span>
+<span class="cstat-no" title="statement not covered" >          setShowPortfolioModal={setShowPortfolioModal} handleDeletePortfolio={handleDeletePortfolio} </span>
+<span class="cstat-no" title="statement not covered" >          handleExportPortfolio={handleExportPortfolio}</span>
+<span class="cstat-no" title="statement not covered" >          handleSetDefaultPortfolio={handleSetDefaultPortfolio}</span>
+<span class="cstat-no" title="statement not covered" >        /&gt;</span>
 <span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >      {isLoadingDetails ? (</span>
-<span class="cstat-no" title="statement not covered" >        &lt;div className="glass-panel flex-row items-center justify-center" style={{ minHeight: '300px' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 35, height: 35 }}&gt;&lt;/span&gt;</span>
+<span class="cstat-no" title="statement not covered" >        &lt;div className="flex-row gap-sm mb-lg flex-wrap"&gt;</span>
+<span class="cstat-no" title="statement not covered" >          {filterCategories.map(cat =&gt; (</span>
+<span class="cstat-no" title="statement not covered" >            &lt;button</span>
+<span class="cstat-no" title="statement not covered" >              key={cat} onClick={() =&gt; setActiveCategoryFilter(cat)}</span>
+<span class="cstat-no" title="statement not covered" >              className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}</span>
+<span class="cstat-no" title="statement not covered" >              style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)', color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)' }}</span>
+<span class="cstat-no" title="statement not covered" >            &gt;</span>
+<span class="cstat-no" title="statement not covered" >              {cat}</span>
+<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
+<span class="cstat-no" title="statement not covered" >          ))}</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
-<span class="cstat-no" title="statement not covered" >      ) : (</span>
-<span class="cstat-no" title="statement not covered" >        &lt;div className="flex-col gap-xl"&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} /&gt;</span>
 <span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >          &lt;div className="flex-row gap-md mt-xl mb-lg" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;button onClick={() =&gt; setActiveTab('ativos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'ativos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'ativos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'ativos' ? 700 : 500, fontSize: '0.9rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              📊 Renda Variável</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;button onClick={() =&gt; setActiveTab('renda-fixa')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'renda-fixa' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'renda-fixa' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'renda-fixa' ? 700 : 500, fontSize: '0.9rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              🏛️ Renda Fixa</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;button onClick={() =&gt; setActiveTab('tesouro')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'tesouro' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'tesouro' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'tesouro' ? 700 : 500, fontSize: '0.9rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              🏛️ Tesouro Direto</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;button onClick={() =&gt; setActiveTab('operacoes')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'operacoes' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'operacoes' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'operacoes' ? 700 : 500, fontSize: '0.9rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              📜 Histórico de Operações</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;button onClick={() =&gt; setActiveTab('proventos')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'proventos' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'proventos' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'proventos' ? 700 : 500, fontSize: '0.9rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              💰 Proventos</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;button onClick={() =&gt; setActiveTab('analise')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'analise' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'analise' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'analise' ? 700 : 500, fontSize: '0.9rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              🔬 Análise da Carteira</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
-<span class="cstat-no" title="statement not covered" >            &lt;button onClick={() =&gt; setActiveTab('diario')} style={{ background: 'none', border: 'none', padding: '0.75rem 1rem', cursor: 'pointer', color: activeTab === 'diario' ? '#00e676' : 'var(--text-secondary)', borderBottom: activeTab === 'diario' ? '2px solid #00e676' : '2px solid transparent', fontWeight: activeTab === 'diario' ? 700 : 500, fontSize: '0.9rem' }}&gt;</span>
-<span class="cstat-no" title="statement not covered" >              📈 Resumo Diário</span>
-<span class="cstat-no" title="statement not covered" >            &lt;/button&gt;</span>
+<span class="cstat-no" title="statement not covered" >        {isLoadingDetails ? (</span>
+<span class="cstat-no" title="statement not covered" >          &lt;div className="glass-panel flex-row items-center justify-center" style={{ minHeight: '300px' }}&gt;</span>
+<span class="cstat-no" title="statement not covered" >            &lt;span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 35, height: 35 }}&gt;&lt;/span&gt;</span>
 <span class="cstat-no" title="statement not covered" >          &lt;/div&gt;</span>
+<span class="cstat-no" title="statement not covered" >        ) : (</span>
+<span class="cstat-no" title="statement not covered" >          &lt;div className="flex-col gap-xl"&gt;</span>
+<span class="cstat-no" title="statement not covered" >            &lt;PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} /&gt;</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >          {activeTab === 'ativos' &amp;&amp; (</span>
 <span class="cstat-no" title="statement not covered" >            &lt;div className="flex-col gap-xl w-full"&gt;</span>
@@ -976,7 +930,8 @@
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >      {/* Renderizado sem prop drilling! Todos os modais consomem o PortfolioContext */}</span>
 <span class="cstat-no" title="statement not covered" >      &lt;Modals /&gt;</span>
-<span class="cstat-no" title="statement not covered" >    &lt;/main&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;/main&gt;</span>
+<span class="cstat-no" title="statement not covered" >    &lt;/div&gt;</span>
 <span class="cstat-no" title="statement not covered" >  );</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 <span class="cstat-no" title="statement not covered" ></span>
@@ -994,7 +949,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-10T02:34:20.405Z
+                at 2026-08-10T03:13:40.168Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>
