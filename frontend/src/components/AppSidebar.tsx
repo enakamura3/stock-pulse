@@ -103,13 +103,17 @@ export default function AppSidebar({
       <aside
         className={`app-sidebar ${isOpen ? 'open' : ''}`}
         style={{
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
           width: '260px',
-          minHeight: '100vh',
+          flexShrink: 0,
+          overflowY: 'auto',
           background: 'var(--panel-bg)',
           borderRight: '1px solid var(--panel-border)',
           display: 'flex',
           flexDirection: 'column',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           padding: '1.5rem 1rem',
           backdropFilter: 'blur(16px)',
           transition: 'transform var(--transition-normal)',
