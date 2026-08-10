@@ -486,3 +486,20 @@ body {
   }
 }
 
+.sidebar-link:hover, .sidebar-sublink:hover {
+  color: var(--text-primary) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.sidebar-link.active:hover, .sidebar-sublink.active:hover {
+  background: rgba(0, 242, 254, 0.12) !important;
+}
+
+.sidebar-link:focus-visible, .sidebar-sublink:focus-visible {
+  outline: 2px solid var(--accent-color);
+}
+
+.sidebar-link:focus:not(:focus-visible), .sidebar-sublink:focus:not(:focus-visible) {
+  outline: none;
+}
+
