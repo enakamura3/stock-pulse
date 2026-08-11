@@ -260,23 +260,23 @@ export default function DividendsHistory({
           <>
             {/* Main KPIs */}
             <div className="flex-row gap-md mb-md flex-wrap">
-              <div className="card" style={{ flex: '1', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+              <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                 <div className="text-secondary text-sm mb-sm font-bold">Proventos (Renda Variável)</div>
-                <div className="font-bold text-3xl mb-xs" style={{ color: '#00e676', letterSpacing: '-0.5px' }}>{formatMoney(stats.rvPaid + stats.rvPending, 'BRL')}</div>
+                <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--color-success)', letterSpacing: '-0.5px' }}>{formatMoney(stats.rvPaid + stats.rvPending, 'BRL')}</div>
                 <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>
-                  <span style={{ color: 'rgba(0, 230, 118, 0.8)' }}>Pago: {formatMoney(stats.rvPaid, 'BRL')}</span>
-                  <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>Pend: {formatMoney(stats.rvPending, 'BRL')}</span>
+                  <span style={{ color: 'var(--color-success)' }}>Pago: {formatMoney(stats.rvPaid, 'BRL')}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Pend: {formatMoney(stats.rvPending, 'BRL')}</span>
                 </div>
               </div>
-              <div className="card" style={{ flex: '1', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+              <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                 <div className="text-secondary text-sm mb-sm font-bold">Juros Acumulados (Renda Fixa)</div>
                 <div className="font-bold text-3xl mb-xs" style={{ color: '#FFB300', letterSpacing: '-0.5px' }}>{formatMoney(stats.rfPaid + stats.rfPending, 'BRL')}</div>
                 <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>
-                  <span style={{ color: 'rgba(255, 179, 0, 0.8)' }}>Pago: {formatMoney(stats.rfPaid, 'BRL')}</span>
-                  <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>Pend: {formatMoney(stats.rfPending, 'BRL')}</span>
+                  <span style={{ color: '#FFB300' }}>Pago: {formatMoney(stats.rfPaid, 'BRL')}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Pend: {formatMoney(stats.rfPending, 'BRL')}</span>
                 </div>
               </div>
-              <div className="card" style={{ flex: '1', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+              <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                 <div className="text-secondary text-sm mb-sm font-bold">Total Consolidado</div>
                 <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>{formatMoney(stats.totalPaid + stats.totalPending, 'BRL')}</div>
                 <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>

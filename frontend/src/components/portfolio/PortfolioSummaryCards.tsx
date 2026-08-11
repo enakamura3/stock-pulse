@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatMoney, formatPercentage } from './helpers';
+import { WalletIcon, TrendingUpIcon, TrendingDownIcon, CoinsIcon, BankIcon } from '@/components/ui/icons';
 
 interface PortfolioSummaryCardsProps {
   totalCost: number;
@@ -20,36 +21,36 @@ export default function PortfolioSummaryCards({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.25rem' }}>
       <div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}>
         <span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          <span>💰</span> Patrimônio Atual
+          <WalletIcon size={16} /> Patrimônio Atual
           {isLoadingTreasury && (
             <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginLeft: '6px' }}>
               ⟳ Tesouro...
             </span>
           )}
         </span>
-        <span className="text-2xl font-bold mt-sm" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+        <span className="text-2xl font-bold mt-sm" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
           {formatMoney(currentValue, kpiCurrency)}
         </span>
       </div>
       
       <div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}>
         <span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          <span>📥</span> Total Investido
+          <BankIcon size={16} /> Total Investido
         </span>
-        <span className="text-2xl font-bold mt-sm" style={{ color: '#fff', letterSpacing: '-0.02em' }}>
+        <span className="text-2xl font-bold mt-sm" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
           {formatMoney(totalCost, kpiCurrency)}
         </span>
       </div>
 
       <div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}>
         <span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          <span>{isPos ? '📈' : '📉'}</span> Lucro / Prejuízo
+          {isPos ? <TrendingUpIcon size={16} color="var(--color-success)" /> : <TrendingDownIcon size={16} color="var(--color-danger)" />} Lucro / Prejuízo
         </span>
         <div className="flex-col gap-xs mt-sm">
-          <span className="text-2xl font-bold" style={{ color: isPos ? '#00e676' : '#ff3d00', letterSpacing: '-0.02em', wordBreak: 'break-word', lineHeight: 1.1 }}>
+          <span className="text-2xl font-bold" style={{ color: isPos ? 'var(--color-success)' : 'var(--color-danger)', letterSpacing: '-0.02em', wordBreak: 'break-word', lineHeight: 1.1 }}>
             {isPos ? '+' : ''}{formatMoney(profitLoss, kpiCurrency)}
           </span>
-          <span style={{ fontSize: '0.9rem', color: isPos ? '#00e676' : '#ff3d00', opacity: 0.9, fontWeight: 600 }}>
+          <span style={{ fontSize: '0.9rem', color: isPos ? 'var(--color-success)' : 'var(--color-danger)', opacity: 0.9, fontWeight: 600 }}>
             {formatPercentage(returnPercent)}
           </span>
         </div>
@@ -57,9 +58,9 @@ export default function PortfolioSummaryCards({
 
       <div className="card flex-col justify-center text-left" style={{ padding: '1.25rem 1.5rem' }}>
         <span className="text-secondary text-xs font-semibold flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          <span>💸</span> Média de Proventos (12m)
+          <CoinsIcon size={16} /> Média de Proventos (12m)
         </span>
-        <span className="text-2xl font-bold mt-sm" style={{ color: '#00f2fe', letterSpacing: '-0.02em' }}>
+        <span className="text-2xl font-bold mt-sm" style={{ color: 'var(--accent-color)', letterSpacing: '-0.02em' }}>
           {formatMoney(avgDividends12m, kpiCurrency)}
           <span style={{ fontSize: '0.8rem', opacity: 0.7, fontWeight: 500, marginLeft: '4px' }}>/mês</span>
         </span>
