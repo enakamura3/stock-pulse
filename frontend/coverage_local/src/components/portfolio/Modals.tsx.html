@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/236</span>
+                <span class='fraction'>0/258</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/236</span>
+                <span class='fraction'>0/258</span>
             </div>
         
             
@@ -299,7 +299,29 @@
 <a name='L234'></a><a href='#L234'>234</a>
 <a name='L235'></a><a href='#L235'>235</a>
 <a name='L236'></a><a href='#L236'>236</a>
-<a name='L237'></a><a href='#L237'>237</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -535,7 +557,29 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import React from 'react';<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import React, { useEffect } from 'react';<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
 <span class="cstat-no" title="statement not covered" >import { SearchResult } from './types';</span>
 <span class="cstat-no" title="statement not covered" >import { usePortfolio } from '@/context/PortfolioContext';</span>
 <span class="cstat-no" title="statement not covered" ></span>
@@ -687,6 +731,28 @@
 <span class="cstat-no" title="statement not covered" >  const isAddingFI = props.isAddingFI ?? context?.isAddingFI ?? false;</span>
 <span class="cstat-no" title="statement not covered" >  const handleAddFixedIncome = props.handleAddFixedIncome ?? context?.handleAddFixedIncome ?? (() =&gt; {});</span>
 <span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  useEffect(() =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    const handleKeyDown = (e: KeyboardEvent) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >      if (e.key === 'Escape') {</span>
+<span class="cstat-no" title="statement not covered" >        if (showPortfolioModal) setShowPortfolioModal(false);</span>
+<span class="cstat-no" title="statement not covered" >        if (showTxModal) setShowTxModal(false);</span>
+<span class="cstat-no" title="statement not covered" >        if (showFIModal) setShowFIModal(false);</span>
+<span class="cstat-no" title="statement not covered" >        if (showFIEditModal) setShowFIEditModal(false);</span>
+<span class="cstat-no" title="statement not covered" >      }</span>
+<span class="cstat-no" title="statement not covered" >    };</span>
+<span class="cstat-no" title="statement not covered" >    window.addEventListener('keydown', handleKeyDown);</span>
+<span class="cstat-no" title="statement not covered" >    return () =&gt; window.removeEventListener('keydown', handleKeyDown);</span>
+<span class="cstat-no" title="statement not covered" >  }, [</span>
+<span class="cstat-no" title="statement not covered" >    showPortfolioModal,</span>
+<span class="cstat-no" title="statement not covered" >    showTxModal,</span>
+<span class="cstat-no" title="statement not covered" >    showFIModal,</span>
+<span class="cstat-no" title="statement not covered" >    showFIEditModal,</span>
+<span class="cstat-no" title="statement not covered" >    setShowPortfolioModal,</span>
+<span class="cstat-no" title="statement not covered" >    setShowTxModal,</span>
+<span class="cstat-no" title="statement not covered" >    setShowFIModal,</span>
+<span class="cstat-no" title="statement not covered" >    setShowFIEditModal,</span>
+<span class="cstat-no" title="statement not covered" >  ]);</span>
+<span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >  return (</span>
 <span class="cstat-no" title="statement not covered" >    &lt;&gt;</span>
 <span class="cstat-no" title="statement not covered" >      &lt;NewPortfolioModal</span>
@@ -778,7 +844,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-10T13:55:22.634Z
+                at 2026-08-11T23:54:08.338Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
