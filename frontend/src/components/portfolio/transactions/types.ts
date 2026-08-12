@@ -37,14 +37,14 @@ export const SELECT_STYLE: React.CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderRadius: '6px',
   border: '1px solid var(--panel-border)',
-  background: '#1E293B',
-  color: '#FFFFFF',
+  background: 'var(--option-bg)',
+  color: 'var(--option-color)',
   fontSize: '0.82rem',
   outline: 'none',
   cursor: 'pointer',
 };
 
-export const OPTION_STYLE: React.CSSProperties = { background: '#1c1f24' };
+export const OPTION_STYLE: React.CSSProperties = { background: 'var(--option-bg)', color: 'var(--option-color)' };
 
 export function formatDateStr(dateStr: string | null | undefined): string {
   if (!dateStr) return 'N/A';
@@ -61,16 +61,16 @@ export function getBadge(tx: UnifiedTransaction): { text: string; color: string;
   const isRF = tx.module === 'RF';
   if (isRF) {
     return tx.type === 'SUBSCRIPTION'
-      ? { text: 'APLICAÇÃO', color: '#2196F3', bg: 'rgba(33,150,243,0.08)' }
-      : { text: 'RESGATE', color: '#FF9800', bg: 'rgba(255,152,0,0.08)' };
+      ? { text: 'APLICAÇÃO', color: 'var(--color-info)', bg: 'var(--color-info-bg)' }
+      : { text: 'RESGATE', color: 'var(--color-warning)', bg: 'var(--color-warning-bg)' };
   }
   switch (tx.type) {
-    case 'BUY':          return { text: 'COMPRA',      color: '#00e676', bg: 'rgba(0,230,118,0.08)' };
-    case 'SELL':         return { text: 'VENDA',       color: '#ff3d00', bg: 'rgba(255,61,0,0.08)' };
-    case 'BONUS':        return { text: 'BÔNUS',       color: '#00e676', bg: 'rgba(0,230,118,0.08)' };
-    case 'SPLIT':        return { text: 'SPLIT',       color: '#00f2fe', bg: 'rgba(0,242,254,0.08)' };
+    case 'BUY':          return { text: 'COMPRA',      color: 'var(--color-success)', bg: 'var(--color-success-bg)' };
+    case 'SELL':         return { text: 'VENDA',       color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' };
+    case 'BONUS':        return { text: 'BÔNUS',       color: 'var(--color-success)', bg: 'var(--color-success-bg)' };
+    case 'SPLIT':        return { text: 'SPLIT',       color: 'var(--accent-color)', bg: 'var(--accent-bg)' };
     case 'REVERSE_SPLIT':return { text: 'AGRUPAMENTO', color: '#e040fb', bg: 'rgba(156,39,176,0.08)' };
-    default:             return { text: tx.type,       color: '#aaa',    bg: 'rgba(255,255,255,0.05)' };
+    default:             return { text: tx.type,       color: 'var(--text-secondary)', bg: 'var(--panel-bg)' };
   }
 }
 

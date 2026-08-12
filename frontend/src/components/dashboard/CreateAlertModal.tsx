@@ -43,7 +43,7 @@ export default function CreateAlertModal({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.7)',
+      backgroundColor: 'var(--overlay-bg)',
       backdropFilter: 'blur(8px)',
       display: 'flex',
       justifyContent: 'center',
@@ -57,9 +57,9 @@ export default function CreateAlertModal({
         padding: '2.5rem',
         textAlign: 'left',
         boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
-        border: '1px solid rgba(255,255,255,0.08)'
+        border: '1px solid var(--panel-border)'
       }}>
-        <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.6rem', fontWeight: 800, color: '#fff' }}>
+        <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)' }}>
           🔔 Criar Alerta de Preço
         </h2>
         <p style={{ margin: '0 0 2rem 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
@@ -74,11 +74,11 @@ export default function CreateAlertModal({
 
         {alertSuccessMsg ? (
           <div style={{
-            background: 'rgba(0, 230, 118, 0.08)',
-            border: '1px solid #00e676',
+            background: 'var(--color-success-bg)',
+            border: '1px solid var(--color-success)',
             borderRadius: '10px',
             padding: '1.2rem',
-            color: '#e2e8f0',
+            color: 'var(--text-primary)',
             fontSize: '0.9rem',
             lineHeight: 1.5,
             marginBottom: '1rem'
@@ -97,10 +97,10 @@ export default function CreateAlertModal({
                 className="form-input"
                 value={alertCondition}
                 onChange={(e) => onConditionChange(e.target.value as 'ABOVE' | 'BELOW')}
-                style={{ background: '#111827', width: '100%', padding: '0.6rem 0.9rem' }}
+                style={{ background: 'var(--input-bg)', width: '100%', padding: '0.6rem 0.9rem' }}
               >
-                <option value="ABOVE">Preço sobe acima de (▲)</option>
-                <option value="BELOW">Preço cai abaixo de (▼)</option>
+                <option value="ABOVE" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>Preço sobe acima de (▲)</option>
+                <option value="BELOW" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>Preço cai abaixo de (▼)</option>
               </select>
             </div>
 
@@ -127,7 +127,7 @@ export default function CreateAlertModal({
                 className="primary-button"
                 type="submit"
                 disabled={isCreatingAlert}
-                style={{ flex: 1, padding: '0.8rem', fontSize: '0.9rem', background: 'linear-gradient(135deg, #00f2fe, #4facfe)', color: '#0b0f19', fontWeight: 700 }}
+                style={{ flex: 1, padding: '0.8rem', fontSize: '0.9rem', background: 'var(--accent-gradient)', color: 'var(--accent-foreground)', fontWeight: 700 }}
               >
                 {isCreatingAlert ? 'Criando...' : 'Salvar Alerta'}
               </button>
@@ -135,7 +135,7 @@ export default function CreateAlertModal({
                 className="primary-button"
                 type="button"
                 onClick={onClose}
-                style={{ flex: 1, padding: '0.8rem', fontSize: '0.9rem', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--panel-border)' }}
+                style={{ flex: 1, padding: '0.8rem', fontSize: '0.9rem', background: 'var(--panel-bg)', color: 'var(--text-primary)', border: '1px solid var(--panel-border)' }}
               >
                 Cancelar
               </button>

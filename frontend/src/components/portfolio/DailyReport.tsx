@@ -127,10 +127,10 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
           <span className="text-secondary text-sm font-semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Variação Total Diária da Carteira
           </span>
-          <span className="text-3xl font-bold mt-sm" style={{ color: isDailyPos ? '#00e676' : '#ff3d00', letterSpacing: '-0.02em' }}>
+          <span className="text-3xl font-bold mt-sm" style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)', letterSpacing: '-0.02em' }}>
             {isDailyPos ? '🟢 +' : '🔴 '}{formatMoney(totalDailyChange, kpiCurrency)}
           </span>
-          <span className="text-lg font-semibold" style={{ color: isDailyPos ? '#00e676' : '#ff3d00' }}>
+          <span className="text-lg font-semibold" style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)' }}>
             ({isDailyPos ? '+' : ''}{totalDailyPercent.toFixed(2)}%)
           </span>
           <span className="text-xs text-secondary" style={{ marginTop: '0.5rem' }}>

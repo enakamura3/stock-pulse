@@ -253,9 +253,9 @@ export default function AnnualSummary({
           color: var(--text-primary);
         }
         .summary-tab-btn.active {
-          background: rgba(0, 230, 118, 0.1);
-          border-color: rgba(0, 230, 118, 0.3);
-          color: #00e676;
+          background: var(--accent-bg);
+          border-color: var(--accent-color);
+          color: var(--accent-color);
           font-weight: 600;
         }
         .progress-bar-bg {

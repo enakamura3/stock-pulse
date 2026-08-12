@@ -417,7 +417,7 @@ export default function DashboardPage() {
     return (
       <main className="container">
         <div className="glass-panel">
-          <span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}></span>
+          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
           <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}>Carregando sua sessão segura...</p>
         </div>
       </main>

@@ -262,11 +262,11 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
                 let statusLabel = null;
                 
                 if (isMatured) {
-                  rowStyle = { backgroundColor: 'rgba(255, 60, 60, 0.05)' };
-                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: '#ff4d4f'}}>(Vencido)</span>;
+                  rowStyle = { backgroundColor: 'var(--color-danger-bg)' };
+                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: 'var(--color-danger)'}}>(Vencido)</span>;
                 } else if (isNearMaturity) {
-                  rowStyle = { backgroundColor: 'rgba(250, 173, 20, 0.05)' };
-                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: '#faad14'}}>(Vence em {pos.days_to_maturity}d)</span>;
+                  rowStyle = { backgroundColor: 'var(--color-warning-bg)' };
+                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: 'var(--color-warning)'}}>(Vence em {pos.days_to_maturity}d)</span>;
                 }
 
                 let rateStr = '';
@@ -298,8 +298,8 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
                     </td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{formatMoney(pos.total_invested, 'BRL')}</td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{formatMoney(pos.gross_value, 'BRL')}</td>
-                    <td className="text-right font-bold" style={{ fontFamily: 'monospace', color: '#00e676' }}>{formatMoney(pos.net_value, 'BRL')}</td>
-                    <td className="text-right font-bold" style={{ color: pos.net_return_percent >= 0 ? '#00e676' : '#ff3d00' }}>
+                    <td className="text-right font-bold" style={{ fontFamily: 'monospace', color: 'var(--color-success)' }}>{formatMoney(pos.net_value, 'BRL')}</td>
+                    <td className="text-right font-bold" style={{ color: pos.net_return_percent >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
                       {formatPercentage(pos.net_return_percent)}
                     </td>
                     <td className="text-center">
@@ -309,7 +309,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
                           setRedeemAmount(pos.net_value);
                           setRedeemDate(new Date().toISOString().split('T')[0]);
                         }} 
-                        style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', background: 'rgba(255, 61, 0, 0.1)', color: '#ff3d00', border: '1px solid rgba(255, 61, 0, 0.3)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                        style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid rgba(var(--danger-rgb), 0.3)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                       >
                         RESGATAR
                       </button>

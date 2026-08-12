@@ -46,9 +46,9 @@ export default function PortfolioTabs({
                 padding: '0.4rem 0.8rem',
                 borderRadius: '8px',
                 fontSize: '0.8rem',
-                background: 'rgba(255, 193, 7, 0.15)',
-                color: '#ffc107',
-                border: '1px solid rgba(255, 193, 7, 0.3)',
+                background: 'var(--color-warning-bg)',
+                color: 'var(--color-warning)',
+                border: '1px solid rgba(var(--warning-rgb), 0.3)',
                 fontWeight: 600,
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -68,8 +68,8 @@ export default function PortfolioTabs({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
-                borderColor: '#ffc107',
-                color: '#ffc107',
+                borderColor: 'var(--color-warning)',
+                color: 'var(--color-warning)',
                 background: 'transparent'
               }}
               title="Definir como carteira principal ao fazer login"
