@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, IChartApi, ISeriesApi, AreaSeries } from 'lightweight-charts';
 import { useTheme } from '@/components/ThemeProvider';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 interface ChartPoint {
   date: string;
@@ -16,6 +17,7 @@ interface PortfolioChartProps {
 
 export default function PortfolioChart({ data }: PortfolioChartProps) {
   const { theme } = useTheme();
+  const colors = useThemeColors();
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const valueSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
@@ -34,8 +36,15 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     }
 
     const isLight = theme === 'light';
-    const textColor = isLight ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.45)';
+    const textColor = isLight ? 'rgba(24, 24, 27, 0.65)' : 'rgba(250, 250, 250, 0.45)';
     const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)';
+
+    const toRgba = (colorStr: string, opacity: number) => {
+      if (colorStr.startsWith('rgb(')) {
+        return colorStr.replace('rgb(', 'rgba(').replace(')', `, ${opacity})`);
+      }
+      return colorStr;
+    };
 
     // Configuração do container do gráfico
     const chart = createChart(containerRef.current, {
@@ -70,9 +79,9 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     // Série 1: Valor de Mercado
     if (showValue) {
       valueSeries = chart.addSeries(AreaSeries, {
-        lineColor: '#00f2fe',
-        topColor: 'rgba(0, 242, 254, 0.15)',
-        bottomColor: 'rgba(0, 242, 254, 0.0)',
+        lineColor: colors.accent,
+        topColor: toRgba(colors.accent, 0.15),
+        bottomColor: toRgba(colors.accent, 0.0),
         lineWidth: 2,
         priceFormat,
       });
@@ -90,9 +99,9 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     // Série 2: Valor Investido
     if (showInvested) {
       investedSeries = chart.addSeries(AreaSeries, {
-        lineColor: '#00e676',
-        topColor: 'rgba(0, 230, 118, 0.15)',
-        bottomColor: 'rgba(0, 230, 118, 0.0)',
+        lineColor: colors.success,
+        topColor: toRgba(colors.success, 0.15),
+        bottomColor: toRgba(colors.success, 0.0),
         lineWidth: 2,
         priceFormat,
       });
@@ -126,7 +135,7 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [data, showValue, showInvested, viewMode, theme]);
+  }, [data, showValue, showInvested, viewMode, theme, colors]);
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -135,26 +144,52 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
         {/* Toggle Linhas */}
         <div style={{ display: 'flex', gap: '1.5rem' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showValue} onChange={e => setShowValue(e.target.checked)} className="accent-[#00f2fe]" />
+            <input 
+              type="checkbox" 
+              checked={showValue} 
+              onChange={e => setShowValue(e.target.checked)} 
+              style={{ accentColor: 'var(--accent-color)' }} 
+            />
             <span style={{ color: 'var(--text-primary)' }}>Evolução Patrimonial</span>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showInvested} onChange={e => setShowInvested(e.target.checked)} className="accent-[#00e676]" />
+            <input 
+              type="checkbox" 
+              checked={showInvested} 
+              onChange={e => setShowInvested(e.target.checked)} 
+              style={{ accentColor: 'var(--color-success)' }} 
+            />
             <span style={{ color: 'var(--text-secondary)' }}>Valor Investido</span>
           </label>
         </div>
         
         {/* Toggle Moeda / Percentual */}
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '6px' }}>
+        <div style={{ display: 'flex', gap: '8px', background: 'var(--input-bg)', padding: '2px', borderRadius: '6px' }}>
           <button 
             onClick={() => setViewMode('currency')}
-            style={{ padding: '2px 8px', borderRadius: '4px', background: viewMode === 'currency' ? '#00f2fe' : 'transparent', color: viewMode === 'currency' ? '#000' : 'var(--text-secondary)' }}
+            style={{ 
+              padding: '2px 8px', 
+              borderRadius: '4px', 
+              border: 'none',
+              background: viewMode === 'currency' ? 'var(--accent-gradient)' : 'transparent', 
+              color: viewMode === 'currency' ? 'var(--accent-foreground)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
           >
             R$
           </button>
           <button 
             onClick={() => setViewMode('percent')}
-            style={{ padding: '2px 8px', borderRadius: '4px', background: viewMode === 'percent' ? '#00f2fe' : 'transparent', color: viewMode === 'percent' ? '#000' : 'var(--text-secondary)' }}
+            style={{ 
+              padding: '2px 8px', 
+              borderRadius: '4px', 
+              border: 'none',
+              background: viewMode === 'percent' ? 'var(--accent-gradient)' : 'transparent', 
+              color: viewMode === 'percent' ? 'var(--accent-foreground)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
           >
             %
           </button>

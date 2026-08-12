@@ -22,25 +22,25 @@ export function Badge({
         return {
           background: 'var(--color-success-bg)',
           color: 'var(--color-success)',
-          border: '1px solid rgba(0, 230, 118, 0.25)',
+          border: '1px solid rgba(var(--success-rgb), 0.25)',
         };
       case 'danger':
         return {
           background: 'var(--color-danger-bg)',
           color: 'var(--color-danger)',
-          border: '1px solid rgba(255, 82, 82, 0.25)',
+          border: '1px solid rgba(var(--danger-rgb), 0.25)',
         };
       case 'warning':
         return {
           background: 'var(--color-warning-bg)',
           color: 'var(--color-warning)',
-          border: '1px solid rgba(255, 193, 7, 0.25)',
+          border: '1px solid rgba(var(--warning-rgb), 0.25)',
         };
       case 'info':
         return {
-          background: 'rgba(0, 242, 254, 0.1)',
-          color: 'var(--accent-color)',
-          border: '1px solid rgba(0, 242, 254, 0.25)',
+          background: 'var(--color-info-bg)',
+          color: 'var(--color-info)',
+          border: '1px solid rgba(var(--info-rgb), 0.25)',
         };
       case 'neutral':
       default:

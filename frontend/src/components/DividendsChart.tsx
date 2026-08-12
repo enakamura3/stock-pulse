@@ -128,7 +128,7 @@ export default function DividendsChart({ data }: DividendsChartProps) {
         <Legend wrapperStyle={{ paddingTop: '20px' }} />
         <Bar dataKey="Nacionais (R$)" stackId="a" fill="var(--color-success)" radius={[0, 0, 4, 4]} barSize={40} />
         <Bar dataKey="Internacionais (R$)" stackId="a" fill="var(--accent-color)" radius={[0, 0, 0, 0]} barSize={40} />
-        <Bar dataKey="Renda Fixa (R$)" stackId="a" fill="#FFB300" radius={[4, 4, 0, 0]} barSize={40} />
+        <Bar dataKey="Renda Fixa (R$)" stackId="a" fill="var(--color-warning)" radius={[4, 4, 0, 0]} barSize={40} />
       </BarChart>
     </ResponsiveContainer>
   );

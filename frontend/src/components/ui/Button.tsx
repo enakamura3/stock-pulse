@@ -21,9 +21,9 @@ export function Button({
       case 'primary':
         return {
           background: 'var(--accent-gradient)',
-          color: '#000',
+          color: 'var(--accent-foreground)',
           border: 'none',
-          boxShadow: '0 4px 14px rgba(0, 242, 254, 0.25)',
+          boxShadow: '0 4px 14px rgba(var(--accent-rgb), 0.25)',
         };
       case 'secondary':
         return {
@@ -41,7 +41,7 @@ export function Button({
         return {
           background: 'var(--color-danger-bg)',
           color: 'var(--color-danger)',
-          border: '1px solid rgba(255, 82, 82, 0.3)',
+          border: '1px solid rgba(var(--danger-rgb), 0.3)',
         };
     }
   };
