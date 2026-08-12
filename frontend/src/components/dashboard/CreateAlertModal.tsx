@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Quote } from './types';
 
 interface CreateAlertModalProps {
@@ -26,6 +26,16 @@ export default function CreateAlertModal({
   onSubmit,
   onClose,
 }: CreateAlertModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <div style={{
       position: 'fixed',
@@ -38,7 +48,7 @@ export default function CreateAlertModal({
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 100,
+      zIndex: 'var(--z-modal)',
       padding: '1rem'
     }}>
       <div className="glass-panel" style={{

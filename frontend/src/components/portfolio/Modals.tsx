@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SearchResult } from './types';
 import { usePortfolio } from '@/context/PortfolioContext';
 
@@ -149,6 +149,28 @@ export default function Modals(props: ModalsProps) {
   const setFiMaturityDate = props.setFiMaturityDate ?? context?.setFiMaturityDate ?? (() => {});
   const isAddingFI = props.isAddingFI ?? context?.isAddingFI ?? false;
   const handleAddFixedIncome = props.handleAddFixedIncome ?? context?.handleAddFixedIncome ?? (() => {});
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showPortfolioModal) setShowPortfolioModal(false);
+        if (showTxModal) setShowTxModal(false);
+        if (showFIModal) setShowFIModal(false);
+        if (showFIEditModal) setShowFIEditModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    showPortfolioModal,
+    showTxModal,
+    showFIModal,
+    showFIEditModal,
+    setShowPortfolioModal,
+    setShowTxModal,
+    setShowFIModal,
+    setShowFIEditModal,
+  ]);
 
   return (
     <>
