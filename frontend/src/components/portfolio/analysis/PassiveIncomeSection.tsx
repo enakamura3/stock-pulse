@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useTheme } from '@/components/ThemeProvider';
 import { Position, CalculatedDividend } from '../types';
 
 import { formatMoney } from '../helpers';
@@ -19,6 +20,15 @@ export default function PassiveIncomeSection({
   dividends,
   kpiCurrency,
 }: PassiveIncomeSectionProps) {
+  let isLight = false;
+  try {
+    const { theme } = useTheme();
+    isLight = theme === 'light';
+  } catch (e) {
+    // Fallback gracioso quando renderizado fora do ThemeProvider
+  }
+  const strokeColor = isLight ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.4)';
+  const gridColor = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)';
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [goalInput, setGoalInput] = useState<string>('');
   const [editingGoal, setEditingGoal] = useState<boolean>(false);
@@ -547,16 +557,16 @@ export default function PassiveIncomeSection({
                 <stop offset="95%" stopColor="#4ade80" stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
             <XAxis
               dataKey="label"
-              stroke="rgba(255,255,255,0.4)"
+              stroke={strokeColor}
               fontSize={11}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              stroke="rgba(255,255,255,0.4)"
+              stroke={strokeColor}
               fontSize={11}
               tickFormatter={(v) => `R$ ${v}`}
               axisLine={false}

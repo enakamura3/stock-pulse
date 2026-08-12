@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useTheme } from '@/components/ThemeProvider';
 import { PerformancePoint } from '../types';
 import { BENCHMARK_COLORS } from './constants';
 import { SectionTitle, AnalysisCard } from './sharedComponents';
@@ -11,6 +12,15 @@ interface PerformanceBenchmarkSectionProps {
 
 export default function PerformanceBenchmarkSection({ performanceData }: PerformanceBenchmarkSectionProps) {
   const [showReal, setShowReal] = useState(false);
+  let isLight = false;
+  try {
+    const { theme } = useTheme();
+    isLight = theme === 'light';
+  } catch (e) {
+    // Fallback gracioso quando renderizado fora do ThemeProvider
+  }
+  const strokeColor = isLight ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.4)';
+  const gridColor = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)';
 
   const benchmarkData = useMemo((): BenchmarkPoint[] => {
     if (!performanceData || performanceData.length === 0) return [];
@@ -94,13 +104,13 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
           <button
             onClick={() => setShowReal(!showReal)}
             style={{
-              background: showReal ? 'rgba(0,242,254,0.15)' : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${showReal ? 'rgba(0,242,254,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              background: showReal ? 'var(--accent-bg)' : 'var(--input-bg)',
+              border: `1px solid ${showReal ? 'rgba(var(--accent-rgb), 0.4)' : 'var(--panel-border)'}`,
               borderRadius: '8px',
               padding: '0.4rem 0.85rem',
               fontSize: '0.75rem',
               fontWeight: 600,
-              color: showReal ? '#00f2fe' : 'var(--text-secondary)',
+              color: showReal ? 'var(--accent-color)' : 'var(--text-secondary)',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
@@ -114,10 +124,10 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
         <>
           <ResponsiveContainer width="100%" height={340}>
             <LineChart data={chartData} margin={{ top: 10, right: 15, left: 5, bottom: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
               <XAxis
                 dataKey="label"
-                stroke="rgba(255,255,255,0.4)"
+                stroke={strokeColor}
                 fontSize={11}
                 tickMargin={10}
                 axisLine={false}
@@ -125,7 +135,7 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
                 interval="preserveStartEnd"
               />
               <YAxis
-                stroke="rgba(255,255,255,0.4)"
+                stroke={strokeColor}
                 fontSize={11}
                 tickFormatter={(v) => `${v}%`}
                 axisLine={false}
