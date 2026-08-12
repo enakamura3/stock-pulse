@@ -188,17 +188,17 @@ export default function DividendsCalendarSection({
         <StatPill
           label="Já Recebido"
           value={formatMoney(monthlyDividends.monthTotalReceived, currency)}
-          color="#4ade80"
+          color="var(--color-success)"
         />
         <StatPill
           label="A Receber"
           value={formatMoney(monthlyDividends.monthTotalUpcoming, currency)}
-          color="#fbbf24"
+          color="var(--color-warning)"
         />
       </div>
 
       {/* Grid do Calendário (7 colunas) */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+      <div style={{ background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
         {/* Cabeçalho dos dias da semana */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '0.5rem' }}>
           {WEEKDAYS.map(wd => (
@@ -227,7 +227,7 @@ export default function DividendsCalendarSection({
             const hasUpcoming = events.some(e => !isPaidEvent(e));
             const daySum = events.reduce((s, e) => s + e.net_amount, 0);
 
-            const badgeColor = hasPaid && hasUpcoming ? '#fbbf24' : hasPaid ? '#4ade80' : '#fbbf24';
+            const badgeColor = hasPaid && hasUpcoming ? 'var(--color-warning)' : hasPaid ? 'var(--color-success)' : 'var(--color-warning)';
 
             return (
               <div
@@ -236,19 +236,19 @@ export default function DividendsCalendarSection({
                 style={{
                   minHeight: '56px',
                   background: isSelected
-                    ? 'rgba(0,242,254,0.15)'
+                    ? 'var(--accent-bg)'
                     : isToday
-                      ? 'rgba(255,255,255,0.06)'
+                      ? 'var(--input-bg)'
                       : hasEvents
-                        ? 'rgba(255,255,255,0.03)'
-                        : 'rgba(255,255,255,0.01)',
+                        ? 'var(--panel-bg)'
+                        : 'transparent',
                   border: isSelected
-                    ? '1px solid #00f2fe'
+                    ? '1px solid var(--accent-color)'
                     : isToday
-                      ? '1px solid rgba(255,255,255,0.2)'
+                      ? '1px solid var(--panel-border)'
                       : hasEvents
-                        ? `1px solid ${badgeColor}30`
-                        : '1px solid rgba(255,255,255,0.03)',
+                        ? '1px solid rgba(var(--accent-rgb), 0.2)'
+                        : '1px solid transparent',
                   borderRadius: '8px',
                   padding: '0.35rem 0.4rem',
                   display: 'flex',
@@ -263,7 +263,7 @@ export default function DividendsCalendarSection({
                   <span style={{
                     fontSize: '0.78rem',
                     fontWeight: isToday || isSelected ? 800 : 600,
-                    color: isToday ? '#00f2fe' : 'var(--text-primary)',
+                    color: isToday ? 'var(--accent-color)' : 'var(--text-primary)',
                   }}>
                     {dayNum}
                   </span>
@@ -293,9 +293,9 @@ export default function DividendsCalendarSection({
 
       {/* Painel de Detalhes do Dia Selecionado */}
       {selectedDayEvents.length > 0 && (
-        <div style={{ padding: '1rem', background: 'rgba(0,242,254,0.04)', borderRadius: '12px', border: '1px solid rgba(0,242,254,0.15)', marginTop: '0.75rem' }}>
+        <div style={{ padding: '1rem', background: 'var(--accent-bg)', borderRadius: '12px', border: '1px solid rgba(var(--accent-rgb), 0.25)', marginTop: '0.75rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f2fe', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <span>📍</span> Proventos do dia {selectedDay} de {MONTH_NAMES[month]}
             </span>
             <button
@@ -309,7 +309,7 @@ export default function DividendsCalendarSection({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {selectedDayEvents.map((item, i) => {
               const paid = isPaidEvent(item);
-              const color = paid ? '#4ade80' : '#fbbf24';
+              const color = paid ? 'var(--color-success)' : 'var(--color-warning)';
               const statusText = paid ? 'Recebido' : 'A receber';
 
               return (

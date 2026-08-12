@@ -335,16 +335,16 @@ export default function DividendsHistory({
                         </td>
                         <td className="text-center">
                           <span className="badge badge-pill" style={{
-                            backgroundColor: div.is_accrued ? 'rgba(34, 211, 238, 0.15)' :
-                                            typeStr === 'JCP' ? 'rgba(251, 191, 36, 0.15)' :
-                                            typeStr === 'Rendimento' ? 'rgba(192, 132, 252, 0.15)' :
-                                            typeStr === 'Amortização' ? 'rgba(248, 113, 113, 0.15)' :
-                                            'rgba(96, 165, 250, 0.15)',
-                            color: div.is_accrued ? '#22d3ee' :
-                                   typeStr === 'JCP' ? '#fbbf24' :
-                                   typeStr === 'Rendimento' ? '#c084fc' :
-                                   typeStr === 'Amortização' ? '#f87171' :
-                                   '#60a5fa'
+                            backgroundColor: div.is_accrued ? 'var(--color-info-bg)' :
+                                            typeStr === 'JCP' ? 'var(--color-warning-bg)' :
+                                            typeStr === 'Rendimento' ? 'var(--accent-bg)' :
+                                            typeStr === 'Amortização' ? 'var(--color-danger-bg)' :
+                                            'var(--color-success-bg)',
+                            color: div.is_accrued ? 'var(--color-info)' :
+                                   typeStr === 'JCP' ? 'var(--color-warning)' :
+                                   typeStr === 'Rendimento' ? 'var(--accent-color)' :
+                                   typeStr === 'Amortização' ? 'var(--color-danger)' :
+                                   'var(--color-success)'
                           }}>
                             {typeStr}
                           </span>

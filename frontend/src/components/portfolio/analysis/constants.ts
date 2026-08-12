@@ -1,34 +1,34 @@
 export const ALLOCATION_COLORS: Record<string, string> = {
-  'Renda Variável': '#60a5fa',
-  'Renda Fixa': '#fbbf24',
+  'Renda Variável': 'var(--accent-color)',
+  'Renda Fixa': 'var(--color-warning)',
 };
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  'Ações (B3)': '#60a5fa',
-  'FIIs': '#c084fc',
-  'FIAGROs': '#a78bfa',
-  'ETFs Nacionais': '#34d399',
-  'BDRs': '#f87171',
-  'Ações EUA': '#38bdf8',
-  'ETF Internacional': '#2dd4bf',
-  'Cripto': '#fb923c',
-  'Renda Fixa': '#fbbf24',
-  'Tesouro Direto': '#10b981',
-  'Desconhecido': '#94a3b8',
+  'Ações (B3)': 'var(--accent-color)',
+  'FIIs': 'var(--color-info)',
+  'FIAGROs': 'var(--color-success)',
+  'ETFs Nacionais': 'var(--color-info)',
+  'BDRs': 'var(--color-warning)',
+  'Ações EUA': 'var(--color-danger)',
+  'ETF Internacional': 'var(--accent-color)',
+  'Cripto': 'var(--color-warning)',
+  'Renda Fixa': 'var(--color-warning)',
+  'Tesouro Direto': 'var(--color-success)',
+  'Desconhecido': 'var(--text-muted)',
 };
 
 export const EXPOSURE_COLORS = {
-  local: '#4ade80',
-  global: '#60a5fa',
+  local: 'var(--color-success)',
+  global: 'var(--accent-color)',
 };
 
 export const BENCHMARK_COLORS = {
   portfolio: 'var(--accent-color)',
-  cdi: '#fbbf24',
-  ipca: '#f87171',
-  ifix: '#c084fc',
-  ibov: '#f472b6',
-  sp500: '#34d399',
+  cdi: 'var(--color-warning)',
+  ipca: 'var(--color-danger)',
+  ifix: 'var(--color-info)',
+  ibov: '#ec4899',
+  sp500: 'var(--color-success)',
 };
 
 export const DIVIDENDS_COLORS = {

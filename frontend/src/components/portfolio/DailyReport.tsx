@@ -23,15 +23,15 @@ function getExchangeRate(pos: Position): number {
 }
 
 // Helper: retorna o rótulo de tipo de ativo
-function getAssetTypeBadge(pos: Position): { label: string; color: string } | null {
+const getAssetTypeBadge = (pos: Position) => {
   const type = (pos.type || '').toUpperCase();
-  if (type === 'FII') return { label: 'FII', color: 'var(--color-warning, #f59e0b)' };
-  if (type === 'ETF') return { label: 'ETF', color: 'var(--color-info, #38bdf8)' };
-  if (type === 'BDR') return { label: 'BDR', color: 'var(--color-secondary-text, #a78bfa)' };
-  if (type === 'STOCK' || type === 'AÇÃO' || type === 'ACAO') return { label: 'Ação', color: 'var(--color-success, #00e676)' };
-  if (type === 'CRYPTO') return { label: 'Crypto', color: '#f97316' };
+  if (type === 'FII') return { label: 'FII', color: 'var(--color-warning)' };
+  if (type === 'ETF') return { label: 'ETF', color: 'var(--color-info)' };
+  if (type === 'BDR') return { label: 'BDR', color: 'var(--color-warning)' };
+  if (type === 'STOCK' || type === 'AÇÃO' || type === 'ACAO') return { label: 'Ação', color: 'var(--color-success)' };
+  if (type === 'CRYPTO') return { label: 'Crypto', color: 'var(--color-warning)' };
   return null;
-}
+};
 
 export default function DailyReport({ positions, fiPositions = [], treasuryPositions = [], kpiCurrency }: DailyReportProps) {
   const [sortKey, setSortKey] = useState<SortKey>('impact');
@@ -149,7 +149,7 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
               {topRisers.map(({ pos, percent, impact, portfolioWeight }) => {
                 const badge = getAssetTypeBadge(pos);
                 return (
-                  <div key={pos.asset_id} className="flex-row justify-between items-center" style={{ padding: '0.5rem 0.75rem', background: 'rgba(0,230,118,0.05)', borderRadius: '8px', borderLeft: '3px solid #00e676' }}>
+                  <div key={pos.asset_id} className="flex-row justify-between items-center" style={{ padding: '0.5rem 0.75rem', background: 'var(--color-success-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-success)' }}>
                     <div className="flex-col" style={{ gap: '2px' }}>
                       <div className="flex-row items-center gap-sm">
                         <span className="font-bold">{pos.ticker}</span>
@@ -182,7 +182,7 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
               {topFallers.map(({ pos, percent, impact, portfolioWeight }) => {
                 const badge = getAssetTypeBadge(pos);
                 return (
-                  <div key={pos.asset_id} className="flex-row justify-between items-center" style={{ padding: '0.5rem 0.75rem', background: 'rgba(255,61,0,0.05)', borderRadius: '8px', borderLeft: '3px solid #ff3d00' }}>
+                  <div key={pos.asset_id} className="flex-row justify-between items-center" style={{ padding: '0.5rem 0.75rem', background: 'var(--color-danger-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-danger)' }}>
                     <div className="flex-col" style={{ gap: '2px' }}>
                       <div className="flex-row items-center gap-sm">
                         <span className="font-bold">{pos.ticker}</span>
@@ -261,8 +261,8 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                             </span>
                           )}
                         </div>
-                        <div style={{ width: '100%', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', height: '3px', marginTop: '4px' }}>
-                          <div style={{ width: `${Math.min(portfolioWeight, 100)}%`, background: 'var(--color-primary, #6366f1)', borderRadius: '3px', height: '3px' }} />
+                        <div style={{ width: '100%', background: 'var(--input-bg)', borderRadius: '3px', height: '3px', marginTop: '4px' }}>
+                          <div style={{ width: `${Math.min(portfolioWeight, 100)}%`, background: 'var(--accent-color)', borderRadius: '3px', height: '3px' }} />
                         </div>
                         <span className="text-xs text-secondary">{portfolioWeight.toFixed(1)}%</span>
                       </td>
@@ -324,7 +324,6 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                   const taxa = p.asset.debt_type === 'POS'
                     ? `${p.asset.rate.toFixed(2)}% ${p.asset.indexer}`
                     : `${p.asset.rate.toFixed(2)}% a.a.`;
-                  const badgeColor = '#38bdf8';
 
                   return (
                     <tr key={p.asset.id}>
@@ -336,7 +335,7 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                       </td>
                       <td>
                         <div className="flex-row items-center gap-sm">
-                          <span style={{ background: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}`, fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          <span style={{ background: 'var(--accent-bg)', color: 'var(--accent-color)', border: '1px solid rgba(var(--accent-rgb), 0.3)', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                             {p.asset.type}
                           </span>
                           <span className="text-xs">{taxa}</span>
@@ -382,13 +381,15 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                   const returnPct = p.total_invested > 1e-6
                     ? ((p.net_value - p.total_invested) / p.total_invested) * 100
                     : 0;
-                  const badgeColor = p.treasury_type === 'SELIC' ? '#4caf50'
-                    : p.treasury_type === 'PREFIXADO' ? '#2196f3' : '#ff9800';
+                  const isSelic = p.treasury_type === 'SELIC';
+                  const isPrefix = p.treasury_type === 'PREFIXADO';
+                  const colorVar = isSelic ? 'var(--color-success)' : isPrefix ? 'var(--accent-color)' : 'var(--color-warning)';
+                  const bgVar = isSelic ? 'var(--color-success-bg)' : isPrefix ? 'var(--accent-bg)' : 'var(--color-warning-bg)';
                   return (
                     <tr key={p.transaction_id}>
                       <td><span className="font-bold">{p.ticker}</span></td>
                       <td>
-                        <span style={{ background: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}`, fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                        <span style={{ background: bgVar, color: colorVar, border: `1px solid ${colorVar}`, fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                           {p.treasury_type}
                         </span>
                       </td>
