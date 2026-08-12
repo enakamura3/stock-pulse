@@ -112,6 +112,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .container {
@@ -130,6 +131,7 @@ body {
   padding: 3rem;
   text-align: center;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  transition: background 0.25s ease, border-color 0.25s ease;
 }
 
 .glass-panel h1 {

@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import ThemeToggle from '../ThemeToggle';
 
 interface DashboardHeaderProps {
   userName: string;
@@ -17,8 +18,8 @@ export default function DashboardHeader({ userName, wsConnected, onLogout }: Das
             width: 8, 
             height: 8, 
             borderRadius: '50%', 
-            backgroundColor: wsConnected ? '#00e676' : '#ff3d00', 
-            boxShadow: wsConnected ? '0 0 10px #00e676' : '0 0 10px #ff3d00',
+            backgroundColor: wsConnected ? 'var(--color-success)' : 'var(--color-danger)', 
+            boxShadow: wsConnected ? '0 0 10px rgba(var(--success-rgb), 0.5)' : '0 0 10px rgba(var(--danger-rgb), 0.5)',
             display: 'inline-block',
             transition: 'all 0.3s ease'
           }} title={wsConnected ? 'Conexão em Tempo Real Ativa' : 'Desconectado da cotação tempo real'} />
@@ -42,6 +43,7 @@ export default function DashboardHeader({ userName, wsConnected, onLogout }: Das
       </div>
       
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+        <ThemeToggle />
         <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
           <span style={{ display: 'block', fontWeight: 600 }}>{userName}</span>
           <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sessão Segura</span>
