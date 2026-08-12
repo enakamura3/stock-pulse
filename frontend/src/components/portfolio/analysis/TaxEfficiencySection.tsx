@@ -191,27 +191,27 @@ export default function TaxEfficiencySection({
           value={formatMoney(taxMetrics.totalIRRetidoRF, currency)}
           subtitle="Imposto de Renda provisionado/retido na Renda Fixa e Tesouro"
           description={`Valores de IR calculados pela tabela regressiva (22.5% a 15%) sobre o rendimento bruto de CDBs, Debêntures e Tesouro Direto.`}
-          color={taxMetrics.totalIRRetidoRF > 0 ? '#f87171' : '#4ade80'}
+          color={taxMetrics.totalIRRetidoRF > 0 ? 'var(--color-danger)' : 'var(--color-success)'}
           alertLevel={taxMetrics.totalIRRetidoRF > 1000 ? 'moderate' : 'safe'}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <StatPill
               label="IR Retido em Renda Fixa & Tesouro"
               value={formatMoney(taxMetrics.totalIRRetidoRF, currency)}
-              color="#f87171"
+              color="var(--color-danger)"
             />
             {taxMetrics.taxaB3TD > 0 && (
               <StatPill
                 label="Taxa de Custódia B3 (Tesouro Direto)"
                 value={formatMoney(taxMetrics.taxaB3TD, currency)}
-                color="#c084fc"
+                color="var(--accent-color)"
               />
             )}
             {taxMetrics.totalIOFRetido > 0 && (
               <StatPill
                 label="IOF Retido (Resgates < 30 dias)"
                 value={formatMoney(taxMetrics.totalIOFRetido, currency)}
-                color="#fbbf24"
+                color="var(--color-warning)"
               />
             )}
           </div>

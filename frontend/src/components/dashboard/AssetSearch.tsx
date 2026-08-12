@@ -68,14 +68,13 @@ export default function AssetSearch({
                 cursor: 'pointer',
                 transition: 'background-color 0.2s ease',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              className="sidebar-link"
             >
               <div>
                 <span style={{ fontWeight: 700, color: 'var(--accent-color)', marginRight: '0.8rem' }}>{item.symbol}</span>
                 <span style={{ fontSize: '0.85rem', opacity: 0.85 }}>{item.name}</span>
               </div>
-              <span style={{ fontSize: '0.65rem', padding: '0.2rem 0.4rem', background: 'rgba(0, 242, 254, 0.08)', color: 'var(--accent-color)', borderRadius: '4px', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.65rem', padding: '0.2rem 0.4rem', background: 'var(--accent-bg)', color: 'var(--accent-color)', borderRadius: '4px', textTransform: 'uppercase' }}>
                 {item.exchange}
               </span>
             </div>

@@ -148,10 +148,8 @@ export default function TransactionModal({
                   <div
                     key={item.symbol}
                     onClick={() => handleSelectAsset(item.symbol)}
-                    className="flex-row justify-between items-center"
+                    className="flex-row justify-between items-center sidebar-link"
                     style={{ padding: '0.55rem 0.8rem', borderRadius: '6px', cursor: 'pointer' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
                     <div>
                       <span className="font-bold text-accent" style={{ marginRight: '0.6rem' }}>
@@ -159,7 +157,7 @@ export default function TransactionModal({
                       </span>
                       <span className="text-sm opacity-80">{item.name}</span>
                     </div>
-                    <span className="badge badge-neutral text-accent" style={{ background: 'rgba(0, 242, 254, 0.08)' }}>
+                    <span className="badge badge-neutral text-accent" style={{ background: 'var(--accent-bg)' }}>
                       {item.exchange}
                     </span>
                   </div>
@@ -181,9 +179,9 @@ export default function TransactionModal({
                   padding: '0.6rem',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  border: txType === 'BUY' ? '1px solid #00e676' : '1px solid var(--panel-border)',
-                  background: txType === 'BUY' ? 'rgba(0, 230, 118, 0.08)' : 'transparent',
-                  color: txType === 'BUY' ? '#00e676' : 'var(--text-secondary)',
+                  border: txType === 'BUY' ? '1px solid var(--color-success)' : '1px solid var(--panel-border)',
+                  background: txType === 'BUY' ? 'var(--color-success-bg)' : 'transparent',
+                  color: txType === 'BUY' ? 'var(--color-success)' : 'var(--text-secondary)',
                 }}
               >
                 🟢 COMPRA
@@ -198,9 +196,9 @@ export default function TransactionModal({
                   padding: '0.6rem',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  border: txType === 'SELL' ? '1px solid #ff3d00' : '1px solid var(--panel-border)',
-                  background: txType === 'SELL' ? 'rgba(255, 61, 0, 0.08)' : 'transparent',
-                  color: txType === 'SELL' ? '#ff3d00' : 'var(--text-secondary)',
+                  border: txType === 'SELL' ? '1px solid var(--color-danger)' : '1px solid var(--panel-border)',
+                  background: txType === 'SELL' ? 'var(--color-danger-bg)' : 'transparent',
+                  color: txType === 'SELL' ? 'var(--color-danger)' : 'var(--text-secondary)',
                 }}
               >
                 🔴 VENDA
@@ -219,9 +217,9 @@ export default function TransactionModal({
                   padding: '0.6rem',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  border: txType === 'SPLIT' ? '1px solid #00f2fe' : '1px solid var(--panel-border)',
-                  background: txType === 'SPLIT' ? 'rgba(0, 242, 254, 0.08)' : 'transparent',
-                  color: txType === 'SPLIT' ? '#00f2fe' : 'var(--text-secondary)',
+                  border: txType === 'SPLIT' ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)',
+                  background: txType === 'SPLIT' ? 'var(--accent-bg)' : 'transparent',
+                  color: txType === 'SPLIT' ? 'var(--accent-color)' : 'var(--text-secondary)',
                 }}
               >
                 ✂️ SPLIT

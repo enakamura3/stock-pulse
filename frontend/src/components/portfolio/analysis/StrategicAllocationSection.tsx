@@ -163,14 +163,14 @@ export default function StrategicAllocationSection({
     const d = payload[0].payload;
     return (
       <div style={{
-        background: 'rgba(15, 23, 42, 0.95)',
-        border: '1px solid rgba(255,255,255,0.1)',
+        background: 'var(--panel-bg)',
+        border: '1px solid var(--panel-border)',
         padding: '0.75rem 1rem',
         borderRadius: '10px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
         backdropFilter: 'blur(12px)',
       }}>
-        <p style={{ margin: '0 0 0.3rem 0', fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>{d.name}</p>
+        <p style={{ margin: '0 0 0.3rem 0', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.85rem' }}>{d.name}</p>
         <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           {formatMoney(d.value, kpiCurrency)} ({d.pct.toFixed(1)}%)
         </p>
@@ -185,7 +185,7 @@ export default function StrategicAllocationSection({
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
     return (
-      <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize="0.7rem" fontWeight={700}>
+      <text x={x} y={y} fill="var(--text-primary)" textAnchor="middle" dominantBaseline="central" fontSize="0.7rem" fontWeight={700}>
         {pct.toFixed(0)}%
       </text>
     );

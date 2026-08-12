@@ -234,7 +234,7 @@ export default function DividendsHistory({
             <select
               value={filterDivYear}
               onChange={(e) => setFilterDivYear(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: 'var(--option-bg)', color: 'var(--option-color)', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
             >
               <option value="Todos">Todos os Anos</option>
               {availableYears.map(year => (
@@ -244,7 +244,7 @@ export default function DividendsHistory({
             <select
               value={filterDivMonth}
               onChange={(e) => setFilterDivMonth(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: 'var(--option-bg)', color: 'var(--option-color)', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
             >
               <option value="Todos">Todos os Meses</option>
               {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
@@ -270,18 +270,17 @@ export default function DividendsHistory({
               </div>
               <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                 <div className="text-secondary text-sm mb-sm font-bold">Juros Acumulados (Renda Fixa)</div>
-                <div className="font-bold text-3xl mb-xs" style={{ color: '#FFB300', letterSpacing: '-0.5px' }}>{formatMoney(stats.rfPaid + stats.rfPending, 'BRL')}</div>
+                <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--color-warning)', letterSpacing: '-0.5px' }}>{formatMoney(stats.rfPaid + stats.rfPending, 'BRL')}</div>
                 <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>
-                  <span style={{ color: '#FFB300' }}>Pago: {formatMoney(stats.rfPaid, 'BRL')}</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>Pend: {formatMoney(stats.rfPending, 'BRL')}</span>
+                  <span style={{ color: 'var(--color-warning)' }}>Acumulado: {formatMoney(stats.rfPaid, 'BRL')}</span>
                 </div>
               </div>
               <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                 <div className="text-secondary text-sm mb-sm font-bold">Total Consolidado</div>
-                <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>{formatMoney(stats.totalPaid + stats.totalPending, 'BRL')}</div>
+                <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{formatMoney(stats.totalPaid + stats.totalPending, 'BRL')}</div>
                 <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>
-                  <span style={{ color: 'rgba(0, 230, 118, 0.8)' }}>Pago: {formatMoney(stats.totalPaid, 'BRL')}</span>
-                  <span style={{ color: 'rgba(255, 179, 0, 0.8)' }}>Pend: {formatMoney(stats.totalPending, 'BRL')}</span>
+                  <span style={{ color: 'var(--color-success)' }}>Pago: {formatMoney(stats.totalPaid, 'BRL')}</span>
+                  <span style={{ color: 'var(--color-warning)' }}>Pend: {formatMoney(stats.totalPending, 'BRL')}</span>
                 </div>
               </div>
             </div>
@@ -320,9 +319,9 @@ export default function DividendsHistory({
                       <tr key={i}>
                         <td className="text-center">
                           {paid ? (
-                            <span className="badge badge-pill" style={{ backgroundColor: 'rgba(74, 222, 128, 0.15)', color: '#4ade80' }}>Pago</span>
+                            <span className="badge badge-pill" style={{ backgroundColor: 'var(--color-success-bg)', color: 'var(--color-success)' }}>Pago</span>
                           ) : (
-                            <span className="badge badge-pill" style={{ backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24' }}>Pendente</span>
+                            <span className="badge badge-pill" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>Pendente</span>
                           )}
                         </td>
                         <td className="text-center font-bold" style={{ color: 'var(--text-primary)' }}>{div.ticker}</td>

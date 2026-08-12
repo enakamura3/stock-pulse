@@ -12,7 +12,7 @@ export function SectionTitle({ emoji, title, subtitle }: { emoji: string; title:
 }
 
 export function ProgressBar({
-  value, max, color = '#00f2fe', label, sublabel,
+  value, max, color = 'var(--accent-color)', label, sublabel,
 }: {
   value: number; max: number; color?: string; label?: string; sublabel?: string;
 }) {
@@ -25,7 +25,7 @@ export function ProgressBar({
           <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{sublabel}</span>
         </div>
       )}
-      <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--input-bg)', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
         <div style={{
           height: '100%',
           width: `${pct}%`,
@@ -41,9 +41,9 @@ export function ProgressBar({
 
 export function AlertBadge({ type, message }: { type: 'warning' | 'info' | 'success'; message: string }) {
   const colors = {
-    warning: { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)', text: '#fbbf24' },
-    info:    { bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.3)',  text: '#60a5fa' },
-    success: { bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)',  text: '#4ade80' },
+    warning: { bg: 'var(--color-warning-bg)', border: 'rgba(var(--warning-rgb), 0.3)', text: 'var(--color-warning)' },
+    info:    { bg: 'var(--color-info-bg)',    border: 'rgba(var(--info-rgb), 0.3)',    text: 'var(--color-info)' },
+    success: { bg: 'var(--color-success-bg)', border: 'rgba(var(--success-rgb), 0.3)', text: 'var(--color-success)' },
   };
   const c = colors[type];
   return (
@@ -60,8 +60,8 @@ export function AlertBadge({ type, message }: { type: 'warning' | 'info' | 'succ
 export function AnalysisCard({ children, style, id }: { children: React.ReactNode; style?: React.CSSProperties; id?: string }) {
   return (
     <div id={id} style={{
-      background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-      border: '1px solid rgba(255,255,255,0.06)',
+      background: 'var(--panel-bg)',
+      border: '1px solid var(--panel-border)',
       borderRadius: '16px',
       padding: '1.5rem',
       boxShadow: '0 4px 24px rgba(0,0,0,0.25)',

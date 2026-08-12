@@ -83,8 +83,8 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                   className="text-center font-bold matrix-cell-clickable text-sm" 
                   style={{ 
                     cursor: 'pointer', 
-                    color: activeYear === year && activeMonth === 'Todos' ? '#00f2fe' : 'var(--text-primary)',
-                    background: activeYear === year && activeMonth === 'Todos' ? 'rgba(0, 242, 254, 0.08)' : 'transparent',
+                    color: activeYear === year && activeMonth === 'Todos' ? 'var(--accent-color)' : 'var(--text-primary)',
+                    background: activeYear === year && activeMonth === 'Todos' ? 'var(--accent-bg)' : 'transparent',
                     borderRight: '1px solid rgba(255,255,255,0.05)'
                   }}
                   onClick={() => onYearClick && onYearClick(activeYear === year && activeMonth === 'Todos' ? 'Todos' : year)}
@@ -102,8 +102,8 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                       className={`text-right text-sm ${val > 0 ? 'matrix-cell-clickable font-medium' : ''}`}
                       style={{ 
                         cursor: val > 0 ? 'pointer' : 'default',
-                        background: isActive ? 'rgba(0, 242, 254, 0.12)' : 'transparent',
-                        color: isActive ? '#00f2fe' : (val > 0 ? 'var(--text-primary)' : 'var(--text-secondary)')
+                        background: isActive ? 'var(--accent-bg)' : 'transparent',
+                        color: isActive ? 'var(--accent-color)' : (val > 0 ? 'var(--text-primary)' : 'var(--text-secondary)')
                       }}
                       onClick={() => val > 0 && onMonthClick && onMonthClick(isActive ? 'Todos' : year, isActive ? 'Todos' : monthStr)}
                       title={val > 0 ? (isActive ? 'Remover filtro' : `Filtrar ${m}/${year}`) : undefined}
@@ -116,7 +116,7 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                     </td>
                   );
                 })}
-                <td className="text-right text-sm font-bold text-success" style={{ borderLeft: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0, 230, 118, 0.02)' }}>
+                <td className="text-right text-sm font-bold text-success" style={{ borderLeft: '1px solid rgba(255,255,255,0.05)', background: 'var(--color-success-bg)' }}>
                   {matrix[year][12].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>

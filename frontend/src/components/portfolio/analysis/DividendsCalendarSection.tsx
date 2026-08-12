@@ -162,10 +162,10 @@ export default function DividendsCalendarSection({
           <button
             onClick={handleTodayMonth}
             style={{
-              background: 'rgba(0,242,254,0.1)',
-              border: '1px solid rgba(0,242,254,0.3)',
+              background: 'var(--accent-bg)',
+              border: '1px solid rgba(var(--accent-rgb), 0.3)',
               borderRadius: '6px',
-              color: '#00f2fe',
+              color: 'var(--accent-color)',
               cursor: 'pointer',
               padding: '0.2rem 0.5rem',
               fontSize: '0.72rem',
@@ -183,7 +183,7 @@ export default function DividendsCalendarSection({
         <StatPill
           label="Total do Mês"
           value={formatMoney(monthlyDividends.monthTotalSum, currency)}
-          color="#00f2fe"
+          color="var(--accent-color)"
         />
         <StatPill
           label="Já Recebido"

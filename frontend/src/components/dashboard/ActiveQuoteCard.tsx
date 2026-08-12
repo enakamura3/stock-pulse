@@ -47,7 +47,7 @@ export default function ActiveQuoteCard({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
               <div>
-                <h2 style={{ fontSize: '2.4rem', margin: 0, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <h2 style={{ fontSize: '2.4rem', margin: 0, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {activeQuote.symbol}
                   
                   {/* ÍCONE ESTRELA PARA FAVORITAR DENTRO DA WATCHLIST ATIVA */}
@@ -59,7 +59,7 @@ export default function ActiveQuoteCard({
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: '2rem',
-                      color: activeFavorited ? '#ffd700' : 'rgba(255,255,255,0.15)',
+                      color: activeFavorited ? '#ffd700' : 'var(--text-muted)',
                       transition: 'transform 0.15s ease, color 0.15s ease',
                       padding: 0,
                       lineHeight: 1,
@@ -83,7 +83,7 @@ export default function ActiveQuoteCard({
                 <button
                   className="primary-button"
                   onClick={onOpenAlertModal}
-                  style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', background: 'linear-gradient(135deg, #ff9800, #f57c00)', border: 'none', color: '#000', fontWeight: 700 }}
+                  style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
                 >
                   🔔 Criar Alerta
                 </button>
@@ -96,12 +96,12 @@ export default function ActiveQuoteCard({
                 </button>
               </div>
               {cacheStatus === 'hit' && (
-                <span style={{ fontSize: '0.7rem', color: '#00f2fe', background: 'rgba(0,242,254,0.08)', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--accent-color)', background: 'var(--accent-bg)', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   ⚡ Redis Cache
                 </span>
               )}
               {cacheStatus === 'miss' && (
-                <span style={{ fontSize: '0.7rem', color: '#ffc107', background: 'rgba(255,193,7,0.08)', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-warning)', background: 'var(--color-warning-bg)', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   🌐 Yahoo API
                 </span>
               )}
@@ -113,8 +113,8 @@ export default function ActiveQuoteCard({
             <span style={{ 
               fontSize: '3rem', 
               fontWeight: 800, 
-              color: priceFlashing[activeQuote.symbol] === 'up' ? '#00e676' : priceFlashing[activeQuote.symbol] === 'down' ? '#ff3d00' : '#fff', 
-              textShadow: priceFlashing[activeQuote.symbol] === 'up' ? '0 0 15px rgba(0, 230, 118, 0.6)' : priceFlashing[activeQuote.symbol] === 'down' ? '0 0 15px rgba(255, 61, 0, 0.6)' : 'none',
+              color: priceFlashing[activeQuote.symbol] === 'up' ? 'var(--color-success)' : priceFlashing[activeQuote.symbol] === 'down' ? 'var(--color-danger)' : 'var(--text-primary)', 
+              textShadow: priceFlashing[activeQuote.symbol] === 'up' ? '0 0 15px rgba(var(--success-rgb), 0.6)' : priceFlashing[activeQuote.symbol] === 'down' ? '0 0 15px rgba(var(--danger-rgb), 0.6)' : 'none',
               transition: 'all 0.2s ease',
               letterSpacing: '-0.02em' 
             }}>
@@ -123,8 +123,8 @@ export default function ActiveQuoteCard({
             <span style={{
               fontSize: '1.1rem',
               fontWeight: 700,
-              color: activeQuote.change >= 0 ? '#00e676' : '#ff3d00',
-              background: activeQuote.change >= 0 ? 'rgba(0,230,118,0.08)' : 'rgba(255,61,0,0.08)',
+              color: activeQuote.change >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
+              background: activeQuote.change >= 0 ? 'var(--color-success-bg)' : 'var(--color-danger-bg)',
               padding: '0.3rem 0.7rem',
               borderRadius: '6px',
             }}>
@@ -134,7 +134,7 @@ export default function ActiveQuoteCard({
 
           {/* Grid Secundária */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-            <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+            <div style={{ background: 'var(--input-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
               <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.2rem', fontWeight: 600 }}>
                 Mínima
               </span>
@@ -142,7 +142,7 @@ export default function ActiveQuoteCard({
                 {formatMoney(activeQuote.low, activeQuote.currency)}
               </span>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+            <div style={{ background: 'var(--input-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
               <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.2rem', fontWeight: 600 }}>
                 Máxima
               </span>
@@ -150,11 +150,11 @@ export default function ActiveQuoteCard({
                 {formatMoney(activeQuote.high, activeQuote.currency)}
               </span>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.015)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+            <div style={{ background: 'var(--input-bg)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
               <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.2rem', fontWeight: 600 }}>
                 Volume
               </span>
-              <span style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'monospace' }}>
+              <span style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                 {new Intl.NumberFormat('pt-BR').format(activeQuote.volume)}
               </span>
             </div>

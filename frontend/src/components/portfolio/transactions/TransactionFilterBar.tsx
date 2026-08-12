@@ -56,7 +56,7 @@ export default function TransactionFilterBar({
         <div
           style={{
             display: 'flex',
-            background: '#1E293B',
+            background: 'var(--input-bg)',
             borderRadius: '6px',
             padding: '2px',
             border: '1px solid var(--panel-border)',
@@ -70,7 +70,7 @@ export default function TransactionFilterBar({
               borderRadius: '4px',
               border: 'none',
               background: groupByDate ? 'var(--accent-gradient)' : 'transparent',
-              color: groupByDate ? '#000' : 'var(--text-secondary)',
+              color: groupByDate ? 'var(--accent-foreground)' : 'var(--text-secondary)',
               cursor: 'pointer',
               fontWeight: groupByDate ? 700 : 500,
             }}
@@ -85,7 +85,7 @@ export default function TransactionFilterBar({
               borderRadius: '4px',
               border: 'none',
               background: !groupByDate ? 'var(--accent-gradient)' : 'transparent',
-              color: !groupByDate ? '#000' : 'var(--text-secondary)',
+              color: !groupByDate ? 'var(--accent-foreground)' : 'var(--text-secondary)',
               cursor: 'pointer',
               fontWeight: !groupByDate ? 700 : 500,
             }}
@@ -148,9 +148,9 @@ export default function TransactionFilterBar({
             style={{
               padding: '0.3rem 0.6rem',
               fontSize: '0.75rem',
-              color: '#ffc107',
-              borderColor: 'rgba(255, 193, 7, 0.4)',
-              background: 'rgba(255, 193, 7, 0.08)',
+              color: 'var(--color-warning)',
+              borderColor: 'rgba(var(--warning-rgb), 0.4)',
+              background: 'var(--color-warning-bg)',
             }}
           >
             🧹 Limpar Filtros

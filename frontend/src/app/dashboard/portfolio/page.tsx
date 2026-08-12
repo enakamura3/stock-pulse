@@ -73,7 +73,7 @@ function PortfolioContent() {
     return (
       <main className="container">
         <div className="glass-panel flex-col items-center justify-center" style={{ minHeight: '300px' }}>
-          <span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}></span>
+          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
           <p className="text-secondary mt-lg">Carregando dados financeiros seguros...</p>
         </div>
       </main>
@@ -171,7 +171,7 @@ function PortfolioContent() {
             <button
               key={cat} onClick={() => setActiveCategoryFilter(cat)}
               className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
-              style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255, 255, 255, 0.02)', color: activeCategoryFilter === cat ? '#fff' : 'var(--text-secondary)' }}
+              style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'var(--accent-bg)' : 'var(--panel-bg)', color: activeCategoryFilter === cat ? 'var(--accent-color)' : 'var(--text-secondary)' }}
             >
               {cat}
             </button>
@@ -196,21 +196,21 @@ function PortfolioContent() {
                   </div>
                   {activeCategoryFilter !== 'Renda Fixa' && (
                     <>
-                    <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                    <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
                       <select 
                         value={filterChartTicker} 
                         onChange={(e) => setFilterChartTicker(e.target.value)}
                         style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.5rem', fontWeight: 600 }}
                       >
-                        <option value="Todos" style={{ background: '#1c1f24', color: '#fff' }}>Todos os Tickers</option>
+                        <option value="Todos" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>Todos os Tickers</option>
                         {Array.from(new Set(filteredPositions.map(p => p.ticker))).sort().map(t => (
-                          <option key={t} value={t} style={{ background: '#1c1f24', color: '#fff' }}>{t}</option>
+                          <option key={t} value={t} style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>{t}</option>
                         ))}
                       </select>
                     </div>
-                    <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                    <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
                       {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-                        <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? '#000' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+                        <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
                           {p}
                         </button>
                       ))}

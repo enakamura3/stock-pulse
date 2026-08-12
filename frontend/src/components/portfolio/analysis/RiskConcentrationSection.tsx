@@ -514,7 +514,7 @@ export default function RiskConcentrationSection({
                         subText="Alocação"
                         valueText={`${item.weight.toFixed(1)}%`}
                         barPct={item.weight}
-                        barColor="#00f2fe"
+                        barColor="var(--accent-color)"
                       />
                     ))}
                   </div>

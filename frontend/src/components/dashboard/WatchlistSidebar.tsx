@@ -51,7 +51,7 @@ export default function WatchlistSidebar({
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#ff4a5a',
+                color: 'var(--color-danger)',
                 cursor: 'pointer',
                 fontSize: '0.8rem',
                 fontWeight: 600,
@@ -75,7 +75,7 @@ export default function WatchlistSidebar({
                 borderRadius: '6px',
                 border: '1px solid',
                 borderColor: activeWatchlistId === wl.id ? 'var(--accent-color)' : 'var(--panel-border)',
-                background: activeWatchlistId === wl.id ? 'rgba(0, 242, 254, 0.08)' : 'transparent',
+                background: activeWatchlistId === wl.id ? 'var(--accent-bg)' : 'transparent',
                 color: activeWatchlistId === wl.id ? 'var(--accent-color)' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 fontWeight: 600,
@@ -119,24 +119,17 @@ export default function WatchlistSidebar({
                 <div
                   key={item.ticker}
                   onClick={() => onSelectAsset(item.ticker)}
+                  className="sidebar-link"
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '0.75rem',
                     borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.015)',
+                    background: 'var(--input-bg)',
                     border: '1px solid var(--panel-border)',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
-                    e.currentTarget.style.borderColor = 'rgba(0, 242, 254, 0.2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.015)';
-                    e.currentTarget.style.borderColor = 'var(--panel-border)';
                   }}
                 >
                   <div>
@@ -155,13 +148,13 @@ export default function WatchlistSidebar({
                           display: 'block', 
                           fontSize: '0.9rem', 
                           fontWeight: 700,
-                          color: priceFlashing[item.ticker] === 'up' ? '#00e676' : priceFlashing[item.ticker] === 'down' ? '#ff3d00' : '#fff',
-                          textShadow: priceFlashing[item.ticker] === 'up' ? '0 0 10px rgba(0, 230, 118, 0.5)' : priceFlashing[item.ticker] === 'down' ? '0 0 10px rgba(255, 61, 0, 0.5)' : 'none',
+                          color: priceFlashing[item.ticker] === 'up' ? 'var(--color-success)' : priceFlashing[item.ticker] === 'down' ? 'var(--color-danger)' : 'var(--text-primary)',
+                          textShadow: priceFlashing[item.ticker] === 'up' ? '0 0 10px rgba(var(--success-rgb), 0.5)' : priceFlashing[item.ticker] === 'down' ? '0 0 10px rgba(var(--danger-rgb), 0.5)' : 'none',
                           transition: 'all 0.2s ease'
                         }}>
                           {formatMoney(item.price, item.currency)}
                         </span>
-                        <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: wlPos ? '#00e676' : '#ff3d00' }}>
+                        <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: wlPos ? 'var(--color-success)' : 'var(--color-danger)' }}>
                           {item.change_percent !== undefined ? formatPercentage(item.change_percent) : ''}
                         </span>
                         {item.graham_value && item.price ? (
@@ -172,9 +165,9 @@ export default function WatchlistSidebar({
                             borderRadius: '4px',
                             fontSize: '0.6rem',
                             fontWeight: 700,
-                            backgroundColor: item.price < item.graham_value ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 61, 0, 0.15)',
-                            color: item.price < item.graham_value ? '#00e676' : '#ff3d00',
-                            border: `1px solid ${item.price < item.graham_value ? 'rgba(0, 230, 118, 0.3)' : 'rgba(255, 61, 0, 0.3)'}`
+                            backgroundColor: item.price < item.graham_value ? 'var(--color-success-bg)' : 'var(--color-danger-bg)',
+                            color: item.price < item.graham_value ? 'var(--color-success)' : 'var(--color-danger)',
+                            border: `1px solid rgba(var(${item.price < item.graham_value ? '--success-rgb' : '--danger-rgb'}), 0.3)`
                           }} title={`Graham: ${formatMoney(item.graham_value, item.currency)}`}>
                             {item.price < item.graham_value ? 'DESC' : 'CARA'}
                           </span>
@@ -187,17 +180,11 @@ export default function WatchlistSidebar({
                     {/* Botão de Excluir Item */}
                     <button
                       onClick={(e) => onRemoveFromSidebar(e, item.ticker)}
+                      className="btn-close"
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'rgba(255,255,255,0.25)',
-                        cursor: 'pointer',
                         fontSize: '1rem',
                         padding: '0.2rem',
-                        transition: 'color 0.15s ease',
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#ff4a5a'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
                       title="Remover dos favoritos"
                     >
                       ✕

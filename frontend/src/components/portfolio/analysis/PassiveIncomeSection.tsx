@@ -607,14 +607,14 @@ export default function PassiveIncomeSection({
                       <div style={{ 
                           width: '100%', 
                           height: `${(item.pctFuture / (item.pctPast + item.pctFuture)) * 100}%`, 
-                          background: 'rgba(251, 191, 36, 0.8)'
+                          background: 'var(--color-warning)'
                       }} />
                    )}
                    {item.pctPast > 0 && (
                       <div style={{ 
                           width: '100%', 
                           height: `${(item.pctPast / (item.pctPast + item.pctFuture)) * 100}%`, 
-                          background: item.isCurrent ? '#4ade80' : 'rgba(96,165,250,0.6)' 
+                          background: item.isCurrent ? 'var(--color-success)' : 'var(--accent-color)' 
                       }} />
                    )}
                 </div>
@@ -624,7 +624,7 @@ export default function PassiveIncomeSection({
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', padding: '0 2px' }}>
            {dividendSeasonality.map((item, i) => (
               <div key={i} style={{ flex: 1, textAlign: 'center' }}>
-                 <span style={{ fontSize: '0.65rem', color: item.isCurrent ? '#4ade80' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>
+                 <span style={{ fontSize: '0.65rem', color: item.isCurrent ? 'var(--color-success)' : 'var(--text-secondary)', fontWeight: item.isCurrent ? 700 : 400 }}>
                     {item.monthLabel}
                  </span>
               </div>
@@ -632,8 +632,8 @@ export default function PassiveIncomeSection({
         </div>
         
         {upcomingDividends.length > 0 && (
-           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(74,222,128,0.05)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.2)' }}>
-              <p style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
+           <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'var(--color-success-bg)', borderRadius: '8px', border: '1px solid rgba(var(--success-rgb), 0.2)' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600, margin: 0, marginBottom: '0.2rem' }}>💰 Proventos a Receber</p>
               <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
                  {formatMoney(upcomingDividends.reduce((s, d) => s + d.net_amount, 0), 'BRL')}
               </p>

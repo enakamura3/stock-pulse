@@ -160,24 +160,24 @@ export default function TreasuryPositionTable({
                     </td>
                     <td className="text-right" style={{ color: 'var(--text-secondary)' }}>
                       {pos.is_matured
-                        ? <span style={{ color: '#f44336', fontWeight: 600 }}>Vencido</span>
+                        ? <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Vencido</span>
                         : `${new Date(pos.maturity_date).toLocaleDateString('pt-BR')} (${pos.days_to_maturity}d)`}
                     </td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{fmt(pos.total_invested)}</td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{fmt(pos.gross_value)}</td>
-                    <td className="text-right font-semibold" style={{ fontFamily: 'monospace', color: pos.net_value >= pos.total_invested ? '#4caf50' : '#f44336' }}>
+                    <td className="text-right font-semibold" style={{ fontFamily: 'monospace', color: pos.net_value >= pos.total_invested ? 'var(--color-success)' : 'var(--color-danger)' }}>
                       {fmt(pos.net_value)}
                     </td>
-                    <td className="text-right font-semibold" style={{ color: isPositive ? '#4caf50' : '#f44336' }}>
+                    <td className="text-right font-semibold" style={{ color: isPositive ? 'var(--color-success)' : 'var(--color-danger)' }}>
                       {fmtPct(liqReturn)}
                     </td>
-                    <td className="text-right" style={{ fontFamily: 'monospace', color: '#f44336', fontSize: '0.8rem' }}>
+                    <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--color-danger)', fontSize: '0.8rem' }}>
                       {pos.iof_tax > 0 ? `-${fmt(pos.iof_tax)}` : 'R$ 0,00'}
                     </td>
-                    <td className="text-right" style={{ fontFamily: 'monospace', color: '#f44336', fontSize: '0.8rem' }}>
+                    <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--color-danger)', fontSize: '0.8rem' }}>
                       {pos.ir_tax > 0 ? `-${fmt(pos.ir_tax)}` : 'R$ 0,00'}
                     </td>
-                    <td className="text-right" style={{ fontFamily: 'monospace', color: '#ff9800', fontSize: '0.8rem' }}>
+                    <td className="text-right" style={{ fontFamily: 'monospace', color: 'var(--color-warning)', fontSize: '0.8rem' }}>
                       {pos.b3_fee > 0 ? `-${fmt(pos.b3_fee)}` : 'R$ 0,00'}
                     </td>
                     <td className="text-center">
@@ -186,8 +186,8 @@ export default function TreasuryPositionTable({
                         borderRadius: '4px',
                         fontSize: '0.65rem',
                         fontWeight: 700,
-                        background: pos.is_matured ? 'rgba(244,67,54,0.15)' : 'rgba(76,175,80,0.15)',
-                        color: pos.is_matured ? '#f44336' : '#4caf50',
+                        background: pos.is_matured ? 'var(--color-danger-bg)' : 'var(--color-success-bg)',
+                        color: pos.is_matured ? 'var(--color-danger)' : 'var(--color-success)',
                       }}>
                         {pos.is_matured ? 'VENCIDO' : 'ATIVO'}
                       </span>
@@ -196,7 +196,7 @@ export default function TreasuryPositionTable({
                       <button
                         onClick={() => onRedeem(pos)}
                         className="btn-secondary"
-                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', color: '#ff9800', borderColor: 'rgba(255,152,0,0.4)' }}
+                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', color: 'var(--color-warning)', borderColor: 'rgba(var(--warning-rgb), 0.4)' }}
                         title="Registrar Resgate"
                       >
                         Resgatar

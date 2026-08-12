@@ -149,7 +149,7 @@ export default function TransactionGroupList({
               {/* Saldo de Cotas após */}
               <div className="flex-col items-start" style={{ minWidth: 120 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#00f2fe' }}>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--accent-color)' }}>
                   {formatQuantity(tx.resulting_quantity ?? 0)} un.
                 </span>
               </div>
@@ -175,7 +175,7 @@ export default function TransactionGroupList({
               {/* Saldo Resultante de Papéis / Cotas após a compra */}
               <div className="flex-col items-start" style={{ minWidth: 110 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#00f2fe' }}>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-color)' }}>
                   {formatQuantity(tx.resulting_quantity ?? 0)} un.
                 </span>
               </div>

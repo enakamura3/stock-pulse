@@ -318,7 +318,7 @@ export default function SettingsPage() {
     return (
       <main className="container">
         <div className="glass-panel">
-          <span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}></span>
+          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
           <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}>Carregando sua sessão segura...</p>
         </div>
       </main>
@@ -341,7 +341,7 @@ export default function SettingsPage() {
           </div>
           <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             {profileError && <div className="alert-error">{profileError}</div>}
-            {profileSuccess && <div style={{ color: '#00e676', fontSize: '0.9rem', padding: '0.5rem 0' }}>{profileSuccess}</div>}
+            {profileSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.9rem', padding: '0.5rem 0' }}>{profileSuccess}</div>}
 
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Nome Completo</label>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
           </div>
           <form onSubmit={handleUpdatePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             {passwordError && <div className="alert-error">{passwordError}</div>}
-            {passwordSuccess && <div style={{ color: '#00e676', fontSize: '0.9rem', padding: '0.5rem 0' }}>{passwordSuccess}</div>}
+            {passwordSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.9rem', padding: '0.5rem 0' }}>{passwordSuccess}</div>}
 
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Senha Atual</label>
@@ -420,7 +420,7 @@ export default function SettingsPage() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button type="submit" className="primary-button" disabled={isSavingPassword}>
-                {isSavingPassword ? 'Atualizando...' : 'Alterar Senha'}
+                {isSavingPassword ? 'Alterando...' : 'Alterar Senha'}
               </button>
             </div>
           </form>
@@ -433,7 +433,7 @@ export default function SettingsPage() {
           </div>
           {isLoadingTelegram ? (
             <div style={{ padding: '1rem', textAlign: 'center' }}>
-              <span className="loading-spinner" style={{ borderTopColor: '#00f2fe' }}></span>
+              <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)' }}></span>
               <span style={{ marginLeft: '10px', color: 'var(--text-secondary)' }}>Carregando integrações...</span>
             </div>
           ) : telegramError ? (
@@ -444,12 +444,12 @@ export default function SettingsPage() {
                 Vincule sua conta com o bot oficial do **Stock Pulse** no Telegram para receber alertas automáticos de preços e variações em tempo real.
               </p>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--panel-border)', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: 'var(--panel-bg)', borderRadius: '10px', border: '1px solid var(--panel-border)', marginTop: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                   <span style={{ fontSize: '2rem' }}>📱</span>
                   <div style={{ textAlign: 'left' }}>
                     <span style={{ display: 'block', fontWeight: 700, fontSize: '0.95rem' }}>Stock Pulse Telegram Bot</span>
-                    <span style={{ color: telegramStatus?.linked ? '#00e676' : 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>
+                    <span style={{ color: telegramStatus?.linked ? 'var(--color-success)' : 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>
                       {telegramStatus?.linked ? `Vinculado com sucesso (Chat ID: ${telegramStatus.chat_id})` : 'Não Vinculado'}
                     </span>
                   </div>
@@ -486,11 +486,11 @@ export default function SettingsPage() {
           </div>
           
           {workersError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{workersError}</div>}
-          {workerSuccess && <div style={{ color: '#00e676', fontSize: '0.9rem', padding: '0.5rem 0', fontWeight: 600, marginBottom: '1rem' }}>{workerSuccess}</div>}
+          {workerSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.9rem', padding: '0.5rem 0', fontWeight: 600, marginBottom: '1rem' }}>{workerSuccess}</div>}
 
           {isLoadingWorkers && workers.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center' }}>
-              <span className="loading-spinner" style={{ borderTopColor: '#00f2fe' }}></span>
+              <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)' }}></span>
               <span style={{ marginLeft: '10px', color: 'var(--text-secondary)' }}>Carregando workers...</span>
             </div>
           ) : (
@@ -564,9 +564,9 @@ export default function SettingsPage() {
         </section>
 
         {/* Seção 5: Zona de Perigo */}
-        <section className="card" style={{ borderColor: 'rgba(255, 74, 90, 0.3)', background: 'rgba(255, 74, 90, 0.02)' }}>
-          <div className="card-header" style={{ borderColor: 'rgba(255, 74, 90, 0.2)' }}>
-            <h2 className="card-title" style={{ color: '#ff4a5a' }}>⚠️ Zona de Perigo</h2>
+        <section className="card" style={{ borderColor: 'rgba(var(--danger-rgb), 0.3)', background: 'var(--color-danger-bg)' }}>
+          <div className="card-header" style={{ borderColor: 'rgba(var(--danger-rgb), 0.2)' }}>
+            <h2 className="card-title" style={{ color: 'var(--color-danger)' }}>⚠️ Zona de Perigo</h2>
           </div>
           <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
             <div style={{ textAlign: 'left', flex: 1, minWidth: '250px' }}>
