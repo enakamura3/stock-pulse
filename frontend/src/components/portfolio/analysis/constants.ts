@@ -23,7 +23,7 @@ export const EXPOSURE_COLORS = {
 };
 
 export const BENCHMARK_COLORS = {
-  portfolio: '#00f2fe',
+  portfolio: 'var(--accent-color)',
   cdi: '#fbbf24',
   ipca: '#f87171',
   ifix: '#c084fc',
@@ -32,9 +32,9 @@ export const BENCHMARK_COLORS = {
 };
 
 export const DIVIDENDS_COLORS = {
-  nacionais: '#00e676',
-  internacionais: '#00f2fe',
-  rendaFixa: '#FFB300',
+  nacionais: 'var(--color-success)',
+  internacionais: 'var(--accent-color)',
+  rendaFixa: 'var(--color-warning)',
 };
 
 export const MONTHS_LABEL = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
