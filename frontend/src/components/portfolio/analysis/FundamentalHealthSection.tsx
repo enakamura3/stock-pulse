@@ -112,10 +112,10 @@ export default function FundamentalHealthSection({
     });
 
     return [
-      { label: 'Liquidez Diária / Vencido', value: daily, color: '#4ade80' },
-      { label: 'Até 1 ano', value: upTo1Year, color: '#60a5fa' },
-      { label: '1 a 3 anos', value: upTo3Years, color: '#fbbf24' },
-      { label: 'Longo Prazo (> 3 anos)', value: longTerm, color: '#f87171' },
+      { label: 'Liquidez Diária / Vencido', value: daily, color: 'var(--color-success)' },
+      { label: 'Até 1 ano', value: upTo1Year, color: 'var(--color-info)' },
+      { label: '1 a 3 anos', value: upTo3Years, color: 'var(--color-warning)' },
+      { label: 'Longo Prazo (> 3 anos)', value: longTerm, color: 'var(--color-danger)' },
     ].filter(i => i.value > 0);
   }, [fiPositions, treasuryPositions]);
 
@@ -132,8 +132,8 @@ export default function FundamentalHealthSection({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1rem' }}>
           {/* P/VP — FIIs */}
           <div style={{
-            background: 'linear-gradient(145deg, rgba(192,132,252,0.06) 0%, rgba(192,132,252,0.01) 100%)',
-            border: '1px solid rgba(192,132,252,0.15)',
+            background: 'var(--accent-bg)',
+            border: '1px solid rgba(var(--accent-rgb), 0.15)',
             borderRadius: '14px',
             padding: '1.25rem',
           }}>
@@ -143,7 +143,7 @@ export default function FundamentalHealthSection({
                 P/VP Médio
               </span>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#c084fc', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--accent-color)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
               {fundamentals.avgPVP !== null ? fundamentals.avgPVP.toFixed(2) : '—'}
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.4rem', lineHeight: 1.4 }}>
@@ -151,17 +151,17 @@ export default function FundamentalHealthSection({
                 <>
                   Baseado em <strong style={{ color: 'var(--text-primary)' }}>{fundamentals.fiiCount}</strong> {fundamentals.fiiCount === 1 ? 'FII/FIAGRO' : 'FIIs/FIAGROs'}
                   {fundamentals.avgPVP < 0.95 - 1e-6 && (
-                    <span style={{ display: 'block', marginTop: '0.3rem', color: '#4ade80' }}>
+                    <span style={{ display: 'block', marginTop: '0.3rem', color: 'var(--color-success)' }}>
                       ✅ Abaixo do VP — carteira com desconto patrimonial
                     </span>
                   )}
                   {fundamentals.avgPVP >= 0.95 - 1e-6 && fundamentals.avgPVP <= 1.05 + 1e-6 && (
-                    <span style={{ display: 'block', marginTop: '0.3rem', color: '#fbbf24' }}>
+                    <span style={{ display: 'block', marginTop: '0.3rem', color: 'var(--color-warning)' }}>
                       ⚠️ Próximo ao VP — avalie com cuidado novas compras
                     </span>
                   )}
                   {fundamentals.avgPVP > 1.05 + 1e-6 && (
-                    <span style={{ display: 'block', marginTop: '0.3rem', color: '#f87171' }}>
+                    <span style={{ display: 'block', marginTop: '0.3rem', color: 'var(--color-danger)' }}>
                       ⚠️ Acima do VP — prêmio sobre o patrimônio
                     </span>
                   )}
@@ -174,8 +174,8 @@ export default function FundamentalHealthSection({
 
           {/* P/L — Ações e ETFs */}
           <div style={{
-            background: 'linear-gradient(145deg, rgba(96,165,250,0.06) 0%, rgba(96,165,250,0.01) 100%)',
-            border: '1px solid rgba(96,165,250,0.15)',
+            background: 'var(--accent-bg)',
+            border: '1px solid rgba(var(--accent-rgb), 0.15)',
             borderRadius: '14px',
             padding: '1.25rem',
           }}>
@@ -185,7 +185,7 @@ export default function FundamentalHealthSection({
                 P/L Médio
               </span>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#60a5fa', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-info)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
               {fundamentals.avgPE !== null ? fundamentals.avgPE.toFixed(1) + 'x' : '—'}
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.4rem', lineHeight: 1.4 }}>
@@ -193,17 +193,17 @@ export default function FundamentalHealthSection({
                 <>
                   Baseado em <strong style={{ color: 'var(--text-primary)' }}>{fundamentals.stockCount}</strong> {fundamentals.stockCount === 1 ? 'ativo' : 'ativos'} (Ações/ETFs/BDRs)
                   {fundamentals.avgPE < 10 - 1e-6 && (
-                    <span style={{ display: 'block', marginTop: '0.3rem', color: '#4ade80' }}>
+                    <span style={{ display: 'block', marginTop: '0.3rem', color: 'var(--color-success)' }}>
                       ✅ P/L atrativo — carteira potencialmente subvalorizada
                     </span>
                   )}
                   {fundamentals.avgPE >= 10 - 1e-6 && fundamentals.avgPE <= 18 + 1e-6 && (
-                    <span style={{ display: 'block', marginTop: '0.3rem', color: '#fbbf24' }}>
+                    <span style={{ display: 'block', marginTop: '0.3rem', color: 'var(--color-warning)' }}>
                       💡 P/L na média do mercado brasileiro
                     </span>
                   )}
                   {fundamentals.avgPE > 18 + 1e-6 && (
-                    <span style={{ display: 'block', marginTop: '0.3rem', color: '#f87171' }}>
+                    <span style={{ display: 'block', marginTop: '0.3rem', color: 'var(--color-danger)' }}>
                       ⚠️ P/L elevado — expectativa de crescimento precificada
                     </span>
                   )}
@@ -217,8 +217,8 @@ export default function FundamentalHealthSection({
           {/* DY Médio */}
           {fundamentals.avgDY !== null && (
             <div style={{
-              background: 'linear-gradient(145deg, rgba(74,222,128,0.06) 0%, rgba(74,222,128,0.01) 100%)',
-              border: '1px solid rgba(74,222,128,0.15)',
+              background: 'var(--color-success-bg)',
+              border: '1px solid rgba(var(--success-rgb), 0.15)',
               borderRadius: '14px',
               padding: '1.25rem',
             }}>
@@ -228,7 +228,7 @@ export default function FundamentalHealthSection({
                   DY Médio
                 </span>
               </div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#4ade80', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+              <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-success)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
                 {fundamentals.avgDY.toFixed(2)}%
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.4rem', lineHeight: 1.4 }}>
@@ -246,41 +246,41 @@ export default function FundamentalHealthSection({
           <AlertBadge type="info" message="Sem dados de rentabilidade disponíveis." />
         ) : (
           <>
-            <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4ade80', marginBottom: '0.5rem' }}>Top {Math.min(TOP_N, topPerformers.length)} melhores</p>
+            <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-success)', marginBottom: '0.5rem' }}>Top {Math.min(TOP_N, topPerformers.length)} melhores</p>
             {topPerformers.map(p => (
               <div key={p.ticker} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
                 <span style={{ width: '52px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>{p.ticker}</span>
-                <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
+                <div style={{ flex: 1, background: 'var(--input-bg)', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
                   <div style={{
                     height: '100%',
                     width: `${((p.return_percent || 0) / maxAbsReturn) * 100}%`,
-                    background: 'linear-gradient(90deg, #4ade80, #00e676)',
+                    background: 'var(--color-success)',
                     borderRadius: '4px',
                     transition: 'width 0.6s ease',
                   }} />
                 </div>
-                <span style={{ width: '60px', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: '#4ade80', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                <span style={{ width: '60px', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-success)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                   +{(p.return_percent || 0).toFixed(1)}%
                 </span>
               </div>
             ))}
 
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '0.75rem 0' }} />
+            <div style={{ borderTop: '1px solid var(--panel-border)', margin: '0.75rem 0' }} />
 
-            <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f87171', marginBottom: '0.5rem' }}>Top {Math.min(TOP_N, worstPerformers.length)} piores</p>
+            <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-danger)', marginBottom: '0.5rem' }}>Top {Math.min(TOP_N, worstPerformers.length)} piores</p>
             {worstPerformers.map(p => (
               <div key={p.ticker} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
                 <span style={{ width: '52px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>{p.ticker}</span>
-                <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
+                <div style={{ flex: 1, background: 'var(--input-bg)', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
                   <div style={{
                     height: '100%',
                     width: `${(Math.abs(p.return_percent || 0) / maxAbsReturn) * 100}%`,
-                    background: 'linear-gradient(90deg, #f87171, #ef4444)',
+                    background: 'var(--color-danger)',
                     borderRadius: '4px',
                     transition: 'width 0.6s ease',
                   }} />
                 </div>
-                <span style={{ width: '60px', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: '#f87171', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                <span style={{ width: '60px', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-danger)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                   {(p.return_percent || 0).toFixed(1)}%
                 </span>
               </div>

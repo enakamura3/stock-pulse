@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CalculatedDividend } from './types';
 import { formatMoney, getAssetCategory } from './helpers';
+import { CATEGORY_COLORS } from './analysis/constants';
 interface AnnualSummaryProps {
   dividends: CalculatedDividend[];
   selectedYear: string;
@@ -214,19 +215,7 @@ export default function AnnualSummary({
   const yearsList = annualData.map(d => String(d.year));
 
   const formatTypeColor = (category: string) => {
-    switch (category) {
-      case 'Ações (B3)': return '#60a5fa'; // Azul
-      case 'FIIs': return '#c084fc'; // Roxo
-      case 'FIAGROs': return '#4ade80'; // Verde claro
-      case 'ETFs Nacionais': return '#f472b6'; // Rosa
-      case 'BDRs': return '#fbbf24'; // Amarelo
-      case 'Ações EUA': return '#f87171'; // Vermelho
-      case 'ETF Internacional': return '#818cf8'; // Indigo
-      case 'Cripto': return '#fcd34d'; // Dourado
-      case 'Renda Fixa': return '#22d3ee'; // Ciano
-      case 'Tesouro Direto': return '#34d399'; // Verde esmeralda
-      default: return '#9ca3af'; // Cinza (Outros)
-    }
+    return CATEGORY_COLORS[category] || 'var(--accent-color)';
   };
 
   const getMonthName = (m: number) => {
@@ -280,12 +269,12 @@ export default function AnnualSummary({
           border-radius: 12px;
         }
         .growth-badge.positive {
-          background: rgba(74, 222, 128, 0.15);
-          color: #4ade80;
+          background: var(--color-success-bg);
+          color: var(--color-success);
         }
         .growth-badge.negative {
-          background: rgba(248, 113, 113, 0.15);
-          color: #f87171;
+          background: var(--color-danger-bg);
+          color: var(--color-danger);
         }
       `}</style>
 
@@ -320,10 +309,10 @@ export default function AnnualSummary({
       {activeYearData && (
         <div 
           style={{ 
-            background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', 
+            background: 'var(--panel-bg)', 
             padding: '1.5rem', 
             borderRadius: '16px', 
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: '1px solid var(--panel-border)',
             boxShadow: '0 4px 24px rgba(0,0,0,0.15)'
           }}
           className="flex-col gap-lg"
@@ -331,9 +320,9 @@ export default function AnnualSummary({
           {/* Top KPIs */}
           <div className="flex-row gap-md mb-md flex-wrap">
             {/* Total Recebido */}
-            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
               <div className="text-secondary text-sm mb-sm font-bold">Total Líquido ({activeYearData.year})</div>
-              <div className="font-bold text-3xl mb-xs" style={{ color: '#00e676', letterSpacing: '-0.5px' }}>
+              <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--color-success)', letterSpacing: '-0.5px' }}>
                 {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
               </div>
               <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem' }}>
@@ -348,9 +337,9 @@ export default function AnnualSummary({
             </div>
 
             {/* Média Mensal */}
-            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
               <div className="text-secondary text-sm mb-sm font-bold">Média Mensal</div>
-              <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>
+              <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
                 {formatMoney(activeYearData.monthlyAverage, activeYearData.currency)}
                 <span className="text-secondary font-normal text-sm" style={{ marginLeft: '4px' }}>/mês</span>
               </div>
@@ -365,9 +354,9 @@ export default function AnnualSummary({
             </div>
 
             {/* Maior Pagamento Único */}
-            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
               <div className="text-secondary text-sm mb-sm font-bold">Recorde de Pagamento</div>
-              <div className="font-bold text-3xl mb-xs" style={{ color: '#fff', letterSpacing: '-0.5px' }}>
+              <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
                 {formatMoney(activeYearData.highestSinglePayment, activeYearData.currency)}
               </div>
               <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
@@ -376,9 +365,9 @@ export default function AnnualSummary({
             </div>
 
             {/* Mês Campeão */}
-            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' }}>
+            <div className="card" style={{ flex: '1', minWidth: '200px', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
               <div className="text-secondary text-sm mb-sm font-bold">Mês Campeão</div>
-              <div className="font-bold text-3xl mb-xs" style={{ color: '#FFB300', letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
+              <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--color-warning)', letterSpacing: '-0.5px', textTransform: 'capitalize' }}>
                 {activeYearData.bestMonthStr ? getMonthName(parseInt(activeYearData.bestMonthStr, 10)) : '--'}
               </div>
               <div className="text-sm text-secondary" style={{ marginTop: 'auto', paddingTop: '0.5rem', opacity: 0.7, lineHeight: '1.4' }}>
@@ -468,7 +457,7 @@ export default function AnnualSummary({
                           className="progress-bar-fill" 
                           style={{ 
                             width: `${item.pct}%`, 
-                            backgroundColor: '#00e676'
+                            backgroundColor: 'var(--color-success)'
                           }} 
                         />
                       </div>

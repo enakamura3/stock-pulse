@@ -151,7 +151,7 @@ export default function SettingsPage() {
     return (
       <main className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <div style={{ textAlign: 'center' }}>
-          <span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}></span>
+          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
           <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}>Carregando...</p>
         </div>
       </main>

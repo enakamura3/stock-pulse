@@ -59,7 +59,7 @@ export default function ActiveQuoteCard({
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: '2rem',
-                      color: activeFavorited ? '#ffd700' : 'var(--text-muted)',
+                      color: activeFavorited ? 'var(--color-warning)' : 'var(--text-muted)',
                       transition: 'transform 0.15s ease, color 0.15s ease',
                       padding: 0,
                       lineHeight: 1,

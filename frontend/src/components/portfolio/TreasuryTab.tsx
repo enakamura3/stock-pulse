@@ -225,10 +225,10 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
       value: fmt(totalNet),
       icon: '💵',
       sub: `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}% (${fmt(totalProfitLoss)})`,
-      subColor: returnPct >= 0 ? '#4caf50' : '#f44336',
+      subColor: returnPct >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
     },
-    { label: 'Impostos (IOF + IR)', value: fmt(totalIOF + totalIR), icon: '🏛️', sub: `IOF: ${fmt(totalIOF)} | IR: ${fmt(totalIR)}`, subColor: '#ef5350' },
-    { label: 'Taxa B3 Acumulada', value: fmt(totalB3), icon: '🏷️', sub: '0,20% a.a. pró-rata', subColor: '#ff9800' },
+    { label: 'Impostos (IOF + IR)', value: fmt(totalIOF + totalIR), icon: '🏛️', sub: `IOF: ${fmt(totalIOF)} | IR: ${fmt(totalIR)}`, subColor: 'var(--color-danger)' },
+    { label: 'Taxa B3 Acumulada', value: fmt(totalB3), icon: '🏷️', sub: '0,20% a.a. pró-rata', subColor: 'var(--color-warning)' },
   ];
 
   return (
@@ -457,7 +457,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
               )}
 
               {error && (
-                <div style={{ padding: '0.6rem 0.9rem', borderRadius: '6px', background: 'rgba(244,67,54,0.1)', border: '1px solid rgba(244,67,54,0.3)', color: '#ef9a9a', fontSize: '0.8rem' }}>
+                <div style={{ padding: '0.6rem 0.9rem', borderRadius: '6px', background: 'var(--color-danger-bg)', border: '1px solid rgba(var(--danger-rgb), 0.3)', color: 'var(--color-danger)', fontSize: '0.8rem' }}>
                   ⚠️ {error}
                 </div>
               )}

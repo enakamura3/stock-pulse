@@ -329,7 +329,7 @@ export default function TransactionHistory({
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Comprado
               </span>
-              <strong style={{ color: '#00e676', fontSize: '1.1rem', fontWeight: 700 }}>
+              <strong style={{ color: 'var(--color-success)', fontSize: '1.1rem', fontWeight: 700 }}>
                 {formatMoney(summary.totalBought, kpiCurrency)}
               </strong>
             </div>
@@ -341,7 +341,7 @@ export default function TransactionHistory({
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Vendido
               </span>
-              <strong style={{ color: '#ff3d00', fontSize: '1.1rem', fontWeight: 700 }}>
+              <strong style={{ color: 'var(--color-danger)', fontSize: '1.1rem', fontWeight: 700 }}>
                 {formatMoney(summary.totalSold, kpiCurrency)}
               </strong>
             </div>
@@ -355,7 +355,7 @@ export default function TransactionHistory({
               </span>
               <strong
                 style={{
-                  color: summary.netContribution >= 0 ? '#00f2fe' : '#ffc107',
+                  color: summary.netContribution >= 0 ? 'var(--accent-color)' : 'var(--color-warning)',
                   fontSize: '1.1rem',
                   fontWeight: 700,
                 }}
