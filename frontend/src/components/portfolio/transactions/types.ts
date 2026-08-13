@@ -69,7 +69,7 @@ export function getBadge(tx: UnifiedTransaction): { text: string; color: string;
     case 'SELL':         return { text: 'VENDA',       color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' };
     case 'BONUS':        return { text: 'BÔNUS',       color: 'var(--color-success)', bg: 'var(--color-success-bg)' };
     case 'SPLIT':        return { text: 'SPLIT',       color: 'var(--accent-color)', bg: 'var(--accent-bg)' };
-    case 'REVERSE_SPLIT':return { text: 'AGRUPAMENTO', color: '#e040fb', bg: 'rgba(156,39,176,0.08)' };
+    case 'REVERSE_SPLIT':return { text: 'AGRUPAMENTO', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' };
     default:             return { text: tx.type,       color: 'var(--text-secondary)', bg: 'var(--panel-bg)' };
   }
 }
@@ -86,13 +86,13 @@ export function getTransactionCircleDetails(tx: UnifiedTransaction): {
     return tx.type === 'SUBSCRIPTION'
       ? {
           emoji: categoryEmoji,
-          gradient: 'linear-gradient(135deg, rgba(33,150,243,0.15) 0%, rgba(33,150,243,0.03) 100%)',
-          borderColor: 'rgba(33,150,243,0.25)',
+          gradient: 'var(--color-info-bg)',
+          borderColor: 'rgba(var(--info-rgb), 0.3)',
         }
       : {
           emoji: categoryEmoji,
-          gradient: 'linear-gradient(135deg, rgba(255,152,0,0.15) 0%, rgba(255,152,0,0.03) 100%)',
-          borderColor: 'rgba(255,152,0,0.25)',
+          gradient: 'var(--color-warning-bg)',
+          borderColor: 'rgba(var(--warning-rgb), 0.3)',
         };
   }
 
@@ -100,38 +100,38 @@ export function getTransactionCircleDetails(tx: UnifiedTransaction): {
     case 'BUY':
       return {
         emoji: '🛒',
-        gradient: 'linear-gradient(135deg, rgba(0,230,118,0.15) 0%, rgba(0,230,118,0.03) 100%)',
-        borderColor: 'rgba(0,230,118,0.25)',
+        gradient: 'var(--color-success-bg)',
+        borderColor: 'rgba(var(--success-rgb), 0.3)',
       };
     case 'SELL':
       return {
         emoji: '💰',
-        gradient: 'linear-gradient(135deg, rgba(255,61,0,0.15) 0%, rgba(255,61,0,0.03) 100%)',
-        borderColor: 'rgba(255,61,0,0.25)',
+        gradient: 'var(--color-danger-bg)',
+        borderColor: 'rgba(var(--danger-rgb), 0.3)',
       };
     case 'BONUS':
       return {
         emoji: '🎁',
-        gradient: 'linear-gradient(135deg, rgba(0,230,118,0.15) 0%, rgba(0,230,118,0.03) 100%)',
-        borderColor: 'rgba(0,230,118,0.25)',
+        gradient: 'var(--color-success-bg)',
+        borderColor: 'rgba(var(--success-rgb), 0.3)',
       };
     case 'SPLIT':
       return {
         emoji: '⚡',
-        gradient: 'linear-gradient(135deg, rgba(0,242,254,0.15) 0%, rgba(0,242,254,0.03) 100%)',
-        borderColor: 'rgba(0,242,254,0.25)',
+        gradient: 'var(--accent-bg)',
+        borderColor: 'rgba(var(--accent-rgb), 0.3)',
       };
     case 'REVERSE_SPLIT':
       return {
         emoji: '🔄',
-        gradient: 'linear-gradient(135deg, rgba(156,39,176,0.15) 0%, rgba(156,39,176,0.03) 100%)',
-        borderColor: 'rgba(156,39,176,0.25)',
+        gradient: 'var(--color-danger-bg)',
+        borderColor: 'rgba(var(--danger-rgb), 0.3)',
       };
     default:
       return {
         emoji: '📄',
-        gradient: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
-        borderColor: 'rgba(255,255,255,0.15)',
+        gradient: 'var(--input-bg)',
+        borderColor: 'var(--panel-border)',
       };
   }
 }
@@ -143,23 +143,23 @@ export function getMacroAssetCategory(tx: UnifiedTransaction): {
   color: string;
 } {
   if (tx.module === 'RF') {
-    return { id: 'RF', name: 'Renda Fixa & Tesouro', emoji: '💵', color: '#2196F3' };
+    return { id: 'RF', name: 'Renda Fixa & Tesouro', emoji: '💵', color: 'var(--color-warning)' };
   }
   const type = (tx.asset_type || '').toUpperCase();
   if (type.includes('STOCK') || type === 'EQUITY' || type === 'EQUITY_BR' || type === 'EQUITY_US') {
-    return { id: 'STOCK', name: 'Ações', emoji: '📈', color: '#00e676' };
+    return { id: 'STOCK', name: 'Ações', emoji: '📈', color: 'var(--accent-color)' };
   }
   if (type.includes('FII') || type.includes('REAL_ESTATE')) {
-    return { id: 'FII', name: 'FIIs', emoji: '🏢', color: '#00f2fe' };
+    return { id: 'FII', name: 'FIIs', emoji: '🏢', color: 'var(--color-info)' };
   }
   if (type.includes('ETF')) {
-    return { id: 'ETF', name: 'ETFs', emoji: '🌐', color: '#e040fb' };
+    return { id: 'ETF', name: 'ETFs', emoji: '🌐', color: 'var(--color-info)' };
   }
   if (type.includes('CRYPTO')) {
-    return { id: 'CRYPTO', name: 'Cripto', emoji: '₿', color: '#ff9800' };
+    return { id: 'CRYPTO', name: 'Cripto', emoji: '₿', color: 'var(--color-warning)' };
   }
   if (type.includes('BDR')) {
-    return { id: 'BDR', name: 'BDRs', emoji: '📦', color: '#ffc107' };
+    return { id: 'BDR', name: 'BDRs', emoji: '📦', color: 'var(--color-warning)' };
   }
-  return { id: 'OTHER', name: 'Outros', emoji: '🎯', color: '#9e9e9e' };
+  return { id: 'OTHER', name: 'Outros', emoji: '🎯', color: 'var(--text-muted)' };
 }
