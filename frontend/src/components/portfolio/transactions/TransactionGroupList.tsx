@@ -48,7 +48,7 @@ export default function TransactionGroupList({
         className="flex-row justify-between items-center flex-wrap gap-md"
         style={{
           padding: '1rem 1.25rem',
-          background: 'rgba(255, 255, 255, 0.015)',
+          background: 'var(--panel-bg)',
           border: '1px solid var(--panel-border)',
           borderRadius: '10px',
           transition: 'all 0.15s ease',
@@ -75,7 +75,7 @@ export default function TransactionGroupList({
 
           <div className="flex-col" style={{ gap: '0.25rem' }}>
             <div className="flex-row items-center gap-sm">
-              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
                 {tx.asset_name}
               </span>
               <span
@@ -116,7 +116,7 @@ export default function TransactionGroupList({
               {/* Saldo Investido Resultante */}
               <div className="flex-col items-start" style={{ minWidth: 130 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Posição após</span>
-                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#00f2fe' }}>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--accent-color)' }}>
                   {formatMoney(tx.resulting_invested ?? 0, tx.currency || 'BRL')}
                 </span>
               </div>
@@ -128,7 +128,7 @@ export default function TransactionGroupList({
                   {formatMoney(tx.total_value ?? 0, tx.currency || 'BRL')}
                 </span>
                 {hasFx && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
                     (Câmbio: {tx.exchange_rate!.toFixed(4)})
                   </span>
                 )}
@@ -166,7 +166,7 @@ export default function TransactionGroupList({
                   {formatQuantity(tx.quantity || 0)} un. a {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
                 </span>
                 {hasFx && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
                     {`(Câmbio: ${tx.exchange_rate!.toFixed(4)})`}
                   </span>
                 )}
@@ -187,7 +187,7 @@ export default function TransactionGroupList({
                   {formatMoney(totalValConverted, kpiCurrency || tx.currency || 'BRL')}
                 </span>
                 {Boolean(tx.fee) && tx.fee! > 0 && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>
                     {`(Taxas: ${formatMoney(tx.fee!, tx.currency || 'BRL')})`}
                   </span>
                 )}
@@ -208,7 +208,7 @@ export default function TransactionGroupList({
             <button
               onClick={() => handleDeleteTransaction(tx.id)}
               className="btn-secondary"
-              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#ff3d00' }}
+              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: 'var(--color-danger)' }}
               title="Excluir operação"
             >
               🗑️
@@ -237,7 +237,7 @@ export default function TransactionGroupList({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.4rem',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                borderBottom: '1px solid var(--panel-border)',
                 paddingBottom: '0.4rem',
               }}
             >

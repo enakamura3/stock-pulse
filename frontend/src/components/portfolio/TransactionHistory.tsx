@@ -315,7 +315,7 @@ export default function TransactionHistory({
       <div
         className="card flex-col gap-lg"
         style={{
-          background: 'rgba(255, 255, 255, 0.02)',
+          background: 'var(--panel-bg)',
           border: '1px solid var(--panel-border)',
           borderRadius: '12px',
           padding: '1.25rem 1.5rem',
@@ -367,7 +367,7 @@ export default function TransactionHistory({
         </div>
 
         {/* Breakdown de Aquisições no Período */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+        <div style={{ borderTop: '1px solid var(--panel-border)', paddingTop: '1rem' }}>
           <div className="flex-row justify-between items-center mb-sm">
             <span className="text-xs font-bold text-secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               📊 Aquisições por Classe de Ativo (Clique para filtrar)
@@ -386,7 +386,7 @@ export default function TransactionHistory({
                       flex: '1 1 210px',
                       padding: '0.85rem 1rem',
                       borderRadius: '10px',
-                      background: isSelected ? 'rgba(0, 242, 254, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                      background: isSelected ? 'var(--accent-bg)' : 'var(--input-bg)',
                       border: isSelected ? `1.5px solid ${cat.color}` : '1px solid var(--panel-border)',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
@@ -395,10 +395,10 @@ export default function TransactionHistory({
                       gap: '0.4rem',
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                      if (!isSelected) e.currentTarget.style.background = 'var(--panel-bg)';
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                      if (!isSelected) e.currentTarget.style.background = 'var(--input-bg)';
                     }}
                   >
                     <div className="flex-row justify-between items-center" style={{ fontSize: '0.8rem' }}>
@@ -415,7 +415,7 @@ export default function TransactionHistory({
                     </div>
 
                     {/* Barra de Progresso */}
-                    <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden', marginTop: '0.1rem', marginBottom: '0.25rem' }}>
+                    <div style={{ width: '100%', height: '5px', background: 'var(--panel-border)', borderRadius: '3px', overflow: 'hidden', marginTop: '0.1rem', marginBottom: '0.25rem' }}>
                       <div
                         style={{
                           width: `${Math.min(100, Math.max(2, cat.percentage))}%`,
@@ -431,7 +431,7 @@ export default function TransactionHistory({
                     {cat.assets.length > 0 && (
                       <div
                         className="flex-col gap-xs mt-xs pt-xs"
-                        style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.4rem' }}
+                        style={{ borderTop: '1px dashed var(--panel-border)', paddingTop: '0.4rem' }}
                       >
                         {cat.assets.map((ast) => (
                           <div
@@ -440,7 +440,7 @@ export default function TransactionHistory({
                             style={{
                               fontSize: '0.74rem',
                               padding: '0.25rem 0.4rem',
-                              background: 'rgba(255, 255, 255, 0.02)',
+                              background: 'var(--panel-bg)',
                               borderRadius: '4px',
                             }}
                           >
