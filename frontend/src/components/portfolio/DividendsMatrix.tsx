@@ -59,16 +59,16 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
           transition: all 0.2s ease;
         }
         .matrix-cell-clickable:hover {
-          background-color: rgba(255,255,255,0.06) !important;
+          background-color: var(--input-bg) !important;
         }
       `}</style>
       <div className="flex-row justify-between items-center mb-md">
         <h4 className="font-bold text-secondary">📅 Mapa de Proventos (Mensal e Anual)</h4>
       </div>
-      <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '12px', overflowX: 'auto', overflowY: 'hidden', background: 'rgba(0,0,0,0.1)' }}>
+      <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '12px', overflowX: 'auto', overflowY: 'hidden', background: 'var(--panel-bg)' }}>
         <table className="data-table matrix-table">
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <tr style={{ background: 'var(--input-bg)' }}>
               <th className="text-center">Ano</th>
               {months.map(m => (
                 <th key={m} className="text-right">{m}</th>
@@ -78,14 +78,14 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
           </thead>
           <tbody>
             {years.map(year => (
-              <tr key={year} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+              <tr key={year} style={{ borderBottom: '1px solid var(--panel-border)' }}>
                 <td 
                   className="text-center font-bold matrix-cell-clickable text-sm" 
                   style={{ 
                     cursor: 'pointer', 
                     color: activeYear === year && activeMonth === 'Todos' ? 'var(--accent-color)' : 'var(--text-primary)',
                     background: activeYear === year && activeMonth === 'Todos' ? 'var(--accent-bg)' : 'transparent',
-                    borderRight: '1px solid rgba(255,255,255,0.05)'
+                    borderRight: '1px solid var(--panel-border)'
                   }}
                   onClick={() => onYearClick && onYearClick(activeYear === year && activeMonth === 'Todos' ? 'Todos' : year)}
                   title={activeYear === year && activeMonth === 'Todos' ? 'Remover filtro de ano' : `Filtrar apenas o ano de ${year}`}
@@ -116,7 +116,7 @@ export default function DividendsMatrix({ data, onYearClick, onMonthClick, activ
                     </td>
                   );
                 })}
-                <td className="text-right text-sm font-bold text-success" style={{ borderLeft: '1px solid rgba(255,255,255,0.05)', background: 'var(--color-success-bg)' }}>
+                <td className="text-right text-sm font-bold text-success" style={{ borderLeft: '1px solid var(--panel-border)', background: 'var(--color-success-bg)' }}>
                   {matrix[year][12].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>
