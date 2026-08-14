@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -176,7 +177,7 @@ func TestServiceCoverage_AddTransaction_Fallback(t *testing.T) {
 	s.httpClient = &http.Client{
 		Transport: &MockHTTPTransport{Err: errors.New("http err")},
 	}
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", errors.New("not found"))
+	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", pgx.ErrNoRows)
 
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
 	mp.On("GetQuote", mock.Anything, "NEW-USD").Return(&market.Quote{Currency: "USD", Name: "New Coin"}, nil)
@@ -375,7 +376,7 @@ func TestServiceCoverage_AddTransaction_TotalFail(t *testing.T) {
 		Transport: &MockHTTPTransport{Err: errors.New("http err")},
 	}
 
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", errors.New("not found"))
+	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", pgx.ErrNoRows)
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
 	mp.On("GetQuote", mock.Anything, "NEW-USD").Return(&market.Quote{Currency: "USD", Name: "New Coin"}, nil)
 	repo.On("CreateAsset", mock.Anything, "NEW-USD", "New Coin", "CRYPTO", "USD").Return("new-a", nil)
