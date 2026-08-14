@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -417,10 +418,19 @@ func TestService_AddTransaction(t *testing.T) {
 		assert.Equal(t, "tx1", res.ID)
 	})
 
+	t.Run("Asset Lookup DB Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("db connection failed"))
+
+		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
+		assert.ErrorContains(t, err, "erro ao consultar ativo no banco")
+	})
+
 	t.Run("New Asset - Provider Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(nil, errors.New("err"))
 
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
@@ -430,7 +440,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New Crypto Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "BTC-USD").Return("", "", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "BTC-USD").Return("", "", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "BTC-USD").Return(&market.Quote{Currency: "USD", Name: "Bitcoin"}, nil)
 		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "CRYPTO", "USD").Return("", errors.New("err"))
 
@@ -441,7 +451,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New US Equity Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Currency: "USD", Name: "Apple"}, nil)
 		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "STOCK_US", "USD").Return("", errors.New("err"))
 

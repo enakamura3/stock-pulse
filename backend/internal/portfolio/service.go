@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
@@ -278,7 +279,10 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 
 	// Busca ou cria o ativo na base local
 	assetID, currency, err := s.repo.GetAssetAndCurrencyByTicker(ctx, tx.Ticker)
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("erro ao consultar ativo no banco: %w", err)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Importa metadados do Yahoo Finance
 		log.Printf("[Portfolio] Ativo %s não existe na base. Importando...", tx.Ticker)
 		quote, err := s.marketProvider.GetQuote(ctx, tx.Ticker)
