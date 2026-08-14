@@ -44,6 +44,11 @@ func TestWorker_SyncRates(t *testing.T) {
 	mockRepo2.On("SaveIndexRates", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	worker2.SyncRates(ctx)
+
+	// 3. Cancelled context exits immediately
+	ctxCancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	worker2.SyncRates(ctxCancelled)
 }
 
 func TestAnbimaHolidayWorker_SyncHolidays(t *testing.T) {
