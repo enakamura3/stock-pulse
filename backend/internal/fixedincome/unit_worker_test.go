@@ -43,12 +43,22 @@ func TestWorker_SyncRates(t *testing.T) {
 	mockRepo2.On("GetLatestIndexRate", mock.Anything, mock.Anything).Return(nil, errors.New("not found")).Maybe()
 	mockRepo2.On("SaveIndexRates", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	worker2.SyncRates(ctx)
+	// 3. SaveIndexRates error
+	mockRepo3 := &MockFullRepo{}
+	worker3 := NewWorker(mockRepo3, registry)
+	mockRepo3.On("GetLatestIndexRate", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+	mockRepo3.On("SaveIndexRates", mock.Anything, mock.Anything).Return(errors.New("db save error")).Maybe()
+	worker3.SyncRates(ctx)
 
-	// 3. Cancelled context exits immediately
+	// 4. Cancelled context exits immediately
 	ctxCancelled, cancel := context.WithCancel(context.Background())
 	cancel()
 	worker2.SyncRates(ctxCancelled)
+
+	// 5. Context cancelled during iteration
+	ctxCancelMid, cancelMid := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancelMid()
+	worker2.SyncRates(ctxCancelMid)
 }
 
 func TestAnbimaHolidayWorker_SyncHolidays(t *testing.T) {
