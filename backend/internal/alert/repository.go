@@ -188,7 +188,7 @@ func (r *Repository) MarkAlertTriggered(ctx context.Context, id string) error {
 
 // GetAssetByTicker verifica se o ativo com o ticker especificado existe no banco de dados.
 func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
-	query := `SELECT id FROM asset WHERE UPPER(ticker) = UPPER($1)`
+	query := `SELECT id FROM asset WHERE ticker = UPPER($1)`
 	var id string
 	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id)
 	return id, err
