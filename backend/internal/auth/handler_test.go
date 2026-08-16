@@ -374,61 +374,156 @@ func TestHandler_RespondWithJSON_Error(t *testing.T) {
 }
 
 func TestHandler_UpdateProfile(t *testing.T) {
-	m := new(MockAuthService)
-	m.On("UpdateProfile", mock.Anything, "1", "NewName", "new@test.com").Return(&User{ID: "1", Name: "NewName", Email: "new@test.com"}, nil)
-	h := NewHandler(m)
+	t.Run("Unauthorized", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodPut, "/user/profile", nil)
+		rec := httptest.NewRecorder()
+		h.UpdateProfile(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
 
-	payload := `{"name":"NewName","email":"new@test.com"}`
-	req := httptest.NewRequest(http.MethodPut, "/user/profile", strings.NewReader(payload))
-	ctx := context.WithValue(req.Context(), UserIDKey, "1")
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
+	t.Run("Invalid JSON", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodPut, "/user/profile", strings.NewReader("invalid"))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		h.UpdateProfile(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
 
-	h.UpdateProfile(rec, req)
+	t.Run("Service Error", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdateProfile", mock.Anything, "1", "NewName", "new@test.com").Return(nil, errors.New("err"))
+		h := NewHandler(m)
+		payload := `{"name":"NewName","email":"new@test.com"}`
+		req := httptest.NewRequest(http.MethodPut, "/user/profile", strings.NewReader(payload))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		h.UpdateProfile(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	var resp User
-	err := json.Unmarshal(rec.Body.Bytes(), &resp)
-	assert.NoError(t, err)
-	assert.Equal(t, "NewName", resp.Name)
-	assert.Equal(t, "new@test.com", resp.Email)
-	m.AssertExpectations(t)
+	t.Run("Success", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdateProfile", mock.Anything, "1", "NewName", "new@test.com").Return(&User{ID: "1", Name: "NewName", Email: "new@test.com"}, nil)
+		h := NewHandler(m)
+
+		payload := `{"name":"NewName","email":"new@test.com"}`
+		req := httptest.NewRequest(http.MethodPut, "/user/profile", strings.NewReader(payload))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		h.UpdateProfile(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var resp User
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		assert.NoError(t, err)
+		assert.Equal(t, "NewName", resp.Name)
+		assert.Equal(t, "new@test.com", resp.Email)
+		m.AssertExpectations(t)
+	})
 }
 
 func TestHandler_UpdatePassword(t *testing.T) {
-	m := new(MockAuthService)
-	m.On("UpdatePassword", mock.Anything, "1", "oldpass", "newpass").Return(nil)
-	h := NewHandler(m)
+	t.Run("Unauthorized", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodPut, "/user/password", nil)
+		rec := httptest.NewRecorder()
+		h.UpdatePassword(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
 
-	payload := `{"current_password":"oldpass","new_password":"newpass"}`
-	req := httptest.NewRequest(http.MethodPut, "/user/password", strings.NewReader(payload))
-	ctx := context.WithValue(req.Context(), UserIDKey, "1")
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
+	t.Run("Invalid JSON", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodPut, "/user/password", strings.NewReader("invalid"))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		h.UpdatePassword(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
 
-	h.UpdatePassword(rec, req)
+	t.Run("Service Error", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdatePassword", mock.Anything, "1", "oldpass", "newpass").Return(errors.New("err"))
+		h := NewHandler(m)
+		payload := `{"current_password":"oldpass","new_password":"newpass"}`
+		req := httptest.NewRequest(http.MethodPut, "/user/password", strings.NewReader(payload))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		h.UpdatePassword(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	m.AssertExpectations(t)
+	t.Run("Success", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdatePassword", mock.Anything, "1", "oldpass", "newpass").Return(nil)
+		h := NewHandler(m)
+
+		payload := `{"current_password":"oldpass","new_password":"newpass"}`
+		req := httptest.NewRequest(http.MethodPut, "/user/password", strings.NewReader(payload))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		h.UpdatePassword(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		m.AssertExpectations(t)
+	})
 }
 
 func TestHandler_DeleteUser(t *testing.T) {
-	m := new(MockAuthService)
-	m.On("DeleteUser", mock.Anything, "1").Return(nil)
-	h := NewHandler(m)
+	t.Run("Unauthorized", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodDelete, "/user", nil)
+		rec := httptest.NewRecorder()
+		h.DeleteUser(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/user", nil)
-	ctx := context.WithValue(req.Context(), UserIDKey, "1")
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
+	t.Run("Service Error", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("DeleteUser", mock.Anything, "1").Return(errors.New("db error"))
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodDelete, "/user", nil)
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		h.DeleteUser(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
 
-	h.DeleteUser(rec, req)
+	t.Run("Success with Cookie Revocation", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("RevokeRefreshToken", mock.Anything, "refresh_val").Return(nil)
+		m.On("DeleteUser", mock.Anything, "1").Return(nil)
+		h := NewHandler(m)
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	// should clear cookies
-	cookies := rec.Result().Cookies()
-	assert.Len(t, cookies, 2)
-	assert.Equal(t, "access_token", cookies[0].Name)
-	assert.Equal(t, "refresh_token", cookies[1].Name)
-	m.AssertExpectations(t)
+		req := httptest.NewRequest(http.MethodDelete, "/user", nil)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "refresh_val"})
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		h.DeleteUser(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		// should clear cookies
+		cookies := rec.Result().Cookies()
+		assert.Len(t, cookies, 2)
+		assert.Equal(t, "access_token", cookies[0].Name)
+		assert.Equal(t, "refresh_token", cookies[1].Name)
+		m.AssertExpectations(t)
+	})
 }

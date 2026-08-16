@@ -26,6 +26,18 @@ func TestWorkerManager_RegisterAndGetAll(t *testing.T) {
 	if infos[0].Status != "idle" {
 		t.Errorf("expected status idle, got %s", infos[0].Status)
 	}
+
+	// Test Info with lastRun and nextRun set
+	now := time.Now()
+	w.lastRun = now
+	w.nextRun = now.Add(1 * time.Hour)
+	info := w.Info()
+	if info.LastRun == nil || !info.LastRun.Equal(now) {
+		t.Errorf("expected LastRun to be set to %v, got %v", now, info.LastRun)
+	}
+	if info.NextRun == nil || !info.NextRun.Equal(now.Add(1*time.Hour)) {
+		t.Errorf("expected NextRun to be set to %v, got %v", now.Add(1*time.Hour), info.NextRun)
+	}
 }
 
 func TestWorkerManager_Trigger(t *testing.T) {
