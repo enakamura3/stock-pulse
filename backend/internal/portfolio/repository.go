@@ -397,7 +397,7 @@ func (r *Repository) GetDailyPricesBatch(ctx context.Context, assetIDs []string,
 // GetAssetByTicker busca o ID de um ativo pelo ticker.
 func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
 	var id string
-	query := `SELECT id FROM asset WHERE UPPER(ticker) = UPPER($1)`
+	query := `SELECT id FROM asset WHERE ticker = UPPER($1)`
 	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id)
 	if err != nil {
 		return "", err
@@ -408,7 +408,7 @@ func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (strin
 // GetAssetAndCurrencyByTicker busca o ID e a moeda de um ativo pelo ticker.
 func (r *Repository) GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error) {
 	var id, currency string
-	query := `SELECT id, currency FROM asset WHERE UPPER(ticker) = UPPER($1)`
+	query := `SELECT id, currency FROM asset WHERE ticker = UPPER($1)`
 	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id, &currency)
 	if err != nil {
 		return "", "", err

@@ -131,7 +131,7 @@ func (r *Repository) DeleteWatchlist(ctx context.Context, id, userID string) err
 // GetAssetByTicker verifica se o ativo com o ticker especificado existe e retorna seu ID.
 func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
-	query := `SELECT id FROM asset WHERE UPPER(ticker) = $1`
+	query := `SELECT id FROM asset WHERE ticker = $1`
 	var id string
 	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id)
 	if err != nil {
@@ -183,7 +183,7 @@ func (r *Repository) RemoveWatchlistItem(ctx context.Context, watchlistID, ticke
 	query := `
 		DELETE FROM watchlist_item
 		WHERE watchlist_id = $1 
-		AND asset_id IN (SELECT id FROM asset WHERE UPPER(ticker) = $2)
+		AND asset_id IN (SELECT id FROM asset WHERE ticker = $2)
 	`
 	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, watchlistID, ticker)
 	return err
