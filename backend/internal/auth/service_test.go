@@ -190,24 +190,70 @@ func TestComparePasswordAndHash(t *testing.T) {
 }
 
 func TestService_UpdateProfile(t *testing.T) {
-	s, repo, _ := setupService()
-	repo.On("GetUserByEmail", mock.Anything, "new@test.com").Return(nil, errors.New("not found"))
-	repo.On("UpdateUser", mock.Anything, "1", "NewName", "new@test.com").Return(&User{ID: "1", Name: "NewName", Email: "new@test.com"}, nil)
+	t.Run("Empty fields", func(t *testing.T) {
+		s, _, _ := setupService()
+		_, err := s.UpdateProfile(context.Background(), "1", "", "test@test.com")
+		assert.EqualError(t, err, "todos os campos são obrigatórios")
+	})
 
-	user, err := s.UpdateProfile(context.Background(), "1", "NewName", "new@test.com")
-	assert.NoError(t, err)
-	assert.Equal(t, "NewName", user.Name)
-	assert.Equal(t, "new@test.com", user.Email)
+	t.Run("Email already in use", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByEmail", mock.Anything, "other@test.com").Return(&User{ID: "2", Email: "other@test.com"}, nil)
+		_, err := s.UpdateProfile(context.Background(), "1", "NewName", "other@test.com")
+		assert.EqualError(t, err, "este e-mail já está cadastrado por outro usuário")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByEmail", mock.Anything, "new@test.com").Return(nil, errors.New("not found"))
+		repo.On("UpdateUser", mock.Anything, "1", "NewName", "new@test.com").Return(&User{ID: "1", Name: "NewName", Email: "new@test.com"}, nil)
+
+		user, err := s.UpdateProfile(context.Background(), "1", "NewName", "new@test.com")
+		assert.NoError(t, err)
+		assert.Equal(t, "NewName", user.Name)
+		assert.Equal(t, "new@test.com", user.Email)
+	})
 }
 
 func TestService_UpdatePassword(t *testing.T) {
-	s, repo, _ := setupService()
-	hash, _ := hashPassword("oldpassword", defaultParams)
-	repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
-	repo.On("UpdatePassword", mock.Anything, "1", mock.Anything).Return(nil)
+	t.Run("Short new password", func(t *testing.T) {
+		s, _, _ := setupService()
+		err := s.UpdatePassword(context.Background(), "1", "old", "123")
+		assert.EqualError(t, err, "a nova senha deve ter no mínimo 6 caracteres")
+	})
 
-	err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
-	assert.NoError(t, err)
+	t.Run("User not found", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(nil, errors.New("not found"))
+		err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
+		assert.Error(t, err)
+	})
+
+	t.Run("Wrong current password", func(t *testing.T) {
+		s, repo, _ := setupService()
+		hash, _ := hashPassword("rightpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		err := s.UpdatePassword(context.Background(), "1", "wrongpassword", "newpassword")
+		assert.EqualError(t, err, "senha atual incorreta")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _ := setupService()
+		hash, _ := hashPassword("oldpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		repo.On("UpdatePassword", mock.Anything, "1", mock.Anything).Return(nil)
+
+		err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
+		assert.NoError(t, err)
+	})
+}
+
+func TestService_ValidateRefreshToken_Error(t *testing.T) {
+	s, _, rdbMock := setupService()
+	rdbMock.ExpectGet("refresh_token:invalid").SetErr(errors.New("redis err"))
+
+	_, err := s.ValidateRefreshToken(context.Background(), "invalid")
+	assert.Error(t, err)
 }
 
 func TestService_DeleteUser(t *testing.T) {

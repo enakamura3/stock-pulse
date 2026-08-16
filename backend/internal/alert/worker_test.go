@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/mock"
 )
@@ -27,10 +28,29 @@ func TestAlertWorker_StartAndStop(t *testing.T) {
 	w := NewAlertWorker(repo, ms, tg)
 	w.interval = 10 * time.Millisecond
 
+	if w.Interval() != 10*time.Millisecond {
+		t.Fatalf("expected 10ms, got %v", w.Interval())
+	}
+
 	// Setup expectations that might occur during the short run
 	repo.On("GetActiveAlerts", mock.Anything).Return(([]*Alert)(nil), nil).Maybe()
 
 	w.CheckActiveAlerts(context.Background())
+}
+
+func TestAlertWorker_NewAlertWorker_CustomInterval(t *testing.T) {
+	repo := new(MockAlertRepo)
+	ms := new(MockMarketService)
+	tg := new(MockTelegramService)
+
+	original := config.Envs.AlertCheckInterval
+	config.Envs.AlertCheckInterval = "30s"
+	defer func() { config.Envs.AlertCheckInterval = original }()
+
+	w := NewAlertWorker(repo, ms, tg)
+	if w.Interval() != 30*time.Second {
+		t.Fatalf("expected 30s, got %v", w.Interval())
+	}
 }
 
 func TestAlertWorker_process(t *testing.T) {
