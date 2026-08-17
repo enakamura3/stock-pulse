@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redismock/v9"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -138,21 +139,32 @@ func TestService_Login(t *testing.T) {
 	})
 }
 
-func TestService_GenerateRefreshToken(t *testing.T) {
-	s, _, rdbMock := setupService()
-	rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetErr(errors.New("redis error"))
+func TestService_Login_RefreshTokenError(t *testing.T) {
+	s, repo, rdbMock := setupService()
+	hash, _ := hashPassword("password", defaultParams)
+	user := &User{ID: "1", Email: "test@test.com", PasswordHash: hash}
+	repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
+	rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetErr(errors.New("redis err"))
 
-	_, err := s.GenerateRefreshToken(context.Background(), "1")
-	assert.EqualError(t, err, "redis error")
+	_, _, _, err := s.Login(context.Background(), "test@test.com", "password")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "falha ao gerar refresh token")
 }
 
-func TestService_ValidateRefreshToken(t *testing.T) {
+func TestService_ValidateRefreshToken_Expired(t *testing.T) {
 	s, _, rdbMock := setupService()
-	rdbMock.ExpectGet("refresh_token:valid").SetVal("1")
+	rdbMock.ExpectGet("refresh_token:expired").SetErr(redis.Nil)
 
-	id, err := s.ValidateRefreshToken(context.Background(), "valid")
-	assert.NoError(t, err)
-	assert.Equal(t, "1", id)
+	_, err := s.ValidateRefreshToken(context.Background(), "expired")
+	assert.EqualError(t, err, "sessão expirada ou inválida")
+}
+
+func TestService_ValidateRefreshToken_Error(t *testing.T) {
+	s, _, rdbMock := setupService()
+	rdbMock.ExpectGet("refresh_token:invalid").SetErr(errors.New("redis err"))
+
+	_, err := s.ValidateRefreshToken(context.Background(), "invalid")
+	assert.Error(t, err)
 }
 
 func TestService_RevokeRefreshToken(t *testing.T) {
@@ -246,14 +258,6 @@ func TestService_UpdatePassword(t *testing.T) {
 		err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
 		assert.NoError(t, err)
 	})
-}
-
-func TestService_ValidateRefreshToken_Error(t *testing.T) {
-	s, _, rdbMock := setupService()
-	rdbMock.ExpectGet("refresh_token:invalid").SetErr(errors.New("redis err"))
-
-	_, err := s.ValidateRefreshToken(context.Background(), "invalid")
-	assert.Error(t, err)
 }
 
 func TestService_DeleteUser(t *testing.T) {
