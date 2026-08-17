@@ -84,3 +84,23 @@ func TestWorkerManager_Trigger(t *testing.T) {
 		t.Errorf("expected trigger to fail for non-existent worker")
 	}
 }
+
+func TestWorkerManager_TickerFiring(t *testing.T) {
+	var counter int32
+	job := func(ctx context.Context) {
+		atomic.AddInt32(&counter, 1)
+	}
+
+	w := NewWorker("TickerWorker", "Ticker Description", 10*time.Millisecond, job)
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	go w.Start(ctx)
+
+	// Wait for start execution + at least one ticker tick
+	time.Sleep(35 * time.Millisecond)
+	cancel()
+
+	if atomic.LoadInt32(&counter) < 2 {
+		t.Errorf("expected counter to be at least 2 after ticker fired, got %d", atomic.LoadInt32(&counter))
+	}
+}
