@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { SearchResult } from './types';
-import { usePortfolio } from '@/context/PortfolioContext';
+import { usePortfolioOptional } from '@/context/PortfolioContext';
 
 import NewPortfolioModal from './modals/NewPortfolioModal';
 import TransactionModal from './modals/TransactionModal';
@@ -78,12 +78,7 @@ export interface ModalsProps {
 }
 
 export default function Modals(props: ModalsProps) {
-  let context: ReturnType<typeof usePortfolio> | undefined;
-  try {
-    context = usePortfolio();
-  } catch (e) {
-    context = undefined;
-  }
+  const context = usePortfolioOptional();
 
   // Resolve values from props first, then fallback to PortfolioContext
   const showPortfolioModal = props.showPortfolioModal ?? context?.showPortfolioModal ?? false;

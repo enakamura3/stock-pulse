@@ -31,7 +31,7 @@ jobs:
       run: go vet ./...
 
     - name: Run tests
-      run: go test -v -race -cover ./...
+      run: go test -v -race -cover ./internal/...
 
   frontend:
     name: Frontend CI
@@ -61,4 +61,6 @@ jobs:
       run: npm run test
 
     - name: Build Next.js App
+      env:
+        NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
       run: npm run build

@@ -766,3 +766,7 @@ export function usePortfolio() {
   }
   return context;
 }
+
+export function usePortfolioOptional() {
+  return useContext(PortfolioContext);
+}

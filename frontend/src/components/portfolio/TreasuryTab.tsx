@@ -95,7 +95,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
       has_coupons: pos.has_coupons,
       type: 'REDEMPTION',
       quantity: pos.quantity,
-      unit_price: pos.current_unit_price || pos.average_unit_price,
+      unit_price: pos.unit_price,
       contracted_rate: 0,
       transaction_date: new Date().toISOString().split('T')[0],
     });
