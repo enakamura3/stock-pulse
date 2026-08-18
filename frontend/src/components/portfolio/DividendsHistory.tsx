@@ -376,7 +376,7 @@ export default function DividendsHistory({
           <div className="text-center text-secondary p-xl">
             <span className="text-2xl block mb-sm">🏜️</span>
             <p>Nenhum provento recebido ainda.</p>
-            <p className="text-xs opacity-70">Aguarde a "Data Com" das suas ações para começar a receber!</p>
+            <p className="text-xs opacity-70">Aguarde a &quot;Data Com&quot; das suas ações para começar a receber!</p>
           </div>
         )}
       </div>

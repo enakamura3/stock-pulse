@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useTheme } from '@/components/ThemeProvider';
+import { useThemeOptional } from '@/components/ThemeProvider';
 import { PerformancePoint } from '../types';
 import { BENCHMARK_COLORS } from './constants';
 import { SectionTitle, AnalysisCard } from './sharedComponents';
@@ -12,13 +12,9 @@ interface PerformanceBenchmarkSectionProps {
 
 export default function PerformanceBenchmarkSection({ performanceData }: PerformanceBenchmarkSectionProps) {
   const [showReal, setShowReal] = useState(false);
-  let isLight = false;
-  try {
-    const { theme } = useTheme();
-    isLight = theme === 'light';
-  } catch (e) {
-    // Fallback gracioso quando renderizado fora do ThemeProvider
-  }
+  const themeContext = useThemeOptional();
+  const isLight = themeContext?.theme === 'light';
+  
   const strokeColor = isLight ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.4)';
   const gridColor = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)';
 
