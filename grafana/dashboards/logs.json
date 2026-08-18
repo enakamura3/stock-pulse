@@ -44,8 +44,7 @@
   ],
   "refresh": "5s",
   "schemaVersion": 38,
-  "style": "dark",
-  "tags": [],
+  "tags": ["stock-pulse", "logs"],
   "templating": {
     "list": [
       {
@@ -58,14 +57,14 @@
           "type": "loki",
           "uid": "loki_datasource"
         },
-        "definition": "label_values(container)",
+        "definition": "label_values({container=~\".+\"}, container)",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "container",
         "options": [],
-        "query": "label_values(container)",
-        "refresh": 1,
+        "query": "label_values({container=~\".+\"}, container)",
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -78,8 +77,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "",
+  "timezone": "browser",
   "title": "Logs dos Containers",
   "uid": "logs-dashboard",
-  "version": 1
+  "version": 2
 }
