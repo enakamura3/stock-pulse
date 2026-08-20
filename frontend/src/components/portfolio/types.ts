@@ -113,14 +113,15 @@ export interface FixedIncomePosition {
   gross_value: number;
   net_value: number;
   net_return_percent: number;
-  gross_return_percent: number;
-  iof_amount: number;
-  ir_amount: number;
-  ir_rate: number;
-  iof_rate: number;
-  days_in_portfolio: number;
   days_to_maturity: number;
   is_matured: boolean;
+  taxes_calculated?: number;
+  gross_return_percent?: number;
+  iof_amount?: number;
+  ir_amount?: number;
+  ir_rate?: number;
+  iof_rate?: number;
+  days_in_portfolio?: number;
 }
 
 export interface UnifiedTransaction {
