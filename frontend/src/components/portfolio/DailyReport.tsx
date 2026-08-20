@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { Position, FixedIncomePosition, TreasuryPosition } from './types';
+import { useRouter } from 'next/navigation';
+import { Position, FixedIncomePosition, TreasuryPosition, CalculatedDividend } from './types';
 import { formatMoney, formatPercentage } from './helpers';
+import { getMarketStatus } from '@/lib/marketHours';
 
-interface DailyReportProps {
+export interface DailyReportProps {
   positions: Position[];
   fiPositions?: FixedIncomePosition[];
   treasuryPositions?: TreasuryPosition[];
+  dividends?: CalculatedDividend[];
   kpiCurrency: string;
+  lastFetchedAt?: Date | null;
+  onRefresh?: () => Promise<void> | void;
+  isRefreshing?: boolean;
+  onGoToAssets?: () => void;
 }
 
 type SortKey = 'ticker' | 'average_price' | 'previousClose' | 'current_price' | 'daily_change' | 'daily_change_percent' | 'impact';
@@ -37,15 +44,60 @@ const getAssetTypeBadge = (pos: Position) => {
   return null;
 };
 
-export default function DailyReport({ positions, fiPositions = [], treasuryPositions = [], kpiCurrency }: DailyReportProps) {
+export default function DailyReport({
+  positions = [],
+  fiPositions = [],
+  treasuryPositions = [],
+  dividends = [],
+  kpiCurrency,
+  lastFetchedAt,
+  onRefresh,
+  isRefreshing = false,
+  onGoToAssets,
+}: DailyReportProps) {
+  const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>('impact');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const now = new Date();
-  const lastUpdateStr = now.toLocaleString('pt-BR', {
+  const refDate = lastFetchedAt ? new Date(lastFetchedAt) : new Date();
+  const lastUpdateStr = refDate.toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+
+  const marketStatus = getMarketStatus(refDate);
+
+  // Proventos creditados hoje (T6)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayDividends = (dividends || []).filter(d => {
+    if (!d.payment_date) return false;
+    const pDate = d.payment_date.split('T')[0];
+    return pDate === todayStr;
+  });
+  const totalTodayDividends = todayDividends.reduce((acc, d) => acc + (d.net_amount || d.total_amount || 0), 0);
+
+  // Se não houver posições em nenhuma categoria: Empty State acionável (T4)
+  const hasNoData = positions.length === 0 && fiPositions.length === 0 && treasuryPositions.length === 0;
+  if (hasNoData) {
+    return (
+      <div className="card flex-col items-center justify-center text-center w-full" style={{ padding: '3.5rem 1.5rem', gap: '1rem' }}>
+        <span style={{ fontSize: '3rem' }}>📊</span>
+        <h3 className="m-0" style={{ color: 'var(--text-primary)', fontSize: '1.25rem' }}>Nenhum ativo cadastrado na carteira</h3>
+        <p className="text-sm text-secondary m-0" style={{ maxWidth: '440px', lineHeight: 1.6 }}>
+          Cadastre ações, fundos imobiliários, renda fixa ou títulos públicos para acompanhar a variação diária consolidada e o impacto no seu patrimônio.
+        </p>
+        {onGoToAssets && (
+          <button
+            className="primary-button font-bold mt-sm"
+            onClick={onGoToAssets}
+            style={{ padding: '0.6rem 1.5rem', fontSize: '0.85rem' }}
+          >
+            + Cadastrar Ativos na Carteira
+          </button>
+        )}
+      </div>
+    );
+  }
 
   // Calcula total diário da carteira em kpiCurrency
   let totalDailyChange = 0;
@@ -125,21 +177,92 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
   return (
     <div className="flex-col gap-xl w-full">
 
-      {/* Card principal: Variação Total */}
-      {(positions.length > 0 || fiPositions.length > 0 || treasuryPositions.length > 0) && (
-        <div className="card flex-col items-center justify-center text-center w-full" style={{ padding: '1.5rem', gap: '0.25rem' }}>
-          <span className="text-secondary text-sm font-semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Variação Total Diária da Carteira
+      {/* Card principal Hero: Variação Total Diária (T1, T2, T3, T13-UX) */}
+      <div className="card flex-col items-center justify-center text-center w-full" style={{ padding: '1.75rem', gap: '0.4rem', border: '1px solid var(--panel-border)' }}>
+        <div className="flex-row items-center gap-sm mb-xs flex-wrap justify-center">
+          <span
+            style={{
+              background: marketStatus.badgeBg,
+              color: marketStatus.color,
+              border: `1px solid ${marketStatus.color}`,
+              fontSize: '0.7rem',
+              padding: '0.15rem 0.55rem',
+              borderRadius: '12px',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title={marketStatus.description}
+          >
+            ● {marketStatus.label}
           </span>
-          <span className="text-3xl font-bold mt-sm" style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)', letterSpacing: '-0.02em' }}>
-            {isDailyPos ? '🟢 +' : '🔴 '}{formatMoney(totalDailyChange, kpiCurrency)}
+          <span className="text-secondary text-xs font-semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Variação Diária da Carteira (Intraday)
           </span>
-          <span className="text-lg font-semibold" style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)' }}>
-            ({isDailyPos ? '+' : ''}{totalDailyPercent.toFixed(2)}%)
-          </span>
-          <span className="text-xs text-secondary" style={{ marginTop: '0.5rem' }}>
-            🕐 Última atualização: {lastUpdateStr}
-          </span>
+        </div>
+
+        <span className="text-3xl sm:text-4xl font-extrabold mt-xs" style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)', letterSpacing: '-0.02em' }}>
+          {isDailyPos ? '🟢 +' : '🔴 '}{formatMoney(totalDailyChange, kpiCurrency)}
+        </span>
+        <span className="text-lg font-bold" style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)' }}>
+          ({isDailyPos ? '+' : ''}{totalDailyPercent.toFixed(2)}%)
+        </span>
+
+        <div className="flex-row items-center gap-md mt-sm flex-wrap justify-center text-xs text-secondary">
+          <span>🕐 Cotações em: <strong>{lastUpdateStr}</strong></span>
+          {onRefresh && (
+            <button
+              onClick={() => onRefresh()}
+              disabled={isRefreshing}
+              className="btn-secondary font-bold"
+              style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '4px', cursor: isRefreshing ? 'not-allowed' : 'pointer' }}
+              title="Recarregar cotações e resumo do portfólio"
+            >
+              {isRefreshing ? '⏳ Atualizando...' : '🔄 Atualizar'}
+            </button>
+          )}
+        </div>
+        <span className="text-xs text-secondary mt-xs" style={{ opacity: 0.65, fontSize: '0.7rem' }}>
+          💡 Cotações de renda variável possuem cache do provedor (TTL 15 min).
+        </span>
+      </div>
+
+      {/* Seção Proventos Creditados Hoje (T6) */}
+      {todayDividends.length > 0 && (
+        <div className="card flex-col gap-sm w-full" style={{ background: 'var(--color-success-bg)', borderLeft: '4px solid var(--color-success)', padding: '1.25rem' }}>
+          <div className="flex-row justify-between items-center flex-wrap gap-sm">
+            <div className="flex-col">
+              <h4 className="m-0 text-success font-bold flex-row items-center gap-xs" style={{ fontSize: '1rem' }}>
+                💰 Proventos Recebidos Hoje ({todayDividends.length})
+              </h4>
+              <span className="text-xs text-secondary mt-xs">Pagamentos com data de crédito prevista para hoje</span>
+            </div>
+            <span className="text-xl font-extrabold text-success">
+              +{formatMoney(totalTodayDividends, kpiCurrency)}
+            </span>
+          </div>
+
+          <div className="flex-row gap-sm flex-wrap mt-xs">
+            {todayDividends.map((div, idx) => (
+              <div
+                key={idx}
+                className="flex-row items-center gap-sm"
+                style={{
+                  background: 'var(--card-bg)',
+                  padding: '0.4rem 0.75rem',
+                  borderRadius: '6px',
+                  border: '1px solid var(--panel-border)',
+                }}
+              >
+                <span className="font-bold text-accent">{div.ticker}</span>
+                <span className="text-xs text-secondary">{div.type}</span>
+                <span className="text-success font-bold text-sm">
+                  {formatMoney(div.net_amount || div.total_amount || 0, kpiCurrency)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -153,10 +276,16 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
               {topRisers.map(({ pos, percent, impact, portfolioWeight }) => {
                 const badge = getAssetTypeBadge(pos);
                 return (
-                  <div key={pos.asset_id} className="flex-row justify-between items-center" style={{ padding: '0.5rem 0.75rem', background: 'var(--color-success-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-success)' }}>
+                  <div
+                    key={pos.asset_id}
+                    className="flex-row justify-between items-center"
+                    style={{ padding: '0.5rem 0.75rem', background: 'var(--color-success-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-success)', cursor: 'pointer' }}
+                    onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
+                    title={`Ver ${pos.ticker} no Monitoramento`}
+                  >
                     <div className="flex-col" style={{ gap: '2px' }}>
                       <div className="flex-row items-center gap-sm">
-                        <span className="font-bold">{pos.ticker}</span>
+                        <span className="font-bold text-accent">{pos.ticker}</span>
                         {badge && (
                           <span style={{ fontSize: '0.65rem', fontWeight: 700, color: badge.color, border: `1px solid ${badge.color}`, borderRadius: '4px', padding: '1px 5px', lineHeight: 1.4 }}>
                             {badge.label}
@@ -186,10 +315,16 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
               {topFallers.map(({ pos, percent, impact, portfolioWeight }) => {
                 const badge = getAssetTypeBadge(pos);
                 return (
-                  <div key={pos.asset_id} className="flex-row justify-between items-center" style={{ padding: '0.5rem 0.75rem', background: 'var(--color-danger-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-danger)' }}>
+                  <div
+                    key={pos.asset_id}
+                    className="flex-row justify-between items-center"
+                    style={{ padding: '0.5rem 0.75rem', background: 'var(--color-danger-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-danger)', cursor: 'pointer' }}
+                    onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
+                    title={`Ver ${pos.ticker} no Monitoramento`}
+                  >
                     <div className="flex-col" style={{ gap: '2px' }}>
                       <div className="flex-row items-center gap-sm">
-                        <span className="font-bold">{pos.ticker}</span>
+                        <span className="font-bold text-accent">{pos.ticker}</span>
                         {badge && (
                           <span style={{ fontSize: '0.65rem', fontWeight: 700, color: badge.color, border: `1px solid ${badge.color}`, borderRadius: '4px', padding: '1px 5px', lineHeight: 1.4 }}>
                             {badge.label}
@@ -212,12 +347,15 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
         </div>
       </div>
 
-      {/* Tabela: Resumo Completo */}
+      {/* Tabela: Resumo Completo com Linhas Clicáveis e Scroll Horizontal Seguro (T5, T30) */}
       <div className="card flex-col gap-md w-full">
-        <h3 className="card-title">📊 Resumo Diário Completo (Renda Variável)</h3>
-        <div className="table-container flex-col">
+        <div className="flex-row justify-between items-center flex-wrap gap-xs">
+          <h3 className="card-title m-0">📊 Resumo Diário Completo (Renda Variável)</h3>
+          <span className="text-xs text-secondary">Clique em um ativo para abrir no Monitoramento</span>
+        </div>
+        <div className="table-container flex-col" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {positions.length > 0 ? (
-            <table className="data-table">
+            <table className="data-table" style={{ width: '100%', minWidth: '650px' }}>
               <thead>
                 <tr>
                   <th style={{ cursor: 'pointer' }} onClick={() => handleSort('ticker')}>
@@ -255,10 +393,16 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                   const badge = getAssetTypeBadge(pos);
 
                   return (
-                    <tr key={pos.asset_id}>
-                      <td>
+                    <tr
+                      key={pos.asset_id}
+                      onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
+                      style={{ cursor: 'pointer', transition: 'background-color 0.15s ease' }}
+                      title={`Clique para ver ${pos.ticker} no Monitoramento de Cotações`}
+                    >
+                      <td style={{ whiteSpace: 'nowrap' }}>
                         <div className="flex-row items-center gap-sm">
-                          <span className="font-bold">{pos.ticker}</span>
+                          <span className="font-bold text-accent">{pos.ticker}</span>
+                          <span className="text-xs text-secondary" style={{ opacity: 0.6 }}>↗</span>
                           {badge && (
                             <span style={{ fontSize: '0.65rem', fontWeight: 700, color: badge.color, border: `1px solid ${badge.color}`, borderRadius: '4px', padding: '1px 5px', lineHeight: 1.4 }}>
                               {badge.label}
@@ -270,22 +414,22 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                         </div>
                         <span className="text-xs text-secondary">{portfolioWeight.toFixed(1)}%</span>
                       </td>
-                      <td className="text-right" style={{ fontFamily: 'monospace' }}>
+                      <td className="text-right" style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                         {formatMoney(pos.average_price ?? 0, pos.currency)}
                       </td>
-                      <td className={`text-right ${prevCloseColor}`} style={{ fontFamily: 'monospace' }}>
+                      <td className={`text-right ${prevCloseColor}`} style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                         {formatMoney(previousClose, pos.currency)}
                       </td>
-                      <td className={`text-right ${currentPriceColor}`} style={{ fontFamily: 'monospace' }}>
+                      <td className={`text-right ${currentPriceColor}`} style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                         {formatMoney(currentPrice, pos.currency)}
                       </td>
-                      <td className={`text-right ${colorClass}`}>
+                      <td className={`text-right ${colorClass}`} style={{ whiteSpace: 'nowrap' }}>
                         {prefix}{formatMoney(absChange, pos.currency)}
                       </td>
-                      <td className={`text-right font-bold ${colorClass}`}>
+                      <td className={`text-right font-bold ${colorClass}`} style={{ whiteSpace: 'nowrap' }}>
                         {formatPercentage(percent)}
                       </td>
-                      <td className={`text-right font-bold ${colorClass}`}>
+                      <td className={`text-right font-bold ${colorClass}`} style={{ whiteSpace: 'nowrap' }}>
                         {prefix}{formatMoney(impact, kpiCurrency)}
                       </td>
                     </tr>
@@ -296,8 +440,7 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
           ) : (
             <div className="flex-col items-center justify-center py-xl text-secondary" style={{ gap: '0.75rem' }}>
               <span style={{ fontSize: '2.5rem' }}>📭</span>
-              <span className="font-semibold">Nenhuma posição ativa encontrada.</span>
-              <span className="text-sm" style={{ opacity: 0.7 }}>Cadastre ativos na aba <strong>Carteira</strong> para visualizar o resumo diário.</span>
+              <span className="font-semibold">Nenhuma posição em renda variável ativa.</span>
             </div>
           )}
         </div>
@@ -310,8 +453,8 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
           <p className="text-xs text-secondary">
             Títulos de renda fixa privada são atualizados diariamente com a rentabilidade acumulada de acordo com o indexador contratado.
           </p>
-          <div className="table-container flex-col">
-            <table className="data-table">
+          <div className="table-container flex-col" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="data-table" style={{ width: '100%', minWidth: '600px' }}>
               <thead>
                 <tr>
                   <th>Instituição & Ativo</th>
@@ -331,13 +474,13 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
 
                   return (
                     <tr key={p.asset.id}>
-                      <td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
                         <div className="flex-col">
                           <span className="font-bold">{p.asset.institution}</span>
                           <span className="text-xs text-secondary">{p.asset.type}</span>
                         </div>
                       </td>
-                      <td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
                         <div className="flex-row items-center gap-sm">
                           <span style={{ background: 'var(--accent-bg)', color: 'var(--accent-color)', border: '1px solid rgba(var(--accent-rgb), 0.3)', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                             {p.asset.type}
@@ -345,10 +488,10 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                           <span className="text-xs">{taxa}</span>
                         </div>
                       </td>
-                      <td className="text-right">{new Date(p.asset.maturity_date).toLocaleDateString('pt-BR')}</td>
-                      <td className="text-right">{formatMoney(p.total_invested, kpiCurrency)}</td>
-                      <td className="text-right" style={{ fontWeight: 600 }}>{formatMoney(p.net_value, kpiCurrency)}</td>
-                      <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`}>
+                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{new Date(p.asset.maturity_date).toLocaleDateString('pt-BR')}</td>
+                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{formatMoney(p.total_invested, kpiCurrency)}</td>
+                      <td className="text-right" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatMoney(p.net_value, kpiCurrency)}</td>
+                      <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`} style={{ whiteSpace: 'nowrap' }}>
                         {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(2)}%
                       </td>
                     </tr>
@@ -368,8 +511,8 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
             Títulos do Tesouro Nacional não possuem cotação intraday. Os valores abaixo
             representam a última posição de liquidação líquida disponível.
           </p>
-          <div className="table-container flex-col">
-            <table className="data-table">
+          <div className="table-container flex-col" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="data-table" style={{ width: '100%', minWidth: '600px' }}>
               <thead>
                 <tr>
                   <th>Título</th>
@@ -391,16 +534,16 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
                   const bgVar = isSelic ? 'var(--color-success-bg)' : isPrefix ? 'var(--accent-bg)' : 'var(--color-warning-bg)';
                   return (
                     <tr key={p.transaction_id}>
-                      <td><span className="font-bold">{p.ticker}</span></td>
-                      <td>
+                      <td style={{ whiteSpace: 'nowrap' }}><span className="font-bold">{p.ticker}</span></td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
                         <span style={{ background: bgVar, color: colorVar, border: `1px solid ${colorVar}`, fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                           {p.treasury_type}
                         </span>
                       </td>
-                      <td className="text-right">{new Date(p.maturity_date).toLocaleDateString('pt-BR')}</td>
-                      <td className="text-right">{formatMoney(p.total_invested, kpiCurrency)}</td>
-                      <td className="text-right" style={{ fontWeight: 600 }}>{formatMoney(p.net_value, kpiCurrency)}</td>
-                      <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`}>
+                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{new Date(p.maturity_date).toLocaleDateString('pt-BR')}</td>
+                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{formatMoney(p.total_invested, kpiCurrency)}</td>
+                      <td className="text-right" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatMoney(p.net_value, kpiCurrency)}</td>
+                      <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`} style={{ whiteSpace: 'nowrap' }}>
                         {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(2)}%
                       </td>
                     </tr>
@@ -414,4 +557,3 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
     </div>
   );
 }
-
