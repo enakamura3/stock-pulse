@@ -67,6 +67,10 @@ function PortfolioContent() {
     handleFileUpload,
     handleExportPortfolio,
     loadTreasuryPositions,
+    lastFetchedAt,
+    loadPortfolioDetails,
+    loadDividends,
+    loadPerformance,
   } = portfolio;
 
   if (authLoading || isLoadingPortfolios) {
@@ -259,7 +263,23 @@ function PortfolioContent() {
           )}
 
           {activeTab === 'diario' && (
-            <DailyReport positions={filteredPositions} fiPositions={filteredFI} treasuryPositions={filteredTreasury} kpiCurrency={kpiCurrency} />
+            <DailyReport
+              positions={filteredPositions}
+              fiPositions={filteredFI}
+              treasuryPositions={filteredTreasury}
+              dividends={dividends}
+              kpiCurrency={kpiCurrency}
+              lastFetchedAt={lastFetchedAt}
+              onRefresh={async () => {
+                if (activePortfolioId) {
+                  await loadPortfolioDetails(activePortfolioId);
+                  await loadDividends(activePortfolioId);
+                  await loadPerformance(activePortfolioId, period);
+                }
+              }}
+              isRefreshing={isLoadingDetails}
+              onGoToAssets={() => setActiveTab('ativos')}
+            />
           )}
 
           {activeTab === 'renda-fixa' && (
