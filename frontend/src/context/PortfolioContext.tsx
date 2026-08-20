@@ -530,7 +530,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       setShowFIModal(false);
       setFiInstitution(''); setFiRate(''); setFiAmount(''); setFiMaturityDate(''); setFiApplicationDate(new Date().toISOString().split('T')[0]);
       
-      window.location.reload();
+      await loadPortfolioDetails(activePortfolioId);
+      await loadDividends(activePortfolioId);
+      await loadPerformance(activePortfolioId, period);
     } catch (e) {
       alert("Erro ao salvar aplicação de Renda Fixa.");
       console.error(e);

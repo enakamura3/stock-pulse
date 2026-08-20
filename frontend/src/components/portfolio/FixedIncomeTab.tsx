@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 import { FixedIncomePosition, PerformancePoint } from './types';
 import { formatMoney, formatPercentage } from './helpers';
 import { apiFetch } from '@/lib/api';
+import { usePortfolioOptional } from '@/context/PortfolioContext';
 
 interface FixedIncomeTabProps {
   portfolioId: string;
@@ -62,6 +63,49 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
     return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
+  const portfolioContext = usePortfolioOptional();
+
+  const fetchPositions = useCallback(async () => {
+    if (!portfolioId) return;
+    setIsLoading(true);
+    try {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`);
+      if (res.ok) {
+        const data = await res.json();
+        setPositions(data || []);
+      } else {
+        console.error("Failed to fetch fixed income positions");
+      }
+    } catch (err) {
+      console.error("Error fetching fixed income positions:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [portfolioId]);
+
+  const fetchPerformance = useCallback(async () => {
+    if (!portfolioId) return;
+    setIsLoadingPerformance(true);
+    try {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPerformanceData(data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching fixed income performance:", err);
+    } finally {
+      setIsLoadingPerformance(false);
+    }
+  }, [portfolioId, period]);
+
+  useEffect(() => {
+    fetchPositions();
+  }, [fetchPositions]);
+
+  useEffect(() => {
+    fetchPerformance();
+  }, [fetchPerformance]);
 
   const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,7 +127,12 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
         } else {
           alert(`Importação concluída com sucesso! ${data.success} registros importados.`);
         }
-        window.location.reload(); // Recarrega para atualizar a carteira inteira
+        await fetchPositions();
+        await fetchPerformance();
+        if (portfolioContext) {
+          await portfolioContext.loadPortfolioDetails(portfolioId);
+          await portfolioContext.loadDividends(portfolioId);
+        }
       } else {
         alert("Erro ao enviar arquivo.");
       }
@@ -94,48 +143,6 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     e.target.value = '';
   };
 
-  useEffect(() => {
-    if (!portfolioId) return;
-
-    const fetchPositions = async () => {
-      setIsLoading(true);
-      try {
-        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`);
-        if (res.ok) {
-          const data = await res.json();
-          setPositions(data || []);
-        } else {
-          console.error("Failed to fetch fixed income positions");
-        }
-      } catch (err) {
-        console.error("Error fetching fixed income positions:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPositions();
-  }, [portfolioId]);
-
-  useEffect(() => {
-    if (!portfolioId) return;
-    const fetchPerformance = async () => {
-      setIsLoadingPerformance(true);
-      try {
-        const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`);
-        if (res.ok) {
-          const data = await res.json();
-          setPerformanceData(data || []);
-        }
-      } catch (err) {
-        console.error("Error fetching fixed income performance:", err);
-      } finally {
-        setIsLoadingPerformance(false);
-      }
-    };
-    fetchPerformance();
-  }, [portfolioId, period]);
-
   const confirmRedeem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!redeemTarget) return;
@@ -144,8 +151,6 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
       return;
     }
 
-    // Validação básica: não pode resgatar mais que o valor líquido atual (simplificação)
-    // Na prática, o backend que dita a regra, mas ajuda no frontend
     if (Number(redeemAmount) > redeemTarget.net_value) {
       if (!confirm(`O valor solicitado (R$ ${Number(redeemAmount).toFixed(2)}) é maior que o saldo líquido atual (R$ ${redeemTarget.net_value.toFixed(2)}). Deseja prosseguir mesmo assim?`)) {
         return;
@@ -166,7 +171,12 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
 
       if (res.ok) {
         alert('Resgate realizado com sucesso!');
-        window.location.reload();
+        await fetchPositions();
+        await fetchPerformance();
+        if (portfolioContext) {
+          await portfolioContext.loadPortfolioDetails(portfolioId);
+          await portfolioContext.loadDividends(portfolioId);
+        }
       } else {
         const data = await res.json();
         alert(`Erro ao resgatar: ${data.error || 'Erro desconhecido'}`);
