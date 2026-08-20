@@ -27,8 +27,13 @@ export const formatMoney = (val: number, currency: string) => {
 };
 
 export const formatPercentage = (val: number) => {
-  const isPos = val >= 0;
-  return `${isPos ? '+' : ''}${val.toFixed(2)}%`;
+  const formatted = Math.abs(val) < 1e-6 ? 0 : val;
+  const isPos = formatted > 1e-6;
+  const fixed = formatted.toFixed(2);
+  if (fixed === '0.00' || fixed === '-0.00') {
+    return '0.00%';
+  }
+  return `${isPos ? '+' : ''}${fixed}%`;
 };
 
 export const formatQuantity = (val: number) => {

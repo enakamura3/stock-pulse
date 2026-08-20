@@ -13,13 +13,17 @@ type SortKey = 'ticker' | 'average_price' | 'previousClose' | 'current_price' | 
 type SortDir = 'asc' | 'desc';
 
 // Helper: calcula a taxa de câmbio de uma posição para a moeda base
-function getExchangeRate(pos: Position): number {
+function getExchangeRate(pos: Position, kpiCurrency: string = 'BRL'): number {
   const price = pos.current_price ?? 0;
   const qty = pos.quantity ?? 0;
-  if (price > 0 && qty > 0) {
-    return (pos.current_value ?? 0) / (price * qty);
+  const val = pos.current_value ?? 0;
+  if (price > 1e-6 && qty > 1e-6 && val > 1e-6) {
+    return val / (price * qty);
   }
-  return 1.0;
+  if (pos.currency && pos.currency.toUpperCase() === kpiCurrency.toUpperCase()) {
+    return 1.0;
+  }
+  return 0.0;
 }
 
 // Helper: retorna o rótulo de tipo de ativo
@@ -47,7 +51,7 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
   let totalDailyChange = 0;
   let totalPortfolioValue = 0;
   positions.forEach(pos => {
-    const rate = getExchangeRate(pos);
+    const rate = getExchangeRate(pos, kpiCurrency);
     totalDailyChange += (pos.daily_change ?? 0) * (pos.quantity ?? 0) * rate;
     totalPortfolioValue += (pos.current_value ?? 0);
   });
@@ -71,7 +75,7 @@ export default function DailyReport({ positions, fiPositions = [], treasuryPosit
     const currentPrice = pos.current_price ?? 0;
     const previousClose = currentPrice - absChange;
     const qty = pos.quantity ?? 0;
-    const rate = getExchangeRate(pos);
+    const rate = getExchangeRate(pos, kpiCurrency);
     const impact = absChange * qty * rate;
     const portfolioWeight = totalPortfolioValue > 1e-6
       ? ((pos.current_value ?? 0) / totalPortfolioValue) * 100

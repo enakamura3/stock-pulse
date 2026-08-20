@@ -149,4 +149,34 @@ describe('DailyReport Component', () => {
     fireEvent.click(tickerHeader);
     expect(screen.getByText('HGLG11')).toBeInTheDocument();
   });
+
+  it('correctly calculates impact for foreign currency positions', () => {
+    const foreignPositions: Position[] = [
+      {
+        asset_id: 'aapl1',
+        ticker: 'AAPL',
+        name: 'Apple Inc.',
+        type: 'STOCK_US',
+        currency: 'USD',
+        quantity: 10,
+        average_price: 150,
+        total_cost: 7500, // in BRL
+        current_price: 200, // in USD
+        current_value: 10000, // in BRL (implied rate 10000 / (200*10) = 5.0)
+        daily_change: 5, // in USD
+        daily_change_percent: 2.56,
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={foreignPositions}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getAllByText('AAPL').length).toBeGreaterThan(0);
+    // Daily change is 5 USD * 10 shares * 5.0 BRL/USD = +R$ 250,00 impact
+    expect(screen.getAllByText(/250,00/).length).toBeGreaterThan(0);
+  });
 });
