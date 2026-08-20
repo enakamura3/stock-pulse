@@ -29,6 +29,8 @@ describe('Portfolio Helpers', () => {
       expect(brl).toContain('1.234,56');
       const usd = formatMoney(100, 'USD');
       expect(usd).toContain('100,00');
+      const defaultBrl = formatMoney(50, '');
+      expect(defaultBrl).toContain('50,00');
     });
   });
 

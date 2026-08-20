@@ -8,6 +8,7 @@ node_modules/
 out/
 build/
 coverage/
+coverage_local/
 
 # Go / Air (Backend)
 tmp/
