@@ -125,7 +125,10 @@ export default function DailyReport({
     const percent = pos.daily_change_percent ?? 0;
     const absChange = pos.daily_change ?? 0;
     const currentPrice = pos.current_price ?? 0;
-    const previousClose = currentPrice - absChange;
+    // Usa previous_close real do backend; caso não disponível, estima via price - change
+    const previousClose = (pos.previous_close != null && pos.previous_close > 1e-6)
+      ? pos.previous_close
+      : currentPrice - absChange;
     const qty = pos.quantity ?? 0;
     const rate = getExchangeRate(pos, kpiCurrency);
     const impact = absChange * qty * rate;

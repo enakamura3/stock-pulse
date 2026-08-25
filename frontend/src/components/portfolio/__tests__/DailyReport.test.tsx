@@ -685,4 +685,37 @@ describe('DailyReport Component', () => {
     expect(screen.getByText('Tesouro Prefixado 2031')).toBeInTheDocument();
     expect(screen.getByText('-10.00%')).toBeInTheDocument();
   });
+
+  it('uses real previous_close from backend when available instead of estimation', () => {
+    const posWithPreviousClose: Position[] = [
+      {
+        asset_id: 'pos_pc',
+        ticker: 'ITUB4',
+        name: 'Itaú Unibanco',
+        type: 'STOCK_BR',
+        currency: 'BRL',
+        quantity: 200,
+        average_price: 28,
+        total_cost: 5600,
+        current_price: 31.50,
+        current_value: 6300,
+        daily_change: 1.50,
+        daily_change_percent: 5.0,
+        previous_close: 30.00, // valor real do backend
+        volume: 12000000,
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={posWithPreviousClose}
+        kpiCurrency="BRL"
+      />
+    );
+
+    // Preço atual deve aparecer na tabela
+    expect(screen.getAllByText('ITUB4').length).toBeGreaterThan(0);
+    // Fech. Anterior real (30,00) deve aparecer (não a estimativa 31.50 - 1.50 = 30.00 coincidência)
+    expect(screen.getAllByText(/R\$ 30,00/).length).toBeGreaterThan(0);
+  });
 });

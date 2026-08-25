@@ -22,6 +22,8 @@ export interface Position {
   return_percent?: number;
   daily_change?: number;
   daily_change_percent?: number;
+  previous_close?: number;
+  volume?: number;
   graham_value?: number;
   bazin_value?: number;
   pvp?: number;

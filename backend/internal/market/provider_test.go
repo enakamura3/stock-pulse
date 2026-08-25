@@ -46,7 +46,8 @@ func TestProvider_GetQuote(t *testing.T) {
 							"symbol": "AAPL",
 							"longName": "Apple Inc.",
 							"regularMarketPrice": 150.0,
-							"chartPreviousClose": 140.0
+							"chartPreviousClose": 140.0,
+							"regularMarketVolume": 55000000
 						}
 					}]
 				}
@@ -63,6 +64,8 @@ func TestProvider_GetQuote(t *testing.T) {
 		assert.Equal(t, "USD", q.Currency)
 		assert.Equal(t, 10.0, q.Change)
 		assert.InDelta(t, (10.0/140.0)*100, q.ChangePercent, 0.0001)
+		assert.Equal(t, 140.0, q.PreviousClose)
+		assert.Equal(t, int64(55000000), q.Volume)
 	})
 
 	t.Run("Name Fallback", func(t *testing.T) {
