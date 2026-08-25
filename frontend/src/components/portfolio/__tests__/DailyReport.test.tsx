@@ -602,6 +602,17 @@ describe('DailyReport Component', () => {
         payment_date: '2025-01-01T00:00:00Z', // past date
         cum_date: '2024-12-15',
       },
+      {
+        id: 'div3',
+        asset_id: 'pos3',
+        ticker: 'HGLG11',
+        type: 'RENDIMENTO',
+        gross_amount: 10,
+        net_amount: 10,
+        total_amount: 10,
+        payment_date: '', // missing payment date branch
+        cum_date: '2026-08-01',
+      },
     ];
 
     render(
@@ -613,5 +624,65 @@ describe('DailyReport Component', () => {
     );
 
     expect(screen.getByText(/Proventos Recebidos Hoje \(1\)/i)).toBeInTheDocument();
+  });
+
+  it('renders negative returns for fixed income and treasury positions with danger styling', () => {
+    const negFI: FixedIncomePosition[] = [
+      {
+        asset: {
+          id: 'fi_neg',
+          portfolio_id: 'p1',
+          institution: 'Banco Negativo',
+          type: 'CDB',
+          debt_type: 'POS',
+          indexer: 'CDI',
+          rate: 100,
+          maturity_date: '2027-12-31T00:00:00Z',
+        },
+        start_date: '2024-01-01',
+        total_invested: 5000,
+        gross_value: 4800,
+        net_value: 4800,
+        net_return_percent: -4.0, // negative return
+      },
+    ];
+
+    const negTreasury: TreasuryPosition[] = [
+      {
+        transaction_id: 'tr_neg',
+        asset_id: 'asset_tr_neg',
+        ticker: 'Tesouro Prefixado 2031',
+        treasury_type: 'PREFIXADO',
+        maturity_date: '2031-01-01',
+        has_coupons: false,
+        start_date: '2024-01-01',
+        quantity: 1,
+        unit_price: 1000,
+        contractedRate: 12.0,
+        total_invested: 1000,
+        gross_value: 900,
+        net_value: 900, // loss: returnPct < 0
+        is_matured: false,
+        days_to_maturity: 2000,
+        taxes: 0,
+        b3_fee: 0,
+        ir_tax: 0,
+        iof_tax: 0,
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={[]}
+        fiPositions={negFI}
+        treasuryPositions={negTreasury}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('Banco Negativo')).toBeInTheDocument();
+    expect(screen.getByText('-4.00%')).toBeInTheDocument();
+    expect(screen.getByText('Tesouro Prefixado 2031')).toBeInTheDocument();
+    expect(screen.getByText('-10.00%')).toBeInTheDocument();
   });
 });
