@@ -34,6 +34,7 @@ interface PortfolioContextType {
   isLoadingPerformance: boolean;
   isLoadingDividends: boolean;
   isLoadingTreasury: boolean;
+  lastFetchedAt: Date | null;
 
   // Filters & Tabs
   activeTab: 'ativos' | 'operacoes' | 'proventos' | 'insights' | 'analise' | 'diario' | 'renda-fixa' | 'tesouro';
@@ -175,6 +176,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
   const [isLoadingDividends, setIsLoadingDividends] = useState(false);
+  const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
 
   const [newPortfolioName, setNewPortfolioName] = useState('');
   const [newPortfolioCurrency, setNewPortfolioCurrency] = useState('BRL');
@@ -253,7 +255,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       if (resFI.ok) setFiPositions(await resFI.json() || []);
 
       await loadTreasuryPositions(id);
-    } catch (e) { console.error('Erro ao buscar detalhes:', e); } finally { setIsLoadingDetails(false); }
+    } catch (e) {
+      console.error('Erro ao buscar detalhes:', e);
+    } finally {
+      setIsLoadingDetails(false);
+      setLastFetchedAt(new Date());
+    }
   }, [loadTreasuryPositions]);
 
   const loadPerformance = useCallback(async (id: string, selectPeriod: string, filterTickers: string[] = []) => {
@@ -680,6 +687,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         isLoadingPerformance,
         isLoadingDividends,
         isLoadingTreasury,
+        lastFetchedAt,
         activeTab,
         setActiveTab,
         activeCategoryFilter,

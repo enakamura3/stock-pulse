@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/api';
 import { Item, Watchlist, SearchResult, Quote } from '@/components/dashboard/types';
@@ -12,6 +13,8 @@ import CreateAlertModal from '@/components/dashboard/CreateAlertModal';
 
 export default function DashboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const tickerParam = searchParams ? searchParams.get('ticker') : null;
   
   // Busca e Resultados
   const [searchQuery, setSearchQuery] = useState('');
@@ -300,6 +303,13 @@ export default function DashboardPage() {
       setTimeout(() => setCacheStatus(null), 3000);
     }
   }, []);
+
+  // Carrega ativo diretamente se passado na URL (?ticker=XXXX)
+  useEffect(() => {
+    if (tickerParam && user) {
+      loadQuote(tickerParam);
+    }
+  }, [tickerParam, user, loadQuote]);
 
   // 4. CRIA UMA NOVA WATCHLIST
   const handleCreateWatchlist = async (e: React.FormEvent) => {

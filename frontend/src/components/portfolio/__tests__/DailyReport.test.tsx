@@ -1,10 +1,20 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import DailyReport from '../DailyReport';
 import { Position, FixedIncomePosition, TreasuryPosition } from '../types';
 
+const mockPush = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
 describe('DailyReport Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   const mockPositions: Position[] = [
     {
       asset_id: 'pos1',
@@ -101,7 +111,12 @@ describe('DailyReport Component', () => {
 
   it('renders empty state when no positions exist', () => {
     render(<DailyReport positions={[]} kpiCurrency="BRL" />);
-    expect(screen.getByText('Nenhuma posição ativa encontrada.')).toBeInTheDocument();
+    expect(screen.getByText('Nenhum ativo cadastrado na carteira')).toBeInTheDocument();
+  });
+
+  it('renders empty state for variable income when only FI exists', () => {
+    render(<DailyReport positions={[]} fiPositions={mockFIPositions} kpiCurrency="BRL" />);
+    expect(screen.getByText('Nenhuma posição em renda variável ativa.')).toBeInTheDocument();
   });
 
   it('renders total daily variation card and asset risers / fallers', () => {
@@ -114,7 +129,7 @@ describe('DailyReport Component', () => {
       />
     );
 
-    expect(screen.getByText('Variação Total Diária da Carteira')).toBeInTheDocument();
+    expect(screen.getByText('Variação Diária da Carteira (Intraday)')).toBeInTheDocument();
     expect(screen.getByText('🚀 Maiores Altas do Dia')).toBeInTheDocument();
     expect(screen.getByText('📉 Maiores Baixas do Dia')).toBeInTheDocument();
   });
@@ -491,5 +506,183 @@ describe('DailyReport Component', () => {
     );
 
     expect(screen.getAllByText('BRLZERO').length).toBeGreaterThan(0);
+  });
+
+  it('renders actionable empty state when no positions exist and calls onGoToAssets', () => {
+    const mockGoToAssets = vi.fn();
+    render(
+      <DailyReport
+        positions={[]}
+        fiPositions={[]}
+        treasuryPositions={[]}
+        kpiCurrency="BRL"
+        onGoToAssets={mockGoToAssets}
+      />
+    );
+
+    expect(screen.getByText('Nenhum ativo cadastrado na carteira')).toBeInTheDocument();
+    const btn = screen.getByRole('button', { name: /\+ Cadastrar Ativos na Carteira/i });
+    fireEvent.click(btn);
+    expect(mockGoToAssets).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates to dashboard monitoring when table row and top riser/faller cards are clicked', () => {
+    render(
+      <DailyReport
+        positions={mockPositions}
+        kpiCurrency="BRL"
+      />
+    );
+
+    // Click on table row for PETR4
+    const petrRow = screen.getAllByText('PETR4').find(el => el.closest('tr'))?.closest('tr');
+    expect(petrRow).toBeInTheDocument();
+    fireEvent.click(petrRow!);
+    expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
+
+    // Click on top riser card for PETR4
+    const petrRiser = screen.getAllByText('PETR4')[0];
+    fireEvent.click(petrRiser);
+    expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
+  });
+
+  it('renders refresh button, handles isRefreshing state, and triggers onRefresh', () => {
+    const mockRefresh = vi.fn();
+    const { rerender } = render(
+      <DailyReport
+        positions={mockPositions}
+        kpiCurrency="BRL"
+        lastFetchedAt={new Date('2026-08-20T14:30:00Z')}
+        onRefresh={mockRefresh}
+        isRefreshing={false}
+      />
+    );
+
+    const refreshBtn = screen.getByRole('button', { name: /🔄 Atualizar/i });
+    expect(refreshBtn).not.toBeDisabled();
+    fireEvent.click(refreshBtn);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+
+    // Rerender in isRefreshing=true state
+    rerender(
+      <DailyReport
+        positions={mockPositions}
+        kpiCurrency="BRL"
+        lastFetchedAt={new Date('2026-08-20T14:30:00Z')}
+        onRefresh={mockRefresh}
+        isRefreshing={true}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /⏳ Atualizando.../i })).toBeDisabled();
+  });
+
+  it('renders dividends received today section when dividends match today date', () => {
+    const todayISO = new Date().toISOString().split('T')[0];
+    const mockDividends = [
+      {
+        id: 'div1',
+        asset_id: 'pos1',
+        ticker: 'PETR4',
+        type: 'DIVIDENDO',
+        gross_amount: 100,
+        net_amount: 100,
+        total_amount: 100,
+        payment_date: `${todayISO}T00:00:00Z`,
+        cum_date: '2026-08-01',
+      },
+      {
+        id: 'div2',
+        asset_id: 'pos2',
+        ticker: 'VALE3',
+        type: 'JCP',
+        gross_amount: 50,
+        net_amount: 42.5,
+        total_amount: 42.5,
+        payment_date: '2025-01-01T00:00:00Z', // past date
+        cum_date: '2024-12-15',
+      },
+      {
+        id: 'div3',
+        asset_id: 'pos3',
+        ticker: 'HGLG11',
+        type: 'RENDIMENTO',
+        gross_amount: 10,
+        net_amount: 10,
+        total_amount: 10,
+        payment_date: '', // missing payment date branch
+        cum_date: '2026-08-01',
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        dividends={mockDividends}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText(/Proventos Recebidos Hoje \(1\)/i)).toBeInTheDocument();
+  });
+
+  it('renders negative returns for fixed income and treasury positions with danger styling', () => {
+    const negFI: FixedIncomePosition[] = [
+      {
+        asset: {
+          id: 'fi_neg',
+          portfolio_id: 'p1',
+          institution: 'Banco Negativo',
+          type: 'CDB',
+          debt_type: 'POS',
+          indexer: 'CDI',
+          rate: 100,
+          maturity_date: '2027-12-31T00:00:00Z',
+        },
+        start_date: '2024-01-01',
+        total_invested: 5000,
+        gross_value: 4800,
+        net_value: 4800,
+        net_return_percent: -4.0, // negative return
+      },
+    ];
+
+    const negTreasury: TreasuryPosition[] = [
+      {
+        transaction_id: 'tr_neg',
+        asset_id: 'asset_tr_neg',
+        ticker: 'Tesouro Prefixado 2031',
+        treasury_type: 'PREFIXADO',
+        maturity_date: '2031-01-01',
+        has_coupons: false,
+        start_date: '2024-01-01',
+        quantity: 1,
+        unit_price: 1000,
+        contractedRate: 12.0,
+        total_invested: 1000,
+        gross_value: 900,
+        net_value: 900, // loss: returnPct < 0
+        is_matured: false,
+        days_to_maturity: 2000,
+        taxes: 0,
+        b3_fee: 0,
+        ir_tax: 0,
+        iof_tax: 0,
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={[]}
+        fiPositions={negFI}
+        treasuryPositions={negTreasury}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('Banco Negativo')).toBeInTheDocument();
+    expect(screen.getByText('-4.00%')).toBeInTheDocument();
+    expect(screen.getByText('Tesouro Prefixado 2031')).toBeInTheDocument();
+    expect(screen.getByText('-10.00%')).toBeInTheDocument();
   });
 });
