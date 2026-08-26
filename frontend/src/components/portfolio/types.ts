@@ -79,6 +79,23 @@ export interface CalculatedDividend {
   is_accrued?: boolean;
 }
 
+export interface BenchmarkItem {
+  symbol: string;
+  name: string;
+  value: number;
+  change: number;
+  change_percent: number;
+  previous_close?: number;
+}
+
+export interface MarketBenchmarks {
+  ibov?: BenchmarkItem;
+  sp500?: BenchmarkItem;
+  usd_brl?: BenchmarkItem;
+  ifix?: BenchmarkItem;
+  updated_at?: string;
+}
+
 export interface SearchResult {
   symbol: string;
   name: string;

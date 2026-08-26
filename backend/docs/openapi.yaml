@@ -164,6 +164,17 @@ paths:
         '200':
           description: Resultados da busca textual
 
+  /market/benchmarks:
+    get:
+      summary: Obter benchmarks e índices de mercado em tempo real
+      tags:
+        - Dados de Mercado
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Benchmarks retornados com sucesso (IBOV, S&P 500, Dólar, IFIX)
+
   /watchlists:
     get:
       summary: Listar watchlists do usuário

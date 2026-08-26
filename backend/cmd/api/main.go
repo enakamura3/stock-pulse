@@ -238,9 +238,10 @@ func main() {
 				r.Delete("/", authHandler.DeleteUser)
 			})
 
-			// Cotações e Busca
+			// Cotações, Busca e Benchmarks
 			r.Get("/quotes/{ticker}", marketHandler.GetQuote)
 			r.Get("/assets/search", marketHandler.Search)
+			r.Get("/market/benchmarks", marketHandler.GetBenchmarks)
 
 			// Favoritos / Watchlists
 			r.Get("/watchlists", watchlistHandler.GetWatchlists)
