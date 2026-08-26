@@ -6,6 +6,7 @@ import {
   formatPercentage,
   calculateDailyFixedIncomeRate,
   calculateEstimatedDailyGain,
+  exportDailyReportCSV,
 } from './helpers';
 import { getMarketStatus } from '@/lib/marketHours';
 import { apiFetch } from '@/lib/api';
@@ -428,9 +429,19 @@ export default function DailyReport({
 
       {/* Tabela: Resumo Completo com Linhas Clicáveis e Scroll Horizontal Seguro (T5, T30) */}
       <div className="card flex-col gap-md w-full">
-        <div className="flex-row justify-between items-center flex-wrap gap-xs">
-          <h3 className="card-title m-0">📊 Resumo Diário Completo (Renda Variável)</h3>
-          <span className="text-xs text-secondary">Clique em um ativo para abrir no Monitoramento</span>
+        <div className="flex-row justify-between items-center flex-wrap gap-sm">
+          <div>
+            <h3 className="card-title m-0">📊 Resumo Diário Completo (Renda Variável)</h3>
+            <span className="text-xs text-secondary">Clique em um ativo para abrir no Monitoramento</span>
+          </div>
+          <button
+            onClick={() => exportDailyReportCSV(positions, fiPositions, treasuryPositions, kpiCurrency)}
+            className="btn-secondary flex-row items-center gap-xs text-xs font-semibold"
+            style={{ padding: '0.35rem 0.75rem', borderRadius: '6px' }}
+            title="Exportar resumo diário completo em arquivo CSV"
+          >
+            <span>📥</span> Exportar CSV
+          </button>
         </div>
         <div className="table-container flex-col" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {positions.length > 0 ? (
@@ -462,6 +473,7 @@ export default function DailyReport({
               </thead>
               <tbody>
                 {sortedRows.map(({ pos, percent, absChange, currentPrice, previousClose, impact, portfolioWeight }) => {
+                  const hasQuote = currentPrice > 1e-6;
                   const isUp = percent > 0;
                   const isDown = percent < 0;
                   const colorClass = isUp ? 'text-success' : isDown ? 'text-danger' : 'text-secondary';
@@ -470,6 +482,7 @@ export default function DailyReport({
                   const prevCloseColor = previousClose >= avgPrice ? 'text-success' : 'text-danger';
                   const currentPriceColor = currentPrice >= avgPrice ? 'text-success' : 'text-danger';
                   const badge = getAssetTypeBadge(pos);
+                  const isUSD = pos.currency?.toUpperCase() === 'USD' || pos.type === 'STOCK_US' || pos.type === 'ETF_US';
 
                   return (
                     <tr
@@ -487,6 +500,11 @@ export default function DailyReport({
                               {badge.label}
                             </span>
                           )}
+                          {isUSD && kpiCurrency === 'BRL' && pos.fx_rate_to_brl && (
+                            <span className="text-xs text-secondary font-mono" style={{ fontSize: '0.65rem', background: 'var(--input-bg)', padding: '1px 4px', borderRadius: '3px' }} title={`Câmbio: US$ 1 = R$ ${pos.fx_rate_to_brl.toFixed(2)}`}>
+                              PTAX R$ {pos.fx_rate_to_brl.toFixed(2)}
+                            </span>
+                          )}
                         </div>
                         <div style={{ width: '100%', background: 'var(--input-bg)', borderRadius: '3px', height: '3px', marginTop: '4px' }}>
                           <div style={{ width: `${Math.min(portfolioWeight, 100)}%`, background: 'var(--accent-color)', borderRadius: '3px', height: '3px' }} />
@@ -500,16 +518,22 @@ export default function DailyReport({
                         {formatMoney(previousClose, pos.currency)}
                       </td>
                       <td className={`text-right ${currentPriceColor}`} style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                        {formatMoney(currentPrice, pos.currency)}
+                        {hasQuote ? (
+                          formatMoney(currentPrice, pos.currency)
+                        ) : (
+                          <span className="text-xs text-secondary font-semibold" title="Ativo sem cotação recente disponível">
+                            ⚠️ Sem cotação
+                          </span>
+                        )}
                       </td>
                       <td className={`text-right ${colorClass}`} style={{ whiteSpace: 'nowrap' }}>
-                        {prefix}{formatMoney(absChange, pos.currency)}
+                        {hasQuote ? `${prefix}${formatMoney(absChange, pos.currency)}` : '-'}
                       </td>
                       <td className={`text-right font-bold ${colorClass}`} style={{ whiteSpace: 'nowrap' }}>
-                        {formatPercentage(percent)}
+                        {hasQuote ? formatPercentage(percent) : '-'}
                       </td>
                       <td className={`text-right font-bold ${colorClass}`} style={{ whiteSpace: 'nowrap' }}>
-                        {prefix}{formatMoney(impact, kpiCurrency)}
+                        {hasQuote ? `${prefix}${formatMoney(impact, kpiCurrency)}` : '-'}
                       </td>
                     </tr>
                   );

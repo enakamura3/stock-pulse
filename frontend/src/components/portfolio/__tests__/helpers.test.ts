@@ -6,6 +6,7 @@ import {
   formatQuantity,
   calculateDailyFixedIncomeRate,
   calculateEstimatedDailyGain,
+  exportDailyReportCSV,
   DEFAULT_ANNUAL_CDI,
   DEFAULT_ANNUAL_SELIC,
 } from '../helpers';
@@ -106,6 +107,158 @@ describe('Portfolio Helpers', () => {
 
       expect(calculateEstimatedDailyGain(0, 0.045)).toBe(0);
       expect(calculateEstimatedDailyGain(10000, 0)).toBe(0);
+    });
+  });
+
+  describe('exportDailyReportCSV', () => {
+    it('generates CSV content correctly for variable income, fixed income and treasury', () => {
+      const mockPositions = [
+        {
+          asset_id: 'pos1',
+          ticker: 'PETR4',
+          name: 'Petrobras',
+          type: 'STOCK_BR',
+          currency: 'BRL',
+          quantity: 100,
+          average_price: 30,
+          total_cost: 3000,
+          current_price: 35,
+          current_value: 3500,
+          daily_change: 1.5,
+          daily_change_percent: 4.48,
+          previous_close: 33.5,
+        },
+        {
+          asset_id: 'pos2',
+          ticker: 'AAPL',
+          name: 'Apple Inc',
+          type: 'STOCK_US',
+          currency: 'USD',
+          quantity: 10,
+          average_price: 150,
+          total_cost: 7500,
+          current_price: 180,
+          current_value: 9900,
+          daily_change: 2.0,
+          daily_change_percent: 1.12,
+          fx_rate_to_brl: 5.5,
+        },
+      ];
+
+      const mockFI = [
+        {
+          asset: {
+            id: 'fi1',
+            portfolio_id: 'p1',
+            institution: 'Banco Inter',
+            type: 'CDB',
+            debt_type: 'POS',
+            indexer: 'CDI',
+            rate: 110,
+            maturity_date: '2027-12-31T00:00:00Z',
+          },
+          total_invested: 10000,
+          gross_value: 11000,
+          net_value: 10850,
+          net_return_percent: 8.5,
+        },
+      ];
+
+      const mockTreasury = [
+        {
+          transaction_id: 'tx1',
+          asset_id: 't1',
+          ticker: 'Tesouro Selic 2029',
+          treasury_type: 'SELIC',
+          maturity_date: '2029-03-01T00:00:00Z',
+          has_coupons: false,
+          start_date: '2024-01-01',
+          quantity: 1,
+          unit_price: 14000,
+          contracted_rate: 10.5,
+          total_invested: 14000,
+          gross_value: 15000,
+          net_value: 14850,
+          is_matured: false,
+          days_to_maturity: 1000,
+          taxes_calculated: 150,
+          b3_fee: 10,
+          ir_tax: 140,
+          iof_tax: 0,
+        },
+      ];
+
+      // Mock browser download
+      const originalCreateObjectURL = window.URL.createObjectURL;
+      const originalRevokeObjectURL = window.URL.revokeObjectURL;
+      window.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+      window.URL.revokeObjectURL = vi.fn();
+
+      const csv = exportDailyReportCSV(mockPositions, mockFI, mockTreasury, 'BRL');
+
+      expect(csv).toContain('--- RENDA VARIÁVEL ---');
+      expect(csv).toContain('PETR4');
+      expect(csv).toContain('AAPL');
+      expect(csv).toContain('--- RENDA FIXA PRIVADA ---');
+      expect(csv).toContain('Banco Inter');
+      expect(csv).toContain('--- TESOURO DIRETO ---');
+      expect(csv).toContain('Tesouro Selic 2029');
+
+      window.URL.createObjectURL = originalCreateObjectURL;
+      window.URL.revokeObjectURL = originalRevokeObjectURL;
+    });
+
+    it('handles empty maturity dates and default empty collections in exportDailyReportCSV', () => {
+      const fiWithoutMaturity = [
+        {
+          asset: {
+            id: 'fi_pre',
+            portfolio_id: 'p1',
+            institution: 'Banco Pre',
+            type: 'CDB',
+            debt_type: 'PRE',
+            indexer: 'PRE',
+            rate: 12,
+            maturity_date: '',
+          },
+          total_invested: 5000,
+          gross_value: 5500,
+          net_value: 5400,
+          net_return_percent: 8.0,
+        },
+      ];
+
+      const treasuryWithoutMaturity = [
+        {
+          transaction_id: 'tx_nomat',
+          asset_id: 't_nomat',
+          ticker: 'Tesouro No Mat',
+          treasury_type: 'PREFIXADO',
+          maturity_date: '',
+          has_coupons: false,
+          start_date: '2024-01-01',
+          quantity: 1,
+          unit_price: 1000,
+          contracted_rate: 11.0,
+          total_invested: 0,
+          gross_value: 1100,
+          net_value: 1080,
+          is_matured: false,
+          days_to_maturity: 500,
+          taxes_calculated: 20,
+          b3_fee: 0,
+          ir_tax: 20,
+          iof_tax: 0,
+        },
+      ];
+
+      const csv = exportDailyReportCSV([], fiWithoutMaturity, treasuryWithoutMaturity);
+      expect(csv).toContain('Banco Pre');
+      expect(csv).toContain('Tesouro No Mat');
+
+      const csvDefault = exportDailyReportCSV([]);
+      expect(csvDefault).toContain('--- RENDA VARIÁVEL ---');
+      expect(csvDefault).not.toContain('--- RENDA FIXA PRIVADA ---');
     });
   });
 });
