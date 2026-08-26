@@ -176,3 +176,42 @@ func CalculateTWRR(periodReturns []float64) float64 {
 	}
 	return (twrr - 1.0) * 100.0
 }
+
+// CalculateDailyFixedIncomeRate calcula a taxa diária equivalente (base 252 dias úteis) para um título de renda fixa.
+func CalculateDailyFixedIncomeRate(indexer string, rate float64, benchmarkAnnualRate float64) float64 {
+	indexerUpper := strings.ToUpper(indexer)
+	var effectiveAnnualRate float64
+
+	switch {
+	case indexerUpper == "PREFIXADO" || indexerUpper == "PRE":
+		effectiveAnnualRate = rate / 100.0
+	case indexerUpper == "CDI" || indexerUpper == "POS":
+		effectiveAnnualRate = (benchmarkAnnualRate / 100.0) * (rate / 100.0)
+	case indexerUpper == "SELIC":
+		if benchmarkAnnualRate > 1e-6 {
+			effectiveAnnualRate = benchmarkAnnualRate / 100.0
+		} else {
+			effectiveAnnualRate = rate / 100.0
+		}
+	case indexerUpper == "IPCA" || indexerUpper == "HIBRIDO":
+		effectiveAnnualRate = rate / 100.0
+	default:
+		effectiveAnnualRate = rate / 100.0
+	}
+
+	if effectiveAnnualRate <= -1.0 {
+		return 0.0
+	}
+
+	// r_dia = (1 + r_anual)^(1/252) - 1
+	dailyRate := math.Pow(1.0+effectiveAnnualRate, 1.0/252.0) - 1.0
+	return dailyRate
+}
+
+// CalculateEstimatedDailyGain calcula o ganho financeiro estimado em 1 dia útil para a posição de renda fixa.
+func CalculateEstimatedDailyGain(netValue float64, dailyRate float64) float64 {
+	if netValue < 1e-6 || dailyRate < 1e-6 {
+		return 0.0
+	}
+	return netValue * dailyRate
+}

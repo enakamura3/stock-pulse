@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Position, FixedIncomePosition, TreasuryPosition, CalculatedDividend, MarketBenchmarks } from './types';
-import { formatMoney, formatPercentage } from './helpers';
+import {
+  formatMoney,
+  formatPercentage,
+  calculateDailyFixedIncomeRate,
+  calculateEstimatedDailyGain,
+} from './helpers';
 import { getMarketStatus } from '@/lib/marketHours';
 import { apiFetch } from '@/lib/api';
 import MarketBenchmarksBar from './MarketBenchmarksBar';
@@ -143,6 +148,17 @@ export default function DailyReport({
   const totalTreasuryValue = treasuryPositions.reduce((s, p) => s + (p.net_value ?? 0), 0);
   totalPortfolioValue += totalFIPrivateValue + totalTreasuryValue;
 
+  // Rendimento diário estimado para Renda Fixa e Tesouro Direto (PR-6)
+  const totalFIDailyGain = fiPositions.reduce((acc, p) => {
+    const rate = calculateDailyFixedIncomeRate(p.asset.indexer || p.asset.debt_type, p.asset.rate);
+    return acc + calculateEstimatedDailyGain(p.net_value ?? 0, rate);
+  }, 0);
+  const totalTreasuryDailyGain = treasuryPositions.reduce((acc, p) => {
+    const rate = calculateDailyFixedIncomeRate(p.treasury_type, p.contracted_rate ?? 0);
+    return acc + calculateEstimatedDailyGain(p.net_value ?? 0, rate);
+  }, 0);
+  const totalEstimatedFixedIncomeGain = totalFIDailyGain + totalTreasuryDailyGain;
+
   // Variação % total ponderada = totalDailyChange / (valor_anterior = totalPortfolioValue - totalDailyChange)
   const previousTotalValue = totalPortfolioValue - totalDailyChange;
   const totalDailyPercent = Math.abs(previousTotalValue) > 1e-6
@@ -257,6 +273,12 @@ export default function DailyReport({
             </button>
           )}
         </div>
+        {totalEstimatedFixedIncomeGain > 1e-6 && (
+          <div className="flex-row items-center gap-sm mt-xs flex-wrap justify-center text-xs" style={{ background: 'var(--card-bg)', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+            <span className="text-secondary">🏛️ Rendimento Diário Est. (Renda Fixa + Tesouro):</span>
+            <strong className="text-success">+{formatMoney(totalEstimatedFixedIncomeGain, kpiCurrency)}/dia</strong>
+          </div>
+        )}
         <span className="text-xs text-secondary mt-xs" style={{ opacity: 0.65, fontSize: '0.7rem' }}>
           💡 Cotações de renda variável possuem cache do provedor (TTL 15 min).
         </span>
@@ -497,9 +519,10 @@ export default function DailyReport({
                   <th>Instituição & Ativo</th>
                   <th>Tipo / Taxa</th>
                   <th className="text-right">Vencimento</th>
-                  <th className="text-right">Total Investido</th>
                   <th className="text-right">Valor Líquido</th>
-                  <th className="text-right">Rentabilidade Acumulada</th>
+                  <th className="text-right">Taxa Diária Est.</th>
+                  <th className="text-right">Ganho Diário Est.</th>
+                  <th className="text-right">Rent. Acumulada</th>
                 </tr>
               </thead>
               <tbody>
@@ -508,6 +531,8 @@ export default function DailyReport({
                   const taxa = p.asset.debt_type === 'POS'
                     ? `${p.asset.rate.toFixed(2)}% ${p.asset.indexer}`
                     : `${p.asset.rate.toFixed(2)}% a.a.`;
+                  const dailyRatePct = calculateDailyFixedIncomeRate(p.asset.indexer || p.asset.debt_type, p.asset.rate);
+                  const dailyGain = calculateEstimatedDailyGain(p.net_value ?? 0, dailyRatePct);
 
                   return (
                     <tr key={p.asset.id}>
@@ -526,8 +551,13 @@ export default function DailyReport({
                         </div>
                       </td>
                       <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{new Date(p.asset.maturity_date).toLocaleDateString('pt-BR')}</td>
-                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{formatMoney(p.total_invested, kpiCurrency)}</td>
                       <td className="text-right" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatMoney(p.net_value, kpiCurrency)}</td>
+                      <td className="text-right text-xs text-secondary font-semibold" style={{ whiteSpace: 'nowrap' }}>
+                        +{dailyRatePct.toFixed(4)}%/dia
+                      </td>
+                      <td className="text-right font-bold text-success" style={{ whiteSpace: 'nowrap' }}>
+                        +{formatMoney(dailyGain, kpiCurrency)}
+                      </td>
                       <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`} style={{ whiteSpace: 'nowrap' }}>
                         {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(2)}%
                       </td>
@@ -555,9 +585,10 @@ export default function DailyReport({
                   <th>Título</th>
                   <th>Tipo</th>
                   <th className="text-right">Vencimento</th>
-                  <th className="text-right">Total Investido</th>
                   <th className="text-right">Valor Líquido</th>
-                  <th className="text-right">Rentabilidade Acumulada</th>
+                  <th className="text-right">Taxa Diária Est.</th>
+                  <th className="text-right">Ganho Diário Est.</th>
+                  <th className="text-right">Rent. Acumulada</th>
                 </tr>
               </thead>
               <tbody>
@@ -569,6 +600,9 @@ export default function DailyReport({
                   const isPrefix = p.treasury_type === 'PREFIXADO';
                   const colorVar = isSelic ? 'var(--color-success)' : isPrefix ? 'var(--accent-color)' : 'var(--color-warning)';
                   const bgVar = isSelic ? 'var(--color-success-bg)' : isPrefix ? 'var(--accent-bg)' : 'var(--color-warning-bg)';
+                  const dailyRatePct = calculateDailyFixedIncomeRate(p.treasury_type, p.contracted_rate ?? 0);
+                  const dailyGain = calculateEstimatedDailyGain(p.net_value ?? 0, dailyRatePct);
+
                   return (
                     <tr key={p.transaction_id}>
                       <td style={{ whiteSpace: 'nowrap' }}><span className="font-bold">{p.ticker}</span></td>
@@ -578,8 +612,13 @@ export default function DailyReport({
                         </span>
                       </td>
                       <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{new Date(p.maturity_date).toLocaleDateString('pt-BR')}</td>
-                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{formatMoney(p.total_invested, kpiCurrency)}</td>
                       <td className="text-right" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatMoney(p.net_value, kpiCurrency)}</td>
+                      <td className="text-right text-xs text-secondary font-semibold" style={{ whiteSpace: 'nowrap' }}>
+                        +{dailyRatePct.toFixed(4)}%/dia
+                      </td>
+                      <td className="text-right font-bold text-success" style={{ whiteSpace: 'nowrap' }}>
+                        +{formatMoney(dailyGain, kpiCurrency)}
+                      </td>
                       <td className={`text-right font-bold ${returnPct >= 0 ? 'text-success' : 'text-danger'}`} style={{ whiteSpace: 'nowrap' }}>
                         {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(2)}%
                       </td>

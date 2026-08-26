@@ -186,3 +186,63 @@ func TestCalculateTWRR(t *testing.T) {
 		t.Errorf("TWRR failed: got %.4f, want 4.5000", twrr)
 	}
 }
+
+func TestCalculateDailyFixedIncomeRate(t *testing.T) {
+	// Prefixado 12% a.a.: (1 + 0.12)^(1/252) - 1 ≈ 0.000450 (0.045% ao dia)
+	ratePre := CalculateDailyFixedIncomeRate("PREFIXADO", 12.0, 0.0)
+	if ratePre <= 0 || !FloatEquals(ratePre, 0.0004500583) {
+		t.Errorf("Prefixado failed: got %.8f", ratePre)
+	}
+
+	// POS / CDI 110% do CDI com CDI anual = 10.40% -> taxa efetiva = 11.44%
+	ratePos := CalculateDailyFixedIncomeRate("CDI", 110.0, 10.40)
+	if ratePos <= 0 || !FloatEquals(ratePos, 0.0004300405) {
+		t.Errorf("CDI failed: got %.8f", ratePos)
+	}
+
+	// Selic com Selic anual = 10.50%
+	rateSelic := CalculateDailyFixedIncomeRate("SELIC", 100.0, 10.50)
+	if rateSelic <= 0 || !FloatEquals(rateSelic, 0.0003969966) {
+		t.Errorf("Selic failed: got %.8f", rateSelic)
+	}
+
+	// Selic fallback rate
+	rateSelicFallback := CalculateDailyFixedIncomeRate("SELIC", 10.50, 0.0)
+	if rateSelicFallback <= 0 {
+		t.Errorf("Selic fallback failed: got %.8f", rateSelicFallback)
+	}
+
+	// IPCA + 6%
+	rateIpca := CalculateDailyFixedIncomeRate("IPCA", 6.0, 0.0)
+	if rateIpca <= 0 {
+		t.Errorf("IPCA failed: got %.8f", rateIpca)
+	}
+
+	// Default fallback
+	rateDef := CalculateDailyFixedIncomeRate("OTHER", 10.0, 0.0)
+	if rateDef <= 0 {
+		t.Errorf("Default fallback failed: got %.8f", rateDef)
+	}
+
+	// Negative rate <= -100%
+	rateNeg := CalculateDailyFixedIncomeRate("PRE", -150.0, 0.0)
+	if rateNeg != 0.0 {
+		t.Errorf("Negative rate should return 0.0: got %.4f", rateNeg)
+	}
+}
+
+func TestCalculateEstimatedDailyGain(t *testing.T) {
+	dailyRate := 0.00045 // approx 0.045%
+	gain := CalculateEstimatedDailyGain(10000.0, dailyRate)
+	if !FloatEquals(gain, 4.50) {
+		t.Errorf("Estimated daily gain failed: got %.2f, want 4.50", gain)
+	}
+
+	// Zero checks
+	if CalculateEstimatedDailyGain(0.0, dailyRate) != 0.0 {
+		t.Errorf("Zero netValue should return 0.0")
+	}
+	if CalculateEstimatedDailyGain(10000.0, 0.0) != 0.0 {
+		t.Errorf("Zero dailyRate should return 0.0")
+	}
+}

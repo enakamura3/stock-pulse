@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { formatPercentage, formatMoney, getAssetCategory, formatQuantity } from '../helpers';
+import {
+  formatPercentage,
+  formatMoney,
+  getAssetCategory,
+  formatQuantity,
+  calculateDailyFixedIncomeRate,
+  calculateEstimatedDailyGain,
+  DEFAULT_ANNUAL_CDI,
+  DEFAULT_ANNUAL_SELIC,
+} from '../helpers';
 
 describe('Portfolio Helpers', () => {
   describe('formatPercentage', () => {
@@ -55,6 +64,48 @@ describe('Portfolio Helpers', () => {
       expect(getAssetCategory('CDB')).toBe('Renda Fixa');
       expect(getAssetCategory('TESOURO')).toBe('Renda Fixa');
       expect(getAssetCategory('UNKNOWN')).toBe('Desconhecido');
+    });
+  });
+
+  describe('calculateDailyFixedIncomeRate and calculateEstimatedDailyGain', () => {
+    it('calculates daily rate for PRE fixed income correctly', () => {
+      const dailyRate = calculateDailyFixedIncomeRate('PREFIXADO', 12.0);
+      expect(dailyRate).toBeGreaterThan(0);
+      expect(dailyRate).toBeCloseTo(0.045, 2);
+    });
+
+    it('calculates daily rate for CDI / POS fixed income correctly', () => {
+      const dailyRate = calculateDailyFixedIncomeRate('CDI', 110.0, 10.40);
+      expect(dailyRate).toBeGreaterThan(0);
+      expect(dailyRate).toBeCloseTo(0.043, 2);
+    });
+
+    it('calculates daily rate for SELIC treasury correctly', () => {
+      const dailyRate = calculateDailyFixedIncomeRate('SELIC', 100.0, 10.50);
+      expect(dailyRate).toBeGreaterThan(0);
+      expect(dailyRate).toBeCloseTo(0.0397, 2);
+    });
+
+    it('calculates daily rate for IPCA / HIBRIDO correctly', () => {
+      const dailyRate = calculateDailyFixedIncomeRate('IPCA', 6.0);
+      expect(dailyRate).toBeGreaterThan(0);
+      expect(dailyRate).toBeCloseTo(0.023, 2);
+    });
+
+    it('handles default indexer and negative effective rates', () => {
+      const defRate = calculateDailyFixedIncomeRate('OTHER', 10.0);
+      expect(defRate).toBeGreaterThan(0);
+
+      const negRate = calculateDailyFixedIncomeRate('PRE', -150.0);
+      expect(negRate).toBe(0);
+    });
+
+    it('calculates estimated daily gain and handles zero values', () => {
+      const gain = calculateEstimatedDailyGain(10000, 0.045);
+      expect(gain).toBeCloseTo(4.50, 2);
+
+      expect(calculateEstimatedDailyGain(0, 0.045)).toBe(0);
+      expect(calculateEstimatedDailyGain(10000, 0)).toBe(0);
     });
   });
 });
