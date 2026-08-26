@@ -546,7 +546,7 @@ describe('DailyReport Component', () => {
     expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
   });
 
-  it('renders refresh button, handles isRefreshing state, and triggers onRefresh', () => {
+  it('renders refresh buttons, handles isRefreshing state, and triggers onRefresh with forceRealtime options', () => {
     const mockRefresh = vi.fn();
     const { rerender } = render(
       <DailyReport
@@ -561,7 +561,12 @@ describe('DailyReport Component', () => {
     const refreshBtn = screen.getByRole('button', { name: /🔄 Atualizar/i });
     expect(refreshBtn).not.toBeDisabled();
     fireEvent.click(refreshBtn);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).toHaveBeenCalledWith(false);
+
+    const forceBtn = screen.getByRole('button', { name: /⚡ Tempo Real/i });
+    expect(forceBtn).not.toBeDisabled();
+    fireEvent.click(forceBtn);
+    expect(mockRefresh).toHaveBeenCalledWith(true);
 
     // Rerender in isRefreshing=true state
     rerender(

@@ -175,6 +175,28 @@ paths:
         '200':
           description: Benchmarks retornados com sucesso (IBOV, S&P 500, Dólar, IFIX)
 
+  /market/quotes/invalidate:
+    post:
+      summary: Invalidar chaves de cache de cotações no Redis
+      tags:
+        - Dados de Mercado
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  description: Lista opcional de tickers para invalidar. Se omitido, invalida todos os caches de cotação.
+      responses:
+        '200':
+          description: Cache de cotações invalidado com sucesso
+
   /watchlists:
     get:
       summary: Listar watchlists do usuário

@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -14,6 +15,7 @@ type MarketService interface {
 	GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
 	GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error)
+	InvalidateQuoteCache(ctx context.Context, symbols []string) (int64, error)
 }
 
 // Handler expõe os endpoints HTTP para busca e cotação.
@@ -75,4 +77,34 @@ func (h *Handler) GetBenchmarks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputils.RespondWithJSON(w, http.StatusOK, benchmarks)
+}
+
+// InvalidateCacheRequest representa a requisição para invalidar o cache de cotações.
+type InvalidateCacheRequest struct {
+	Symbols []string `json:"symbols"`
+}
+
+// InvalidateCacheResponse representa a resposta da invalidação de cache.
+type InvalidateCacheResponse struct {
+	Message string `json:"message"`
+	Removed int64  `json:"removed"`
+}
+
+// InvalidateCache invalida as chaves de cotação e benchmarks no Redis.
+func (h *Handler) InvalidateCache(w http.ResponseWriter, r *http.Request) {
+	var req InvalidateCacheRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	removed, err := h.service.InvalidateQuoteCache(r.Context(), req.Symbols)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao invalidar cache de cotações")
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, InvalidateCacheResponse{
+		Message: "Cache de cotações invalidado com sucesso",
+		Removed: removed,
+	})
 }

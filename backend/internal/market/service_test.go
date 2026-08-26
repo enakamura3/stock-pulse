@@ -152,3 +152,47 @@ func TestService_SearchAssets(t *testing.T) {
 		assert.Equal(t, "AAPL", res[0].Symbol)
 	})
 }
+
+func TestService_InvalidateQuoteCache(t *testing.T) {
+	t.Run("Specific Symbols Success", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("quote:PETR4.SA", "quote:VALE3.SA", "benchmarks:summary:v1").SetVal(2)
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), []string{"PETR4.SA", "VALE3.SA"})
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), removed)
+		assert.NoError(t, rmock.ExpectationsWereMet())
+	})
+
+	t.Run("Specific Symbols Redis Error", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("quote:PETR4.SA", "benchmarks:summary:v1").SetErr(errors.New("redis failure"))
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), []string{"PETR4.SA"})
+		assert.Error(t, err)
+		assert.Equal(t, int64(0), removed)
+	})
+
+	t.Run("All Symbols / Empty Slice Scan", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("benchmarks:summary:v1").SetVal(1)
+		rmock.ExpectScan(0, "quote:*", 100).SetVal([]string{"quote:PETR4.SA", "quote:VALE3.SA"}, 0)
+		rmock.ExpectDel("quote:PETR4.SA", "quote:VALE3.SA").SetVal(2)
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), nil)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(3), removed)
+		assert.NoError(t, rmock.ExpectationsWereMet())
+	})
+
+	t.Run("All Symbols Scan Error", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("benchmarks:summary:v1").SetVal(1)
+		rmock.ExpectScan(0, "quote:*", 100).SetErr(errors.New("scan error"))
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), []string{})
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), removed)
+	})
+}
+
