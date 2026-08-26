@@ -3,6 +3,7 @@ package market
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -108,6 +109,18 @@ func TestService_GetHistoricalExchangeRate(t *testing.T) {
 	})
 }
 
+type MockFundamentalsScraper struct {
+	mock.Mock
+}
+
+func (m *MockFundamentalsScraper) GetFundamentals(ctx context.Context, symbol string) (*Fundamentals, error) {
+	args := m.Called(ctx, symbol)
+	if args.Get(0) != nil {
+		return args.Get(0).(*Fundamentals), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func TestService_GetFundamentals(t *testing.T) {
 	t.Run("Invalid Symbol", func(t *testing.T) {
 		s, _, _, _ := setupServiceTest()
@@ -128,25 +141,50 @@ func TestService_GetFundamentals(t *testing.T) {
 
 	t.Run("Cache Miss Scrape Fundamentus and Bazin", func(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
+		mockScraper := new(MockFundamentalsScraper)
+		mockScraper.On("GetFundamentals", mock.Anything, "PETR4.SA").Return(&Fundamentals{
+			Symbol:        "PETR4.SA",
+			DividendYield: 10.0,
+			EPS:           5.0,
+			BookValue:     30.0,
+			GrahamValue:   45.0,
+		}, nil)
+		s.scraper = mockScraper
+
 		rmock.ExpectGet("fundamentals:v2:PETR4.SA").RedisNil()
 
 		rmock.ExpectGet("quote:PETR4.SA").RedisNil()
-		mp.On("GetQuote", mock.Anything, "PETR4.SA").Return(&Quote{Price: 35.0}, nil)
-		rmock.ExpectSet("quote:PETR4.SA", mock.Anything, 60*time.Second).SetVal("OK")
+		expectedQuote := &Quote{Symbol: "PETR4.SA", Price: 35.0}
+		mp.On("GetQuote", mock.Anything, "PETR4.SA").Return(expectedQuote, nil)
+		qb, _ := json.Marshal(expectedQuote)
+		rmock.ExpectSet("quote:PETR4.SA", qb, 60*time.Second).SetVal("OK")
 
-		rmock.ExpectSet("fundamentals:v2:PETR4.SA", mock.Anything, 12*time.Hour).SetVal("OK")
+		expectedFund := &Fundamentals{
+			Symbol:        "PETR4.SA",
+			DividendYield: 10.0,
+			EPS:           5.0,
+			BookValue:     30.0,
+			GrahamValue:   45.0,
+			BazinValue:    (35.0 * (10.0 / 100.0)) / 0.06,
+		}
+		fb, _ := json.Marshal(expectedFund)
+		rmock.ExpectSet("fundamentals:v2:PETR4.SA", fb, 12*time.Hour).SetVal("OK")
 
 		res, err := s.GetFundamentals(context.Background(), "PETR4.SA")
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.True(t, res.BazinValue > 0, "Bazin value should be > 0")
+		assert.NoError(t, rmock.ExpectationsWereMet())
 	})
 
 	t.Run("Scraper Error", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()
+		mockScraper := new(MockFundamentalsScraper)
+		mockScraper.On("GetFundamentals", mock.Anything, "INVALID").Return(nil, errors.New("scraper error"))
+		s.scraper = mockScraper
+
 		rmock.ExpectGet("fundamentals:v2:INVALID").RedisNil()
 
-		// scraper vai falhar num request fake
 		_, err := s.GetFundamentals(context.Background(), "INVALID")
 		assert.Error(t, err)
 	})
