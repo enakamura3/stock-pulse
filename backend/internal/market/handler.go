@@ -13,6 +13,7 @@ type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*Quote, error)
 	GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
+	GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error)
 }
 
 // Handler expõe os endpoints HTTP para busca e cotação.
@@ -63,4 +64,15 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputils.RespondWithJSON(w, http.StatusOK, results)
+}
+
+// GetBenchmarks retorna os principais benchmarks de mercado para comparação intradiária.
+func (h *Handler) GetBenchmarks(w http.ResponseWriter, r *http.Request) {
+	benchmarks, err := h.service.GetBenchmarks(r.Context())
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao obter benchmarks de mercado")
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, benchmarks)
 }

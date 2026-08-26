@@ -727,4 +727,97 @@ describe('DailyReport Component', () => {
     // Fech. Anterior real (30,00) deve aparecer (não a estimativa 31.50 - 1.50 = 30.00 coincidência)
     expect(screen.getAllByText(/R\$ 30,00/).length).toBeGreaterThan(0);
   });
+
+  it('renders market benchmarks bar when benchmarks are provided as prop', () => {
+    const mockBenchmarks = {
+      ibov: {
+        symbol: '^BVSP',
+        name: 'Ibovespa',
+        value: 130000,
+        change: 1000,
+        change_percent: 0.77,
+      },
+    };
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        benchmarks={mockBenchmarks}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('🌐 Índices e Benchmarks de Mercado')).toBeInTheDocument();
+    expect(screen.getByText('Ibovespa')).toBeInTheDocument();
+  });
+
+  it('fetches market benchmarks from API when benchmarks prop is undefined', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/market/benchmarks')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ibov: {
+                symbol: '^BVSP',
+                name: 'Ibovespa',
+                value: 130000,
+                change: 500,
+                change_percent: 0.38,
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(await screen.findByText('🌐 Índices e Benchmarks de Mercado')).toBeInTheDocument();
+  });
+
+  it('handles market benchmarks API failure gracefully without crashing', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('Variação Diária da Carteira (Intraday)')).toBeInTheDocument();
+  });
+
+  it('handles benchmarks API returning ok: false gracefully', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/market/benchmarks')) {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'not found' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+    });
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('Variação Diária da Carteira (Intraday)')).toBeInTheDocument();
+  });
 });

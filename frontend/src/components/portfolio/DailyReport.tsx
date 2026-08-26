@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Position, FixedIncomePosition, TreasuryPosition, CalculatedDividend } from './types';
+import { Position, FixedIncomePosition, TreasuryPosition, CalculatedDividend, MarketBenchmarks } from './types';
 import { formatMoney, formatPercentage } from './helpers';
 import { getMarketStatus } from '@/lib/marketHours';
+import { apiFetch } from '@/lib/api';
+import MarketBenchmarksBar from './MarketBenchmarksBar';
 
 export interface DailyReportProps {
   positions: Position[];
   fiPositions?: FixedIncomePosition[];
   treasuryPositions?: TreasuryPosition[];
   dividends?: CalculatedDividend[];
+  benchmarks?: MarketBenchmarks | null;
   kpiCurrency: string;
   lastFetchedAt?: Date | null;
   onRefresh?: () => Promise<void> | void;
@@ -49,6 +52,7 @@ export default function DailyReport({
   fiPositions = [],
   treasuryPositions = [],
   dividends = [],
+  benchmarks,
   kpiCurrency,
   lastFetchedAt,
   onRefresh,
@@ -58,6 +62,33 @@ export default function DailyReport({
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>('impact');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [fetchedBenchmarks, setFetchedBenchmarks] = useState<MarketBenchmarks | null>(null);
+  const [isLoadingBenchmarks, setIsLoadingBenchmarks] = useState(false);
+
+  useEffect(() => {
+    if (benchmarks !== undefined) return;
+    let isMounted = true;
+    setIsLoadingBenchmarks(true);
+    apiFetch('/market/benchmarks')
+      .then(res => {
+        if (res.ok) return res.json();
+        return null;
+      })
+      .then(data => {
+        if (isMounted && data) {
+          setFetchedBenchmarks(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setIsLoadingBenchmarks(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [benchmarks, lastFetchedAt]);
+
+  const activeBenchmarks = benchmarks !== undefined ? benchmarks : fetchedBenchmarks;
 
   const refDate = lastFetchedAt ? new Date(lastFetchedAt) : new Date();
   const lastUpdateStr = refDate.toLocaleString('pt-BR', {
@@ -230,6 +261,9 @@ export default function DailyReport({
           💡 Cotações de renda variável possuem cache do provedor (TTL 15 min).
         </span>
       </div>
+
+      {/* Benchmarks de Mercado (PR-5) */}
+      <MarketBenchmarksBar benchmarks={activeBenchmarks} isLoading={isLoadingBenchmarks} />
 
       {/* Seção Proventos Creditados Hoje (T6) */}
       {todayDividends.length > 0 && (

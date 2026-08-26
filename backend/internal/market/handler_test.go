@@ -41,6 +41,14 @@ func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]S
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketService) GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error) {
+	args := m.Called(ctx)
+	if args.Get(0) != nil {
+		return args.Get(0).(*MarketBenchmarks), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func setupHandlerTest() (*Handler, *MockMarketService) {
 	s := new(MockMarketService)
 	return NewHandler(s), s
@@ -134,6 +142,51 @@ func TestHandler_RespondWithJSON_Error(t *testing.T) {
 	rec := httptest.NewRecorder()
 	httputils.RespondWithJSON(rec, http.StatusOK, failMarshal{})
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestHandler_GetBenchmarks(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		mockBenchmarks := &MarketBenchmarks{
+			IBOV: &BenchmarkItem{
+				Symbol:        "^BVSP",
+				Name:          "Ibovespa",
+				Value:         130000.0,
+				Change:        1300.0,
+				ChangePercent: 1.01,
+				PreviousClose: 128700.0,
+			},
+			SP500: &BenchmarkItem{
+				Symbol:        "^GSPC",
+				Name:          "S&P 500",
+				Value:         5500.0,
+				Change:        25.0,
+				ChangePercent: 0.45,
+				PreviousClose: 5475.0,
+			},
+		}
+		s.On("GetBenchmarks", mock.Anything).Return(mockBenchmarks, nil)
+
+		req := httptest.NewRequest("GET", "/market/benchmarks", nil)
+		rec := httptest.NewRecorder()
+		h.GetBenchmarks(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Ibovespa")
+		assert.Contains(t, rec.Body.String(), "^GSPC")
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("GetBenchmarks", mock.Anything).Return(nil, errors.New("provider failure"))
+
+		req := httptest.NewRequest("GET", "/market/benchmarks", nil)
+		rec := httptest.NewRecorder()
+		h.GetBenchmarks(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Erro ao obter benchmarks de mercado")
+	})
 }
 
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
