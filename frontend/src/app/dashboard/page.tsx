@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/api';
@@ -11,7 +11,7 @@ import ActiveQuoteCard from '@/components/dashboard/ActiveQuoteCard';
 import WatchlistSidebar from '@/components/dashboard/WatchlistSidebar';
 import CreateAlertModal from '@/components/dashboard/CreateAlertModal';
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const tickerParam = searchParams ? searchParams.get('ticker') : null;
@@ -520,5 +520,13 @@ export default function DashboardPage() {
       )}
       </main>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 p-xl">Carregando...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

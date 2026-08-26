@@ -17,6 +17,7 @@ type Quote struct {
 	Price         float64 `json:"price"`
 	Change        float64 `json:"change"`
 	ChangePercent float64 `json:"change_percent"`
+	PreviousClose float64 `json:"previous_close,omitempty"`
 	High          float64 `json:"high"`
 	Low           float64 `json:"low"`
 	Volume        int64   `json:"volume"`
@@ -137,6 +138,7 @@ func (y *YahooFinanceProvider) GetQuote(ctx context.Context, symbol string) (*Qu
 		Price:         meta.RegularMarketPrice,
 		Change:        change,
 		ChangePercent: changePercent,
+		PreviousClose: meta.ChartPreviousClose,
 		High:          meta.RegularMarketDayHigh,
 		Low:           meta.RegularMarketDayLow,
 		Volume:        meta.RegularMarketVolume,

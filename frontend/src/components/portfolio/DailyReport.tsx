@@ -74,7 +74,7 @@ export default function DailyReport({
     const pDate = d.payment_date.split('T')[0];
     return pDate === todayStr;
   });
-  const totalTodayDividends = todayDividends.reduce((acc, d) => acc + (d.net_amount || d.total_amount || 0), 0);
+  const totalTodayDividends = todayDividends.reduce((acc, d) => acc + (d.net_amount || d.gross_amount || 0), 0);
 
   // Se não houver posições em nenhuma categoria: Empty State acionável (T4)
   const hasNoData = positions.length === 0 && fiPositions.length === 0 && treasuryPositions.length === 0;
@@ -125,7 +125,10 @@ export default function DailyReport({
     const percent = pos.daily_change_percent ?? 0;
     const absChange = pos.daily_change ?? 0;
     const currentPrice = pos.current_price ?? 0;
-    const previousClose = currentPrice - absChange;
+    // Usa previous_close real do backend; caso não disponível, estima via price - change
+    const previousClose = (pos.previous_close != null && pos.previous_close > 1e-6)
+      ? pos.previous_close
+      : currentPrice - absChange;
     const qty = pos.quantity ?? 0;
     const rate = getExchangeRate(pos, kpiCurrency);
     const impact = absChange * qty * rate;
@@ -258,7 +261,7 @@ export default function DailyReport({
                 <span className="font-bold text-accent">{div.ticker}</span>
                 <span className="text-xs text-secondary">{div.type}</span>
                 <span className="text-success font-bold text-sm">
-                  {formatMoney(div.net_amount || div.total_amount || 0, kpiCurrency)}
+                  {formatMoney(div.net_amount || div.gross_amount || 0, kpiCurrency)}
                 </span>
               </div>
             ))}

@@ -20,6 +20,7 @@ func (m *MockProvider) GetQuote(ctx context.Context, symbol string) (*Quote, err
 		Price:         50.00,
 		Change:        1.50,
 		ChangePercent: 3.09,
+		PreviousClose: 48.50,
 		High:          51.00,
 		Low:           49.50,
 		Volume:        1000000,
