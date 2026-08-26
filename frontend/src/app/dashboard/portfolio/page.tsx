@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { PortfolioProvider, usePortfolio } from '@/context/PortfolioContext';
 import { getAssetCategory } from '@/components/portfolio/helpers';
+import { apiFetch } from '@/lib/api';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
@@ -270,8 +271,13 @@ function PortfolioContent() {
               dividends={dividends}
               kpiCurrency={kpiCurrency}
               lastFetchedAt={lastFetchedAt}
-              onRefresh={async () => {
+              onRefresh={async (forceRealtime?: boolean) => {
                 if (activePortfolioId) {
+                  if (forceRealtime) {
+                    try {
+                      await apiFetch('/market/quotes/invalidate', { method: 'POST' });
+                    } catch {}
+                  }
                   await loadPortfolioDetails(activePortfolioId);
                   await loadDividends(activePortfolioId);
                   await loadPerformance(activePortfolioId, period);

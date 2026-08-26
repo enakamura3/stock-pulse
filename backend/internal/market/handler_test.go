@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -189,6 +190,51 @@ func TestHandler_GetBenchmarks(t *testing.T) {
 	})
 }
 
+func (m *MockMarketService) InvalidateQuoteCache(ctx context.Context, symbols []string) (int64, error) {
+	args := m.Called(ctx, symbols)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func TestHandler_InvalidateCache(t *testing.T) {
+	t.Run("Success with Specific Symbols", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("InvalidateQuoteCache", mock.Anything, []string{"PETR4.SA", "VALE3.SA"}).Return(int64(2), nil)
+
+		body := `{"symbols":["PETR4.SA", "VALE3.SA"]}`
+		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		h.InvalidateCache(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Cache de cotações invalidado com sucesso")
+		assert.Contains(t, rec.Body.String(), `"removed":2`)
+	})
+
+	t.Run("Success with Empty Body", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("InvalidateQuoteCache", mock.Anything, []string(nil)).Return(int64(15), nil)
+
+		req := httptest.NewRequest("POST", "/market/quotes/invalidate", nil)
+		rec := httptest.NewRecorder()
+		h.InvalidateCache(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"removed":15`)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("InvalidateQuoteCache", mock.Anything, []string(nil)).Return(int64(0), errors.New("redis down"))
+
+		req := httptest.NewRequest("POST", "/market/quotes/invalidate", nil)
+		rec := httptest.NewRecorder()
+		h.InvalidateCache(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Erro ao invalidar cache de cotações")
+	})
+}
+
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
 	args := m.Called(ctx, ticker, assetType)
 	if args.Get(0) != nil {
@@ -196,3 +242,4 @@ func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, ass
 	}
 	return nil, args.Error(1)
 }
+

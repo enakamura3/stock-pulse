@@ -242,6 +242,7 @@ func main() {
 			r.Get("/quotes/{ticker}", marketHandler.GetQuote)
 			r.Get("/assets/search", marketHandler.Search)
 			r.Get("/market/benchmarks", marketHandler.GetBenchmarks)
+			r.Post("/market/quotes/invalidate", marketHandler.InvalidateCache)
 
 			// Favoritos / Watchlists
 			r.Get("/watchlists", watchlistHandler.GetWatchlists)

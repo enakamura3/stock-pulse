@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Position, FixedIncomePosition, TreasuryPosition, CalculatedDividend, MarketBenchmarks } from './types';
 import {
@@ -19,7 +19,7 @@ export interface DailyReportProps {
   benchmarks?: MarketBenchmarks | null;
   kpiCurrency: string;
   lastFetchedAt?: Date | null;
-  onRefresh?: () => Promise<void> | void;
+  onRefresh?: (forceRealtime?: boolean) => Promise<void> | void;
   isRefreshing?: boolean;
   onGoToAssets?: () => void;
 }
@@ -70,9 +70,8 @@ export default function DailyReport({
   const [fetchedBenchmarks, setFetchedBenchmarks] = useState<MarketBenchmarks | null>(null);
   const [isLoadingBenchmarks, setIsLoadingBenchmarks] = useState(false);
 
-  useEffect(() => {
+  const fetchBenchmarksData = useCallback(() => {
     if (benchmarks !== undefined) return;
-    let isMounted = true;
     setIsLoadingBenchmarks(true);
     apiFetch('/market/benchmarks')
       .then(res => {
@@ -80,18 +79,28 @@ export default function DailyReport({
         return null;
       })
       .then(data => {
-        if (isMounted && data) {
+        if (data) {
           setFetchedBenchmarks(data);
         }
       })
       .catch(() => {})
       .finally(() => {
-        if (isMounted) setIsLoadingBenchmarks(false);
+        setIsLoadingBenchmarks(false);
       });
-    return () => {
-      isMounted = false;
-    };
-  }, [benchmarks, lastFetchedAt]);
+  }, [benchmarks]);
+
+  useEffect(() => {
+    fetchBenchmarksData();
+  }, [fetchBenchmarksData]);
+
+  const handleRefresh = async (forceRealtime = false) => {
+    if (onRefresh) {
+      await onRefresh(forceRealtime);
+    }
+    if (benchmarks === undefined) {
+      fetchBenchmarksData();
+    }
+  };
 
   const activeBenchmarks = benchmarks !== undefined ? benchmarks : fetchedBenchmarks;
 
@@ -262,15 +271,26 @@ export default function DailyReport({
         <div className="flex-row items-center gap-md mt-sm flex-wrap justify-center text-xs text-secondary">
           <span>🕐 Cotações em: <strong>{lastUpdateStr}</strong></span>
           {onRefresh && (
-            <button
-              onClick={() => onRefresh()}
-              disabled={isRefreshing}
-              className="btn-secondary font-bold"
-              style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '4px', cursor: isRefreshing ? 'not-allowed' : 'pointer' }}
-              title="Recarregar cotações e resumo do portfólio"
-            >
-              {isRefreshing ? '⏳ Atualizando...' : '🔄 Atualizar'}
-            </button>
+            <div className="flex-row items-center gap-xs">
+              <button
+                onClick={() => handleRefresh(false)}
+                disabled={isRefreshing}
+                className="btn-secondary font-bold"
+                style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '4px', cursor: isRefreshing ? 'not-allowed' : 'pointer' }}
+                title="Recarregar cotações e resumo do portfólio"
+              >
+                {isRefreshing ? '⏳ Atualizando...' : '🔄 Atualizar'}
+              </button>
+              <button
+                onClick={() => handleRefresh(true)}
+                disabled={isRefreshing}
+                className="btn-secondary text-xs"
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', cursor: isRefreshing ? 'not-allowed' : 'pointer', opacity: 0.85 }}
+                title="Forçar atualização de cotações em tempo real (ignora cache)"
+              >
+                ⚡ Tempo Real
+              </button>
+            </div>
           )}
         </div>
         {totalEstimatedFixedIncomeGain > 1e-6 && (
