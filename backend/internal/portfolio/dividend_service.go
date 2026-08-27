@@ -112,11 +112,19 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 					originalGross = grossAmount
 					originalNet = netAmount
 
-					fx, err := s.marketService.GetHistoricalExchangeRate(ctx, cumDate)
-					if err == nil {
-						exchangeRate = fx
+					now := time.Now()
+					// Regra de Mercado:
+					// 1. Se a Data de Pagamento está definida e já ocorreu no passado: usa o câmbio histórico da PaymentDate
+					if !div.PaymentDate.IsZero() && !div.PaymentDate.After(now) {
+						fx, err := s.marketService.GetHistoricalExchangeRate(ctx, div.PaymentDate)
+						if err == nil && fx > 1e-6 {
+							exchangeRate = fx
+						} else {
+							exchangeRate = s.getCurrencyRate(ctx, "USD", "BRL")
+						}
 					} else {
-						exchangeRate = 5.0 // fallback
+						// 2. Se o dividendo é futuro ou com PaymentDate não informada: usa o câmbio atual (Hoje / Spot) como projeção
+						exchangeRate = s.getCurrencyRate(ctx, "USD", "BRL")
 					}
 
 					// Converte Gross e Net para a moeda base do Portfolio (assumindo BRL)

@@ -928,6 +928,88 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 			assert.Equal(t, 10.0, divs[0].OriginalGross)
 		}
 	})
+
+	t.Run("Market Rule - Past PaymentDate uses Historical Rate of PaymentDate", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		pastPaymentDate := now.AddDate(0, 0, -10)
+		cumDate := now.AddDate(0, 0, -20)
+
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "VOO", Type: "BUY", Quantity: 10, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "ETF_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: cumDate, PaymentDate: pastPaymentDate, GrossAmount: 2.0, Type: "DIVIDEND"},
+		}, nil)
+
+		// Câmbio na PaymentDate = 5.40
+		ms.On("GetHistoricalExchangeRate", mock.Anything, pastPaymentDate).Return(5.40, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.InDelta(t, 20.0, divs[0].OriginalGross, 1e-6)     // 10 cotas * $2.00 = $20.00
+		assert.InDelta(t, 20.0*0.70, divs[0].OriginalNet, 1e-6) // $14.00 líq após 30% US tax
+		assert.InDelta(t, 20.0*5.40, divs[0].GrossAmount, 1e-6) // R$ 108.00 em BRL
+		assert.InDelta(t, 14.0*5.40, divs[0].NetAmount, 1e-6)   // R$ 75.60 em BRL
+	})
+
+	t.Run("Market Rule - Future PaymentDate uses Spot Rate as projection", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		futurePaymentDate := now.AddDate(0, 0, 15) // Daqui a 15 dias
+		cumDate := now.AddDate(0, 0, -5)
+
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "VOO", Type: "BUY", Quantity: 10, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "ETF_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: cumDate, PaymentDate: futurePaymentDate, GrossAmount: 2.0, Type: "DIVIDEND"},
+		}, nil)
+
+		// Cotação Spot de Hoje para USDBRL=X = 5.75
+		ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(&market.Quote{Price: 5.75}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.InDelta(t, 20.0, divs[0].OriginalGross, 1e-6)
+		assert.InDelta(t, 20.0*5.75, divs[0].GrossAmount, 1e-6) // R$ 115.00 projetado
+	})
+
+	t.Run("Market Rule - Zero PaymentDate uses Spot Rate as projection", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		cumDate := now.AddDate(0, 0, -5)
+
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "SPY", Type: "BUY", Quantity: 5, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "ETF_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: cumDate, PaymentDate: time.Time{}, GrossAmount: 3.0, Type: "DIVIDEND"},
+		}, nil)
+
+		// Cotação Spot de Hoje = 5.80
+		ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(&market.Quote{Price: 5.80}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.InDelta(t, 15.0, divs[0].OriginalGross, 1e-6)   // 5 * $3.00 = $15.00
+		assert.InDelta(t, 15.0*5.80, divs[0].GrossAmount, 1e-6) // R$ 87.00 projetado
+	})
 }
 
 // ─── Testes de TWRR (Time-Weighted Rate of Return) ──────────────────────────
