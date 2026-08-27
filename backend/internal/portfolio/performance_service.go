@@ -164,9 +164,14 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			dailyCurrencies[tx.AssetID] = tx.Currency
 			dailyTickers[tx.AssetID] = tx.Ticker
 
-			if tx.Type == "BUY" {
+			rate := tx.ExchangeRate
+			if rate <= 1e-6 {
+				rate = 1.0
+			}
+
+			if tx.Type == "BUY" || tx.Type == "BONUS" {
 				dailyQuantities[tx.AssetID] += tx.Quantity
-				dailyCosts[tx.AssetID] += ((tx.Quantity * tx.UnitPrice) + tx.Fee) * tx.ExchangeRate
+				dailyCosts[tx.AssetID] += ((tx.Quantity * tx.UnitPrice) + tx.Fee) * rate
 			} else if tx.Type == "SELL" {
 				if dailyQuantities[tx.AssetID] >= tx.Quantity {
 					dailyQuantities[tx.AssetID] -= tx.Quantity
@@ -268,10 +273,14 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 		if err == nil {
 			for _, tx := range txs {
 				if tx.ExecutedAt.Year() == d.Year() && tx.ExecutedAt.Month() == d.Month() && tx.ExecutedAt.Day() == d.Day() {
+					rate := tx.ExchangeRate
+					if rate <= 1e-6 {
+						rate = 1.0
+					}
 					if tx.Type == "BUY" {
-						dailyCashFlow += tx.TotalCost * tx.ExchangeRate
+						dailyCashFlow += tx.TotalCost * rate
 					} else if tx.Type == "SELL" {
-						dailyCashFlow -= tx.TotalCost * tx.ExchangeRate
+						dailyCashFlow -= tx.TotalCost * rate
 					}
 				}
 			}

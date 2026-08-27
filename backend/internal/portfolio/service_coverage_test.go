@@ -471,3 +471,106 @@ func TestServiceCoverage_UpdateTransaction_ExchangeFallback(t *testing.T) {
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 }
+
+func TestServiceCoverage_GetPortfolioPerformance_Bonus(t *testing.T) {
+	t.Run("Standard BRL Bonus", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		now := time.Now().Truncate(24 * time.Hour)
+		startDate := now.AddDate(0, 0, -10)
+		bonusDate := now.AddDate(0, 0, -5)
+
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("usdbrl-id", nil).Maybe()
+		repo.On("GetDailyPrices", mock.Anything, "usdbrl-id", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil).Maybe()
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{AssetID: "a1", Ticker: "ITUB4", Type: "BUY", Quantity: 100, UnitPrice: 20.0, TotalCost: 2000.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: startDate},
+			{AssetID: "a1", Ticker: "ITUB4", Type: "BONUS", Quantity: 10, UnitPrice: 15.0, TotalCost: 150.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: bonusDate},
+		}, nil)
+
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+			{AssetID: "a1", PriceDate: startDate, ClosePrice: 20.0},
+			{AssetID: "a1", PriceDate: bonusDate, ClosePrice: 25.0},
+			{AssetID: "a1", PriceDate: now, ClosePrice: 30.0},
+		}, nil)
+
+		pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, pts)
+
+		// O último ponto deve refletir 110 ações a R$ 30,00 e TotalInvested = R$ 2150,00
+		lastPt := pts[len(pts)-1]
+		assert.InDelta(t, 2150.0, lastPt.TotalInvested, 1e-4)
+		assert.InDelta(t, 110.0*30.0, lastPt.Value, 1e-4)
+	})
+
+	t.Run("Bonus Followed By Sell", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		now := time.Now().Truncate(24 * time.Hour)
+		startDate := now.AddDate(0, 0, -10)
+		bonusDate := now.AddDate(0, 0, -5)
+		sellDate := now.AddDate(0, 0, -2)
+
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("usdbrl-id", nil).Maybe()
+		repo.On("GetDailyPrices", mock.Anything, "usdbrl-id", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil).Maybe()
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{AssetID: "a1", Ticker: "ITUB4", Type: "BUY", Quantity: 100, UnitPrice: 20.0, TotalCost: 2000.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: startDate},
+			{AssetID: "a1", Ticker: "ITUB4", Type: "BONUS", Quantity: 10, UnitPrice: 15.0, TotalCost: 150.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: bonusDate},
+			{AssetID: "a1", Ticker: "ITUB4", Type: "SELL", Quantity: 20, UnitPrice: 35.0, TotalCost: 700.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: sellDate},
+		}, nil)
+
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+			{AssetID: "a1", PriceDate: startDate, ClosePrice: 20.0},
+			{AssetID: "a1", PriceDate: bonusDate, ClosePrice: 25.0},
+			{AssetID: "a1", PriceDate: sellDate, ClosePrice: 35.0},
+			{AssetID: "a1", PriceDate: now, ClosePrice: 30.0},
+		}, nil)
+
+		pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, pts)
+
+		// 100 + 10 - 20 = 90 ações
+		// Custo após bonificação: 2150. Custo proporcional após venda de 20/110: 90 * (2150 / 110) = 1759.0909
+		lastPt := pts[len(pts)-1]
+		assert.InDelta(t, 90.0*(2150.0/110.0), lastPt.TotalInvested, 1e-4)
+		assert.InDelta(t, 90.0*30.0, lastPt.Value, 1e-4)
+	})
+
+	t.Run("Foreign Currency Bonus With Exchange Rate", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		now := time.Now().Truncate(24 * time.Hour)
+		startDate := now.AddDate(0, 0, -10)
+		bonusDate := now.AddDate(0, 0, -5)
+
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("usdbrl-id", nil).Maybe()
+		repo.On("GetDailyPrices", mock.Anything, "usdbrl-id", mock.Anything, mock.Anything).Return([]DailyPrice{
+			{AssetID: "usdbrl-id", PriceDate: startDate, ClosePrice: 5.0},
+			{AssetID: "usdbrl-id", PriceDate: bonusDate, ClosePrice: 5.0},
+			{AssetID: "usdbrl-id", PriceDate: now, ClosePrice: 5.0},
+		}, nil).Maybe()
+
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 100.0, TotalCost: 1000.0, ExchangeRate: 5.0, Currency: "USD", ExecutedAt: startDate},
+			{AssetID: "a1", Ticker: "AAPL", Type: "BONUS", Quantity: 2, UnitPrice: 50.0, TotalCost: 100.0, ExchangeRate: 5.0, Currency: "USD", ExecutedAt: bonusDate},
+		}, nil)
+
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+			{AssetID: "a1", PriceDate: startDate, ClosePrice: 100.0},
+			{AssetID: "a1", PriceDate: bonusDate, ClosePrice: 120.0},
+			{AssetID: "a1", PriceDate: now, ClosePrice: 150.0},
+		}, nil)
+
+		pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, pts)
+
+		// Custo: (10 * 100 * 5.0) + (2 * 50 * 5.0) = 5000 + 500 = 5500 BRL
+		// Valor: 12 * 150 * 5.0 = 9000 BRL
+		lastPt := pts[len(pts)-1]
+		assert.InDelta(t, 5500.0, lastPt.TotalInvested, 1e-4)
+		assert.InDelta(t, 12.0*150.0*5.0, lastPt.Value, 1e-4)
+	})
+}
+
