@@ -96,6 +96,14 @@ func (m *MockTelebotContext) Callback() *telebot.Callback {
 	return nil
 }
 
+func (m *MockTelebotContext) Sender() *telebot.User {
+	args := m.Called()
+	if args.Get(0) != nil {
+		return args.Get(0).(*telebot.User)
+	}
+	return nil
+}
+
 // Mocks for dependencies
 type MockPortfolioService struct {
 	mock.Mock
