@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -573,4 +574,166 @@ func TestServiceCoverage_GetPortfolioPerformance_Bonus(t *testing.T) {
 		assert.InDelta(t, 12.0*150.0*5.0, lastPt.Value, 1e-4)
 	})
 }
+
+type MockFixedIncomeService struct {
+	mock.Mock
+	fixedincome.Service
+}
+
+func (m *MockFixedIncomeService) GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]fixedincome.IndexRate, error) {
+	args := m.Called(ctx, indexer, startDate, endDate)
+	if args.Get(0) != nil {
+		return args.Get(0).([]fixedincome.IndexRate), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func TestServiceCoverage_GetPortfolioPerformance_Benchmarks_BRL(t *testing.T) {
+	repo := new(MockPortfolioRepo)
+	ms := new(MockMarketService)
+	mp := new(MockMarketProvider)
+	fiService := new(MockFixedIncomeService)
+	uow := &dummyUOW{}
+	s := NewService(repo, ms, mp, fiService, uow)
+
+	now := time.Now().Truncate(24 * time.Hour)
+	startDate := now.AddDate(0, 0, -10)
+
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("usdbrl-id", nil).Maybe()
+	repo.On("GetDailyPrices", mock.Anything, "usdbrl-id", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "usdbrl-id", PriceDate: startDate, ClosePrice: 5.0},
+		{AssetID: "usdbrl-id", PriceDate: now, ClosePrice: 5.2},
+	}, nil).Maybe()
+
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 100, UnitPrice: 30.0, TotalCost: 3000.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: startDate},
+	}, nil)
+
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: startDate, ClosePrice: 30.0},
+		{AssetID: "a1", PriceDate: now, ClosePrice: 35.0},
+	}, nil)
+
+	// Mock benchmark rates
+	fiService.On("GetIndexRates", mock.Anything, "CDI", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
+		{Date: startDate, Rate: 0.05},
+		{Date: now, Rate: 0.05},
+	}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IPCA", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
+		{Date: startDate, Rate: 0.40},
+		{Date: now, Rate: 0.45},
+	}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IFIX", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
+		{Date: startDate, Rate: 3000.0},
+		{Date: now, Rate: 3050.0},
+	}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IBOV", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
+		{Date: startDate, Rate: 120000.0},
+		{Date: now, Rate: 125000.0},
+	}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "SP500", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
+		{Date: startDate, Rate: 5000.0},
+		{Date: now, Rate: 5200.0},
+	}, nil)
+
+	pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, pts)
+
+	lastPt := pts[len(pts)-1]
+	assert.True(t, lastPt.CdiReturnPct > 0)
+	assert.True(t, lastPt.IpcaReturnPct > 0)
+	assert.True(t, lastPt.IfixReturnPct > 0)
+	assert.True(t, lastPt.IbovReturnPct > 0)
+	assert.True(t, lastPt.Sp500ReturnPct > 0)
+}
+
+func TestServiceCoverage_GetPortfolioPerformance_Benchmarks_USD(t *testing.T) {
+	repo := new(MockPortfolioRepo)
+	ms := new(MockMarketService)
+	mp := new(MockMarketProvider)
+	fiService := new(MockFixedIncomeService)
+	uow := &dummyUOW{}
+	s := NewService(repo, ms, mp, fiService, uow)
+
+	now := time.Now().Truncate(24 * time.Hour)
+	startDate := now.AddDate(0, 0, -5)
+
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+		{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 150.0, TotalCost: 1500.0, ExchangeRate: 1.0, Currency: "USD", ExecutedAt: startDate},
+	}, nil)
+
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: startDate, ClosePrice: 150.0},
+		{AssetID: "a1", PriceDate: now, ClosePrice: 160.0},
+	}, nil)
+
+	fiService.On("GetIndexRates", mock.Anything, "CDI", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IPCA", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IFIX", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IBOV", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{}, nil)
+	fiService.On("GetIndexRates", mock.Anything, "SP500", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
+		{Date: startDate, Rate: 5000.0},
+		{Date: now, Rate: 5100.0},
+	}, nil)
+
+	pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, pts)
+
+	lastPt := pts[len(pts)-1]
+	assert.InDelta(t, ((5100.0-5000.0)/5000.0)*100.0, lastPt.Sp500ReturnPct, 1e-4)
+}
+
+func TestServiceCoverage_GetPortfolioPerformance_Benchmarks_Errors(t *testing.T) {
+	repo := new(MockPortfolioRepo)
+	ms := new(MockMarketService)
+	mp := new(MockMarketProvider)
+	fiService := new(MockFixedIncomeService)
+	uow := &dummyUOW{}
+	s := NewService(repo, ms, mp, fiService, uow)
+
+	now := time.Now().Truncate(24 * time.Hour)
+	startDate := now.AddDate(0, 0, -5)
+
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found")).Maybe()
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 100, UnitPrice: 30.0, TotalCost: 3000.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: startDate},
+	}, nil)
+
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: startDate, ClosePrice: 30.0},
+		{AssetID: "a1", PriceDate: now, ClosePrice: 35.0},
+	}, nil)
+
+	fiService.On("GetIndexRates", mock.Anything, "CDI", mock.Anything, mock.Anything).Return(([]fixedincome.IndexRate)(nil), errors.New("cdi err"))
+	fiService.On("GetIndexRates", mock.Anything, "IPCA", mock.Anything, mock.Anything).Return(([]fixedincome.IndexRate)(nil), errors.New("ipca err"))
+	fiService.On("GetIndexRates", mock.Anything, "IFIX", mock.Anything, mock.Anything).Return(([]fixedincome.IndexRate)(nil), errors.New("ifix err"))
+	fiService.On("GetIndexRates", mock.Anything, "IBOV", mock.Anything, mock.Anything).Return(([]fixedincome.IndexRate)(nil), errors.New("ibov err"))
+	fiService.On("GetIndexRates", mock.Anything, "SP500", mock.Anything, mock.Anything).Return(([]fixedincome.IndexRate)(nil), errors.New("sp500 err"))
+
+	pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, pts)
+}
+
+func TestServiceCoverage_GetPortfolioPerformance_FutureTxAllPeriod(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	futureDate := time.Now().AddDate(0, 0, 5)
+
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 100, UnitPrice: 30.0, TotalCost: 3000.0, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: futureDate},
+	}, nil)
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
+
+	pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+	assert.NoError(t, err)
+	assert.Empty(t, pts)
+}
+
+
 
