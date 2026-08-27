@@ -75,6 +75,12 @@ func TestUpdatePositionOnTransaction(t *testing.T) {
 		t.Errorf("Buy 1 failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}
 
+	// 1b. Buy with 0 qty (edge case fallback to txUnitPrice)
+	qBuyZero, cBuyZero, aBuyZero := UpdatePositionOnTransaction(0, 0, 0, "BUY", 0, 25.0, 1.0, 0.0)
+	if qBuyZero != 0 || cBuyZero != 0 || aBuyZero != 25.0 {
+		t.Errorf("Buy zero qty failed: got qty=%.2f, cost=%.2f, avg=%.2f", qBuyZero, cBuyZero, aBuyZero)
+	}
+
 	// 2. Second Buy at higher price with R$ 10.00 fee
 	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "BUY", 100, 40.0, 1.0, 10.0)
 	if qty != 200 || totalCost != 7010.0 || avgPrice != 35.05 {

@@ -74,23 +74,12 @@ func UpdatePositionOnTransaction(
 	case "BUY":
 		nativeCost := (txQty * txUnitPrice) + txFee
 		txCostInBase := nativeCost * fxRate
-
-		if FloatIsZero(currentQty) || currentQty <= 0 {
-			newQty = txQty
-			newTotalCost = txCostInBase
-			if txQty > 1e-6 {
-				newAvgPrice = nativeCost / txQty
-			} else {
-				newAvgPrice = txUnitPrice
-			}
+		newQty = currentQty + txQty
+		newTotalCost = currentTotalCost + txCostInBase
+		if newQty > 1e-6 {
+			newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
 		} else {
-			newQty = currentQty + txQty
-			newTotalCost = currentTotalCost + txCostInBase
-			if newQty > 1e-6 {
-				newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
-			} else {
-				newAvgPrice = currentAvgPrice
-			}
+			newAvgPrice = txUnitPrice
 		}
 
 	case "SELL":
@@ -134,15 +123,7 @@ func UpdatePositionOnTransaction(
 		newQty = currentQty + txQty
 		newTotalCost = currentTotalCost + txCostInBase
 		if newQty > 1e-6 {
-			if FloatIsZero(currentQty) || currentQty <= 0 {
-				if txQty > 1e-6 {
-					newAvgPrice = nativeCost / txQty
-				} else {
-					newAvgPrice = txUnitPrice
-				}
-			} else {
-				newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
-			}
+			newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
 		} else {
 			newAvgPrice = currentAvgPrice
 		}
