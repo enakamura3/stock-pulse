@@ -558,12 +558,12 @@ describe('DailyReport Component', () => {
       />
     );
 
-    const refreshBtn = screen.getByRole('button', { name: /🔄 Atualizar/i });
+    const refreshBtn = screen.getByRole('button', { name: /Recarregar cotações e resumo do portfólio/i });
     expect(refreshBtn).not.toBeDisabled();
     fireEvent.click(refreshBtn);
     expect(mockRefresh).toHaveBeenCalledWith(false);
 
-    const forceBtn = screen.getByRole('button', { name: /⚡ Tempo Real/i });
+    const forceBtn = screen.getByRole('button', { name: /Forçar atualização de cotações em tempo real/i });
     expect(forceBtn).not.toBeDisabled();
     fireEvent.click(forceBtn);
     expect(mockRefresh).toHaveBeenCalledWith(true);
@@ -579,7 +579,7 @@ describe('DailyReport Component', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: /⏳ Atualizando.../i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Recarregar cotações e resumo do portfólio/i })).toBeDisabled();
   });
 
   it('renders dividends received today section when dividends match today date', () => {
@@ -839,7 +839,7 @@ describe('DailyReport Component', () => {
       />
     );
 
-    const exportBtn = screen.getByRole('button', { name: /Exportar CSV/i });
+    const exportBtn = screen.getByRole('button', { name: /Exportar resumo diário completo em arquivo CSV/i });
     expect(exportBtn).toBeInTheDocument();
     fireEvent.click(exportBtn);
 
@@ -891,5 +891,215 @@ describe('DailyReport Component', () => {
 
     expect(screen.getByText(/PTAX R\$ 5\.50/i)).toBeInTheDocument();
     expect(screen.getByText('⚠️ Sem cotação')).toBeInTheDocument();
+  });
+
+  it('supports keyboard navigation for sorting table headers and opening tickers', () => {
+    const mockFI: FixedIncomePosition[] = [
+      {
+        asset: {
+          id: 'fi1',
+          portfolio_id: 'p1',
+          institution: 'Banco ABC',
+          type: 'CDB',
+          debt_type: 'POS',
+          indexer: 'CDI',
+          rate: 100,
+          maturity_date: '2026-12-31T00:00:00Z',
+        },
+        total_invested: 1000,
+        gross_value: 1100,
+        net_value: 1080,
+        net_return_percent: 8,
+      },
+    ];
+
+    const mockTreasury: TreasuryPosition[] = [
+      {
+        transaction_id: 't1',
+        asset_id: 't1',
+        ticker: 'Tesouro Selic',
+        treasury_type: 'SELIC',
+        maturity_date: '2029-03-01T00:00:00Z',
+        has_coupons: false,
+        start_date: '2024-01-01',
+        quantity: 1,
+        unit_price: 1000,
+        contracted_rate: 10.5,
+        total_invested: 1000,
+        gross_value: 1100,
+        net_value: 1080,
+        is_matured: false,
+        days_to_maturity: 500,
+        taxes_calculated: 20,
+        b3_fee: 0,
+        ir_tax: 20,
+        iof_tax: 0,
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        fiPositions={mockFI}
+        treasuryPositions={mockTreasury}
+        kpiCurrency="BRL"
+      />
+    );
+
+    // Verify captions exist
+    expect(screen.getByText('Resumo diário de ativos de renda variável')).toBeInTheDocument();
+    expect(screen.getByText('Posição atualizada de renda fixa privada')).toBeInTheDocument();
+    expect(screen.getByText('Posição atualizada do tesouro direto')).toBeInTheDocument();
+
+    // Verify aria-sort on headers
+    const tickerHeader = screen.getByRole('columnheader', { name: /Ordenar por ativo/i });
+    expect(tickerHeader).toHaveAttribute('aria-sort', 'none');
+
+    // Press Enter to sort by ticker (descending)
+    fireEvent.keyDown(tickerHeader, { key: 'Enter' });
+    expect(tickerHeader).toHaveAttribute('aria-sort', 'descending');
+
+    // Press Space to flip sort to ascending
+    fireEvent.keyDown(tickerHeader, { key: ' ' });
+    expect(tickerHeader).toHaveAttribute('aria-sort', 'ascending');
+
+    // Press irrelevant key (e.g. Tab) - should not change
+    fireEvent.keyDown(tickerHeader, { key: 'Tab' });
+    expect(tickerHeader).toHaveAttribute('aria-sort', 'ascending');
+
+    // Keyboard navigation on top risers card
+    const riserCard = screen.getAllByRole('button', { name: /Ver PETR4 no Monitoramento/i })[0];
+    if (riserCard) {
+      fireEvent.keyDown(riserCard, { key: 'Enter' });
+      expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
+    }
+
+    // Keyboard navigation with space on table row
+    const rowPETR4 = screen.getAllByText('PETR4').find(el => el.closest('tr'))?.closest('tr');
+    expect(rowPETR4).toBeInTheDocument();
+    fireEvent.keyDown(rowPETR4!, { key: ' ' });
+    expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
+
+    // Non-navigation key on table row
+    fireEvent.keyDown(rowPETR4!, { key: 'Escape' });
+    expect(mockPush).toHaveBeenCalledTimes(2);
+
+    // Keyboard navigation on top fallers card
+    const fallerCard = screen.getAllByRole('button', { name: /Ver VALE3 no Monitoramento/i })[0];
+    if (fallerCard) {
+      fireEvent.keyDown(fallerCard, { key: 'Enter' });
+      expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=VALE3');
+    }
+  });
+
+  it('covers PRE fixed income, PREFIXADO and IPCA treasury, and empty risers/fallers', () => {
+    const onGoToAssetsMock = vi.fn();
+    const { rerender } = render(
+      <DailyReport
+        positions={[]}
+        kpiCurrency="BRL"
+        onGoToAssets={onGoToAssetsMock}
+      />
+    );
+
+    const goToAssetsBtn = screen.getByRole('button', { name: /\+ Cadastrar Ativos na Carteira/i });
+    fireEvent.click(goToAssetsBtn);
+    expect(onGoToAssetsMock).toHaveBeenCalled();
+
+    // All zero or negative daily change (no risers)
+    const noRiserPositions: Position[] = [
+      {
+        asset_id: 'p1',
+        ticker: 'FLAT1',
+        name: 'Flat Corp',
+        type: 'STOCK_BR',
+        currency: 'BRL',
+        quantity: 10,
+        average_price: 10,
+        total_cost: 100,
+        current_price: 10,
+        current_value: 100,
+        daily_change: 0,
+        daily_change_percent: 0,
+      },
+    ];
+
+    const fiPre: FixedIncomePosition[] = [
+      {
+        asset: {
+          id: 'fi_pre',
+          portfolio_id: 'p1',
+          institution: 'Banco Inter',
+          type: 'CDB',
+          debt_type: 'PRE',
+          rate: 12.5,
+          maturity_date: '2028-01-01T00:00:00Z',
+        },
+        total_invested: 1000,
+        gross_value: 1100,
+        net_value: 1080,
+        net_return_percent: 8.0,
+      },
+    ];
+
+    const treasuryVaried: TreasuryPosition[] = [
+      {
+        transaction_id: 't_pre',
+        asset_id: 't_pre',
+        ticker: 'Tesouro Prefixado 2029',
+        treasury_type: 'PREFIXADO',
+        maturity_date: '2029-01-01',
+        has_coupons: false,
+        start_date: '2024-01-01',
+        quantity: 1,
+        unit_price: 800,
+        contracted_rate: 11.0,
+        total_invested: 0, // total_invested <= 0 branch
+        gross_value: 850,
+        net_value: 840,
+        is_matured: false,
+        days_to_maturity: 1000,
+        taxes_calculated: 10,
+        b3_fee: 0,
+        ir_tax: 10,
+        iof_tax: 0,
+      },
+      {
+        transaction_id: 't_ipca',
+        asset_id: 't_ipca',
+        ticker: 'Tesouro IPCA+ 2035',
+        treasury_type: 'IPCA',
+        maturity_date: '2035-05-15',
+        has_coupons: false,
+        start_date: '2024-01-01',
+        quantity: 1,
+        unit_price: 2000,
+        contracted_rate: 6.0,
+        total_invested: 2000,
+        gross_value: 2200,
+        net_value: 2150,
+        is_matured: false,
+        days_to_maturity: 3000,
+        taxes_calculated: 50,
+        b3_fee: 0,
+        ir_tax: 50,
+        iof_tax: 0,
+      },
+    ];
+
+    rerender(
+      <DailyReport
+        positions={noRiserPositions}
+        fiPositions={fiPre}
+        treasuryPositions={treasuryVaried}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('Nenhuma alta registrada hoje.')).toBeInTheDocument();
+    expect(screen.getByText('Nenhuma baixa registrada hoje.')).toBeInTheDocument();
+    expect(screen.getByText(/12\.50% a\.a\./i)).toBeInTheDocument();
+    expect(screen.getByText('Tesouro Prefixado 2029')).toBeInTheDocument();
+    expect(screen.getByText('Tesouro IPCA+ 2035')).toBeInTheDocument();
   });
 });

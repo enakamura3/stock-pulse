@@ -234,6 +234,25 @@ export default function DailyReport({
     return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
+  const getAriaSort = (key: SortKey): 'ascending' | 'descending' | 'none' => {
+    if (sortKey !== key) return 'none';
+    return sortDir === 'asc' ? 'ascending' : 'descending';
+  };
+
+  const handleSortKeyDown = (e: React.KeyboardEvent, key: SortKey) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSort(key);
+    }
+  };
+
+  const handleNavigateKeyDown = (e: React.KeyboardEvent, ticker: string) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      router.push(`/dashboard?ticker=${encodeURIComponent(ticker)}`);
+    }
+  };
+
   return (
     <div className="flex-col gap-xl w-full">
 
@@ -269,13 +288,14 @@ export default function DailyReport({
           ({isDailyPos ? '+' : ''}{totalDailyPercent.toFixed(2)}%)
         </span>
 
-        <div className="flex-row items-center gap-md mt-sm flex-wrap justify-center text-xs text-secondary">
+        <div className="flex-row items-center gap-md mt-sm flex-wrap justify-center text-xs text-secondary" aria-live="polite">
           <span>🕐 Cotações em: <strong>{lastUpdateStr}</strong></span>
           {onRefresh && (
             <div className="flex-row items-center gap-xs">
               <button
                 onClick={() => handleRefresh(false)}
                 disabled={isRefreshing}
+                aria-label="Recarregar cotações e resumo do portfólio"
                 className="btn-secondary font-bold"
                 style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '4px', cursor: isRefreshing ? 'not-allowed' : 'pointer' }}
                 title="Recarregar cotações e resumo do portfólio"
@@ -285,6 +305,7 @@ export default function DailyReport({
               <button
                 onClick={() => handleRefresh(true)}
                 disabled={isRefreshing}
+                aria-label="Forçar atualização de cotações em tempo real ignorando cache"
                 className="btn-secondary text-xs"
                 style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', cursor: isRefreshing ? 'not-allowed' : 'pointer', opacity: 0.85 }}
                 title="Forçar atualização de cotações em tempo real (ignora cache)"
@@ -358,9 +379,13 @@ export default function DailyReport({
                 return (
                   <div
                     key={pos.asset_id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Ver ${pos.ticker} no Monitoramento`}
                     className="flex-row justify-between items-center"
                     style={{ padding: '0.5rem 0.75rem', background: 'var(--color-success-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-success)', cursor: 'pointer' }}
                     onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
+                    onKeyDown={(e) => handleNavigateKeyDown(e, pos.ticker)}
                     title={`Ver ${pos.ticker} no Monitoramento`}
                   >
                     <div className="flex-col" style={{ gap: '2px' }}>
@@ -397,9 +422,13 @@ export default function DailyReport({
                 return (
                   <div
                     key={pos.asset_id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Ver ${pos.ticker} no Monitoramento`}
                     className="flex-row justify-between items-center"
                     style={{ padding: '0.5rem 0.75rem', background: 'var(--color-danger-bg)', borderRadius: '8px', borderLeft: '3px solid var(--color-danger)', cursor: 'pointer' }}
                     onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
+                    onKeyDown={(e) => handleNavigateKeyDown(e, pos.ticker)}
                     title={`Ver ${pos.ticker} no Monitoramento`}
                   >
                     <div className="flex-col" style={{ gap: '2px' }}>
@@ -436,6 +465,7 @@ export default function DailyReport({
           </div>
           <button
             onClick={() => exportDailyReportCSV(positions, fiPositions, treasuryPositions, kpiCurrency)}
+            aria-label="Exportar resumo diário completo em arquivo CSV"
             className="btn-secondary flex-row items-center gap-xs text-xs font-semibold"
             style={{ padding: '0.35rem 0.75rem', borderRadius: '6px' }}
             title="Exportar resumo diário completo em arquivo CSV"
@@ -445,28 +475,98 @@ export default function DailyReport({
         </div>
         <div className="table-container flex-col" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {positions.length > 0 ? (
-            <table className="data-table" style={{ width: '100%', minWidth: '650px' }}>
+            <table className="data-table" style={{ width: '100%', minWidth: '650px' }} aria-label="Resumo diário completo de renda variável">
+              <caption className="sr-only">Resumo diário de ativos de renda variável</caption>
               <thead>
                 <tr>
-                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('ticker')}>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    tabIndex={0}
+                    aria-sort={getAriaSort('ticker')}
+                    aria-label="Ordenar por ativo"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleSort('ticker')}
+                    onKeyDown={(e) => handleSortKeyDown(e, 'ticker')}
+                  >
                     Ativo {sortIcon('ticker')}
                   </th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('average_price')}>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    tabIndex={0}
+                    aria-sort={getAriaSort('average_price')}
+                    aria-label="Ordenar por preço médio"
+                    className="text-right"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleSort('average_price')}
+                    onKeyDown={(e) => handleSortKeyDown(e, 'average_price')}
+                  >
                     Preço Médio {sortIcon('average_price')}
                   </th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('previousClose')}>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    tabIndex={0}
+                    aria-sort={getAriaSort('previousClose')}
+                    aria-label="Ordenar por fechamento anterior"
+                    className="text-right"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleSort('previousClose')}
+                    onKeyDown={(e) => handleSortKeyDown(e, 'previousClose')}
+                  >
                     Fech. Anterior {sortIcon('previousClose')}
                   </th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('current_price')}>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    tabIndex={0}
+                    aria-sort={getAriaSort('current_price')}
+                    aria-label="Ordenar por cotação atual"
+                    className="text-right"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleSort('current_price')}
+                    onKeyDown={(e) => handleSortKeyDown(e, 'current_price')}
+                  >
                     Cotação Atual {sortIcon('current_price')}
                   </th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('daily_change')}>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    tabIndex={0}
+                    aria-sort={getAriaSort('daily_change')}
+                    aria-label="Ordenar por variação nominal por cota"
+                    className="text-right"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleSort('daily_change')}
+                    onKeyDown={(e) => handleSortKeyDown(e, 'daily_change')}
+                  >
                     Var./Cota {sortIcon('daily_change')}
                   </th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('daily_change_percent')}>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    tabIndex={0}
+                    aria-sort={getAriaSort('daily_change_percent')}
+                    aria-label="Ordenar por variação percentual"
+                    className="text-right"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleSort('daily_change_percent')}
+                    onKeyDown={(e) => handleSortKeyDown(e, 'daily_change_percent')}
+                  >
                     Var. % {sortIcon('daily_change_percent')}
                   </th>
-                  <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('impact')}>
+                  <th
+                    scope="col"
+                    role="columnheader"
+                    tabIndex={0}
+                    aria-sort={getAriaSort('impact')}
+                    aria-label="Ordenar por impacto diário"
+                    className="text-right"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleSort('impact')}
+                    onKeyDown={(e) => handleSortKeyDown(e, 'impact')}
+                  >
                     Impacto Diário {sortIcon('impact')}
                   </th>
                 </tr>
@@ -487,7 +587,10 @@ export default function DailyReport({
                   return (
                     <tr
                       key={pos.asset_id}
+                      tabIndex={0}
+                      aria-label={`Ver ${pos.ticker} no Monitoramento`}
                       onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
+                      onKeyDown={(e) => handleNavigateKeyDown(e, pos.ticker)}
                       style={{ cursor: 'pointer', transition: 'background-color 0.15s ease' }}
                       title={`Clique para ver ${pos.ticker} no Monitoramento de Cotações`}
                     >
@@ -557,16 +660,17 @@ export default function DailyReport({
             Títulos de renda fixa privada são atualizados diariamente com a rentabilidade acumulada de acordo com o indexador contratado.
           </p>
           <div className="table-container flex-col" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="data-table" style={{ width: '100%', minWidth: '600px' }}>
+            <table className="data-table" style={{ width: '100%', minWidth: '600px' }} aria-label="Posição atualizada de renda fixa privada">
+              <caption className="sr-only">Posição atualizada de renda fixa privada</caption>
               <thead>
                 <tr>
-                  <th>Instituição & Ativo</th>
-                  <th>Tipo / Taxa</th>
-                  <th className="text-right">Vencimento</th>
-                  <th className="text-right">Valor Líquido</th>
-                  <th className="text-right">Taxa Diária Est.</th>
-                  <th className="text-right">Ganho Diário Est.</th>
-                  <th className="text-right">Rent. Acumulada</th>
+                  <th scope="col">Instituição & Ativo</th>
+                  <th scope="col">Tipo / Taxa</th>
+                  <th scope="col" className="text-right">Vencimento</th>
+                  <th scope="col" className="text-right">Valor Líquido</th>
+                  <th scope="col" className="text-right">Taxa Diária Est.</th>
+                  <th scope="col" className="text-right">Ganho Diário Est.</th>
+                  <th scope="col" className="text-right">Rent. Acumulada</th>
                 </tr>
               </thead>
               <tbody>
@@ -623,16 +727,17 @@ export default function DailyReport({
             representam a última posição de liquidação líquida disponível.
           </p>
           <div className="table-container flex-col" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="data-table" style={{ width: '100%', minWidth: '600px' }}>
+            <table className="data-table" style={{ width: '100%', minWidth: '600px' }} aria-label="Posição atualizada de títulos do tesouro direto">
+              <caption className="sr-only">Posição atualizada do tesouro direto</caption>
               <thead>
                 <tr>
-                  <th>Título</th>
-                  <th>Tipo</th>
-                  <th className="text-right">Vencimento</th>
-                  <th className="text-right">Valor Líquido</th>
-                  <th className="text-right">Taxa Diária Est.</th>
-                  <th className="text-right">Ganho Diário Est.</th>
-                  <th className="text-right">Rent. Acumulada</th>
+                  <th scope="col">Título</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col" className="text-right">Vencimento</th>
+                  <th scope="col" className="text-right">Valor Líquido</th>
+                  <th scope="col" className="text-right">Taxa Diária Est.</th>
+                  <th scope="col" className="text-right">Ganho Diário Est.</th>
+                  <th scope="col" className="text-right">Rent. Acumulada</th>
                 </tr>
               </thead>
               <tbody>
