@@ -72,31 +72,42 @@ func UpdatePositionOnTransaction(
 
 	switch txType {
 	case "BUY":
-		txCost := ((txQty * txUnitPrice) + txFee) * fxRate
-		if FloatIsZero(currentQty) {
+		nativeCost := (txQty * txUnitPrice) + txFee
+		txCostInBase := nativeCost * fxRate
+
+		if FloatIsZero(currentQty) || currentQty <= 0 {
 			newQty = txQty
-			newTotalCost = txCost
-			newAvgPrice = newTotalCost / (newQty * fxRate)
+			newTotalCost = txCostInBase
+			if txQty > 1e-6 {
+				newAvgPrice = nativeCost / txQty
+			} else {
+				newAvgPrice = txUnitPrice
+			}
 		} else {
 			newQty = currentQty + txQty
-			newTotalCost = currentTotalCost + txCost
-			newAvgPrice = newTotalCost / (newQty * fxRate)
+			newTotalCost = currentTotalCost + txCostInBase
+			if newQty > 1e-6 {
+				newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
+			} else {
+				newAvgPrice = currentAvgPrice
+			}
 		}
 
 	case "SELL":
-		if currentQty >= txQty {
-			newQty = currentQty - txQty
-			newTotalCost = newQty * currentAvgPrice * fxRate
+		remainingQty := currentQty - txQty
+		if remainingQty > 1e-6 && currentQty > 1e-6 {
+			newQty = remainingQty
+			newTotalCost = currentTotalCost * (remainingQty / currentQty)
 			newAvgPrice = currentAvgPrice
 		} else {
-			// Venda acima do saldo zera a posição
+			// Venda total ou acima do saldo zera a posição
 			newQty = 0
 			newTotalCost = 0
 			newAvgPrice = 0
 		}
 
 	case "SPLIT":
-		if currentQty > 0 && txQty > 0 {
+		if currentQty > 1e-6 && txQty > 1e-6 {
 			newQty = currentQty * txQty
 			newTotalCost = currentTotalCost
 			newAvgPrice = currentAvgPrice / txQty
@@ -107,7 +118,7 @@ func UpdatePositionOnTransaction(
 		}
 
 	case "REVERSE_SPLIT":
-		if currentQty > 0 && txQty > 0 {
+		if currentQty > 1e-6 && txQty > 1e-6 {
 			newQty = math.Floor(currentQty / txQty)
 			newTotalCost = currentTotalCost
 			newAvgPrice = currentAvgPrice * txQty
@@ -118,11 +129,20 @@ func UpdatePositionOnTransaction(
 		}
 
 	case "BONUS":
-		txCost := (txQty * txUnitPrice * fxRate)
+		nativeCost := txQty * txUnitPrice
+		txCostInBase := nativeCost * fxRate
 		newQty = currentQty + txQty
-		newTotalCost = currentTotalCost + txCost
-		if newQty > 0 {
-			newAvgPrice = newTotalCost / (newQty * fxRate)
+		newTotalCost = currentTotalCost + txCostInBase
+		if newQty > 1e-6 {
+			if FloatIsZero(currentQty) || currentQty <= 0 {
+				if txQty > 1e-6 {
+					newAvgPrice = nativeCost / txQty
+				} else {
+					newAvgPrice = txUnitPrice
+				}
+			} else {
+				newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
+			}
 		} else {
 			newAvgPrice = currentAvgPrice
 		}

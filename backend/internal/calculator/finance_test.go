@@ -246,3 +246,51 @@ func TestCalculateEstimatedDailyGain(t *testing.T) {
 		t.Errorf("Zero dailyRate should return 0.0")
 	}
 }
+
+func TestUpdatePositionOnTransaction_ForeignCurrencyAndETFs(t *testing.T) {
+	// 1. First BUY of 10 VOO at $400.00 with $5.00 fee, USD/BRL = 5.00
+	qty, totalCost, avgPrice := UpdatePositionOnTransaction(0, 0, 0, "BUY", 10, 400.0, 5.0, 5.0)
+	if !FloatEquals(qty, 10) || !FloatEquals(totalCost, 20025.0) || !FloatEquals(avgPrice, 400.50) {
+		t.Errorf("Foreign Buy 1 failed: got qty=%.2f, cost=%.2f, avg=%.2f (expected qty=10, cost=20025.0, avg=400.50)", qty, totalCost, avgPrice)
+	}
+
+	// 2. Second BUY of 10 VOO at $400.00 with $5.00 fee, USD/BRL = 6.00 (Average price in USD must stay 400.50 regardless of FX rate changes)
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "BUY", 10, 400.0, 6.0, 5.0)
+	if !FloatEquals(qty, 20) || !FloatEquals(totalCost, 44055.0) || !FloatEquals(avgPrice, 400.50) {
+		t.Errorf("Foreign Buy 2 failed: got qty=%.2f, cost=%.2f, avg=%.4f (expected qty=20, cost=44055.0, avg=400.5000)", qty, totalCost, avgPrice)
+	}
+
+	// 3. Third BUY of 5 VOO at $500.00 with $10.00 fee, USD/BRL = 5.50
+	// Native cost: (5 * 500) + 10 = $2510.00
+	// New avg price: (20 * 400.50 + 2510) / 25 = 10520 / 25 = $420.80
+	// New BRL cost: 44055.0 + (2510 * 5.50) = 44055.0 + 13805.0 = 57860.0
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "BUY", 5, 500.0, 5.5, 10.0)
+	if !FloatEquals(qty, 25) || !FloatEquals(totalCost, 57860.0) || !FloatEquals(avgPrice, 420.80) {
+		t.Errorf("Foreign Buy 3 failed: got qty=%.2f, cost=%.2f, avg=%.2f (expected qty=25, cost=57860.0, avg=420.80)", qty, totalCost, avgPrice)
+	}
+
+	// 4. Partial SELL of 10 units at $600.00 with $5.00 fee, USD/BRL = 7.00
+	// Remaining qty: 15
+	// Avg price remains $420.80 in USD
+	// Total cost in BRL reduced proportionally: 57860.0 * (15/25) = 34716.0
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SELL", 10, 600.0, 7.0, 5.0)
+	if !FloatEquals(qty, 15) || !FloatEquals(totalCost, 34716.0) || !FloatEquals(avgPrice, 420.80) {
+		t.Errorf("Foreign Partial Sell failed: got qty=%.2f, cost=%.2f, avg=%.2f (expected qty=15, cost=34716.0, avg=420.80)", qty, totalCost, avgPrice)
+	}
+
+	// 5. BONUS of 5 shares at $100.00 with USD/BRL = 5.00
+	// New qty: 20
+	// Native bonus cost: 5 * 100 = 500.0 USD
+	// New avg price: (15 * 420.80 + 500) / 20 = (6312 + 500) / 20 = 6812 / 20 = 340.60 USD
+	// New BRL cost: 34716.0 + (500 * 5.0) = 37216.0 BRL
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "BONUS", 5, 100.0, 5.0, 0.0)
+	if !FloatEquals(qty, 20) || !FloatEquals(totalCost, 37216.0) || !FloatEquals(avgPrice, 340.60) {
+		t.Errorf("Foreign Bonus failed: got qty=%.2f, cost=%.2f, avg=%.2f (expected qty=20, cost=37216.0, avg=340.60)", qty, totalCost, avgPrice)
+	}
+
+	// 6. Complete SELL of all 20 units
+	qty, totalCost, avgPrice = UpdatePositionOnTransaction(qty, totalCost, avgPrice, "SELL", 20, 700.0, 5.5, 0.0)
+	if !FloatEquals(qty, 0) || !FloatEquals(totalCost, 0) || !FloatEquals(avgPrice, 0) {
+		t.Errorf("Foreign Complete Sell failed: got qty=%.2f, cost=%.2f, avg=%.2f (expected 0, 0, 0)", qty, totalCost, avgPrice)
+	}
+}
