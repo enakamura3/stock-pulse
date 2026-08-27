@@ -825,4 +825,71 @@ describe('DailyReport Component', () => {
 
     expect(screen.getByText('Variação Diária da Carteira (Intraday)')).toBeInTheDocument();
   });
+
+  it('triggers exportDailyReportCSV when Exportar CSV button is clicked', () => {
+    const originalCreateObjectURL = window.URL.createObjectURL;
+    const originalRevokeObjectURL = window.URL.revokeObjectURL;
+    window.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    window.URL.revokeObjectURL = vi.fn();
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        kpiCurrency="BRL"
+      />
+    );
+
+    const exportBtn = screen.getByRole('button', { name: /Exportar CSV/i });
+    expect(exportBtn).toBeInTheDocument();
+    fireEvent.click(exportBtn);
+
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+
+    window.URL.createObjectURL = originalCreateObjectURL;
+    window.URL.revokeObjectURL = originalRevokeObjectURL;
+  });
+
+  it('renders PTAX rate for USD positions and missing quote warning for zero prices', () => {
+    const mixedPositions: Position[] = [
+      {
+        asset_id: 'usd_pos',
+        ticker: 'NVDA',
+        name: 'Nvidia Corp',
+        type: 'STOCK_US',
+        currency: 'USD',
+        quantity: 5,
+        average_price: 100,
+        total_cost: 2750,
+        current_price: 120,
+        current_value: 3300,
+        daily_change: 5,
+        daily_change_percent: 4.35,
+        fx_rate_to_brl: 5.5,
+      },
+      {
+        asset_id: 'no_quote_pos',
+        ticker: 'ILLIQ3',
+        name: 'Iliquid Corp',
+        type: 'STOCK_BR',
+        currency: 'BRL',
+        quantity: 100,
+        average_price: 10,
+        total_cost: 1000,
+        current_price: 0, // no quote
+        current_value: 0,
+        daily_change: 0,
+        daily_change_percent: 0,
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={mixedPositions}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText(/PTAX R\$ 5\.50/i)).toBeInTheDocument();
+    expect(screen.getByText('⚠️ Sem cotação')).toBeInTheDocument();
+  });
 });

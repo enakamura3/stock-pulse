@@ -232,6 +232,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 				if pos.Currency != p.BaseCurrency {
 					rate = s.getCurrencyRate(ctx, pos.Currency, p.BaseCurrency)
 				}
+				pos.FxRateToBRL = rate
 
 				pos.CurrentPrice = quote.Price
 				pos.DailyChange = quote.Change

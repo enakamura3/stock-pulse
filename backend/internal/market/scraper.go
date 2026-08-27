@@ -21,6 +21,10 @@ type Fundamentals struct {
 	BazinValue    float64
 }
 
+type FundamentalsScraper interface {
+	GetFundamentals(ctx context.Context, symbol string) (*Fundamentals, error)
+}
+
 type Scraper struct {
 	client             *http.Client
 	fundamentusBaseURL string

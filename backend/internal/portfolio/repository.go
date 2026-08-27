@@ -57,6 +57,7 @@ type Position struct {
 	DailyChangePercent float64 `json:"daily_change_percent,omitempty"`
 	PreviousClose      float64 `json:"previous_close,omitempty"`
 	Volume             int64   `json:"volume,omitempty"`
+	FxRateToBRL        float64 `json:"fx_rate_to_brl,omitempty"`
 	GrahamValue        float64 `json:"graham_value,omitempty"`
 	BazinValue         float64 `json:"bazin_value,omitempty"`
 	PVP                float64 `json:"pvp,omitempty"`

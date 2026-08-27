@@ -16,7 +16,7 @@ import (
 // Service gerencia cotações de ativos agregando cacheamento Redis de alta performance.
 type Service struct {
 	provider         QuoteProvider
-	scraper          *Scraper
+	scraper          FundamentalsScraper
 	dividendGateway  *DividendGateway
 	rdb              *redis.Client
 	ttlQuotes        time.Duration
