@@ -1010,6 +1010,29 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 		assert.InDelta(t, 15.0, divs[0].OriginalGross, 1e-6)   // 5 * $3.00 = $15.00
 		assert.InDelta(t, 15.0*5.80, divs[0].GrossAmount, 1e-6) // R$ 87.00 projetado
 	})
+
+	t.Run("FII Deduplication and Zero PaymentDate Month Key", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		txs := []Transaction{
+			{AssetID: "fii1", Ticker: "MXRF11", Type: "BUY", Quantity: 100, ExecutedAt: now.AddDate(0, -2, 0), Currency: "BRL", AssetType: "FII"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "fii1").Return([]AssetEvent{
+			// Event 1 with PaymentDate: time.Time{} (zero date)
+			{AssetID: "fii1", CumDate: now.AddDate(0, -1, 10), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
+			// Event 2 in same month (should be deduped / skipped)
+			{AssetID: "fii1", CumDate: now.AddDate(0, -1, 15), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
+		}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1) // Deduped to 1
+		assert.InDelta(t, 10.0, divs[0].GrossAmount, 1e-6)
+	})
 }
 
 // ─── Testes de TWRR (Time-Weighted Rate of Return) ──────────────────────────
