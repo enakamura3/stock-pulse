@@ -56,6 +56,7 @@ func TestServiceCoverage_GetPortfolioDividends_Calculation(t *testing.T) {
 	}, nil)
 
 	ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(0.0, errors.New("err"))
+	ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(&market.Quote{Price: 5.5}, nil).Maybe()
 	repo.On("GetExchangeRateByDate", mock.Anything, "USDBRL", mock.Anything).Return(1.0, nil)
 
 	divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
@@ -94,6 +95,7 @@ func TestServiceCoverage_GetPortfolioDividends_FallbackError(t *testing.T) {
 		{Type: "DIVIDEND", GrossAmount: 2, PaymentDate: time.Now(), CumDate: time.Now()},
 	}, nil)
 	ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(0.0, errors.New("err"))
+	ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(nil, errors.New("quote err")).Maybe()
 	repo.On("GetExchangeRateByDate", mock.Anything, "USDBRL", mock.Anything).Return(0.0, errors.New("err"))
 
 	_, _ = s.GetPortfolioDividends(context.Background(), "p1", "u1")
