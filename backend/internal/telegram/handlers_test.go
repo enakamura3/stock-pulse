@@ -236,3 +236,155 @@ func TestHandlers_HandleStart(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestHandlers_GetUserID(t *testing.T) {
+	h, _, _, _, _ := setupHandlersTest()
+
+	t.Run("valid user_id", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": "user-123"}
+
+		uid, err := h.getUserID(mCtx)
+		assert.NoError(t, err)
+		assert.Equal(t, "user-123", uid)
+	})
+
+	t.Run("nil user_id in message context", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Send", mock.Anything, mock.Anything).Return(nil)
+
+		uid, err := h.getUserID(mCtx)
+		assert.Error(t, err)
+		assert.Empty(t, uid)
+	})
+
+	t.Run("nil user_id in callback context", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		uid, err := h.getUserID(mCtx)
+		assert.Error(t, err)
+		assert.Empty(t, uid)
+	})
+
+	t.Run("invalid type user_id", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": 12345}
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Send", mock.Anything, mock.Anything).Return(nil)
+
+		uid, err := h.getUserID(mCtx)
+		assert.Error(t, err)
+		assert.Empty(t, uid)
+	})
+
+	t.Run("empty string user_id in callback context", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": ""}
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		uid, err := h.getUserID(mCtx)
+		assert.Error(t, err)
+		assert.Empty(t, uid)
+	})
+}
+
+func TestHandlers_Unauthenticated_Handlers(t *testing.T) {
+	h, _, _, _, _ := setupHandlersTest()
+
+	t.Run("HandlePortfolioSummary unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err := h.HandlePortfolioSummary(mCtx)
+		assert.Error(t, err)
+	})
+
+	t.Run("HandleFixedIncome unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err := h.HandleFixedIncome(mCtx)
+		assert.Error(t, err)
+	})
+
+	t.Run("HandleHistory unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err := h.HandleHistory(mCtx)
+		assert.Error(t, err)
+	})
+
+	t.Run("HandleMenu unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Send", mock.Anything, mock.Anything).Return(nil)
+
+		err := h.HandleMenu(mCtx)
+		assert.Error(t, err)
+	})
+
+	t.Run("HandleLaunchOperation unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err := h.HandleLaunchOperation(mCtx)
+		assert.Error(t, err)
+	})
+
+	t.Run("HandleChangePortfolio unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err := h.HandleChangePortfolio(mCtx)
+		assert.Error(t, err)
+	})
+
+	t.Run("handleSelectedPortfolio unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Respond", mock.Anything).Return(nil)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err := h.handleSelectedPortfolio(mCtx, "p1")
+		assert.Error(t, err)
+	})
+
+	t.Run("fetchDividends unauthenticated", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.store = map[string]interface{}{"user_id": nil}
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Send", mock.Anything, mock.Anything).Return(nil)
+
+		divs, pName, err := h.fetchDividends(mCtx)
+		assert.Error(t, err)
+		assert.Nil(t, divs)
+		assert.Empty(t, pName)
+	})
+}
+

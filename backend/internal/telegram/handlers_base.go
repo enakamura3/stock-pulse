@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
@@ -71,4 +72,31 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 
 	// Intercepta todas as mensagens de texto para a máquina de estados
 	bot.Handle(telebot.OnText, h.HandleText)
+}
+
+// getUserID extrai o ID do usuário autenticado do contexto telebot com segurança contra nil ou types incorretos.
+func (h *Handlers) getUserID(c telebot.Context) (string, error) {
+	val := c.Get("user_id")
+	if val == nil {
+		if c.Callback() != nil {
+			_ = c.Respond()
+			_ = c.Edit("⚠️ Sessão não encontrada ou expirada. Por favor, envie /start para reconectar.")
+		} else {
+			_ = c.Send("⚠️ Sessão não encontrada ou expirada. Por favor, envie /start para reconectar.")
+		}
+		return "", errors.New("sessão não autenticada")
+	}
+
+	userIDStr, ok := val.(string)
+	if !ok || userIDStr == "" {
+		if c.Callback() != nil {
+			_ = c.Respond()
+			_ = c.Edit("⚠️ Sessão inválida. Por favor, envie /start para reconectar.")
+		} else {
+			_ = c.Send("⚠️ Sessão inválida. Por favor, envie /start para reconectar.")
+		}
+		return "", errors.New("user_id inválido")
+	}
+
+	return userIDStr, nil
 }

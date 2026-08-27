@@ -21,7 +21,10 @@ func (h *Handlers) HandleCancelOperation(c telebot.Context) error {
 
 func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	defer c.Respond()
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil || len(portfolios) == 0 {
@@ -214,7 +217,10 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			return c.Send("⚠️ Preço inválido. Por favor, envie apenas o número (ex: 15.50):", menu)
 		}
 
-		userIDStr := c.Get("user_id").(string)
+		userIDStr, err := h.getUserID(c)
+		if err != nil {
+			return err
+		}
 
 		tx := &portfolio.Transaction{
 			PortfolioID:  state.PortfolioID,

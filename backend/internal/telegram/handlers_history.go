@@ -12,7 +12,10 @@ import (
 
 func (h *Handlers) HandleHistory(c telebot.Context) error {
 	defer c.Respond()
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil || len(portfolios) == 0 {

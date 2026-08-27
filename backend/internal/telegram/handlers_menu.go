@@ -38,7 +38,10 @@ func (h *Handlers) HandleMenuCallback(c telebot.Context) error {
 }
 
 func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
 
 	// Se houver estado pendente, vamos limpar
 	_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
