@@ -3,7 +3,10 @@ package portfolio
 import (
 	"context"
 	"log"
+	"math"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 )
 
 type DividendWorker struct {
@@ -18,70 +21,93 @@ func NewDividendWorker(repo PortfolioRepository, ms MarketService) *DividendWork
 	}
 }
 
-func (w *DividendWorker) Start(ctx context.Context) {
-	log.Println("[DividendWorker] Inicializado. Rodando a cada 24 horas.")
-
-	// Executa uma vez imediatamente ao ligar o servidor
-	w.syncAllDividends(ctx)
-
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("[DividendWorker] Encerrando graciosamente...")
-			return
-		case <-ticker.C:
-			w.syncAllDividends(ctx)
-		}
-	}
-}
-
-func (w *DividendWorker) syncAllDividends(ctx context.Context) {
-	log.Println("[DividendWorker] Iniciando sincronização de dividendos de mercado...")
-
+func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 	assets, err := w.repo.GetAllAssets(ctx)
 	if err != nil {
 		log.Printf("[DividendWorker] Erro ao buscar ativos: %v", err)
 		return
 	}
 
+	log.Printf("[DividendWorker] Iniciando sincronização para %d ativos", len(assets))
+
 	for _, asset := range assets {
-		// Use the market service to fetch the dividends (which uses scrapers or Yahoo as fallback)
-		// We use a new background context with timeout for each asset to prevent hanging
+		if asset.Ticker == "" {
+			continue
+		}
+
 		assetCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		
 		events, err := w.marketService.GetDividends(assetCtx, asset.Ticker, asset.AssetType)
 		if err != nil {
-			log.Printf("[DividendWorker] Aviso: falha ao buscar proventos para %s: %v", asset.Ticker, err)
+			log.Printf("[DividendWorker] Erro ao buscar dividendos para %s: %v", asset.Ticker, err)
 			cancel()
 			continue
 		}
 
-		successCount := 0
-		for _, ev := range events {
-			err = w.repo.UpsertAssetEvent(assetCtx, AssetEvent{
-				AssetID:     asset.ID,
-				Type:        ev.Type,
-				GrossAmount: ev.Amount,
-				NetAmount:   ev.Amount, // We store gross in both places, taxes are applied per-portfolio later
-				ExDate:      ev.Date,
-				PaymentDate: ev.PaymentDate,
-			})
+		var successCount int
+		for i, ev := range events {
+			existingEvents, err := w.repo.GetAssetEventsByDate(assetCtx, asset.ID, ev.Date)
 			if err != nil {
-				log.Printf("[DividendWorker] Erro ao salvar dividendo %s para %s: %v", ev.Date.Format("2006-01-02"), asset.Ticker, err)
+				log.Printf("[DividendWorker] Erro ao buscar dividendos existentes para %s em %s: %v", asset.Ticker, ev.Date, err)
+				continue
+			}
+
+			var bestMatch *AssetEvent
+			var minDiff float64 = -1
+
+			for j := range existingEvents {
+				existing := &existingEvents[j]
+				if existing.Type != ev.Type {
+					continue
+				}
+
+				diff := math.Abs(existing.GrossAmount - ev.Amount)
+				if diff <= calculator.FuzzyMatchGrossAmountThreshold {
+					if minDiff == -1 || diff < minDiff {
+						minDiff = diff
+						bestMatch = existing
+					}
+				}
+			}
+
+			if bestMatch != nil {
+				if minDiff < calculator.FinancialEpsilon && bestMatch.PaymentDate.Equal(ev.PaymentDate) {
+					successCount++
+					continue
+				}
+
+				// Update existing
+				err = w.repo.UpdateAssetEventValueByID(assetCtx, bestMatch.ID, ev.Amount, ev.Amount, ev.PaymentDate)
+				if err != nil {
+					log.Printf("[DividendWorker] Erro ao atualizar dividendo (Fuzzy Match) %d/%d (ID: %s) para %s: %v",
+						i+1, len(events), bestMatch.ID, asset.Ticker, err)
+				} else {
+					successCount++
+				}
 			} else {
-				successCount++
+				// Insert new
+				err = w.repo.UpsertAssetEvent(assetCtx, AssetEvent{
+					AssetID:     asset.ID,
+					Type:        ev.Type,
+					GrossAmount: ev.Amount,
+					NetAmount:   ev.Amount, // We store gross in both places, taxes are applied per-portfolio later
+					CumDate:     ev.Date,
+					PaymentDate: ev.PaymentDate,
+				})
+				if err != nil {
+					log.Printf("[DividendWorker] Erro ao salvar novo dividendo %d/%d (DataCom: %s, Tipo: %s, Valor: %.4f) para %s: %v",
+						i+1, len(events), ev.Date.Format("2006-01-02"), ev.Type, ev.Amount, asset.Ticker, err)
+				} else {
+					successCount++
+				}
 			}
 		}
 
 		if successCount > 0 {
 			log.Printf("[DividendWorker] Sincronizados %d proventos para %s", successCount, asset.Ticker)
 		}
-		
+
 		cancel()
-		
+
 		// Small sleep to avoid hammering the scrapers
 		time.Sleep(2 * time.Second)
 	}

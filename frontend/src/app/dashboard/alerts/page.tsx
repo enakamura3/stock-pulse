@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import AppSidebar from '@/components/AppSidebar';
+import { apiFetch } from '@/lib/api';
 
 interface Alert {
   id: string;
@@ -24,8 +26,6 @@ interface SearchResult {
   exchange: string;
   type: string;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 export default function AlertsPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -51,9 +51,7 @@ export default function AlertsPage() {
   // CARREGAR ALERTAS DO BANCO
   const loadAlerts = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/alerts`, {
-        credentials: 'include',
-      });
+      const res = await apiFetch(`/alerts`);
       if (res.ok) {
         const data = await res.json();
         setAlerts(data || []);
@@ -82,9 +80,7 @@ export default function AlertsPage() {
     const delayDebounce = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`${API_URL}/assets/search?q=${encodeURIComponent(searchQuery)}`, {
-          credentials: 'include',
-        });
+        const res = await apiFetch(`/assets/search?q=${encodeURIComponent(searchQuery)}`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data || []);
@@ -121,7 +117,7 @@ export default function AlertsPage() {
     setFormSuccess(null);
 
     try {
-      const res = await fetch(`${API_URL}/alerts`, {
+      const res = await apiFetch(`/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,7 +125,6 @@ export default function AlertsPage() {
           target_price: parseFloat(targetPrice),
           condition: condition,
         }),
-        credentials: 'include',
       });
 
       const data = await res.json();
@@ -153,9 +148,8 @@ export default function AlertsPage() {
   // TOGGLE STATUS (ATIVE <-> DISABLED)
   const handleToggleStatus = async (id: string) => {
     try {
-      const res = await fetch(`${API_URL}/alerts/${id}/toggle`, {
+      const res = await apiFetch(`/alerts/${id}/toggle`, {
         method: 'PUT',
-        credentials: 'include',
       });
       if (res.ok) {
         // Atualiza status localmente de forma otimista
@@ -173,9 +167,8 @@ export default function AlertsPage() {
   const handleDeleteAlert = async (id: string) => {
     if (!confirm('Deseja realmente excluir permanentemente este alerta?')) return;
     try {
-      const res = await fetch(`${API_URL}/alerts/${id}`, {
+      const res = await apiFetch(`/alerts/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (res.ok) {
         setAlerts((prev) => prev.filter((a) => a.id !== id));
@@ -193,21 +186,27 @@ export default function AlertsPage() {
     }).format(val);
   };
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}/${mm}/${dd} às ${hh}:${min}`;
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${yyyy}/${mm}/${dd} às ${hh}:${min}`;
+    } catch {
+      return dateStr;
+    }
   };
 
   if (authLoading) {
     return (
       <main className="container">
         <div className="glass-panel">
-          <span className="loading-spinner" style={{ borderTopColor: '#00f2fe', width: 40, height: 40 }}></span>
+          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
           <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}>Carregando sua sessão segura...</p>
         </div>
       </main>
@@ -222,43 +221,16 @@ export default function AlertsPage() {
   const disabledAlerts = alerts.filter((a) => a.status === 'DISABLED');
 
   return (
-    <main className="container" style={{ maxWidth: 1100 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', flexFlow: 'row wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '1.25rem', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2.3rem', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0, fontWeight: 800 }}>stock-pulse</h1>
-          
-          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}>
-            <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              📊 Monitoramento
-            </Link>
-            <Link href="/dashboard/portfolio" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              💼 Minha Carteira
-            </Link>
-            <Link href="/dashboard/alerts" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 700, borderBottom: '2px solid var(--accent-color)', paddingBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              🔔 Meus Alertas
-            </Link>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ textAlign: 'right', fontSize: '0.8rem' }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>{user.name}</span>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sessão Segura</span>
-          </div>
-          <button className="primary-button" onClick={logout} style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}>
-            Sair
-          </button>
-        </div>
-      </div>
+    <div className="app-layout">
+      <AppSidebar userName={user.name} onLogout={logout} />
 
-      {/* Grid Central */}
-      <div style={{ display: 'flex', flexFlow: 'row wrap', gap: '2rem', alignItems: 'stretch' }}>
-        
-        {/* Painel Esquerdo: Criar Alerta */}
-        <div style={{ flex: '1 1 350px' }}>
+      <main className="app-main-content">
+        {/* Grid Central */}
+        <div style={{ display: 'flex', flexFlow: 'row wrap', gap: '2rem', alignItems: 'stretch' }}>
+          {/* Painel Esquerdo: Criar Alerta */}
+          <div style={{ flex: '1 1 350px' }}>
           <div className="glass-panel" style={{ padding: '2rem', textAlign: 'left', height: '100%' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', margin: '0 0 1.5rem 0' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 1.5rem 0' }}>
               Novo Alerta
             </h2>
 
@@ -270,11 +242,11 @@ export default function AlertsPage() {
 
             {formSuccess && (
               <div style={{
-                background: 'rgba(0, 230, 118, 0.08)',
-                border: '1px solid #00e676',
+                background: 'var(--color-success-bg)',
+                border: '1px solid var(--color-success)',
                 borderRadius: '10px',
                 padding: '1rem',
-                color: '#e2e8f0',
+                color: 'var(--text-primary)',
                 fontSize: '0.85rem',
                 marginBottom: '1.5rem'
               }}>
@@ -352,9 +324,9 @@ export default function AlertsPage() {
               </div>
 
               {selectedAsset && (
-                <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--panel-border)', padding: '0.8rem', borderRadius: '8px', fontSize: '0.8rem' }}>
+                <div style={{ background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', padding: '0.8rem', borderRadius: '8px', fontSize: '0.8rem' }}>
                   <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Empresa Selecionada</span>
-                  <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>{selectedAsset.name}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{selectedAsset.name}</span>
                   <span style={{ display: 'block', color: 'var(--accent-color)', fontSize: '0.7rem', textTransform: 'uppercase', marginTop: '0.2rem' }}>
                     Bolsa: {selectedAsset.exchange} | Tipo: {selectedAsset.type}
                   </span>
@@ -370,10 +342,10 @@ export default function AlertsPage() {
                   className="form-input"
                   value={condition}
                   onChange={(e) => setCondition(e.target.value as 'ABOVE' | 'BELOW')}
-                  style={{ background: '#111827', width: '100%', padding: '0.6rem 0.9rem' }}
+                  style={{ background: 'var(--input-bg)', width: '100%', padding: '0.6rem 0.9rem' }}
                 >
-                  <option value="ABOVE">Sobe acima de (▲)</option>
-                  <option value="BELOW">Cai abaixo de (▼)</option>
+                  <option value="ABOVE" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>Sobe acima de (▲)</option>
+                  <option value="BELOW" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>Cai abaixo de (▼)</option>
                 </select>
               </div>
 
@@ -403,8 +375,8 @@ export default function AlertsPage() {
                   padding: '0.75rem',
                   fontSize: '0.9rem',
                   marginTop: '0.5rem',
-                  background: (!selectedAsset) ? 'rgba(255,255,255,0.03)' : 'linear-gradient(135deg, #00f2fe 0%, #4facfe 100%)',
-                  color: (!selectedAsset) ? 'var(--text-secondary)' : '#0b0f19',
+                  background: (!selectedAsset) ? 'var(--input-bg)' : 'var(--accent-gradient)',
+                  color: (!selectedAsset) ? 'var(--text-secondary)' : 'var(--accent-foreground)',
                   cursor: (!selectedAsset) ? 'not-allowed' : 'pointer',
                   fontWeight: 700,
                   border: 'none'
@@ -422,7 +394,7 @@ export default function AlertsPage() {
           
           {/* Seção 1: Alertas Ativos */}
           <div className="glass-panel" style={{ padding: '1.5rem 2rem', textAlign: 'left' }}>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 800, color: '#00f2fe', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               🟢 Alertas Ativos ({activeAlerts.length})
             </h3>
             
@@ -437,13 +409,13 @@ export default function AlertsPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
                 {activeAlerts.map((a) => (
-                  <div key={a.id} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--panel-border)', borderRadius: '12px', padding: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={a.id} style={{ background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', borderRadius: '12px', padding: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#fff', display: 'block' }}>{a.ticker}</span>
+                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)', display: 'block' }}>{a.ticker}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
                         {a.asset_name}
                       </span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: a.condition === 'ABOVE' ? '#00e676' : '#ff3d00' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: a.condition === 'ABOVE' ? 'var(--color-success)' : 'var(--color-danger)' }}>
                         {a.condition === 'ABOVE' ? '▲ Acima de' : '▼ Abaixo de'} {formatMoney(a.target_price, a.currency)}
                       </span>
                     </div>
@@ -453,9 +425,9 @@ export default function AlertsPage() {
                       <button
                         onClick={() => handleToggleStatus(a.id)}
                         style={{
-                          background: 'rgba(0, 242, 254, 0.1)',
-                          border: '1px solid #00f2fe',
-                          color: '#00f2fe',
+                          background: 'var(--accent-bg)',
+                          border: '1px solid var(--accent-color)',
+                          color: 'var(--accent-color)',
                           borderRadius: '20px',
                           padding: '0.25rem 0.65rem',
                           fontSize: '0.7rem',
@@ -463,8 +435,6 @@ export default function AlertsPage() {
                           cursor: 'pointer',
                           transition: 'all 0.2s'
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = '#00f2fe'; e.currentTarget.style.color = '#000'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0, 242, 254, 0.1)'; e.currentTarget.style.color = '#00f2fe'; }}
                         title="Desativar Alerta"
                       >
                         Pausar
@@ -473,9 +443,8 @@ export default function AlertsPage() {
                       {/* Excluir */}
                       <button
                         onClick={() => handleDeleteAlert(a.id)}
-                        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '1.1rem', cursor: 'pointer', transition: 'color 0.15s' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#ff4a5a'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                        className="btn-close"
+                        style={{ fontSize: '1.1rem' }}
                         title="Excluir Alerta"
                       >
                         ✕
@@ -489,13 +458,13 @@ export default function AlertsPage() {
 
           {/* Seção 2: Alertas Disparados */}
           <div className="glass-panel" style={{ padding: '1.5rem 2rem', textAlign: 'left' }}>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 800, color: '#ffb300', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-warning)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               🔔 Disparados recentemente ({triggeredAlerts.length})
             </h3>
             
             {isLoadingAlerts ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>
-                <span className="loading-spinner" style={{ borderTopColor: '#ffb300' }}></span>
+                <span className="loading-spinner" style={{ borderTopColor: 'var(--color-warning)' }}></span>
               </div>
             ) : triggeredAlerts.length === 0 ? (
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '1rem 0' }}>
@@ -504,10 +473,10 @@ export default function AlertsPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
                 {triggeredAlerts.map((a) => (
-                  <div key={a.id} style={{ background: 'rgba(255,179,0,0.02)', border: '1px solid rgba(255,179,0,0.15)', borderRadius: '12px', padding: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={a.id} style={{ background: 'var(--color-warning-bg)', border: '1px solid rgba(var(--warning-rgb), 0.25)', borderRadius: '12px', padding: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ffb300', display: 'block' }}>{a.ticker}</span>
-                      <span style={{ fontSize: '0.7rem', color: '#ffb300', display: 'block', fontWeight: 600, marginBottom: '0.2rem' }}>
+                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--color-warning)', display: 'block' }}>{a.ticker}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-warning)', display: 'block', fontWeight: 600, marginBottom: '0.2rem' }}>
                         Disparou {a.triggered_at ? formatDate(a.triggered_at) : ''}
                       </span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block' }}>
@@ -517,9 +486,8 @@ export default function AlertsPage() {
 
                     <button
                       onClick={() => handleDeleteAlert(a.id)}
-                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '1.1rem', cursor: 'pointer', transition: 'color 0.15s' }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#ff4a5a'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                      className="btn-close"
+                      style={{ fontSize: '1.1rem' }}
                       title="Excluir Histórico"
                     >
                       ✕
@@ -532,13 +500,13 @@ export default function AlertsPage() {
 
           {/* Seção 3: Alertas Desativados */}
           <div className="glass-panel" style={{ padding: '1.5rem 2rem', textAlign: 'left' }}>
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               ⚪ Pausados / Inativos ({disabledAlerts.length})
             </h3>
             
             {isLoadingAlerts ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>
-                <span className="loading-spinner" style={{ borderTopColor: '#9ca3af' }}></span>
+                <span className="loading-spinner" style={{ borderTopColor: 'var(--text-muted)' }}></span>
               </div>
             ) : disabledAlerts.length === 0 ? (
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '1rem 0' }}>
@@ -547,9 +515,9 @@ export default function AlertsPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
                 {disabledAlerts.map((a) => (
-                  <div key={a.id} style={{ background: 'rgba(255,255,255,0.005)', border: '1px solid var(--panel-border)', borderRadius: '12px', padding: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.6 }}>
+                  <div key={a.id} style={{ background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', borderRadius: '12px', padding: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.6 }}>
                     <div>
-                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#9ca3af', display: 'block' }}>{a.ticker}</span>
+                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-muted)', display: 'block' }}>{a.ticker}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
                         Pausado
                       </span>
@@ -563,9 +531,9 @@ export default function AlertsPage() {
                       <button
                         onClick={() => handleToggleStatus(a.id)}
                         style={{
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid #9ca3af',
-                          color: '#9ca3af',
+                          background: 'var(--input-bg)',
+                          border: '1px solid var(--text-muted)',
+                          color: 'var(--text-muted)',
                           borderRadius: '20px',
                           padding: '0.25rem 0.65rem',
                           fontSize: '0.7rem',
@@ -573,8 +541,6 @@ export default function AlertsPage() {
                           cursor: 'pointer',
                           transition: 'all 0.2s'
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#000'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.color = '#9ca3af'; }}
                         title="Reativar Alerta"
                       >
                         Ativar
@@ -583,9 +549,8 @@ export default function AlertsPage() {
                       {/* Excluir */}
                       <button
                         onClick={() => handleDeleteAlert(a.id)}
-                        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '1.1rem', cursor: 'pointer', transition: 'color 0.15s' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#ff4a5a'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                        className="btn-close"
+                        style={{ fontSize: '1.1rem' }}
                         title="Excluir Alerta"
                       >
                         ✕
@@ -601,5 +566,6 @@ export default function AlertsPage() {
 
       </div>
     </main>
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 
 export interface User {
   id: string;
@@ -18,11 +19,10 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  fetchMe: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -32,38 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Busca perfil do usuário logado na inicialização para restaurar sessão ativa
   const fetchMe = async (): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_URL}/auth/me`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Essencial para transmitir cookies HttpOnly
-      });
-
+      const res = await apiFetch('/auth/me');
       if (res.ok) {
         const data = await res.json();
         setUser(data);
         return true;
       }
-
-      // Se o status for 401, tenta fazer o refresh silencioso
-      if (res.status === 401) {
-        const refreshSuccess = await handleRefresh();
-        if (refreshSuccess) {
-          // Se o refresh deu certo, tenta puxar o perfil /me novamente
-          const retryRes = await fetch(`${API_URL}/auth/me`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-          });
-          if (retryRes.ok) {
-            const data = await retryRes.json();
-            setUser(data);
-            return true;
-          }
-        }
-      }
-
       setUser(null);
       return false;
     } catch (error) {
@@ -73,24 +47,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Realiza a renovação silenciosa do access_token usando o refresh_token
-  const handleRefresh = async (): Promise<boolean> => {
-    try {
-      const res = await fetch(`${API_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-      return res.ok;
-    } catch (error) {
-      console.error('Erro ao renovar sessão:', error);
-      return false;
-    }
-  };
+  // handleRefresh foi migrado para o lib/api.ts (attemptRefresh)
+
+  const initRef = React.useRef(false);
 
   useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+
     const initAuth = async () => {
       await fetchMe();
       setIsLoading(false);
@@ -101,24 +65,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await apiFetch('/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ email, password }),
-        credentials: 'include',
       });
-
-      const data = await res.json();
-
       if (!res.ok) {
+        const data = await res.json();
         throw new Error(data.error || 'Falha ao efetuar login');
       }
-
-      setUser(data);
-      window.location.href = '/dashboard';
-    } catch (error) {
+      await fetchMe();
+      setIsLoading(false);
+      router.push('/dashboard/portfolio');
+    } catch (error: any) {
       setIsLoading(false);
       throw error;
     }
@@ -127,18 +85,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_URL}/auth/register`, {
+      const res = await apiFetch('/auth/register', {
         method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ name, email, password }),
       });
-
-      const data = await res.json();
-
       if (!res.ok) {
+        const data = await res.json();
         throw new Error(data.error || 'Falha ao efetuar cadastro');
       }
 
@@ -153,13 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+      await apiFetch('/auth/logout', { method: 'POST' });
     } catch (error) {
       console.error('Erro ao efetuar logout no servidor:', error);
     } finally {
@@ -178,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        fetchMe,
       }}
     >
       {children}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redismock/v9"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,14 +35,35 @@ func (m *MockQuoteProvider) SearchAssets(ctx context.Context, query string) ([]S
 }
 
 func (m *MockQuoteProvider) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
-	args := m.Called(ctx, ticker)
+	args := m.Called(ctx, ticker, assetType)
 	if args.Get(0) != nil {
 		return args.Get(0).([]DividendEvent), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
+func (m *MockQuoteProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuoteProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func setupServiceTest() (*Service, *MockQuoteProvider, *redis.Client, redismock.ClientMock) {
+	config.Envs.RedisTTLQuotes = 60 * time.Second
+	config.Envs.RedisTTLFundamentals = 12 * time.Hour
+	config.Envs.RedisTTLExchangeRates = 12 * time.Hour
+	config.Envs.RedisTTLDividends = 12 * time.Hour
+
 	mp := new(MockQuoteProvider)
 	rdb, rmock := redismock.NewClientMock()
 	s := NewService(mp, rdb)
@@ -94,7 +116,7 @@ func TestService_GetQuote(t *testing.T) {
 		assert.Equal(t, 150.0, quote.Price)
 		assert.NoError(t, rmock.ExpectationsWereMet())
 	})
-	
+
 	t.Run("Cache Miss - Set Cache Error (Logs)", func(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
 		rmock.ExpectGet("quote:AAPL").RedisNil()
@@ -146,3 +168,86 @@ func TestService_SearchAssets(t *testing.T) {
 		assert.Equal(t, "AAPL", res[0].Symbol)
 	})
 }
+
+func TestService_InvalidateQuoteCache(t *testing.T) {
+	t.Run("Specific Symbols Success", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("quote:PETR4.SA", "quote:VALE3.SA", "benchmarks:summary:v1").SetVal(2)
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), []string{"PETR4.SA", "VALE3.SA"})
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), removed)
+		assert.NoError(t, rmock.ExpectationsWereMet())
+	})
+
+	t.Run("Specific Symbols Redis Error", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("quote:PETR4.SA", "benchmarks:summary:v1").SetErr(errors.New("redis failure"))
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), []string{"PETR4.SA"})
+		assert.Error(t, err)
+		assert.Equal(t, int64(0), removed)
+	})
+
+	t.Run("All Symbols / Empty Slice Scan", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("benchmarks:summary:v1").SetVal(1)
+		rmock.ExpectScan(0, "quote:*", 100).SetVal([]string{"quote:PETR4.SA", "quote:VALE3.SA"}, 0)
+		rmock.ExpectDel("quote:PETR4.SA", "quote:VALE3.SA").SetVal(2)
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), nil)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(3), removed)
+		assert.NoError(t, rmock.ExpectationsWereMet())
+	})
+
+	t.Run("All Symbols Scan Error", func(t *testing.T) {
+		s, _, _, rmock := setupServiceTest()
+		rmock.ExpectDel("benchmarks:summary:v1").SetVal(1)
+		rmock.ExpectScan(0, "quote:*", 100).SetErr(errors.New("scan error"))
+
+		removed, err := s.InvalidateQuoteCache(context.Background(), []string{})
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), removed)
+	})
+}
+
+func TestService_GetHistoricalPrices(t *testing.T) {
+	s, mp, _, _ := setupServiceTest()
+
+	t.Run("GetHistoricalPrices delegates to provider", func(t *testing.T) {
+		expected := []HistoricalPrice{
+			{Timestamp: 1700000000, Close: 35.50},
+		}
+		mp.On("GetHistoricalPrices", mock.Anything, "PETR4.SA", "10y").Return(expected, nil).Once()
+
+		res, err := s.GetHistoricalPrices(context.Background(), "PETR4.SA", "10y")
+		assert.NoError(t, err)
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("GetHistoricalPricesBetween delegates to provider", func(t *testing.T) {
+		expected := []HistoricalPrice{
+			{Timestamp: 1700000000, Close: 35.50},
+		}
+		mp.On("GetHistoricalPricesBetween", mock.Anything, "PETR4.SA", int64(1690000000), int64(1700000000)).Return(expected, nil).Once()
+
+		res, err := s.GetHistoricalPricesBetween(context.Background(), "PETR4.SA", 1690000000, 1700000000)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, res)
+	})
+}
+
+func TestMockProvider_HistoricalMethods(t *testing.T) {
+	mockProv := NewMockProvider()
+	hp1, err := mockProv.GetHistoricalPrices(context.Background(), "AAPL", "10y")
+	assert.NoError(t, err)
+	assert.Empty(t, hp1)
+
+	hp2, err := mockProv.GetHistoricalPricesBetween(context.Background(), "AAPL", 100, 200)
+	assert.NoError(t, err)
+	assert.Empty(t, hp2)
+}
+
+
+

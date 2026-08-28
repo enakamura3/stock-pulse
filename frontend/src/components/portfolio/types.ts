@@ -3,6 +3,7 @@ export interface Portfolio {
   user_id: string;
   name: string;
   base_currency: string;
+  is_default: boolean;
   created_at: string;
 }
 
@@ -21,6 +22,9 @@ export interface Position {
   return_percent?: number;
   daily_change?: number;
   daily_change_percent?: number;
+  previous_close?: number;
+  volume?: number;
+  fx_rate_to_brl?: number;
   graham_value?: number;
   bazin_value?: number;
   pvp?: number;
@@ -40,6 +44,7 @@ export interface Transaction {
   quantity: number;
   unit_price: number;
   total_cost: number;
+  fee?: number;
   exchange_rate: number;
   executed_at: string;
   created_at: string;
@@ -49,12 +54,18 @@ export interface PerformancePoint {
   date: string;
   value: number;
   total_invested: number;
+  return_pct?: number;
+  cdi_return_pct?: number;
+  ipca_return_pct?: number;
+  ifix_return_pct?: number;
+  ibov_return_pct?: number;
+  sp500_return_pct?: number;
 }
 
 export interface CalculatedDividend {
   asset_id: string;
   ticker: string;
-  ex_date: string;
+  cum_date: string;
   payment_date: string;
   gross_amount: number;
   net_amount: number;
@@ -67,6 +78,23 @@ export interface CalculatedDividend {
   asset_type: string;
   asset_name: string;
   is_accrued?: boolean;
+}
+
+export interface BenchmarkItem {
+  symbol: string;
+  name: string;
+  value: number;
+  change: number;
+  change_percent: number;
+  previous_close?: number;
+}
+
+export interface MarketBenchmarks {
+  ibov?: BenchmarkItem;
+  sp500?: BenchmarkItem;
+  usd_brl?: BenchmarkItem;
+  ifix?: BenchmarkItem;
+  updated_at?: string;
 }
 
 export interface SearchResult {
@@ -105,14 +133,15 @@ export interface FixedIncomePosition {
   gross_value: number;
   net_value: number;
   net_return_percent: number;
-  gross_return_percent: number;
-  iof_amount: number;
-  ir_amount: number;
-  ir_rate: number;
-  iof_rate: number;
-  days_in_portfolio: number;
   days_to_maturity: number;
   is_matured: boolean;
+  taxes_calculated?: number;
+  gross_return_percent?: number;
+  iof_amount?: number;
+  ir_amount?: number;
+  ir_rate?: number;
+  iof_rate?: number;
+  days_in_portfolio?: number;
 }
 
 export interface UnifiedTransaction {
@@ -125,6 +154,7 @@ export interface UnifiedTransaction {
   type: string;
   quantity: number | null;
   unit_price: number | null;
+  fee?: number | null;
   exchange_rate: number | null;
   total_value: number;
   currency: string;
@@ -133,3 +163,30 @@ export interface UnifiedTransaction {
   resulting_invested?: number;
 }
 
+export interface TreasuryPosition {
+  transaction_id: string;
+  asset_id: string;
+  ticker: string;
+  treasury_type: string;
+  maturity_date: string;
+  has_coupons: boolean;
+  start_date: string;
+  quantity: number;
+  unit_price: number;
+  contracted_rate: number;
+  total_invested: number;
+  gross_value: number;
+  net_value: number;
+  is_matured: boolean;
+  days_to_maturity: number;
+  taxes_calculated: number;
+  b3_fee: number;
+  ir_tax: number;
+  iof_tax: number;
+}
+
+export interface TreasuryPerfPoint {
+  date: string;
+  value: number;
+  total_invested: number;
+}

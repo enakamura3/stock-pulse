@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
 type AssetEvent struct {
@@ -12,42 +14,42 @@ type AssetEvent struct {
 	Type        string    `json:"type"`
 	GrossAmount float64   `json:"gross_amount"`
 	NetAmount   float64   `json:"net_amount"`
-	ExDate      time.Time `json:"ex_date"`
+	CumDate     time.Time `json:"cum_date"`
 	PaymentDate time.Time `json:"payment_date"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func (r *Repository) UpsertAssetEvent(ctx context.Context, event AssetEvent) error {
 	query := `
-		INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, ex_date, payment_date)
+		INSERT INTO asset_event (asset_id, type, gross_amount, net_amount, cum_date, payment_date)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (asset_id, type, gross_amount, payment_date) 
+		ON CONFLICT (asset_id, cum_date, type, gross_amount) 
 		DO UPDATE SET 
-			ex_date = EXCLUDED.ex_date,
+			payment_date = EXCLUDED.payment_date,
 			net_amount = EXCLUDED.net_amount,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE
-			asset_event.ex_date IS DISTINCT FROM EXCLUDED.ex_date OR
+			asset_event.payment_date IS DISTINCT FROM EXCLUDED.payment_date OR
 			asset_event.net_amount IS DISTINCT FROM EXCLUDED.net_amount
 	`
 	var paymentDate interface{} = event.PaymentDate
 	if event.PaymentDate.IsZero() {
 		paymentDate = nil
 	}
-	_, err := r.db.Exec(ctx, query,
-		event.AssetID, event.Type, event.GrossAmount, event.NetAmount, event.ExDate, paymentDate,
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query,
+		event.AssetID, event.Type, event.GrossAmount, event.NetAmount, event.CumDate, paymentDate,
 	)
 	return err
 }
 
 func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error) {
 	query := `
-		SELECT id, asset_id, type, gross_amount, net_amount, ex_date, payment_date, updated_at
+		SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at
 		FROM asset_event
 		WHERE asset_id = $1
-		ORDER BY ex_date DESC
+		ORDER BY cum_date DESC
 	`
-	rows, err := r.db.Query(ctx, query, assetID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +59,7 @@ func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]Asse
 	for rows.Next() {
 		var e AssetEvent
 		var paymentDate sql.NullTime
-		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.ExDate, &paymentDate, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.CumDate, &paymentDate, &e.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if paymentDate.Valid {
@@ -66,4 +68,46 @@ func (r *Repository) GetAssetEvents(ctx context.Context, assetID string) ([]Asse
 		list = append(list, e)
 	}
 	return list, nil
+}
+
+func (r *Repository) GetAssetEventsByDate(ctx context.Context, assetID string, cumDate time.Time) ([]AssetEvent, error) {
+	query := `
+		SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at
+		FROM asset_event
+		WHERE asset_id = $1 AND cum_date = $2
+	`
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, assetID, cumDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []AssetEvent
+	for rows.Next() {
+		var e AssetEvent
+		var paymentDate sql.NullTime
+		if err := rows.Scan(&e.ID, &e.AssetID, &e.Type, &e.GrossAmount, &e.NetAmount, &e.CumDate, &paymentDate, &e.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if paymentDate.Valid {
+			e.PaymentDate = paymentDate.Time
+		}
+		list = append(list, e)
+	}
+	return list, nil
+}
+
+func (r *Repository) UpdateAssetEventValueByID(ctx context.Context, eventID string, newGross, newNet float64, newPayment time.Time) error {
+	query := `
+		UPDATE asset_event
+		SET gross_amount = $1, net_amount = $2, payment_date = $3, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $4
+	`
+	var paymentDate interface{} = newPayment
+	if newPayment.IsZero() {
+		paymentDate = nil
+	}
+
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, newGross, newNet, paymentDate, eventID)
+	return err
 }

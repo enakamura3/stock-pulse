@@ -164,6 +164,39 @@ paths:
         '200':
           description: Resultados da busca textual
 
+  /market/benchmarks:
+    get:
+      summary: Obter benchmarks e índices de mercado em tempo real
+      tags:
+        - Dados de Mercado
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Benchmarks retornados com sucesso (IBOV, S&P 500, Dólar, IFIX)
+
+  /market/quotes/invalidate:
+    post:
+      summary: Invalidar chaves de cache de cotações no Redis
+      tags:
+        - Dados de Mercado
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbols:
+                  type: array
+                  items:
+                    type: string
+                  description: Lista opcional de tickers para invalidar. Se omitido, invalida todos os caches de cotação.
+      responses:
+        '200':
+          description: Cache de cotações invalidado com sucesso
+
   /watchlists:
     get:
       summary: Listar watchlists do usuário
@@ -319,6 +352,24 @@ paths:
       responses:
         '201':
           description: Portfólio criado
+
+  /portfolios/{id}/default:
+    put:
+      summary: Definir carteira como padrão do usuário ao fazer login
+      tags:
+        - Portfólios
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Carteira definida como padrão
 
   /portfolios/{id}:
     get:
@@ -496,7 +547,41 @@ paths:
             example: ALL
       responses:
         '200':
-          description: Série histórica de evolução de saldo para gráficos
+          description: Série histórica de evolução de saldo e rentabilidade comparativa para gráficos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      example: "2026-07-07"
+                    value:
+                      type: number
+                      example: 10500.42
+                    total_invested:
+                      type: number
+                      example: 10000.00
+                    return_pct:
+                      type: number
+                      example: 5.00
+                    cdi_return_pct:
+                      type: number
+                      example: 3.42
+                    ipca_return_pct:
+                      type: number
+                      example: 1.25
+                    ifix_return_pct:
+                      type: number
+                      example: 2.10
+                    ibov_return_pct:
+                      type: number
+                      example: 4.56
+                    sp500_return_pct:
+                      type: number
+                      example: 6.80
 
   /alerts:
     get:
@@ -574,6 +659,56 @@ paths:
       responses:
         '200':
           description: Status alternado com sucesso
+
+  /workers:
+    get:
+      summary: Listar todos os workers (tarefas em segundo plano)
+      tags:
+        - Administração
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Listagem de workers com status e horários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    last_run:
+                      type: string
+                      format: date-time
+                    next_run:
+                      type: string
+                      format: date-time
+                    status:
+                      type: string
+                    interval:
+                      type: string
+
+  /workers/{name}/trigger:
+    post:
+      summary: Executar um worker manualmente
+      tags:
+        - Administração
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            example: DividendWorker
+      responses:
+        '200':
+          description: Worker disparado com sucesso
+        '404':
+          description: Worker não encontrado
 
 components:
   securitySchemes:

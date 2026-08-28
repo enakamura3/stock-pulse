@@ -1,15 +1,14 @@
 package middleware
 
 import (
-
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -55,42 +54,42 @@ func TestAuthRequired(t *testing.T) {
 		{
 			name:           "Missing cookie",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Sessão ausente. Faça login novamente."}` + "\n",
+			expectedBody:   `{"error":"Sessão ausente. Faça login novamente."}`,
 		},
 		{
 			name:           "Invalid algorithm",
 			cookieName:     "access_token",
 			cookieValue:    invalidAlgTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}` + "\n",
+			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
 		},
 		{
 			name:           "Invalid signature",
 			cookieName:     "access_token",
 			cookieValue:    validTokenStr + "invalid",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}` + "\n",
+			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
 		},
 		{
 			name:           "Missing user_id",
 			cookieName:     "access_token",
 			cookieValue:    missingUserIdTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Erro ao processar as credenciais."}` + "\n",
+			expectedBody:   `{"error":"Erro ao processar as credenciais."}`,
 		},
 		{
 			name:           "Empty user_id",
 			cookieName:     "access_token",
 			cookieValue:    emptyUserIdTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"ID de usuário inválido nas credenciais."}` + "\n",
+			expectedBody:   `{"error":"ID de usuário inválido nas credenciais."}`,
 		},
 		{
 			name:           "Invalid claims type",
 			cookieName:     "access_token",
 			cookieValue:    customClaimsTokenStr,
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Erro ao processar as credenciais."}` + "\n",
+			expectedBody:   `{"error":"Erro ao processar as credenciais."}`,
 		},
 		{
 			name:           "Valid token",
@@ -133,8 +132,8 @@ func TestAuthRequired(t *testing.T) {
 }
 
 func TestCORS(t *testing.T) {
-	os.Setenv("FRONTEND_URL", "http://example.com")
-	defer os.Unsetenv("FRONTEND_URL")
+	config.Envs.FrontendURL = "http://example.com"
+	defer func() { config.Envs.FrontendURL = "" }()
 
 	tests := []struct {
 		name           string
@@ -196,7 +195,7 @@ func TestCORS(t *testing.T) {
 }
 
 func TestCORS_FallbackURL(t *testing.T) {
-	os.Setenv("FRONTEND_URL", "") // ensure it is empty
+	config.Envs.FrontendURL = "" // ensure it is empty
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Origin", "http://localhost:3000")
 

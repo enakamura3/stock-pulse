@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/smtp"
-	"os"
+
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 )
 
 // SendMailFunc define a assinatura para enviar emails, permitindo mock nos testes.
@@ -19,15 +20,15 @@ type Service struct {
 
 // NewService inicializa o serviço de e-mail buscando as configurações SMTP do ambiente.
 func NewService() *Service {
-	host := os.Getenv("SMTP_HOST")
+	host := config.Envs.SMTPHost
 	if host == "" {
 		host = "localhost"
 	}
-	port := os.Getenv("SMTP_PORT")
+	port := config.Envs.SMTPPort
 	if port == "" {
 		port = "1025" // Porta SMTP padrão do Mailpit/Mailhog
 	}
-	from := os.Getenv("SMTP_FROM")
+	from := config.Envs.SMTPFrom
 	if from == "" {
 		from = "no-reply@stock-pulse.com"
 	}

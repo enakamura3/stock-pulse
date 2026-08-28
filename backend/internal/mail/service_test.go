@@ -3,16 +3,16 @@ package mail
 import (
 	"errors"
 	"net/smtp"
-	"os"
 	"testing"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewService(t *testing.T) {
-	os.Setenv("SMTP_HOST", "test_host")
-	os.Setenv("SMTP_PORT", "test_port")
-	os.Setenv("SMTP_FROM", "test_from")
+	config.Envs.SMTPHost = "test_host"
+	config.Envs.SMTPPort = "test_port"
+	config.Envs.SMTPFrom = "test_from"
 
 	svc := NewService()
 
@@ -20,9 +20,9 @@ func TestNewService(t *testing.T) {
 	assert.Equal(t, "test_port", svc.port)
 	assert.Equal(t, "test_from", svc.from)
 
-	os.Unsetenv("SMTP_HOST")
-	os.Unsetenv("SMTP_PORT")
-	os.Unsetenv("SMTP_FROM")
+	config.Envs.SMTPHost = ""
+	config.Envs.SMTPPort = ""
+	config.Envs.SMTPFrom = ""
 
 	svcDefault := NewService()
 

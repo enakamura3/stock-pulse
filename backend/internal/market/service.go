@@ -9,28 +9,44 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 )
 
 // Service gerencia cotações de ativos agregando cacheamento Redis de alta performance.
 type Service struct {
-	provider     QuoteProvider
-	scraper      *Scraper
-	fundamentus  *FundamentusScraper
-	stockAnalysis *StockAnalysisScraper
-	rdb          *redis.Client
-	ttl          time.Duration
+	provider         QuoteProvider
+	scraper          FundamentalsScraper
+	dividendGateway  *DividendGateway
+	rdb              *redis.Client
+	ttlQuotes        time.Duration
+	ttlFundamentals  time.Duration
+	ttlExchangeRates time.Duration
 }
 
-// NewService cria uma nova instância de Service com o TTL configurado para 60 segundos.
+// NewService cria uma nova instância de Service com TTLs configuráveis.
 func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
+
+	b3Client := NewB3Client()
+	fundamentusClient := NewFundamentusClient()
+	stockAnalysisClient := NewStockAnalysisClient()
+	yahooClient := NewYahooClient()
+
+	b3Source := NewB3DividendSource(b3Client)
+	fundamentusSource := NewFundamentusDividendSource(fundamentusClient)
+	stockAnalysisSource := NewStockAnalysisDividendSource(stockAnalysisClient)
+	yahooSource := NewYahooDividendSource(yahooClient)
+
+	ttlDividends := config.Envs.RedisTTLDividends
+
 	return &Service{
-		provider:      provider,
-		scraper:       NewScraper(),
-		fundamentus:   NewFundamentusScraper(),
-		stockAnalysis: NewStockAnalysisScraper(),
-		rdb:           rdb,
-		ttl:           60 * time.Second, // Decisão aprovada pelo usuário
+		provider:         provider,
+		scraper:          NewScraper(),
+		dividendGateway:  NewDividendGateway(b3Source, fundamentusSource, stockAnalysisSource, yahooSource, rdb, ttlDividends),
+		rdb:              rdb,
+		ttlQuotes:        config.Envs.RedisTTLQuotes,
+		ttlFundamentals:  config.Envs.RedisTTLFundamentals,
+		ttlExchangeRates: config.Envs.RedisTTLExchangeRates,
 	}
 }
 
@@ -60,14 +76,14 @@ func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*
 		return nil, false, err
 	}
 
-	// Serializa e salva no Redis de forma assíncrona (ou imediata) com TTL de 60s
+	// Serializa e salva no Redis
 	quoteJSON, err := json.Marshal(quote)
 	if err == nil {
-		err = s.rdb.Set(ctx, key, quoteJSON, s.ttl).Err()
+		err = s.rdb.Set(ctx, key, quoteJSON, s.ttlQuotes).Err()
 		if err != nil {
 			log.Printf("[Redis] Erro ao salvar cache para %s: %v", symbol, err)
 		} else {
-			log.Printf("[Redis] Novo cache salvo para %s com sucesso (TTL 60s)", symbol)
+			log.Printf("[Redis] Novo cache salvo para %s com sucesso", symbol)
 		}
 	}
 
@@ -82,47 +98,7 @@ func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
 
 // GetDividends busca os proventos de um ativo e faz cache.
 func (s *Service) GetDividends(ctx context.Context, symbol string, assetType string) ([]DividendEvent, error) {
-	cacheKey := fmt.Sprintf("dividends:%s", symbol)
-	
-	// Tenta no Redis primeiro
-	val, err := s.rdb.Get(ctx, cacheKey).Result()
-	if err == nil {
-		var cached []DividendEvent
-		if err := json.Unmarshal([]byte(val), &cached); err == nil {
-			return cached, nil
-		}
-	}
-
-	// Roteamento: tenta buscar com o scraper correto
-	var events []DividendEvent
-	var fetchErr error
-
-	if strings.HasSuffix(strings.ToUpper(symbol), ".SA") {
-		events, fetchErr = s.fundamentus.GetDividends(ctx, symbol, assetType)
-		if fetchErr != nil || len(events) == 0 {
-			// Fallback para StockAnalysis caso o Fundamentus falhe (ex: ETFs BR)
-			log.Printf("[Market] Fundamentus falhou para %s. Tentando StockAnalysis...", symbol)
-			events, fetchErr = s.stockAnalysis.GetDividends(ctx, symbol, assetType)
-		}
-	} else {
-		events, fetchErr = s.stockAnalysis.GetDividends(ctx, symbol, assetType)
-	}
-
-	// Fallback para Yahoo Finance caso dê erro
-	if fetchErr != nil || len(events) == 0 {
-		log.Printf("[Market] Falha no scraper de proventos para %s (%v). Usando fallback do Yahoo Finance.", symbol, fetchErr)
-		events, err = s.provider.GetDividends(ctx, symbol, assetType)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Cacheia por 12 horas (proventos não mudam com frequência)
-	if data, err := json.Marshal(events); err == nil {
-		s.rdb.Set(ctx, cacheKey, data, 12*time.Hour)
-	}
-
-	return events, nil
+	return s.dividendGateway.GetDividends(ctx, symbol, assetType)
 }
 
 // getExchangeRatesMap fetches the 10y history of BRL=X and returns it as a map[string]float64 (date string "YYYY-MM-DD" -> rate).
@@ -142,17 +118,16 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 
-	resp, err := s.provider.(*YahooFinanceProvider).client.Do(req)
+	var resp *http.Response
+	if yp, ok := s.provider.(*YahooFinanceProvider); ok {
+		resp, err = yp.client.Do(req)
+	} else {
+		err = fmt.Errorf("not a YahooFinanceProvider")
+	}
 	// We need to use http.DefaultClient since we can't easily access the unexported client.
 	// Actually, just create a temporary client here for simplicity, since it's just an internal helper.
 	if err != nil {
 		// fallback to generic http
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err = client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-	} else if resp == nil {
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err = client.Do(req)
 		if err != nil {
@@ -169,7 +144,7 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 	var data struct {
 		Chart struct {
 			Result []struct {
-				Timestamp []int64 `json:"timestamp"`
+				Timestamp  []int64 `json:"timestamp"`
 				Indicators struct {
 					Quote []struct {
 						Close []float64 `json:"close"`
@@ -199,7 +174,7 @@ func (s *Service) getExchangeRatesMap(ctx context.Context) (map[string]float64, 
 
 	if len(rates) > 0 {
 		if cacheData, err := json.Marshal(rates); err == nil {
-			s.rdb.Set(ctx, cacheKey, cacheData, 12*time.Hour)
+			s.rdb.Set(ctx, cacheKey, cacheData, s.ttlExchangeRates)
 		}
 	}
 
@@ -266,8 +241,8 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 		return nil, err
 	}
 
-	// Calcula Preço Teto de Bazin se soubermos a cotação. 
-	// Para não criar deadlock ou chamadas lentas demais, faremos depois. 
+	// Calcula Preço Teto de Bazin se soubermos a cotação.
+	// Para não criar deadlock ou chamadas lentas demais, faremos depois.
 	// Wait, we can get current price from s.GetQuote(ctx, symbol) to calc Bazin Yield Ceiling
 	quote, errQ := s.GetQuote(ctx, symbol)
 	if errQ == nil && quote != nil && quote.Price > 0 {
@@ -281,8 +256,7 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 
 	fundJSON, err := json.Marshal(fund)
 	if err == nil {
-		// Salva no Redis com TTL de 12 horas
-		err = s.rdb.Set(ctx, key, fundJSON, 12*time.Hour).Err()
+		err = s.rdb.Set(ctx, key, fundJSON, s.ttlFundamentals).Err()
 		if err != nil {
 			log.Printf("[Redis] Erro ao salvar cache de fundamentos para %s: %v", symbol, err)
 		}
@@ -290,3 +264,63 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 
 	return fund, nil
 }
+
+// InvalidateQuoteCache remove do Redis as chaves de cotação e benchmarks para os símbolos informados.
+// Se symbols estiver vazio ou não fornecido, invalida todas as chaves "quote:*" e "benchmarks:summary:v1".
+func (s *Service) InvalidateQuoteCache(ctx context.Context, symbols []string) (int64, error) {
+	if len(symbols) == 0 {
+		var totalRemoved int64
+		// Remove resumo de benchmarks
+		if del, err := s.rdb.Del(ctx, "benchmarks:summary:v1").Result(); err == nil {
+			totalRemoved += del
+		}
+
+		// Escaneia chaves de cotação
+		var cursor uint64
+		for {
+			keys, nextCursor, err := s.rdb.Scan(ctx, cursor, "quote:*", 100).Result()
+			if err != nil {
+				log.Printf("[Redis] Erro ao escanear chaves de cotações para invalidação: %v", err)
+				break
+			}
+			if len(keys) > 0 {
+				deleted, err := s.rdb.Del(ctx, keys...).Result()
+				if err == nil {
+					totalRemoved += deleted
+				}
+			}
+			cursor = nextCursor
+			if cursor == 0 {
+				break
+			}
+		}
+		return totalRemoved, nil
+	}
+
+	var keys []string
+	for _, sym := range symbols {
+		cleaned := strings.ToUpper(strings.TrimSpace(sym))
+		if cleaned != "" {
+			keys = append(keys, fmt.Sprintf("quote:%s", cleaned))
+		}
+	}
+	keys = append(keys, "benchmarks:summary:v1")
+
+	deleted, err := s.rdb.Del(ctx, keys...).Result()
+	if err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
+// GetHistoricalPrices busca série histórica diária do provedor de mercado.
+func (s *Service) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+	return s.provider.GetHistoricalPrices(ctx, symbol, rangePeriod)
+}
+
+// GetHistoricalPricesBetween busca série histórica delimitada por timestamps Unix do provedor de mercado.
+func (s *Service) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+	return s.provider.GetHistoricalPricesBetween(ctx, symbol, period1, period2)
+}
+
+

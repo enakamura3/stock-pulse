@@ -6,15 +6,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
-
-// DBTX define a interface necessária para realizar queries e abstrair pgxpool.Pool para testes.
-type DBTX interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-}
 
 // Alert representa o modelo de dados de um alerta de preço.
 type Alert struct {
@@ -31,17 +24,17 @@ type Alert struct {
 	CreatedAt   time.Time  `json:"created_at"`
 
 	// Dados do usuário injetados na busca do Worker
-	UserName  string `json:"user_name,omitempty"`
-	UserEmail string `json:"user_email,omitempty"`
+	UserName       string `json:"user_name,omitempty"`
+	TelegramChatID *int64 `json:"telegram_chat_id,omitempty"`
 }
 
 // Repository gerencia a persistência das regras de alertas no PostgreSQL.
 type Repository struct {
-	db DBTX
+	db database.DBTX
 }
 
 // NewRepository inicializa o repositório de Alertas.
-func NewRepository(db DBTX) *Repository {
+func NewRepository(db database.DBTX) *Repository {
 	return &Repository{
 		db: db,
 	}
@@ -54,7 +47,7 @@ func (r *Repository) CreateAlert(ctx context.Context, a *Alert) error {
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at
 	`
-	err := r.db.QueryRow(ctx, query, a.UserID, a.AssetID, a.TargetPrice, a.Condition, a.Status).Scan(&a.ID, &a.CreatedAt)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, a.UserID, a.AssetID, a.TargetPrice, a.Condition, a.Status).Scan(&a.ID, &a.CreatedAt)
 	return err
 }
 
@@ -67,7 +60,7 @@ func (r *Repository) GetAlertsByUserID(ctx context.Context, userID string) ([]*A
 		WHERE a.user_id = $1
 		ORDER BY a.created_at DESC
 	`
-	rows, err := r.db.Query(ctx, query, userID)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +91,7 @@ func (r *Repository) GetAlertByID(ctx context.Context, id string, userID string)
 		WHERE a.id = $1 AND a.user_id = $2
 	`
 	var a Alert
-	err := r.db.QueryRow(ctx, query, id, userID).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, userID).Scan(
 		&a.ID, &a.UserID, &a.AssetID, &a.Ticker, &a.AssetName, &a.Currency,
 		&a.TargetPrice, &a.Condition, &a.Status, &a.TriggeredAt, &a.CreatedAt,
 	)
@@ -114,7 +107,7 @@ func (r *Repository) GetAlertByID(ctx context.Context, id string, userID string)
 // DeleteAlert exclui fisicamente o alerta de preço do usuário (Anti-IDOR).
 func (r *Repository) DeleteAlert(ctx context.Context, id string, userID string) error {
 	query := `DELETE FROM alert WHERE id = $1 AND user_id = $2`
-	res, err := r.db.Exec(ctx, query, id, userID)
+	res, err := database.GetDB(ctx, r.db).Exec(ctx, query, id, userID)
 	if err != nil {
 		return err
 	}
@@ -133,7 +126,7 @@ func (r *Repository) ToggleAlertStatus(ctx context.Context, id string, userID st
 		RETURNING status
 	`
 	var nextStatus string
-	err := r.db.QueryRow(ctx, query, id, userID).Scan(&nextStatus)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, userID).Scan(&nextStatus)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", errors.New("alerta não encontrado ou não pertence a este usuário")
@@ -146,13 +139,14 @@ func (r *Repository) ToggleAlertStatus(ctx context.Context, id string, userID st
 // GetActiveAlerts retorna todos os alertas ativos globalmente junto com dados de contato do usuário.
 func (r *Repository) GetActiveAlerts(ctx context.Context) ([]*Alert, error) {
 	query := `
-		SELECT a.id, a.user_id, a.asset_id, ast.ticker, ast.name, ast.currency, a.target_price, a.condition, a.status, a.triggered_at, a.created_at, u.name, u.email
+		SELECT a.id, a.user_id, a.asset_id, ast.ticker, ast.name, ast.currency, a.target_price, a.condition, a.status, a.triggered_at, a.created_at, u.name, utl.telegram_chat_id
 		FROM alert a
 		INNER JOIN asset ast ON a.asset_id = ast.id
 		INNER JOIN "user" u ON a.user_id = u.id
+		LEFT JOIN user_telegram_link utl ON u.id = utl.user_id
 		WHERE a.status = 'ACTIVE'
 	`
-	rows, err := r.db.Query(ctx, query)
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +158,7 @@ func (r *Repository) GetActiveAlerts(ctx context.Context) ([]*Alert, error) {
 		err := rows.Scan(
 			&a.ID, &a.UserID, &a.AssetID, &a.Ticker, &a.AssetName, &a.Currency,
 			&a.TargetPrice, &a.Condition, &a.Status, &a.TriggeredAt, &a.CreatedAt,
-			&a.UserName, &a.UserEmail,
+			&a.UserName, &a.TelegramChatID,
 		)
 		if err != nil {
 			return nil, err
@@ -182,7 +176,7 @@ func (r *Repository) MarkAlertTriggered(ctx context.Context, id string) error {
 		SET status = 'TRIGGERED', triggered_at = NOW()
 		WHERE id = $1 AND status = 'ACTIVE'
 	`
-	res, err := r.db.Exec(ctx, query, id)
+	res, err := database.GetDB(ctx, r.db).Exec(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -194,9 +188,9 @@ func (r *Repository) MarkAlertTriggered(ctx context.Context, id string) error {
 
 // GetAssetByTicker verifica se o ativo com o ticker especificado existe no banco de dados.
 func (r *Repository) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
-	query := `SELECT id FROM asset WHERE UPPER(ticker) = UPPER($1)`
+	query := `SELECT id FROM asset WHERE ticker = UPPER($1)`
 	var id string
-	err := r.db.QueryRow(ctx, query, ticker).Scan(&id)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&id)
 	return id, err
 }
 
@@ -208,7 +202,6 @@ func (r *Repository) CreateAsset(ctx context.Context, ticker, name, assetType, c
 		RETURNING id
 	`
 	var id string
-	err := r.db.QueryRow(ctx, query, ticker, name, assetType, currency).Scan(&id)
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker, name, assetType, currency).Scan(&id)
 	return id, err
 }
-

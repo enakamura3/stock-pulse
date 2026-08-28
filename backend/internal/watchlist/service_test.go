@@ -104,6 +104,22 @@ func (m *MockMarketProvider) SearchAssets(ctx context.Context, query string) ([]
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func setupServiceTest() (*Service, *MockWatchlistRepo, *MockMarketService, *MockMarketProvider) {
 	repo := new(MockWatchlistRepo)
 	ms := new(MockMarketService)
@@ -144,7 +160,7 @@ func TestService_GetWatchlists(t *testing.T) {
 		assert.Len(t, lists, 1)
 		assert.Equal(t, "w2", lists[0].ID)
 	})
-	
+
 	t.Run("Repo Error", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetWatchlistsByUserID", mock.Anything, "u3").Return(nil, errors.New("db error"))
@@ -184,7 +200,7 @@ func TestService_GetWatchlist(t *testing.T) {
 	t.Run("Success with Quotes", func(t *testing.T) {
 		s, repo, ms, _ := setupServiceTest()
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{ID: "w1"}, nil)
-		
+
 		items := []Item{{Ticker: "AAPL"}, {Ticker: "INVALID"}}
 		repo.On("GetWatchlistItems", mock.Anything, "w1").Return(items, nil)
 
@@ -265,7 +281,7 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "i2", item.ID)
 	})
-	
+
 	t.Run("New Default Asset - Success", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)
@@ -277,6 +293,19 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		item, err := s.AddAssetToWatchlist(context.Background(), "w1", "u1", "PETR4.SA")
 		assert.NoError(t, err)
 		assert.Equal(t, "i3", item.ID)
+	})
+
+	t.Run("New Crypto Asset - Crypto Branch", func(t *testing.T) {
+		s, repo, _, mp := setupServiceTest()
+		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)
+		repo.On("GetAssetByTicker", mock.Anything, "BTC-BRL").Return("", errors.New("not found"))
+		mp.On("GetQuote", mock.Anything, "BTC-BRL").Return(&market.Quote{Name: "Bitcoin", Currency: "BRL"}, nil)
+		repo.On("CreateAsset", mock.Anything, "BTC-BRL", "Bitcoin", "CRYPTO", "BRL").Return("a4", nil)
+		repo.On("AddWatchlistItem", mock.Anything, "w1", "a4").Return(&Item{ID: "i4"}, nil)
+
+		item, err := s.AddAssetToWatchlist(context.Background(), "w1", "u1", "BTC-BRL")
+		assert.NoError(t, err)
+		assert.Equal(t, "i4", item.ID)
 	})
 }
 

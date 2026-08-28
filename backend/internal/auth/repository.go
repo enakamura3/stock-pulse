@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
 // User representa o modelo do usuário conforme mapeado no banco de dados.
@@ -18,18 +18,13 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// DBTX define a interface necessária para realizar queries, abstraindo o pgxpool.Pool para facilitar os testes.
-type DBTX interface {
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
 // Repository encapsula a conexão para operações na tabela user.
 type Repository struct {
-	db DBTX
+	db database.DBTX
 }
 
 // NewRepository cria uma nova instância de Repository.
-func NewRepository(db DBTX) *Repository {
+func NewRepository(db database.DBTX) *Repository {
 	return &Repository{db: db}
 }
 
@@ -41,7 +36,7 @@ func (r *Repository) CreateUser(ctx context.Context, name, email, passwordHash s
 		RETURNING id, name, email, created_at, updated_at
 	`
 	user := &User{}
-	err := r.db.QueryRow(ctx, query, name, email, passwordHash).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, name, email, passwordHash).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -62,7 +57,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, e
 		WHERE email = $1
 	`
 	user := &User{}
-	err := r.db.QueryRow(ctx, query, email).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -84,7 +79,7 @@ func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 		WHERE id = $1
 	`
 	user := &User{}
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
@@ -95,4 +90,79 @@ func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 		return nil, err
 	}
 	return user, nil
+}
+
+// GetUserByIDWithHash busca o usuário completo pelo ID, incluindo o hash da senha.
+func (r *Repository) GetUserByIDWithHash(ctx context.Context, id string) (*User, error) {
+	query := `
+		SELECT id, name, email, password_hash, created_at, updated_at
+		FROM "user"
+		WHERE id = $1
+	`
+	user := &User{}
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.PasswordHash,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// UpdateUser atualiza os dados públicos (nome e e-mail) do usuário.
+func (r *Repository) UpdateUser(ctx context.Context, id, name, email string) (*User, error) {
+	query := `
+		UPDATE "user"
+		SET name = $2, email = $3, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, name, email, created_at, updated_at
+	`
+	user := &User{}
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, name, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao atualizar usuário: %w", err)
+	}
+	return user, nil
+}
+
+// UpdatePassword atualiza o hash da senha do usuário.
+func (r *Repository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	query := `
+		UPDATE "user"
+		SET password_hash = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id
+	`
+	var returnedID string
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, passwordHash).Scan(&returnedID)
+	if err != nil {
+		return fmt.Errorf("erro ao atualizar senha: %w", err)
+	}
+	return nil
+}
+
+// DeleteUser remove o usuário e todas as suas informações associadas em cascata.
+func (r *Repository) DeleteUser(ctx context.Context, id string) error {
+	query := `
+		DELETE FROM "user"
+		WHERE id = $1
+		RETURNING id
+	`
+	var returnedID string
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id).Scan(&returnedID)
+	if err != nil {
+		return fmt.Errorf("erro ao excluir usuário: %w", err)
+	}
+	return nil
 }

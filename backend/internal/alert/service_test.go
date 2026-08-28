@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -82,6 +83,22 @@ func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]m
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketService) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketService) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 // Tests
 
 func setupServiceTest() (*Service, *MockAlertRepo, *MockMarketService) {
@@ -107,7 +124,7 @@ func TestService_CreateAlert(t *testing.T) {
 
 	t.Run("Asset Exists Locally", func(t *testing.T) {
 		svc, repo, _ := setupServiceTest()
-		
+
 		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
 		repo.On("CreateAlert", mock.Anything, mock.MatchedBy(func(a *Alert) bool {
 			return a.AssetID == "a1" && a.TargetPrice == 150.0 && a.Condition == "ABOVE"
@@ -122,7 +139,7 @@ func TestService_CreateAlert(t *testing.T) {
 	t.Run("Asset Not Found Locally - Provider Error", func(t *testing.T) {
 		svc, repo, mp := setupServiceTest()
 
-		repo.On("GetAssetByTicker", mock.Anything, "INVALID").Return("", errors.New("not found"))
+		repo.On("GetAssetByTicker", mock.Anything, "INVALID").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "INVALID").Return((*market.Quote)(nil), errors.New("api error"))
 
 		_, err := svc.CreateAlert(context.Background(), "u1", "INVALID", 150.0, "ABOVE")
@@ -131,10 +148,19 @@ func TestService_CreateAlert(t *testing.T) {
 		mp.AssertExpectations(t)
 	})
 
+	t.Run("Asset Lookup DB Error", func(t *testing.T) {
+		svc, repo, _ := setupServiceTest()
+
+		repo.On("GetAssetByTicker", mock.Anything, "FAIL").Return("", errors.New("connection failed"))
+
+		_, err := svc.CreateAlert(context.Background(), "u1", "FAIL", 150.0, "ABOVE")
+		assert.ErrorContains(t, err, "erro ao consultar ativo no banco")
+	})
+
 	t.Run("Asset Created - Crypto", func(t *testing.T) {
 		svc, repo, mp := setupServiceTest()
 
-		repo.On("GetAssetByTicker", mock.Anything, "BTC-USD").Return("", errors.New("not found"))
+		repo.On("GetAssetByTicker", mock.Anything, "BTC-USD").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "BTC-USD").Return(&market.Quote{Name: "Bitcoin", Currency: "USD"}, nil)
 		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "CRYPTO", "USD").Return("a1", nil)
 		repo.On("CreateAlert", mock.Anything, mock.Anything).Return(nil)
@@ -148,7 +174,7 @@ func TestService_CreateAlert(t *testing.T) {
 	t.Run("Asset Created - US Equity", func(t *testing.T) {
 		svc, repo, mp := setupServiceTest()
 
-		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", errors.New("not found"))
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Name: "Apple", Currency: "USD"}, nil)
 		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "EQUITY_US", "USD").Return("a1", nil)
 		repo.On("CreateAlert", mock.Anything, mock.Anything).Return(nil)
@@ -160,7 +186,7 @@ func TestService_CreateAlert(t *testing.T) {
 	t.Run("Asset Created - General Equity", func(t *testing.T) {
 		svc, repo, mp := setupServiceTest()
 
-		repo.On("GetAssetByTicker", mock.Anything, "PETR4.SA").Return("", errors.New("not found"))
+		repo.On("GetAssetByTicker", mock.Anything, "PETR4.SA").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "PETR4.SA").Return(&market.Quote{Name: "Petrobras", Currency: "BRL"}, nil)
 		repo.On("CreateAsset", mock.Anything, "PETR4.SA", "Petrobras", "EQUITY", "BRL").Return("a1", nil)
 		repo.On("CreateAlert", mock.Anything, mock.Anything).Return(nil)
@@ -172,7 +198,7 @@ func TestService_CreateAlert(t *testing.T) {
 	t.Run("Asset Creation DB Error", func(t *testing.T) {
 		svc, repo, mp := setupServiceTest()
 
-		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", errors.New("not found"))
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Name: "Apple", Currency: "USD"}, nil)
 		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "EQUITY_US", "USD").Return("", errors.New("db err"))
 

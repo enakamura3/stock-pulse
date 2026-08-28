@@ -34,7 +34,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL", Price: 150.0}, nil)
 
 	hub := NewHub(ms)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	go hub.Start(ctx)
 	defer cancel()
@@ -70,7 +70,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	// Wait for subscription to process and force broadcast
 	time.Sleep(50 * time.Millisecond)
 	go hub.broadcastQuotes(context.Background())
-	
+
 	// Read message (could be a ping or quote)
 	ws.SetReadDeadline(time.Now().Add(1 * time.Second))
 	for {
@@ -78,7 +78,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error reading message: %v", err)
 		}
-		
+
 		// Unmarshal
 		var payload map[string]interface{}
 		if err := json.Unmarshal(p, &payload); err == nil && payload["type"] == "quote" {
@@ -104,6 +104,13 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeWS(rec, req)
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	// Test handler bad upgrade (authorized but missing WS headers)
+	req2 := httptest.NewRequest("GET", "/ws", nil)
+	req2 = req2.WithContext(context.WithValue(req2.Context(), auth.UserIDKey, "test_user"))
+	rec2 := httptest.NewRecorder()
+	handler.ServeWS(rec2, req2)
+	assert.Equal(t, http.StatusBadRequest, rec2.Code)
 }
 
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {

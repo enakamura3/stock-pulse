@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
 // MarketService define a interface que o Handler consome.
@@ -13,6 +14,8 @@ type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*Quote, error)
 	GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
+	GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error)
+	InvalidateQuoteCache(ctx context.Context, symbols []string) (int64, error)
 }
 
 // Handler expõe os endpoints HTTP para busca e cotação.
@@ -29,13 +32,13 @@ func NewHandler(service MarketService) *Handler {
 func (h *Handler) GetQuote(w http.ResponseWriter, r *http.Request) {
 	ticker := chi.URLParam(r, "ticker")
 	if ticker == "" {
-		h.respondWithError(w, http.StatusBadRequest, "Símbolo do ativo (ticker) é obrigatório")
+		httputils.RespondWithError(w, http.StatusBadRequest, "Símbolo do ativo (ticker) é obrigatório")
 		return
 	}
 
 	quote, hit, err := h.service.GetQuoteWithCacheStatus(r.Context(), ticker)
 	if err != nil {
-		h.respondWithError(w, http.StatusNotFound, err.Error())
+		httputils.RespondWithError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -45,38 +48,63 @@ func (h *Handler) GetQuote(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Cache", "MISS")
 	}
 
-	h.respondWithJSON(w, http.StatusOK, quote)
+	httputils.RespondWithJSON(w, http.StatusOK, quote)
 }
 
 // Search realiza a busca de ativos autocomplete.
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	if query == "" {
-		h.respondWithJSON(w, http.StatusOK, []SearchResult{})
+		httputils.RespondWithJSON(w, http.StatusOK, []SearchResult{})
 		return
 	}
 
 	results, err := h.service.SearchAssets(r.Context(), query)
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao efetuar busca no provedor de mercado")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao efetuar busca no provedor de mercado")
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusOK, results)
+	httputils.RespondWithJSON(w, http.StatusOK, results)
 }
 
-func (h *Handler) respondWithError(w http.ResponseWriter, status int, msg string) {
-	h.respondWithJSON(w, status, map[string]string{"error": msg})
-}
-
-func (h *Handler) respondWithJSON(w http.ResponseWriter, status int, payload interface{}) {
-	response, err := json.Marshal(payload)
+// GetBenchmarks retorna os principais benchmarks de mercado para comparação intradiária.
+func (h *Handler) GetBenchmarks(w http.ResponseWriter, r *http.Request) {
+	benchmarks, err := h.service.GetBenchmarks(r.Context())
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error": "Erro de serialização JSON interno"}`))
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao obter benchmarks de mercado")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write(response)
+
+	httputils.RespondWithJSON(w, http.StatusOK, benchmarks)
+}
+
+// InvalidateCacheRequest representa a requisição para invalidar o cache de cotações.
+type InvalidateCacheRequest struct {
+	Symbols []string `json:"symbols"`
+}
+
+// InvalidateCacheResponse representa a resposta da invalidação de cache.
+type InvalidateCacheResponse struct {
+	Message string `json:"message"`
+	Removed int64  `json:"removed"`
+}
+
+// InvalidateCache invalida as chaves de cotação e benchmarks no Redis.
+func (h *Handler) InvalidateCache(w http.ResponseWriter, r *http.Request) {
+	var req InvalidateCacheRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	removed, err := h.service.InvalidateQuoteCache(r.Context(), req.Symbols)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao invalidar cache de cotações")
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, InvalidateCacheResponse{
+		Message: "Cache de cotações invalidado com sucesso",
+		Removed: removed,
+	})
 }

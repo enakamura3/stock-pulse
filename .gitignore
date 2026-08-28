@@ -8,10 +8,12 @@ node_modules/
 out/
 build/
 coverage/
+coverage_local/
 
 # Go / Air (Backend)
 tmp/
-api
+/backend/api
+/backend/cmd/api/api
 *.exe
 *.exe~
 *.dll

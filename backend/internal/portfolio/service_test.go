@@ -3,12 +3,10 @@ package portfolio
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,6 +38,10 @@ func (m *MockPortfolioRepo) GetPortfolioByID(ctx context.Context, id, userID str
 		return args.Get(0).(*Portfolio), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+func (m *MockPortfolioRepo) SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error {
+	return m.Called(ctx, portfolioID, userID).Error(0)
 }
 
 func (m *MockPortfolioRepo) DeletePortfolio(ctx context.Context, id, userID string) error {
@@ -82,6 +84,19 @@ func (m *MockPortfolioRepo) GetDailyPrices(ctx context.Context, assetID string, 
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetDailyPricesBatch(ctx context.Context, assetIDs []string, startDate, endDate time.Time) ([]DailyPrice, error) {
+	var allPrices []DailyPrice
+	for _, id := range assetIDs {
+		prices, err := m.GetDailyPrices(ctx, id, startDate, endDate)
+		if err != nil && err.Error() != "ignored" { // Avoid failing immediately if a specific test ignores some errors
+			// Wait, the tests might mock errors. If err is returned, maybe we just return it.
+			return nil, err
+		}
+		allPrices = append(allPrices, prices...)
+	}
+	return allPrices, nil
+}
+
 func (m *MockPortfolioRepo) GetAssetByTicker(ctx context.Context, ticker string) (string, error) {
 	args := m.Called(ctx, ticker)
 	return args.String(0), args.Error(1)
@@ -118,6 +133,16 @@ func (m *MockPortfolioRepo) GetAssetEvents(ctx context.Context, assetID string) 
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetAssetEventsByDate(ctx context.Context, assetID string, exDate time.Time) ([]AssetEvent, error) {
+	args := m.Called(ctx, assetID, exDate)
+	return args.Get(0).([]AssetEvent), args.Error(1)
+}
+
+func (m *MockPortfolioRepo) UpdateAssetEventValueByID(ctx context.Context, eventID string, newGross, newNet float64, newPayment time.Time) error {
+	args := m.Called(ctx, eventID, newGross, newNet, newPayment)
+	return args.Error(0)
+}
+
 type MockMarketService struct {
 	mock.Mock
 }
@@ -144,9 +169,22 @@ func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]m
 }
 
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
-	args := m.Called(ctx, ticker)
+	args := m.Called(ctx, ticker, assetType)
+	return args.Get(0).([]market.DividendEvent), args.Error(1)
+}
+
+func (m *MockMarketService) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
 	if args.Get(0) != nil {
-		return args.Get(0).([]market.DividendEvent), args.Error(1)
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketService) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -168,6 +206,22 @@ func (m *MockMarketProvider) SearchAssets(ctx context.Context, query string) ([]
 	return args.Get(0).([]market.SearchResult), args.Error(1)
 }
 
+func (m *MockMarketProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockMarketProvider) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
 	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
@@ -176,11 +230,18 @@ func (m *MockMarketProvider) GetDividends(ctx context.Context, ticker string, as
 	return nil, args.Error(1)
 }
 
+type dummyUOW struct{}
+
+func (d *dummyUOW) Do(ctx context.Context, fn func(ctx context.Context) error) error {
+	return fn(ctx)
+}
+
 func setupServiceTest() (*Service, *MockPortfolioRepo, *MockMarketService, *MockMarketProvider) {
 	repo := new(MockPortfolioRepo)
 	ms := new(MockMarketService)
 	mp := new(MockMarketProvider)
-	s := NewService(repo, ms, mp, nil)
+	uow := &dummyUOW{}
+	s := NewService(repo, ms, mp, nil, uow)
 	return s, repo, ms, mp
 }
 
@@ -200,11 +261,10 @@ func TestService_CreatePortfolio(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "p2", p.ID)
 }
-
 func TestService_GetPortfolios(t *testing.T) {
 	t.Run("Existing lists", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
-		repo.On("GetPortfoliosByUserID", mock.Anything, "u1").Return([]Portfolio{{ID: "p1"}}, nil)
+		repo.On("GetPortfoliosByUserID", mock.Anything, "u1").Return([]Portfolio{{ID: "p1", IsDefault: true}}, nil)
 
 		lists, err := s.GetPortfolios(context.Background(), "u1")
 		assert.NoError(t, err)
@@ -214,7 +274,7 @@ func TestService_GetPortfolios(t *testing.T) {
 	t.Run("Onboarding create default", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfoliosByUserID", mock.Anything, "u2").Return([]Portfolio{}, nil)
-		repo.On("CreatePortfolio", mock.Anything, "u2", "Principal", "BRL").Return(&Portfolio{ID: "p2"}, nil)
+		repo.On("CreatePortfolio", mock.Anything, "u2", "Principal", "BRL").Return(&Portfolio{ID: "p2", IsDefault: true}, nil)
 
 		lists, err := s.GetPortfolios(context.Background(), "u2")
 		assert.NoError(t, err)
@@ -237,6 +297,21 @@ func TestService_GetPortfolios(t *testing.T) {
 
 		_, err := s.GetPortfolios(context.Background(), "u4")
 		assert.ErrorContains(t, err, "falha ao criar portfólio")
+	})
+}
+
+func TestService_SetDefaultPortfolio(t *testing.T) {
+	t.Run("Invalid IDs", func(t *testing.T) {
+		s, _, _, _ := setupServiceTest()
+		err := s.SetDefaultPortfolio(context.Background(), "", "u1")
+		assert.ErrorContains(t, err, "IDs inválidos")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("SetDefaultPortfolio", mock.Anything, "p1", "u1").Return(nil)
+		err := s.SetDefaultPortfolio(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
 	})
 }
 
@@ -372,10 +447,19 @@ func TestService_AddTransaction(t *testing.T) {
 		assert.Equal(t, "tx1", res.ID)
 	})
 
+	t.Run("Asset Lookup DB Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("db connection failed"))
+
+		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
+		assert.ErrorContains(t, err, "erro ao consultar ativo no banco")
+	})
+
 	t.Run("New Asset - Provider Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(nil, errors.New("err"))
 
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
@@ -385,7 +469,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New Crypto Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "BTC-USD").Return("", "", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "BTC-USD").Return("", "", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "BTC-USD").Return(&market.Quote{Currency: "USD", Name: "Bitcoin"}, nil)
 		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "CRYPTO", "USD").Return("", errors.New("err"))
 
@@ -396,7 +480,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New US Equity Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Currency: "USD", Name: "Apple"}, nil)
 		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "STOCK_US", "USD").Return("", errors.New("err"))
 
@@ -510,146 +594,47 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 	})
 }
 
-// Backfill Test - We need httptest
+// Backfill Test
 func TestService_BackfillHistoricalPrices(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{
-				"chart": {
-					"result": [{
-						"timestamp": [1609459200],
-						"indicators": {
-							"quote": [{
-								"close": [150.0]
-							}]
-						}
-					}]
-				}
-			}`))
-		}))
-		defer server.Close()
+		s, repo, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
 
-		s, repo, _, _ := setupServiceTest()
-
-		// To mock the URL call, we intercept transport
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.NoError(t, err)
 	})
 
-	t.Run("HTTP Error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusInternalServerError)
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+	t.Run("Market Service Error", func(t *testing.T) {
+		s, _, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{}, errors.New("market error")).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "status 500")
+		assert.ErrorContains(t, err, "market error")
 	})
 
-	t.Run("JSON Error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`invalid`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+	t.Run("Empty Prices", func(t *testing.T) {
+		s, _, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{}, nil).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.Error(t, err)
-	})
-
-	t.Run("Provider Error Message", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"error": "not found"}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "not found")
-	})
-
-	t.Run("Empty Result", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": []}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "vazio")
-	})
-
-	t.Run("Missing Indicators", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": [{"timestamp": []}]}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "sem timestamps")
-	})
-
-	t.Run("Inconsistent Lengths", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": [{"timestamp": [1, 2], "indicators": {"quote": [{"close": [1]}]}}]}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "inconsistência")
+		assert.NoError(t, err)
 	})
 
 	t.Run("Save Error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": [{"timestamp": [1], "indicators": {"quote": [{"close": [1]}]}}]}}`))
-		}))
-		defer server.Close()
+		s, repo, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
 
-		s, repo, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db error"))
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db error")).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "falha ao gravar")
+		assert.ErrorContains(t, err, "falha ao gravar histórico")
 	})
-}
-
-// Mock transport to reroute requests
-type mockTransport struct {
-	serverURL string
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.URL.Scheme = "http"
-	req.URL.Host = strings.TrimPrefix(m.serverURL, "http://")
-	return http.DefaultTransport.RoundTrip(req)
 }
 
 func (m *MockMarketService) GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error) {
@@ -665,4 +650,438 @@ func (m *MockPortfolioRepo) GetExchangeRateByDate(ctx context.Context, currencyP
 func (m *MockPortfolioRepo) GetOldestPriceDate(ctx context.Context, assetID string) (time.Time, error) {
 	args := m.Called(ctx, assetID)
 	return args.Get(0).(time.Time), args.Error(1)
+}
+
+func TestService_DetermineAssetType(t *testing.T) {
+	assert.Equal(t, "CRYPTO", determineAssetType("BTC-USD", "Bitcoin", "USD"))
+	assert.Equal(t, "ETF_US", determineAssetType("SPY", "SPDR S&P 500 ETF Trust", "USD"))
+	assert.Equal(t, "STOCK_US", determineAssetType("AAPL", "Apple", "USD"))
+	assert.Equal(t, "BDR", determineAssetType("AAPL34.SA", "Apple BDR", "BRL"))
+	assert.Equal(t, "BDR", determineAssetType("AAPL35.SA", "Apple BDR", "BRL"))
+	assert.Equal(t, "BDR", determineAssetType("AAPL39.SA", "Apple BDR", "BRL"))
+	assert.Equal(t, "ETF_BR", determineAssetType("BOVA11.SA", "iShares Ibovespa ETF", "BRL"))
+	assert.Equal(t, "FIAGRO", determineAssetType("RZAG11.SA", "Riza Fiagro", "BRL"))
+	assert.Equal(t, "FII", determineAssetType("HGLG11.SA", "FII CSHG", "BRL"))
+	assert.Equal(t, "STOCK_BR", determineAssetType("PETR4.SA", "Petrobras", "BRL"))
+}
+
+func TestService_GetFixedIncomeService(t *testing.T) {
+	s, _, _, _ := setupServiceTest()
+	assert.Nil(t, s.GetFixedIncomeService())
+}
+
+func TestService_UpdateTransaction(t *testing.T) {
+	t.Run("Portfolio Not Found", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL"})
+		assert.ErrorContains(t, err, "carteira não encontrada")
+	})
+
+	t.Run("Invalid Ticker", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: ""})
+		assert.ErrorContains(t, err, "ticker do ativo inválido")
+	})
+
+	t.Run("Asset Not Found", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL"})
+		assert.ErrorContains(t, err, "ativo não encontrado na base")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
+		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err")) // Ignore background
+
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL", Quantity: 10, UnitPrice: 150})
+		assert.NoError(t, err)
+	})
+}
+
+func TestService_GetUnifiedTransactions(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+		{ID: "tx1", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 150, ExchangeRate: 1.0, Currency: "USD"},
+		{ID: "tx2", PortfolioID: "p1", Ticker: "AAPL", Type: "SPLIT", Quantity: 2, UnitPrice: 0, ExchangeRate: 1.0, Currency: "USD"},
+	}, nil)
+
+	unified, err := s.GetUnifiedTransactions(context.Background(), "p1", "u1")
+	assert.NoError(t, err)
+	assert.Len(t, unified, 2)
+	assert.Equal(t, float64(1500), unified[0].TotalValue)
+	assert.Equal(t, float64(0), unified[1].TotalValue)
+
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p2", "u1").Return(([]Transaction)(nil), errors.New("err"))
+	_, err = s.GetUnifiedTransactions(context.Background(), "p2", "u1")
+	assert.ErrorContains(t, err, "err")
+}
+
+func TestService_BackfillGap(t *testing.T) {
+	t.Run("Create Asset Fallback", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("err"))
+		repo.On("CreateAsset", mock.Anything, "USDBRL=X", "USDBRL=X", "CURRENCY", "BRL").Return("", errors.New("err"))
+
+		err := s.BackfillGap(context.Background(), "USDBRL=X", time.Now())
+		assert.ErrorContains(t, err, "falha ao criar ativo cambial")
+	})
+
+	t.Run("No Gap", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now().AddDate(0, 0, -10), nil)
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now())
+		assert.NoError(t, err)
+	})
+
+	t.Run("Market Service Error", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
+		ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("market gap error")).Once()
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
+		assert.ErrorContains(t, err, "market gap error")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
+		ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil).Once()
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
+		assert.NoError(t, err)
+	})
+
+	t.Run("Save Error", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
+		ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db save error")).Once()
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
+		assert.ErrorContains(t, err, "falha ao gravar histórico")
+	})
+}
+
+func TestService_GetPortfolioDividends(t *testing.T) {
+	t.Run("Portfolio Not Found", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(nil, errors.New("err"))
+		_, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "err")
+	})
+
+	t.Run("Tx Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(([]Transaction)(nil), errors.New("err"))
+		_, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "err")
+	})
+
+	t.Run("Success Calculate", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "STOCK_US"},
+			{AssetID: "a1", Ticker: "AAPL", Type: "SELL", Quantity: 5, ExecutedAt: now.AddDate(0, -1, 5), Currency: "USD", AssetType: "STOCK_US"},
+			{AssetID: "a2", Ticker: "ITUB4", Type: "BUY", Quantity: 100, ExecutedAt: now.AddDate(0, -1, 0), Currency: "BRL", AssetType: "STOCK_BR"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: now.AddDate(0, -1, 10), PaymentDate: now, GrossAmount: 1.0, Type: "DIVIDEND"},
+		}, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a2").Return([]AssetEvent{
+			{AssetID: "a2", CumDate: now.AddDate(0, -1, 10), PaymentDate: now, GrossAmount: 0.5, Type: "JCP"},
+		}, nil)
+
+		ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(5.0, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 2)
+	})
+
+	t.Run("Data Com Transaction Included", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		cumDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		txs := []Transaction{
+			// Compra no cum_date (Data Com)
+			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 10, ExecutedAt: cumDate.Add(14 * time.Hour), Currency: "USD", AssetType: "STOCK_US"},
+			// Compra depois do cum_date (não deve ser incluída)
+			{AssetID: "a1", Ticker: "AAPL", Type: "BUY", Quantity: 20, ExecutedAt: cumDate.AddDate(0, 0, 1), Currency: "USD", AssetType: "STOCK_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: cumDate, PaymentDate: now, GrossAmount: 1.0, Type: "DIVIDEND"},
+		}, nil)
+
+		ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(5.0, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		if len(divs) == 1 {
+			// Deve calcular baseando-se apenas nas 10 ações compradas no cum_date (Data Com).
+			// O valor bruto original deve ser 10 * 1.0 = 10.0
+			assert.Equal(t, 10.0, divs[0].OriginalGross)
+		}
+	})
+
+	t.Run("Market Rule - Past PaymentDate uses Historical Rate of PaymentDate", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		pastPaymentDate := now.AddDate(0, 0, -10)
+		cumDate := now.AddDate(0, 0, -20)
+
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "VOO", Type: "BUY", Quantity: 10, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "ETF_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: cumDate, PaymentDate: pastPaymentDate, GrossAmount: 2.0, Type: "DIVIDEND"},
+		}, nil)
+
+		// Câmbio na PaymentDate = 5.40
+		ms.On("GetHistoricalExchangeRate", mock.Anything, pastPaymentDate).Return(5.40, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.InDelta(t, 20.0, divs[0].OriginalGross, 1e-6)     // 10 cotas * $2.00 = $20.00
+		assert.InDelta(t, 20.0*0.70, divs[0].OriginalNet, 1e-6) // $14.00 líq após 30% US tax
+		assert.InDelta(t, 20.0*5.40, divs[0].GrossAmount, 1e-6) // R$ 108.00 em BRL
+		assert.InDelta(t, 14.0*5.40, divs[0].NetAmount, 1e-6)   // R$ 75.60 em BRL
+	})
+
+	t.Run("Market Rule - Future PaymentDate uses Spot Rate as projection", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		futurePaymentDate := now.AddDate(0, 0, 15) // Daqui a 15 dias
+		cumDate := now.AddDate(0, 0, -5)
+
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "VOO", Type: "BUY", Quantity: 10, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "ETF_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: cumDate, PaymentDate: futurePaymentDate, GrossAmount: 2.0, Type: "DIVIDEND"},
+		}, nil)
+
+		// Cotação Spot de Hoje para USDBRL=X = 5.75
+		ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(&market.Quote{Price: 5.75}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.InDelta(t, 20.0, divs[0].OriginalGross, 1e-6)
+		assert.InDelta(t, 20.0*5.75, divs[0].GrossAmount, 1e-6) // R$ 115.00 projetado
+	})
+
+	t.Run("Market Rule - Zero PaymentDate uses Spot Rate as projection", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		cumDate := now.AddDate(0, 0, -5)
+
+		txs := []Transaction{
+			{AssetID: "a1", Ticker: "SPY", Type: "BUY", Quantity: 5, ExecutedAt: now.AddDate(0, -1, 0), Currency: "USD", AssetType: "ETF_US"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "a1").Return([]AssetEvent{
+			{AssetID: "a1", CumDate: cumDate, PaymentDate: time.Time{}, GrossAmount: 3.0, Type: "DIVIDEND"},
+		}, nil)
+
+		// Cotação Spot de Hoje = 5.80
+		ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(&market.Quote{Price: 5.80}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.InDelta(t, 15.0, divs[0].OriginalGross, 1e-6)   // 5 * $3.00 = $15.00
+		assert.InDelta(t, 15.0*5.80, divs[0].GrossAmount, 1e-6) // R$ 87.00 projetado
+	})
+
+	t.Run("FII Deduplication and Zero PaymentDate Month Key", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		now := time.Now()
+		txs := []Transaction{
+			{AssetID: "fii1", Ticker: "MXRF11", Type: "BUY", Quantity: 100, ExecutedAt: now.AddDate(0, -2, 0), Currency: "BRL", AssetType: "FII"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+		repo.On("GetAssetEvents", mock.Anything, "fii1").Return([]AssetEvent{
+			// Event 1 with PaymentDate: time.Time{} (zero date)
+			{AssetID: "fii1", CumDate: now.AddDate(0, -1, 10), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
+			// Event 2 in same month (should be deduped / skipped)
+			{AssetID: "fii1", CumDate: now.AddDate(0, -1, 15), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
+		}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1) // Deduped to 1
+		assert.InDelta(t, 10.0, divs[0].GrossAmount, 1e-6)
+	})
+}
+
+// ─── Testes de TWRR (Time-Weighted Rate of Return) ──────────────────────────
+
+// TestTWRR_SimpleGain valida que quando a carteira sobe de valor sem nenhum
+// aporte externo, o TWRR é matematicamente equivalente ao retorno simples.
+func TestTWRR_SimpleGain(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	buyDate := now.AddDate(0, -1, -5) // 1 mês e 5 dias atrás — dentro da janela 1M
+
+	// Compra 10 ações a R$100 (custo total: R$1.000)
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: buyDate},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+
+	// Preços: sobe de 100 para 110 (+10%) — preço atual recente
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: buyDate, ClosePrice: 100.0},
+		{AssetID: "a1", PriceDate: now.AddDate(0, 0, -3), ClosePrice: 110.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	// O último ponto deve ter ReturnPct > 0 (carteira valorizou)
+	lastPoint := res[len(res)-1]
+	assert.Greater(t, lastPoint.ReturnPct, 0.0, "carteira que subiu deve ter ReturnPct positivo")
+}
+
+// TestTWRR_ExternalCashFlowDoesNotInflateReturn valida que um aporte externo
+// (novo BUY) no segundo dia NÃO deve inflar artificialmente o TWRR.
+// Sem TWRR, o aporte tornaria o retorno negativo ou distorcido.
+func TestTWRR_ExternalCashFlowDoesNotInflateReturn(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	day0 := now.AddDate(0, -1, -3)
+	day1 := now.AddDate(0, -1, -2)
+
+	// Dia 0: compra 10 ações a 100 (R$1.000)
+	// Dia 1: compra mais 10 ações a 100 (R$1.000 novo aporte, preço não mudou)
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: day0},
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: day1},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+	// Preço estável em 100 durante todo o período
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: day0, ClosePrice: 100.0},
+		{AssetID: "a1", PriceDate: day1, ClosePrice: 100.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	// Preço não mudou → TWRR deve ser ~0% (o aporte não deve inflar o retorno)
+	lastPoint := res[len(res)-1]
+	assert.InDelta(t, 0.0, lastPoint.ReturnPct, 0.1,
+		"aporte externo com preço estável não deve alterar o TWRR (esperado ~0%%)")
+}
+
+// TestTWRR_ZeroReturnOnFlatPrice garante que retorno zero com preço constante
+// resulta em ReturnPct = 0.
+func TestTWRR_ZeroReturnOnFlatPrice(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	buyDate := now.AddDate(0, -1, -1)
+
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 50, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: buyDate},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+	// Preço constante = sem valorização
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: buyDate, ClosePrice: 50.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	// Todos os pontos devem ter ReturnPct muito próximo de 0
+	for _, pt := range res {
+		assert.InDelta(t, 0.0, pt.ReturnPct, 0.01,
+			"preço constante deve resultar em ReturnPct ≈ 0 no ponto %s", pt.Date)
+	}
+}
+
+// TestTWRR_NegativeReturn valida que queda de preço resulta em ReturnPct < 0.
+func TestTWRR_NegativeReturn(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+
+	now := time.Now()
+	buyDate := now.AddDate(0, -1, -5) // 1 mês e 5 dias atrás — dentro da janela 1M
+
+	txs := []Transaction{
+		{AssetID: "a1", Ticker: "PETR4", Type: "BUY", Quantity: 10, UnitPrice: 100, ExchangeRate: 1.0, Currency: "BRL", ExecutedAt: buyDate},
+	}
+	repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+
+	repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("not found"))
+	// Preço cai de 100 para 80 (-20%) — preço recente
+	repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{
+		{AssetID: "a1", PriceDate: buyDate, ClosePrice: 100.0},
+		{AssetID: "a1", PriceDate: now.AddDate(0, 0, -3), ClosePrice: 80.0},
+	}, nil)
+
+	res, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "1M", nil)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res)
+
+	lastPoint := res[len(res)-1]
+	assert.Less(t, lastPoint.ReturnPct, 0.0, "queda de preço deve resultar em ReturnPct negativo")
 }

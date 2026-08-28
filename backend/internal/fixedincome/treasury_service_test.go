@@ -1,0 +1,256 @@
+package fixedincome
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestTreasuryService_EditDelete(t *testing.T) {
+	dbURL := config.Envs.DBURL
+	if dbURL == "" {
+		t.Skip("DB_URL is empty, skipping service integration tests")
+	}
+
+	pool := getTestDB(t)
+	ctx := context.Background()
+
+	err := cleanupDB(ctx, pool)
+	require.NoError(t, err)
+
+	// Initialize repository and service
+	repo := NewRepository(pool)
+	bcbClient := &mockBCBClient{}
+	s := NewService(repo, bcbClient)
+
+	// Create test user and portfolio
+	var userID string
+	err = pool.QueryRow(ctx, "INSERT INTO \"user\" (email, password_hash, name) VALUES ('service_test@test.com', 'hash', 'Service User') RETURNING id").Scan(&userID)
+	require.NoError(t, err)
+
+	var portfolioID string
+	err = pool.QueryRow(ctx, "INSERT INTO portfolio (user_id, name) VALUES ($1, 'Service Portfolio') RETURNING id", userID).Scan(&portfolioID)
+	require.NoError(t, err)
+
+	// Seed holidays so calculations don't fail or return default
+	_, err = pool.Exec(ctx, "INSERT INTO anbima_holidays (holiday_date, description) VALUES ('2026-12-25', 'Natal') ON CONFLICT DO NOTHING")
+	require.NoError(t, err)
+
+	var subTxID string
+
+	t.Run("Create subscription via service", func(t *testing.T) {
+		req := &TreasuryTxRequest{
+			Ticker:          "TESOURO PREFIXADO 2031",
+			TreasuryType:    "PREFIXADO",
+			MaturityDate:    "2031-01-01",
+			HasCoupons:      false,
+			Type:            "SUBSCRIPTION",
+			Quantity:        2.0,
+			UnitPrice:       1000.0,
+			ContractedRate:  10.0,
+			TransactionDate: "2026-06-01",
+		}
+
+		res, err := s.CreateTreasuryTransaction(ctx, portfolioID, req)
+		require.NoError(t, err)
+
+		resMap, ok := res.(map[string]string)
+		require.True(t, ok)
+		subTxID = resMap["id"]
+		assert.NotEmpty(t, subTxID)
+	})
+
+	t.Run("Create redemption via service (triggers FIFO)", func(t *testing.T) {
+		req := &TreasuryTxRequest{
+			Ticker:          "TESOURO PREFIXADO 2031",
+			TreasuryType:    "PREFIXADO",
+			MaturityDate:    "2031-01-01",
+			HasCoupons:      false,
+			Type:            "REDEMPTION",
+			Quantity:        1.0,
+			UnitPrice:       1050.0,
+			ContractedRate:  10.0,
+			TransactionDate: "2026-07-01",
+		}
+
+		res, err := s.CreateTreasuryTransaction(ctx, portfolioID, req)
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+	})
+
+	t.Run("Edit subscription via service (triggers FIFO rebuild)", func(t *testing.T) {
+		// Change the unit price of the subscription from 1000 to 950
+		req := &TreasuryTxRequest{
+			Ticker:          "TESOURO PREFIXADO 2031",
+			TreasuryType:    "PREFIXADO",
+			MaturityDate:    "2031-01-01",
+			HasCoupons:      false,
+			Type:            "SUBSCRIPTION",
+			Quantity:        2.0,
+			UnitPrice:       950.0,
+			ContractedRate:  10.0,
+			TransactionDate: "2026-06-01",
+		}
+
+		err := s.UpdateTreasuryTransaction(ctx, portfolioID, subTxID, req)
+		require.NoError(t, err)
+
+		// Verify that subscription unit price is updated
+		positions, err := s.GetTreasuryPositions(ctx, portfolioID)
+		require.NoError(t, err)
+		require.Len(t, positions, 1)
+		assert.Equal(t, 950.0, positions[0].UnitPrice)
+	})
+
+	t.Run("Delete subscription via service", func(t *testing.T) {
+		err := s.DeleteTreasuryTransaction(ctx, portfolioID, subTxID)
+		require.NoError(t, err)
+
+		// Verify position is deleted
+		positions, err := s.GetTreasuryPositions(ctx, portfolioID)
+		require.NoError(t, err)
+		assert.Empty(t, positions)
+	})
+}
+
+// Mock BCB Client for service setup
+type mockBCBClient struct{}
+
+func (m *mockBCBClient) FetchRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error) {
+	return nil, nil
+}
+
+func TestTreasuryService_MonthlyYields(t *testing.T) {
+	dbURL := config.Envs.DBURL
+	if dbURL == "" {
+		t.Skip("DB_URL is empty, skipping service integration tests")
+	}
+
+	pool := getTestDB(t)
+	ctx := context.Background()
+
+	err := cleanupDB(ctx, pool)
+	require.NoError(t, err)
+
+	repo := NewRepository(pool)
+	bcbClient := &mockBCBClient{}
+	s := NewService(repo, bcbClient)
+
+	// Create test user and portfolio
+	var userID string
+	err = pool.QueryRow(ctx, "INSERT INTO \"user\" (email, password_hash, name) VALUES ('yield_test@test.com', 'hash', 'Yield User') RETURNING id").Scan(&userID)
+	require.NoError(t, err)
+
+	var portfolioID string
+	err = pool.QueryRow(ctx, "INSERT INTO portfolio (user_id, name) VALUES ($1, 'Yield Portfolio') RETURNING id", userID).Scan(&portfolioID)
+	require.NoError(t, err)
+
+	// Seed holidays so calculations don't fail
+	_, err = pool.Exec(ctx, "INSERT INTO anbima_holidays (holiday_date, description) VALUES ('2026-12-25', 'Natal') ON CONFLICT DO NOTHING")
+	require.NoError(t, err)
+
+	// Create subscription in the past
+	req := &TreasuryTxRequest{
+		Ticker:          "TESOURO PREFIXADO 2031",
+		TreasuryType:    "PREFIXADO",
+		MaturityDate:    "2031-01-01",
+		HasCoupons:      false,
+		Type:            "SUBSCRIPTION",
+		Quantity:        2.0,
+		UnitPrice:       1000.0,
+		ContractedRate:  10.0,
+		TransactionDate: "2026-03-01", // Past date to have monthly yields
+	}
+
+	_, err = s.CreateTreasuryTransaction(ctx, portfolioID, req)
+	require.NoError(t, err)
+
+	yields, err := s.GetTreasuryMonthlyYields(ctx, portfolioID)
+	require.NoError(t, err)
+
+	// We expect at least some monthly yields since March 2026
+	assert.NotEmpty(t, yields)
+	for _, y := range yields {
+		assert.Equal(t, "TESOURO PREFIXADO 2031", y.AssetName)
+		assert.Equal(t, "TESOURO", y.AssetType)
+		assert.True(t, y.GrossAmount > 0)
+		assert.True(t, y.NetAmount > 0)
+		assert.NotEmpty(t, y.Month)
+	}
+}
+
+func TestTreasuryService_GetTreasuryPerformance(t *testing.T) {
+	dbURL := config.Envs.DBURL
+	if dbURL == "" {
+		t.Skip("DB_URL is empty, skipping service integration tests")
+	}
+
+	pool := getTestDB(t)
+	ctx := context.Background()
+
+	err := cleanupDB(ctx, pool)
+	require.NoError(t, err)
+
+	repo := NewRepository(pool)
+	bcbClient := &mockBCBClient{}
+	s := NewService(repo, bcbClient)
+
+	// Create test user and portfolio
+	var userID string
+	err = pool.QueryRow(ctx, "INSERT INTO \"user\" (email, password_hash, name) VALUES ('perf_test@test.com', 'hash', 'Perf User') RETURNING id").Scan(&userID)
+	require.NoError(t, err)
+
+	var portfolioID string
+	err = pool.QueryRow(ctx, "INSERT INTO portfolio (user_id, name) VALUES ($1, 'Perf Portfolio') RETURNING id", userID).Scan(&portfolioID)
+	require.NoError(t, err)
+
+	// Seed holidays so calculations don't fail
+	_, err = pool.Exec(ctx, "INSERT INTO anbima_holidays (holiday_date, description) VALUES ('2026-12-25', 'Natal') ON CONFLICT DO NOTHING")
+	require.NoError(t, err)
+
+	// Seed SELIC rates for dynamic calculations
+	_, err = pool.Exec(ctx, "INSERT INTO index_rates (indexer, date, rate) VALUES ('SELIC', '2026-03-02', 10.75), ('SELIC', '2026-03-03', 10.75) ON CONFLICT DO NOTHING")
+	require.NoError(t, err)
+
+	// 1. Check with no transactions
+	points, err := s.GetTreasuryPerformance(ctx, portfolioID)
+	require.NoError(t, err)
+	assert.Empty(t, points)
+
+	// 2. Add subscription
+	req := &TreasuryTxRequest{
+		Ticker:          "TESOURO SELIC 2029",
+		TreasuryType:    "SELIC",
+		MaturityDate:    "2029-03-01",
+		HasCoupons:      false,
+		Type:            "SUBSCRIPTION",
+		Quantity:        1.5,
+		UnitPrice:       2000.0,
+		ContractedRate:  0.15,
+		TransactionDate: "2026-03-02",
+	}
+	_, err = s.CreateTreasuryTransaction(ctx, portfolioID, req)
+	require.NoError(t, err)
+
+	// Fetch performance
+	points, err = s.GetTreasuryPerformance(ctx, portfolioID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, points)
+
+	// Verify the first point is the transaction date
+	assert.Equal(t, "2026-03-02", points[0].Date)
+	// On day 1 (purchase day), total_invested should be 3000.0 (1.5 * 2000.0)
+	assert.InDelta(t, 3000.0, points[0].TotalInvested, 1e-6)
+	assert.InDelta(t, 3000.0, points[0].Value, 1e-6)
+
+	// Verify subsequent points (value grows with SELIC + spread rate)
+	if len(points) > 1 {
+		assert.Equal(t, "2026-03-03", points[1].Date)
+		assert.InDelta(t, 3000.0, points[1].TotalInvested, 1e-6)
+		assert.True(t, points[1].Value > points[1].TotalInvested, "Value should grow by daily SELIC rate + spread")
+	}
+}

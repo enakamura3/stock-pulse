@@ -13,13 +13,15 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 - [📡 Integração com Provedores de Dados](#integração-com-provedores-de-dados)
 - [💱 Arquitetura Multimoeda e Taxas de Câmbio](#arquitetura-multimoeda-e-taxas-de-câmbio)
 - [📦 Especificação de Importação de Arquivos CSV](#especificação-de-importação-de-arquivos-csv)
+- [🏛️ Especificação de Import/Export CSV — Tesouro Direto](#️-especificação-de-importexport-csv--tesouro-direto)
 - [📊 Arquitetura Global e Modelagem de Dados](#arquitetura-global-e-modelagem-de-dados)
 - [🔍 Detalhamento de Módulos Core](#detalhamento-de-módulos-core)
   - [1. Autenticação e Segurança (Auth)](#1-autenticação-e-segurança-auth)
   - [2. Inserção de Transações e Auto-Cura (Transactions, Bulk Import & Backfill)](#2-inserção-de-transações-e-auto-cura-transactions-bulk-import--backfill)
   - [3. Scraping e Motor de Avaliação (Fundamentals & Valuation)](#3-scraping-e-motor-de-avaliação-fundamentals--valuation)
-  - [4. Trabalhadores em Segundo Plano (Background Workers)](#4-trabalhadores-em-segundo-plano-background-workers)
-  - [5. Integração com Bot do Telegram (Telegram Bot)](#5-integração-com-bot-do-telegram-telegram-bot)
+  - [4. Módulo de Proventos (Dividends & Yields)](#4-módulo-de-proventos-dividends--yields)
+  - [5. Trabalhadores em Segundo Plano (Background Workers)](#5-trabalhadores-em-segundo-plano-background-workers)
+  - [6. Integração com Bot do Telegram (Telegram Bot)](#6-integração-com-bot-do-telegram-telegram-bot)
 - [📂 Arquitetura do Repositório (Monorepo Layout)](#arquitetura-do-repositório-monorepo-layout)
 - [⚙️ Configuração e Desenvolvimento Local](#configuração-e-desenvolvimento-local)
 - [🏗️ Migrações de Banco de Dados](#migrações-de-banco-de-dados)
@@ -32,14 +34,17 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 ## 🚀 Funcionalidades Core (Core Features)
 
 - **Streaming de Dados em Tempo Real:** Conexões via WebSockets garantem atualizações instantâneas dos preços dos ativos no painel do usuário sem a necessidade de recarregar a página.
-- **Gestão de Carteiras Modular:** Acompanhe a rentabilidade, o histórico de transações e o preço médio de ativos nacionais (B3) e internacionais. A interface é modularizada nas seções de Renda Variável, Renda Fixa, Transações, Dividendos e Diário de Bordo. Suporta a edição nativa de transações, desdobramentos (splits), grupamentos (reverse splits), bonificações e importação em lote via arquivo CSV.
-- **Mecanismo de Renda Fixa Dedicado:** Um módulo isolado para acompanhamento de renda fixa (e.g., CDBs, Tesouro Direto, LCI, LCA) com gráficos de evolução de juros compostos e tabelas de rendimento líquido padronizadas. Inclui um simulador de rendimento diário que integra os **Rendimentos Mensais Acumulados** (descontando imposto regressivo e IOF) diretamente na visão de Dividendos, exibindo os juros acumulados como pagamentos em pilhas.
-- **Precisão Matemática e Backtesting:** Um motor de rentabilidade que calcula retroativamente desdobramentos e grupamentos futuros nas quantidades históricas dos ativos. Ele se alinha aos dados ajustados de provedores como o Yahoo Finance para evitar distorções ou falsos picos nos relatórios de lucro/prejuízo.
+- **Gestão de Carteiras Modular:** Acompanhe a rentabilidade, o histórico de transações e o preço médio de ativos nacionais (B3) e internacionais. A interface é organizada em seções especializadas: Renda Variável, Renda Fixa, Transações, Dividendos e Diário de Bordo. Suporta a edição nativa de transações, desdobramentos (splits), grupamentos (reverse splits), bonificações e importação em lote via arquivo CSV.
+- **Mecanismo de Renda Fixa & Tesouro Direto:** Módulo isolado para acompanhamento de renda fixa (CDBs, Tesouro Direto, LCI, LCA) com evolução de juros compostos e tabelas de rendimento líquido. O `treasury_service` gerencia exclusivamente as operações de aplicação/resgate do Tesouro Direto, incluindo exportação e importação integral em `.csv`.
+- **Motor Financeiro e Precisão Matemática (`calculator`):** Um motor de domínio isolado (`internal/calculator`) que executa os cálculos de preço médio, ajustes retroativos por splits/grupamentos/bonificações, TWRR, múltiplos fundamentalistas e comparações financeiras com margem de tolerância a ponto flutuante (`1e-6`).
+- **Desduplicação e Sincronização Inteligente de Proventos:** O `DividendGateway` orquestra dados de múltiplas fontes (B3, Fundamentus, StockAnalysis, Yahoo) e aplica desduplicação de rendimentos mensais em ETFs (ex: `SPYI11.SA`), além de *fuzzy matching* com tolerância de R$ 0,05 para evitar registros duplicados por centavos de ajuste.
+- **Filtros Inteligentes no Histórico de Operações (Smart Fallback):** O histórico de transações utiliza inicialização dinâmica de filtros: prioriza mês/ano atuais quando há movimentações e faz fallback gracioso para o ano corrente ou para a visão global ("Todos"), impedindo a exibição acidental de tabelas vazias.
+- **Arquitetura Frontend Desacoplada:** Gerenciamento de estado global no frontend via `PortfolioContext` para eliminar *prop-drilling* em views e modais, aliado ao cliente HTTP `apiFetch` centralizado para controle padronizado de requisições e erros.
 - **Múltiplas Watchlists:** Permite criar listas personalizadas para acompanhar diferentes estratégias de investimentos.
 - **Bot do Telegram Integrado:** Bot interativo bidirecional que permite aos usuários consultar relatórios financeiros, gráficos e lançar operações diretamente pelo chat. A sessão e a FSM de cadastro de transações são gerenciadas no Redis.
 - **Scraping e Motores de Valuation (P/L, P/VP, Yield):** Cálculo em tempo real dos preços teto intrínsecos de Benjamin Graham e Décio Bazin. Os indicadores fundamentais de mercado são obtidos via web scraping (Fundamentus para ativos da B3 e Finviz para o mercado global).
 - **Livro de Registro de Transações Unificado (Ledger):** Consolida operações de Renda Variável e Renda Fixa em um leiaute de linha única, com filtragem avançada por carteira, ativo e data. Possui uma coluna nativa de "Impacto Real Diário" para medir instantaneamente a contribuição diária de P&L de cada ativo.
-- **Alertas de Preços Assíncronos (Asynchronous Alerts):** Trabalhadores em segundo plano monitoram os preços dos ativos configurados pelos usuários a cada 1 minuto, disparando notificações imediatas por e-mail e Telegram quando os limites são atingidos.
+- **Alertas de Preços Assíncronos (Asynchronous Alerts):** Trabalhadores em segundo plano monitoram os preços dos ativos configurados pelos usuários a cada 1 minuto, disparando notificações imediatas via bot do Telegram quando os limites configurados são atingidos.
 - **Segurança Robusta:** Autenticação baseada em Cookies `HttpOnly` e `Secure` contendo tokens JWT de curta duração combinada com verificação no Redis para Refresh Tokens opacos, além de configurações rígidas de CORS e CSRF.
 - **Observabilidade Completa:** Integração com Prometheus, Grafana, Loki e Promtail para exportação de métricas e agregação centralizada de logs em tempo real.
 
@@ -48,16 +53,21 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 ## 🛠️ Stack Tecnológica
 
 ### Backend (Golang 1.24)
+- **Arquitetura de Domínio (DDD):** Separação clara de responsabilidades em pacotes isolados: `calculator` (motor matemático), `portfolio` (desacoplado em `dividend_service.go` e `performance_service.go`), `fixedincome` (desacoplado em `treasury_service.go`), `market`, `auth`, `alert`, `telegram`, `worker`.
 - **Roteamento e HTTP:** `go-chi` (com middlewares customizados de CORS, autenticação e coleta de métricas).
 - **Banco de Dados Relacional:** PostgreSQL 16 utilizando o pool de conexões do driver nativo `pgx/v5`.
 - **Cache e Controle de Sessão:** Redis 7 através da biblioteca `go-redis/v9`.
 - **Segurança e Criptografia:** Hashing de senhas utilizando o algoritmo Argon2id em conformidade com as recomendações do OWASP e tokens de acesso JWT assinados com HMAC-SHA256.
 - **Migrações:** `golang-migrate` para gerenciar a evolução estrutural das tabelas.
-- **Provedores de Mercado:** Yahoo Finance API (Cotações em tempo real e busca autocomplete) e Scraping estruturado de dados (Fundamentus e Finviz).
+- **Provedores de Mercado:** Yahoo Finance API (Cotações em tempo real e busca autocomplete) e Scraping estruturado de dados (Fundamentus, Finviz e StockAnalysis).
+- **Otimização do `DividendWorker` (Skip Pattern):** O `DividendWorker` (em `portfolio/`) implementa *fuzzy matching* ao sincronizar proventos: se o valor e a data de pagamento forem matematicamente idênticos (diferença `< 1e-6`) ao registro existente, o `UPDATE` é suprimido, evitando escritas desnecessárias no PostgreSQL.
 - **Concorrência:** Uso intenso de Goroutines para gerenciamento do ciclo de vida dos alertas, sincronização de dividendos históricos e backfill de carteiras.
 
 ### Frontend (Next.js 14)
-- **Framework:** React 18 escrito em TypeScript.
+- **Framework:** React 18 escrito em TypeScript (App Router do Next.js 14).
+- **Gerenciamento de Estado Global:** `PortfolioContext` centralizado para compartilhamento de estado e métodos entre abas e modais sem *prop drilling*.
+- **Cliente HTTP Centralizado:** Wrapper `apiFetch` para chamadas padronizadas à API REST, tratamento unificado de resposta e envio de credenciais.
+- **Arquitetura Modular de Componentes:** Páginas e abas decompostas em subdiretórios especializados (`modals/`, `transactions/`, `treasury/`, `analysis/`).
 - **Estilização:** CSS nativo (Glassmorphism e suporte nativo ao Modo Escuro).
 - **Gráficos:** Lightweight Charts (TradingView) para renderização eficiente do histórico dos ativos.
 - **Testes Unitários:** Vitest e React Testing Library (garantindo alta cobertura).
@@ -66,7 +76,6 @@ O **stock-pulse** é uma plataforma abrangente de gestão de carteiras e monitor
 ### Infraestrutura e DevOps
 - **Orquestração:** Docker Compose.
 - **Proxy Reverso:** Caddy (com roteamento unificado local, compressão gzip/zstd e tratamento de cabeçalhos).
-- **Servidor de Teste SMTP:** Mailpit para captura e validação de e-mails em desenvolvimento.
 - **Monitoramento:** Coleta de métricas e agregação de logs com Prometheus, Grafana, Loki e Promtail.
 
 ---
@@ -79,9 +88,9 @@ O sistema opera dinamicamente realizando consultas em APIs externas e fazendo ra
 - **Busca de Ativos:** `GET https://query1.finance.yahoo.com/v1/finance/search?q={query}`
 - **Histórico e Preços:** `GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=10y` (busca histórico de até 10 anos).
 
-### 2. Fundamentus (Fundamentos e Proventos da B3)
-- **Fundamentos:** Extração baseada em expressões regulares (regex) de P/VP, P/L, LPA, VPA e Dividend Yield a partir do endpoint `/detalhes.php`.
-- **Histórico de Proventos:** Captura de proventos (dividendos e JCP) a partir do endpoint `/proventos.php` ou `/fii_proventos.php` com desduplicação heurística refinada para expurgar duplicatas da base de dados.
+### 2. Integração B3 e Fundamentus (Proventos e Fundamentos da B3)
+- **Histórico de Proventos:** A fonte primária oficial de dividendos e JCP para ativos nacionais (Ações, FIIs, Fiagros e ETFs) é a própria **B3 (Bolsa de Valores do Brasil)**. O `DividendGateway` orquestra a captura consultando as APIs da B3 e, em caso de indisponibilidade, realiza um fallback transparente para o **Fundamentus**. O gateway utiliza um algoritmo de **Fuzzy Matching** na camada de aplicação para identificar e unificar correções de centavos entre as múltiplas fontes, evitando duplicatas e garantindo precisão na Data Com.
+- **Fundamentos:** Extração baseada em expressões regulares (regex) de P/VP, P/L, LPA, VPA e Dividend Yield a partir do endpoint `/detalhes.php` do Fundamentus.
 
 ### 3. Finviz (Fundamentos do Mercado Internacional)
 - **Raspagem de Indicadores:** `GET https://finviz.com/quote.ashx?t={symbol}` para obter LPA (EPS), valor patrimonial (Book/sh) e dividendos de ativos globais usando expressões regulares.
@@ -121,6 +130,36 @@ Formato de colunas obrigatório (a linha de cabeçalho `DATE, TICKER, TYPE, QUAN
 
 ---
 
+## 🏛️ Especificação de Import/Export CSV — Tesouro Direto
+
+A aba **Tesouro Direto** permite exportar e importar todo o histórico de operações de aplicação e resgate em formato `.csv`. O arquivo gerado pelo botão **📤 Exportar** pode ser reimportado integralmente pelo botão **📥 Importar**, servindo como backup ou para migração entre carteiras.
+
+### Formato do CSV
+O arquivo contém um cabeçalho fixo na primeira linha, seguido de uma operação por linha:
+
+`ticker,treasury_type,maturity_date,has_coupons,type,quantity,unit_price,contracted_rate,transaction_date`
+
+| Coluna | Tipo | Descrição | Exemplo |
+|---|---|---|---|
+| `ticker` | string | Nome do título no formato do Tesouro Nacional | `TESOURO SELIC 2027` |
+| `treasury_type` | string | Tipo do título: `SELIC`, `PREFIXADO` ou `IPCA+` | `SELIC` |
+| `maturity_date` | date | Data de vencimento no formato `YYYY-MM-DD` | `2027-03-01` |
+| `has_coupons` | boolean | Se o título paga cupons semestrais (`true` / `false`) | `false` |
+| `type` | string | Tipo da operação: `SUBSCRIPTION` (aplicação) ou `REDEMPTION` (resgate) | `SUBSCRIPTION` |
+| `quantity` | float | Quantidade de frações negociadas | `0.5` |
+| `unit_price` | float | Preço unitário na data da operação (R$) | `14523.87` |
+| `contracted_rate` | float | Taxa contratada (% a.a.). Para Selic é o spread; para Prefixado e IPCA+ é a taxa inteira | `6.40` |
+| `transaction_date` | date | Data de execução da operação no formato `YYYY-MM-DD` | `2024-01-15` |
+
+### Endpoints Relacionados
+- `GET /api/v1/portfolios/{id}/treasury/transactions` — Retorna todas as operações do Tesouro em JSON (usado pelo botão Exportar para gerar o CSV).
+- `POST /api/v1/portfolios/{id}/treasury/transactions` — Registra uma operação individual (chamado sequencialmente pelo botão Importar para cada linha do CSV).
+
+> [!NOTE]
+> Durante a importação, cada linha é processada e enviada individualmente para a API. Ao final, uma notificação exibe o total de operações com sucesso e o total de erros.
+
+---
+
 ## 📊 Arquitetura Global e Modelagem de Dados
 
 ### 1. Diagrama de Blocos de Alto Nível
@@ -138,9 +177,9 @@ graph TD
     end
     
     subgraph Integrações Externas
-        GoAPI -->|Alertas| Mailpit[Servidor SMTP Mailpit]
         GoAPI -->|Cotações| Yahoo[Yahoo Finance API]
-        GoAPI -->|Dados B3| Fundamentus[Fundamentus Scraper]
+        GoAPI -->|Dados Oficiais B3| B3[B3 API]
+        GoAPI -->|Fundamentos B3| Fundamentus[Fundamentus Scraper]
         GoAPI -->|Dados Globais| Finviz[Finviz Scraper]
         GoAPI -->|Telegram| Telegram[Telegram Bot]
     end
@@ -154,8 +193,8 @@ A plataforma gerencia a persistência relacional de forma rígida através de **
    - **Colunas Principais:** `id` (UUID, PK), `email` (VARCHAR, UNIQUE), `password_hash` (VARCHAR, contendo hash Argon2id), `name` (VARCHAR), `created_at`, `updated_at`.
 2. **`portfolio`**
    - **Propósito:** Agrupa ativos e transações sob uma determinada carteira pertencente a um usuário.
-   - **Colunas Principais:** `id` (UUID, PK), `user_id` (UUID, FK -> `"user"`), `name` (VARCHAR), `base_currency` (VARCHAR, ex: 'BRL', 'USD'), `created_at`.
-   - **Constraint:** `UNIQUE (user_id, name)` impede carteiras com nomes duplicados para o mesmo usuário.
+   - **Colunas Principais:** `id` (UUID, PK), `user_id` (UUID, FK -> `"user"`), `name` (VARCHAR), `base_currency` (VARCHAR, ex: 'BRL', 'USD'), `is_default` (BOOLEAN), `created_at`.
+   - **Constraint:** `UNIQUE (user_id, name)` impede carteiras com nomes duplicados para o mesmo usuário. `UNIQUE (user_id) WHERE is_default = true` assegura que exista no máximo uma carteira padrão por usuário.
 3. **`asset`**
    - **Propósito:** Cadastro global de ativos e instrumentos de mercado (ações, FIIs, pares cambiais, ETFs).
    - **Colunas Principais:** `id` (UUID, PK), `ticker` (VARCHAR, UNIQUE), `name` (VARCHAR), `asset_type` (VARCHAR, ex: 'STOCK', 'FII', 'CURRENCY'), `currency` (VARCHAR), `is_active` (BOOLEAN), `created_at`, `updated_at`.
@@ -165,7 +204,7 @@ A plataforma gerencia a persistência relacional de forma rígida através de **
    - **Constraint:** `UNIQUE (asset_id, price_date)` garante integridade da série de preços.
 5. **`asset_event`**
    - **Propósito:** Registra eventos corporativos históricos (dividendos, JCP, splits, grupamentos e bonificações) associados aos ativos.
-   - **Colunas Principais:** `id` (UUID, PK), `asset_id` (UUID, FK -> `asset`), `type` (VARCHAR), `gross_amount` (DECIMAL), `net_amount` (DECIMAL), `split_factor` (DECIMAL), `ex_date` (DATE), `payment_date` (DATE), `created_at`, `updated_at`.
+   - **Colunas Principais:** `id` (UUID, PK), `asset_id` (UUID, FK -> `asset`), `type` (VARCHAR), `gross_amount` (DECIMAL), `net_amount` (DECIMAL), `split_factor` (DECIMAL), `cum_date` (DATE), `payment_date` (DATE), `created_at`, `updated_at`.
 6. **`transaction`**
    - **Propósito:** Livro-razão de transações executadas em ativos de renda variável pertencentes a uma carteira.
    - **Colunas Principais:** `id` (UUID, PK), `portfolio_id` (UUID, FK -> `portfolio`), `asset_id` (UUID, FK -> `asset`), `type` (VARCHAR), `quantity` (DECIMAL), `unit_price` (DECIMAL), `total_cost` (DECIMAL), `exchange_rate` (DECIMAL), `executed_at` (DATE), `created_at`.
@@ -321,10 +360,12 @@ O gerenciamento do histórico de transações é centralizado e atua ativamente 
 - `PUT /api/v1/portfolios/{id}/transactions/{txId}` - Atualiza transação existente.
 - `DELETE /api/v1/portfolios/{id}/transactions/{txId}` - Remove uma transação.
 
-#### Componentes de Código (Go):
-- **Handlers:** `portfolio.Handler.AddTransaction`, `portfolio.Handler.BulkImportTransactions`
-- **Services:** `portfolio.Service.AddTransaction`, `portfolio.Service.BulkAddTransactions`, `portfolio.Service.BackfillGap`, `portfolio.Service.BackfillHistoricalPrices`
-- **Repositories:** `portfolio.Repository.GetPortfolioByID`, `portfolio.Repository.GetAssetAndCurrencyByTicker`, `portfolio.Repository.CreateAsset`, `portfolio.Repository.GetExchangeRateByDate` (usando o método LOCF), `portfolio.Repository.CreateTransaction`, `portfolio.Repository.GetDailyPrices`, `portfolio.Repository.GetOldestPriceDate`
+#### Componentes de Código (Go & TypeScript):
+- **Handlers (Go):** `portfolio.Handler.AddTransaction`, `portfolio.Handler.BulkImportTransactions`
+- **Services (Go):** `portfolio.Service.AddTransaction`, `portfolio.Service.BulkAddTransactions`, `portfolio.DividendService`, `portfolio.PerformanceService`, `portfolio.Service.BackfillGap`, `portfolio.Service.BackfillHistoricalPrices`
+- **Motor Financeiro (Go):** `calculator.UpdatePositionOnTransaction`, `calculator.DetermineAssetType`, `calculator.CalculatePositionMetrics`
+- **Repositories (Go):** `portfolio.Repository.GetPortfolioByID`, `portfolio.Repository.GetAssetAndCurrencyByTicker`, `portfolio.Repository.CreateAsset`, `portfolio.Repository.GetExchangeRateByDate` (usando o método LOCF), `portfolio.Repository.CreateTransaction`, `portfolio.Repository.GetDailyPrices`, `portfolio.Repository.GetOldestPriceDate`
+- **Frontend (TSX):** `TransactionHistory.tsx` (componente modularizado em `src/components/portfolio/transactions/` com inicialização inteligente de filtros `setFilterTxYear` e `setFilterTxMonth`)
 
 #### Diagrama 1: Fluxo de Transação Individual (Single Transaction Flow)
 ```mermaid
@@ -447,17 +488,19 @@ O sistema calcula dinamicamente indicadores fundamentalistas e o preço justo so
     $$\text{Bazin Value} = \frac{\text{Dividendo Anual}}{0.06}$$
     onde o dividendo anual absoluto é calculado a partir de:
     $$\text{Dividendo Anual} = \text{Preço Atual} \times \left(\frac{\text{Dividend Yield}}{100}\right)$$
-- **Scraping e Desduplicação de Dividendos:**
-  - Varre o Fundamentus (`proventos.php` ou `fii_proventos.php` usando decodificação ISO-8859-1) agrupando eventos.
-  - **Filtro de Desduplicação:** Agrupa dividendos de FIIs por mês/ano e ações por valor/mês/ano para evitar registros duplicados vindos de fontes despadronizadas. Em caso de falha, utiliza o StockAnalysis ou Yahoo Finance.
+- **Scraping e Orquestração de Dividendos (`DividendGateway`):**
+  - Integra dados de múltiplas fontes (`B3DividendSource`, `FundamentusDividendSource`, `StockAnalysisDividendSource`, `YahooDividendSource`).
+  - **Filtro de Desduplicação (Fuzzy Matching):** Agrupa dividendos de FIIs e ações para evitar registros duplicados quando combinando fontes diferentes (ex: primária B3 + secundária Fundamentus). Ignora ajustes de diferença absolutas de poucos centavos (≤ R$ 0,05).
 
 #### Endpoints de API:
 - `GET /api/v1/portfolios/{id}` - Retorna a carteira com métricas e múltiplos fundamentalistas integrados.
 - `GET /api/v1/portfolios/{id}/dividends` - Retorna a série de dividendos e proventos projetados/pagos ao portfólio.
 
-#### Componentes de Código (Go):
-- **Structs de Scraping:** `market.Scraper`, `market.FundamentusScraper`, `market.StockAnalysisScraper`
-- **Métodos:** `Scraper.GetFundamentals`, `Scraper.ScrapeFundamentus`, `Scraper.ScrapeFinviz`, `FundamentusScraper.GetDividends`, `StockAnalysisScraper.GetDividends`, `market.Service.GetFundamentals` (que gerencia o cache Redis e orquestração).
+#### Componentes de Código (Go & TypeScript):
+- **Motor Financeiro (Go):** `calculator.CalculateValuationRatios`, `calculator.DetermineAssetType`
+- **Structs de Scraping (Go):** `market.Scraper`, `market.FundamentusScraper`, `market.StockAnalysisScraper`, `market.DividendGateway`
+- **Métodos (Go):** `Scraper.GetFundamentals`, `Scraper.ScrapeFundamentus`, `Scraper.ScrapeFinviz`, `FundamentusScraper.GetDividends`, `StockAnalysisScraper.GetDividends`, `market.Service.GetFundamentals` (que gerencia o cache Redis e orquestração).
+- **Frontend (TSX):** `PortfolioAnalysis.tsx` (descomposto em `src/components/portfolio/analysis/`).
 
 ```mermaid
 sequenceDiagram
@@ -505,12 +548,238 @@ sequenceDiagram
 
 ---
 
-### 4. Trabalhadores em Segundo Plano (Background Workers)
-O backend da plataforma mantém tarefas secundárias em execução contínua com ciclos de vida controlados por contexto (`workerCtx` cancelável no graceful shutdown):
-- **`DailyWorker` (Sincronização de Cotações):** Executado a cada 24 horas. Identifica todos os ativos cadastrados no sistema e atualiza seus preços de fechamento diários na tabela `asset_daily_price`, aplicando um atraso síncrono de **350ms** entre requisições externas para evitar limitação de taxa (rate limiting).
-- **`DividendWorker` (Histórico de Proventos):** Executado a cada 24 horas. Busca novos dividendos distribuídos no Fundamentus/StockAnalysis e realiza uma operação segura de salvamento (`UPSERT` com constraints de data e tipo) na tabela `asset_event` para evitar dados duplicados.
-- **`fiWorker` (Renda Fixa):** Executado a cada 24 horas. Consome a API do Banco Central do Brasil (BCB) para baixar as taxas diárias de CDI e SELIC. Fragmenta as requisições em blocos de no máximo **5 anos** de histórico, com pausas de **500ms** entre chamadas, persistindo os dados na tabela `index_rates`.
-- **`AlertWorker` (Monitoramento de Preços de Alertas):** Executado a cada 1 minuto. Busca todos os alertas ativos na tabela `alert`. Para evitar o disparo de notificações redundantes em decorrência de concorrência ou atrasos de rede, o trabalhador **atualiza primeiro** o status do alerta para `TRIGGERED` no banco de dados (`MarkAlertTriggered`) através de uma transação. Apenas se essa atualização for bem-sucedida, ele agenda de forma assíncrona o envio de e-mails via `mailService.SendAlertEmail` (SMTP).
+### 4. Módulo de Proventos (Dividends & Yields)
+
+O módulo de proventos é responsável pela obtenção, normalização, deduplicação e persistência de eventos corporativos de distribuição de rendimentos (dividendos, JCP, rendimentos de FIIs, amortizações) para todos os tipos de ativos suportados pela plataforma. A arquitetura é baseada em um **Gateway multi-fonte com roteamento por tipo de ativo**, fallback automático e cache Redis.
+
+#### 4.1 Arquitetura do `DividendGateway`
+
+O `DividendGateway` atua como orquestrador central, definindo **rotas específicas por tipo de ativo**. Cada rota configura uma hierarquia de fontes com papéis distintos:
+
+| Papel | Descrição |
+|---|---|
+| **Primary** | Fonte consultada primeiro. Se retornar dados, é usada como base principal. |
+| **Secondary** | Consultada em paralelo à primary para **enriquecimento e merge**. |
+| **Fallback** | Usada apenas se primary e secondary falharem ou retornarem vazio. |
+
+As 4 fontes de dados disponíveis são:
+
+| Fonte | Módulo | Método de Captura | Tipos Suportados |
+|---|---|---|---|
+| **B3** | `B3DividendSource` / `B3Client` | API REST oficial da B3 (JSON + Base64) | Ações BR, ETF BR |
+| **Fundamentus** | `FundamentusDividendSource` / `FundamentusClient` | Web scraping HTML (goquery + ISO-8859-1) | Ações BR, FII, FIAGRO, ETF BR, BDR |
+| **StockAnalysis** | `StockAnalysisDividendSource` / `StockAnalysisClient` | Web scraping HTML (goquery) | Ações BR, FII, FIAGRO, ETF BR, BDR, Ações US, ETF US |
+| **Yahoo Finance** | `YahooDividendSource` / `YahooClient` | API REST Chart (JSON) | Ações BR, FII, FIAGRO, ETF BR, BDR, Ações US, ETF US, Crypto |
+
+#### 4.2 Tabela de Roteamento por Tipo de Ativo
+
+O gateway define as seguintes rotas de prioridade:
+
+| Tipo de Ativo | Primary | Secondary | Fallback |
+|---|---|---|---|
+| **`STOCK_BR`** (Ações BR) | B3 | Fundamentus | StockAnalysis |
+| **`FII`** (Fundos Imobiliários) | Fundamentus | StockAnalysis | — |
+| **`FIAGRO`** (Fundos Agro) | Fundamentus | StockAnalysis | — |
+| **`ETF_BR`** (ETFs BR) | B3 | StockAnalysis | Yahoo |
+| **`BDR`** (BDRs) | StockAnalysis | Fundamentus | Yahoo |
+| **`STOCK_US`** (Ações US) | StockAnalysis | — | Yahoo |
+| **`ETF_US`** (ETFs US) | StockAnalysis | — | Yahoo |
+| **`CRYPTO`** (Criptomoedas) | Yahoo | — | — |
+
+#### 4.3 Fluxo de Obtenção de Proventos
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Caller as DividendWorker / API
+    participant Gateway as DividendGateway
+    participant Redis as Redis (dividends:*)
+    participant Primary as Fonte Primary
+    participant Secondary as Fonte Secondary
+    participant Fallback as Fonte Fallback
+    participant DB as PostgreSQL (asset_event)
+
+    Caller->>Gateway: GetDividends(ctx, ticker, assetType)
+    Gateway->>Redis: GET dividends:<ticker>
+    
+    alt Cache Hit (TTL 12h)
+        Redis-->>Gateway: JSON com eventos
+        Gateway-->>Caller: []DividendEvent (do cache)
+    else Cache Miss
+        Gateway->>Primary: GetDividends(ctx, ticker, assetType)
+        
+        alt Primary retornou dados
+            Primary-->>Gateway: []DividendEvent (primary)
+            
+            alt Secondary configurada
+                Gateway->>Secondary: GetDividends(ctx, ticker, assetType)
+                Secondary-->>Gateway: []DividendEvent (secondary)
+                Note over Gateway: mergeAndDedupDividends(primaryEvents, secondaryEvents)
+            end
+        else Primary falhou ou retornou vazio
+            alt Secondary configurada
+                Gateway->>Secondary: GetDividends(ctx, ticker, assetType)
+                Secondary-->>Gateway: []DividendEvent
+            end
+            alt Ainda sem dados e Fallback configurado
+                Gateway->>Fallback: GetDividends(ctx, ticker, assetType)
+                Fallback-->>Gateway: []DividendEvent
+            end
+        end
+        
+        Gateway->>Redis: SET dividends:<ticker> (TTL 12h)
+        Gateway-->>Caller: []DividendEvent (consolidados)
+    end
+```
+
+#### 4.4 Modelo Canônico: `DividendEvent`
+
+Todas as fontes produzem o modelo canônico `DividendEvent`, definido em `dividend_source.go`:
+
+```go
+type DividendEvent struct {
+    Date        time.Time // Data Com (cum_date) — data de corte para elegibilidade
+    PaymentDate time.Time // Data de Pagamento
+    Amount      float64   // Valor bruto por cota/ação
+    Type        string    // "Dividendo" | "JCP" | "Rendimento" | "Amortização"
+}
+```
+
+A interface `DividendSource` exige que toda fonte implemente:
+- `GetDividends(ctx, ticker, assetType)` — busca e normaliza proventos.
+- `Name()` — identificador da fonte.
+- `SupportedAssetTypes()` — tipos de ativo suportados.
+
+#### 4.5 Obtenção por Tipo de Ativo
+
+##### Ações Brasileiras (`STOCK_BR`)
+- **Primary (B3):** Consulta `FetchCashDividends` na API `GetListedCashDividends`. Mapeia `corporateAction`:
+  - `"DIVIDENDO"` → `"Dividendo"`
+  - `"JRS CAP PROPRIO"` / `"JCP"` → `"JCP"`
+- **Secondary (Fundamentus):** Scraping de `proventos.php?papel={TICKER}&tipo=2`. A tabela HTML de ações segue a ordem de colunas: **Data | Valor | Tipo | Data Pagamento**. Mesmos mapeamentos de tipo.
+- **Merge:** Para ações, a deduplicação ocorre por **data exata** (`ExDate`). Fundamentus é priorizado como base do merge para preservar a distinção entre Dividendo e JCP.
+- **Fallback (StockAnalysis):** StockAnalysis foi adotado no lugar do Yahoo Finance, o que unifica o padrão de datas de corte com o Brasil. Utiliza prioritariamente a coluna **Record Date** (que já representa a Data Com sem necessitar de ajustes). Caso a `Record Date` não seja preenchida, o sistema faz fallback para a `Ex-Div Date` americana e aplica a normalização matemática de subtrair 1 dia (24h) para chegar à Data Com real.
+
+##### Fundos Imobiliários (`FII`) e Fundos Agro (`FIAGRO`)
+- **Primary (Fundamentus):** Scraping de `fii_proventos.php?papel={TICKER}&tipo=2`. A tabela HTML de FIIs possui a ordem de colunas: **Data | Tipo | Data Pagamento | Valor**. Mapeia `Rendimento` e `Amortização` com deduplicação por `Month() + Year()`.
+- **Secondary (StockAnalysis):** Scraping via rota BVMF (`stockanalysis.com/quote/bvmf/{ticker}/dividend/`). Força `Type = "Rendimento"` quando `assetType` é FII ou FIAGRO. Utilizado em paralelo para merge e enriquecimento de proventos.
+- **Nota:** A API da B3 (`GetListedFundDividends`) foi removida como fonte para FIIs/FIAGROs devido a bloqueios de acesso no endpoint dedicado a fundos.
+
+##### ETFs Brasileiros (`ETF_BR`)
+- **Primary (B3):** Mesma API de ações (`FetchCashDividends`).
+- **Secondary (StockAnalysis):** Scraping via rota BVMF.
+- **Fallback (Yahoo):** API Chart com sufixo `.SA`.
+- **Deduplicação de Rendimentos Mensais em ETFs:** ETFs de renda mensal (como `SPYI11.SA`, `QQQI11.SA`, `IVVB11.SA`) possuem deduplicação por mês/ano (`Month() + Year()`) em camadas de scraper e no `portfolio.DividendService`, evitando a duplicação de pro-rata ou registros múltiplos da mesma distribuição mensal.
+- **Tributação:** ETFs na B3 sofrem 15% de imposto retido na fonte sobre dividendos, tratado na camada de cálculo (`netAmount = grossAmount * 0.85`).
+
+##### BDRs (`BDR`)
+- **Primary (StockAnalysis):** Fonte principal pois BDRs são recibos de ativos internacionais.
+- **Secondary (Fundamentus):** Fallback via scraping.
+- **Fallback (Yahoo):** API Chart.
+
+##### Ações Americanas (`STOCK_US`) e ETFs Americanos (`ETF_US`)
+- **Primary (StockAnalysis):** Scraping de `stockanalysis.com/stocks/{ticker}/dividend/` ou `/etf/{ticker}/dividend/`.
+- **Fallback (Yahoo):** API Chart sem sufixo `.SA`.
+- **Tributação:** Ativos em USD sofrem 30% de imposto retido na fonte (`netAmount = grossAmount * 0.70`) e são convertidos para BRL na data da `cum_date` usando a taxa histórica `USDBRL=X`.
+
+##### Criptomoedas (`CRYPTO`)
+- **Primary (Yahoo):** Única fonte configurada. Todos os eventos são classificados como `"Dividendo"`.
+
+#### 4.6 Algoritmo de Merge e Deduplicação (`mergeAndDedupDividends`)
+
+Quando primary e secondary retornam dados, o gateway executa um merge inteligente:
+
+1. **Define a base:** Para FIIs/FIAGROs, a base são os eventos da primary (Fundamentus), sendo enriquecida com eventos do secundário (StockAnalysis). Para ações, a base são os da secondary (Fundamentus), pois preserva a distinção JCP vs Dividendo. Para ETFs mensais, a base são os eventos da primary (B3).
+2. **Itera eventos secundários:** Para cada evento da fonte não-base, verifica se já existe na lista consolidada:
+   - **FII/FIAGRO/ETF Mensal:** Match por `Month() + Year()` (1 rendimento por mês) ou *Fuzzy Matching* por tolerância de valor (≤ R$ 0,05).
+   - **Ações/ETFs/BDR:** Match por data exata (`Date.Equal()`) ou aproximação por margem de centavos.
+3. **Se não existe:** Adiciona o evento ao consolidado.
+4. **Pós-processamento:** Reescreve `"Dividendo"` → `"Rendimento"` em FIIs/FIAGROs e unifica rendimentos mensais em ETFs.
+5. **Ordena** por data decrescente.
+
+#### 4.7 Persistência e Fuzzy Matching (`DividendWorker` + `AssetEventRepo`)
+
+O `DividendWorker` (executado a cada 24h) sincroniza os proventos obtidos para a tabela `asset_event` do PostgreSQL:
+
+1. Busca todos os ativos ativos via `GetAllAssets()`.
+2. Para cada ativo, chama `marketService.GetDividends(ticker, assetType)` (que aciona o gateway).
+3. Para cada `DividendEvent` retornado, aplica o **Fuzzy Matching** antes de persistir:
+
+```mermaid
+flowchart TD
+    A["DividendEvent da fonte"] --> B{"Existe evento no BD com\nmesmo asset_id + cum_date?"}
+    B -- Não --> F["INSERT novo registro"]
+    B -- Sim --> C{"Mesmo type?"}
+    C -- Não --> B2{"Outro match?"}
+    B2 -- Sim --> C
+    B2 -- Não --> F
+    C -- Sim --> D{"|gross_amount diff| ≤ 0,05?"}
+    D -- Não --> B2
+    D -- Sim --> E{"|diff| < 1e-6 E\npayment_date idêntica?"}
+    E -- Sim --> G["⏭️ SKIP — sem escrita no BD"]
+    E -- Não --> H["UPDATE gross_amount + payment_date"]
+
+    style G fill:#ffd60a,color:#000
+    style F fill:#2d6a4f,color:#fff
+    style H fill:#40916c,color:#fff
+```
+
+A chave de unicidade no banco é `(asset_id, cum_date, type, gross_amount)`. O `ON CONFLICT` do `UPSERT` atualiza apenas `payment_date` e `net_amount` quando há conflito exato.
+
+#### 4.8 Cálculo de Proventos por Carteira e Regras Tributárias
+
+O `portfolio.Service.GetPortfolioDividends` calcula os proventos efetivos recebidos por cada carteira:
+
+1. **Posição na Data Com:** Para cada `AssetEvent`, calcula a quantidade de cotas/ações que o usuário detinha na `cum_date`, iterando cronologicamente as transações (`BUY`, `SELL`, `SPLIT`, `REVERSE_SPLIT`, `BONUS`).
+2. **Valor bruto:** `grossAmount = quantity × event.GrossAmount`
+3. **Regras de imposto por tipo:**
+
+| Moeda | Tipo do Provento | Alíquota | Cálculo |
+|---|---|---|---|
+| BRL | Dividendo (Ações) | **0%** | `net = gross` |
+| BRL | Rendimento (FII/FIAGRO) | **0%** | `net = gross` |
+| BRL | Amortização | **0%** | `net = gross` |
+| BRL | JCP | **15%** | `net = gross × 0.85` |
+| BRL | ETF (qualquer tipo) | **15%** | `net = gross × 0.85` |
+| USD | Qualquer tipo | **30%** | `net = gross × 0.70` |
+
+4. **Conversão cambial:** Para ativos em USD, o valor é convertido para BRL usando a taxa histórica `USDBRL=X` da `cum_date` via LOCF.
+
+#### Componentes de Código (Go):
+- **Gateway:** `market.DividendGateway`, `market.DividendSource` (interface), `market.DividendEvent` (modelo canônico)
+- **Fontes:** `market.B3DividendSource`, `market.FundamentusDividendSource`, `market.StockAnalysisDividendSource`, `market.YahooDividendSource`
+- **Clients:** `market.B3Client` (API REST B3), `market.FundamentusClient` (scraping HTML), `market.StockAnalysisClient` (scraping HTML), `market.YahooClient` (API REST Yahoo)
+- **Worker:** `portfolio.DividendWorker.SyncAllDividends`
+- **Repositório:** `portfolio.Repository.UpsertAssetEvent`, `GetAssetEvents`, `GetAssetEventsByDate`, `UpdateAssetEventValueByID`
+- **Serviço:** `portfolio.Service.GetPortfolioDividends`
+
+---
+
+### 5. Trabalhadores em Segundo Plano (Background Workers)
+
+A plataforma executa tarefas periódicas cruciais (como cotações e dividendos) em segundo plano através de um `WorkerManager` centralizado (`backend/internal/worker`). 
+
+A estrutura do `Worker` possui os seguintes atributos armazenados **em memória RAM** e controlados via `sync.Mutex` para evitar condições de corrida (Race Conditions):
+```go
+type Worker struct {
+	Name     string        // Nome do worker (ex: "DividendWorker")
+	Interval time.Duration // Intervalo entre as repetições
+	lastRun  time.Time     // Data e hora da última execução 
+	nextRun  time.Time     // Quando rodará automaticamente da próxima vez
+	status   string        // Estado atual ("idle" ou "running")
+}
+```
+*Nota: Sendo armazenado em memória, ao reiniciar a aplicação os timers de agendamento reiniciam suas contagens.*
+
+Você pode interagir e gerenciar os workers de forma dinâmica através dos endpoints da API protegida:
+- `GET /api/v1/workers` - Retorna um array JSON contendo o status, last_run, next_run e nome de todos os robôs da plataforma.
+- `POST /api/v1/workers/{name}/trigger` - Força a execução imediata de um robô específico, interrompendo a espera e resetando seu cronômetro (útil para atualizações forçadas).
+
+**Workers Disponíveis:**
+- **`DailyWorker` (Sincronização de Cotações):** Executado a cada 24 horas. Atualiza preços de fechamento diários na tabela `asset_daily_price`, com atraso síncrono de **350ms** entre requisições.
+- **`DividendWorker` (Histórico de Proventos):** Executado a cada 24 horas. Busca dividendos distribuídos e salva com `UPSERT` na tabela `asset_event` garantindo idempotência.
+- **`FixedIncomeWorker` (Renda Fixa):** Executado a cada 24 horas. Consome a API do Banco Central do Brasil (BCB) populando o histórico CDI/SELIC em `index_rates`.
+- **`AlertWorker` (Monitoramento de Preços de Alertas):** Executado a cada 1 minuto. Busca alertas `ACTIVE`. Ao identificar hit, atualiza o banco para `TRIGGERED` via transação atômica *antes* de enviar a notificação pelo Telegram, evitando envios duplicados.
 
 #### Tabelas de Banco Utilizadas:
 - `asset`, `asset_daily_price`, `asset_event`, `alert`, `index_rates`.
@@ -524,9 +793,9 @@ sequenceDiagram
     participant Worker as alert.AlertWorker
     participant DB as PostgreSQL (alert)
     participant Market as market.Service
-    participant Mail as mail.Service (SMTP)
+    participant Telegram as telegram.BotRunner
 
-    Note over Worker, Mail: Ciclo executado a cada 1 minuto
+    Note over Worker, Telegram: Ciclo executado a cada 1 minuto
     Worker->>DB: SELECT * FROM alert WHERE status = 'ACTIVE'
     DB-->>Worker: Lista de Alertas Ativos
     
@@ -543,12 +812,12 @@ sequenceDiagram
                 Note over Worker: Dispara notificação assíncrona em goroutine
                 rect rgb(230, 245, 230)
                     go-->>Worker: Background
-                    Worker->>Mail: SendAlertEmail(userEmail, targetPrice, currentPrice)
-                    Mail-->>Worker: E-mail entregue ao SMTP (Mailpit/Produção)
+                    Worker->>Telegram: SendAlertMessage(chatID, ticker, currentPrice, targetPrice)
+                    Telegram-->>Worker: Mensagem enviada via API do Telegram
                 end
             else Falha de Concorrência (Já alterado por outro thread)
                 DB-->>Worker: Erro (0 linhas alteradas)
-                Note over Worker: Ignora e continua para evitar e-mail duplicado
+                Note over Worker: Ignora e continua para evitar mensagem duplicada
             end
         end
     end
@@ -556,16 +825,19 @@ sequenceDiagram
 
 ---
 
-### 5. Integração com Bot do Telegram (Telegram Bot)
+### 6. Integração com Bot do Telegram (Telegram Bot)
 O bot do Telegram (`telebot.v3`) atua como uma interface de conversação bidirecional totalmente integrada ao fluxo do stock-pulse.
 - **Emparelhamento Seguro de Contas (Secure Cross-Pairing Flow):**
   1. O usuário autenticado no navegador inicia a integração e faz uma chamada `POST /api/v1/telegram/link`.
   2. A API gera um token hexadecimal randômico curto, salvando-o no Redis sob a chave `telegram_link:{token}` com duração de **10 minutos**.
   3. O cliente web exibe o link direcionando ao Telegram: `https://t.me/NomeDoBot?start={token}`.
   4. Ao clicar no link, o bot recebe o comando `/start {token}` e executa o handler `HandleStart`. Ele busca o token no Redis, mapeia o ID do chat (`telegram_chat_id`) ao `user_id` correspondente na tabela `user_telegram_link` do PostgreSQL e apaga o token do Redis imediatamente (uso único).
-- **Gestão de Sessão no Redis:**
-  - Armazena a carteira selecionada sob a chave `telegram_active_portfolio:{chatID}` (TTL de 365 dias).
+- **Gestão de Sessão no Redis e Contexto Dinâmico:**
+  - Armazena a carteira selecionada sob a chave `telegram_active_portfolio:{chatID}` (TTL de 365 dias). Todos os menus e relatórios exibem de forma clara qual é a carteira ativa no momento, prevenindo inserções de dados errôneas.
   - Mantém o estado da FSM de cadastro de transações em `telegram_state:{chatID}` (TTL de 1 hora).
+- **Relatórios Avançados por Chat:**
+  - **Consultas de Dividendos Agrupados:** Além do fluxo padrão, o usuário pode agrupar e visualizar seus dividendos acumulados categorizados automaticamente por Mês ou por Ano.
+  - **Suporte a Renda Fixa e Alertas:** Exibe um resumo da alocação em renda fixa e é capaz de alertar instantaneamente os usuários sobre rompimentos de alvos de preço configurados no dashboard.
 - **FSM do Fluxo Assistido (Wizard Flow FSM - Sem Comando `/adicionar`):**
   - O fluxo é acionado exclusivamente enviando o comando `/menu` e clicando no botão inline `💵 Lançar Operação` (que dispara callback `btn_operacao`).
   - O bot define o estado no Redis para `EXPECT_TICKER` e envia botões inline para os ativos em carteira, além da opção `➕ Novo Ativo` (callback `btn_new_asset`).
@@ -645,20 +917,38 @@ sequenceDiagram
 
 ```text
 .
-├── backend/          # Backend escrito em Golang (Domain-Driven Design)
-│   ├── cmd/api/      # Ponto de entrada da aplicação (main.go)
-│   ├── internal/     # Módulos centrais (auth, market, portfolio, fixedincome, etc.)
-│   ├── migrations/   # Arquivos de migração SQL gerenciados pelo golang-migrate
-│   └── Dockerfile    # Imagem Go configurada para hot-reload em ambiente dev (Air)
+├── backend/                  # Backend escrito em Golang (Domain-Driven Architecture)
+│   ├── cmd/api/              # Ponto de entrada HTTP da aplicação (main.go)
+│   ├── internal/             # Módulos e domínios de negócio
+│   │   ├── calculator/       # Motor de cálculos financeiros (Graham, Bazin, TWRR, preço médio)
+│   │   ├── fixedincome/      # Gestão de Renda Fixa e Tesouro Direto (treasury_service.go)
+│   │   ├── market/           # Scrapers (Fundamentus, Finviz, StockAnalysis) e DividendGateway
+│   │   ├── portfolio/        # Gestão de carteiras (dividend_service.go, performance_service.go, worker_dividend.go)
+│   │   ├── auth/             # Autenticação Argon2id + JWT / Redis
+│   │   ├── alert/            # Motor de alertas de preço em background
+│   │   ├── history/          # Livro de registro unificado (Ledger) de transações de renda variável e fixa
+│   │   ├── telegram/         # Bot do Telegram e FSM de cadastro de operações
+│   │   └── worker/           # Orquestrador de workers agendados (AlertWorker, DailyWorker)
+│   ├── migrations/           # Migrações SQL gerenciadas pelo golang-migrate
+│   └── Dockerfile            # Container Go com suporte a hot-reload (Air)
 │
-├── frontend/         # Frontend Next.js
-│   ├── src/app/      # Páginas e roteamento do Next.js App Router
-│   ├── tests/        # Testes de regressão e E2E Playwright
-│   └── Dockerfile    # Configuração de build do Node.js
+├── frontend/                 # Frontend Next.js 14 (App Router)
+│   ├── src/
+│   │   ├── app/              # Páginas e rotas da aplicação
+│   │   ├── components/       # Componentes React modularizados
+│   │   │   └── portfolio/    # Visualização e gestão da carteira
+│   │   │       ├── analysis/ # Subcomponentes de análise e múltiplos
+│   │   │       ├── modals/   # Modais reutilizáveis de cadastro/edição
+│   │   │       ├── transactions/# Tabela de transações com filtros inteligentes
+│   │   │       └── treasury/ # Módulo do Tesouro Direto (import/export CSV)
+│   │   ├── context/          # Estado global (PortfolioContext) para eliminar prop-drilling
+│   │   └── lib/              # Cliente HTTP unificado (apiFetch) e utilitários
+│   ├── tests/                # Testes de regressão e E2E com Playwright
+│   └── Dockerfile            # Imagem de build do Node.js
 │
-├── docker-compose.yml # Arquitetura orquestrada com 9 containers locais
-├── Makefile          # Atalhos utilitários para automação de tarefas de desenvolvimento
-└── Caddyfile         # Configurações do proxy reverso de rotas locais
+├── docker-compose.yml         # Orquestração local (Go, Next, Postgres, Redis, Prometheus, Grafana, Loki)
+├── Makefile                  # Utilitários de automação e scripts de teste
+└── Caddyfile                 # Configuração do proxy reverso Caddy
 ```
 
 ---
@@ -670,7 +960,7 @@ sequenceDiagram
 - Ferramenta Make (recomendado).
 
 ### Execução do Ambiente
-Para inicializar toda a stack integrada (Banco, Redis, Go, Next, Grafana, Loki, Mailpit):
+Para inicializar toda a stack integrada (Banco, Redis, Go, Next, Grafana, Loki):
 
 ```bash
 # Executa a compilação e orquestração dos containers
@@ -692,7 +982,6 @@ make down
 ### Endpoints Úteis Locais
 - **Interface Web:** [http://stock-pulse.localhost](http://stock-pulse.localhost) ou `localhost:3000`
 - **API Backend:** [http://api.stock-pulse.localhost](http://api.stock-pulse.localhost) ou `localhost:8080`
-- **Mailpit (Captura de E-mails):** [http://localhost:8025](http://localhost:8025)
 - **Painel Grafana:** [http://localhost:3001](http://localhost:3001) (acesso padrão: `admin` / `admin`)
 
 ---

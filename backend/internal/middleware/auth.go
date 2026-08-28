@@ -2,16 +2,14 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
-
-
 
 // AuthRequired é o middleware real de validação de token JWT.
 func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
@@ -20,7 +18,7 @@ func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
 			// Busca pelo cookie access_token
 			cookie, err := r.Cookie("access_token")
 			if err != nil || cookie == nil {
-				respondWithError(w, http.StatusUnauthorized, "Sessão ausente. Faça login novamente.")
+				httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão ausente. Faça login novamente.")
 				return
 			}
 
@@ -34,20 +32,20 @@ func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
 			})
 
 			if err != nil || !token.Valid {
-				respondWithError(w, http.StatusUnauthorized, "Sessão inválida ou expirada. Refaça o login.")
+				httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão inválida ou expirada. Refaça o login.")
 				return
 			}
 
 			// Extrai as claims e injeta o user_id no contexto da requisição
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok || claims["user_id"] == nil {
-				respondWithError(w, http.StatusUnauthorized, "Erro ao processar as credenciais.")
+				httputils.RespondWithError(w, http.StatusUnauthorized, "Erro ao processar as credenciais.")
 				return
 			}
 
 			userID, ok := claims["user_id"].(string)
 			if !ok || userID == "" {
-				respondWithError(w, http.StatusUnauthorized, "ID de usuário inválido nas credenciais.")
+				httputils.RespondWithError(w, http.StatusUnauthorized, "ID de usuário inválido nas credenciais.")
 				return
 			}
 
@@ -60,7 +58,7 @@ func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
 
 // CORS configura as permissões de compartilhamento de recursos entre origens de forma extremamente segura.
 func CORS() func(http.Handler) http.Handler {
-	frontendURL := os.Getenv("FRONTEND_URL")
+	frontendURL := config.Envs.FrontendURL
 	if frontendURL == "" {
 		frontendURL = "http://localhost:3000" // Fallback seguro de desenvolvimento
 	}
@@ -72,7 +70,7 @@ func CORS() func(http.Handler) http.Handler {
 			if origin == frontendURL {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 			}
-			
+
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Idempotency-Key")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -86,10 +84,4 @@ func CORS() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func respondWithError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

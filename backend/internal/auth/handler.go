@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/config"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
 type contextKey string
@@ -22,6 +24,9 @@ type AuthService interface {
 	ValidateRefreshToken(ctx context.Context, token string) (string, error)
 	GetUserByID(ctx context.Context, id string) (*User, error)
 	GenerateAccessToken(user *User) (string, error)
+	UpdateProfile(ctx context.Context, id, name, email string) (*User, error)
+	UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error
+	DeleteUser(ctx context.Context, id string) error
 }
 
 // Handler expõe os métodos HTTP da API de Autenticação.
@@ -33,7 +38,7 @@ type Handler struct {
 // NewHandler cria uma nova instância de Handler.
 func NewHandler(service AuthService) *Handler {
 	// Em modo de desenvolvimento local, cookieSecure pode ser desativado para permitir testes sem HTTPS
-	cookieSecure := os.Getenv("ENV") != "development"
+	cookieSecure := config.Envs.Env != "development"
 	return &Handler{
 		service:      service,
 		cookieSecure: cookieSecure,
@@ -55,37 +60,37 @@ type loginPayload struct {
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var payload registerPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		h.respondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		httputils.RespondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
 		return
 	}
 
 	user, err := h.service.Register(r.Context(), payload.Name, payload.Email, payload.Password)
 	if err != nil {
 		slog.Warn("Falha no registro", "email", payload.Email, "error", err.Error())
-		h.respondWithError(w, http.StatusBadRequest, err.Error())
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusCreated, user)
+	httputils.RespondWithJSON(w, http.StatusCreated, user)
 }
 
 // Login lida com a autenticação e injeção de Cookies HttpOnly.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var payload loginPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		h.respondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		httputils.RespondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
 		return
 	}
 
 	user, accessToken, refreshToken, err := h.service.Login(r.Context(), payload.Email, payload.Password)
 	if err != nil {
 		slog.Warn("Falha de autenticação", "email", payload.Email, "error", err.Error())
-		h.respondWithError(w, http.StatusUnauthorized, err.Error())
+		httputils.RespondWithError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	h.setTokenCookies(w, accessToken, refreshToken)
-	h.respondWithJSON(w, http.StatusOK, user)
+	httputils.RespondWithJSON(w, http.StatusOK, user)
 }
 
 // Logout limpa os cookies e invalida o refresh token no Redis.
@@ -96,32 +101,32 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.clearTokenCookies(w)
-	h.respondWithJSON(w, http.StatusOK, map[string]string{"message": "Logout efetuado com sucesso"})
+	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Logout efetuado com sucesso"})
 }
 
 // Refresh renova o access_token se o refresh_token for válido.
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil || cookie == nil {
-		h.respondWithError(w, http.StatusUnauthorized, "Sessão não encontrada. Faça login novamente.")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão não encontrada. Faça login novamente.")
 		return
 	}
 
 	userID, err := h.service.ValidateRefreshToken(r.Context(), cookie.Value)
 	if err != nil {
-		h.respondWithError(w, http.StatusUnauthorized, err.Error())
+		httputils.RespondWithError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	user, err := h.service.GetUserByID(r.Context(), userID)
 	if err != nil {
-		h.respondWithError(w, http.StatusUnauthorized, "Usuário não encontrado.")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Usuário não encontrado.")
 		return
 	}
 
 	newAccessToken, err := h.service.GenerateAccessToken(user)
 	if err != nil {
-		h.respondWithError(w, http.StatusInternalServerError, "Erro ao gerar credenciais de acesso.")
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao gerar credenciais de acesso.")
 		return
 	}
 
@@ -137,24 +142,24 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	h.respondWithJSON(w, http.StatusOK, map[string]string{"message": "Sessão renovada com sucesso"})
+	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Sessão renovada com sucesso"})
 }
 
 // Me retorna as informações do usuário autenticado no contexto HTTP.
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(UserIDKey).(string)
 	if !ok || userID == "" {
-		h.respondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Não autorizado")
 		return
 	}
 
 	user, err := h.service.GetUserByID(r.Context(), userID)
 	if err != nil {
-		h.respondWithError(w, http.StatusNotFound, "Usuário não encontrado")
+		httputils.RespondWithError(w, http.StatusNotFound, "Usuário não encontrado")
 		return
 	}
 
-	h.respondWithJSON(w, http.StatusOK, user)
+	httputils.RespondWithJSON(w, http.StatusOK, user)
 }
 
 // setTokenCookies injeta os cookies access_token e refresh_token.
@@ -207,18 +212,81 @@ func (h *Handler) clearTokenCookies(w http.ResponseWriter) {
 	})
 }
 
-func (h *Handler) respondWithError(w http.ResponseWriter, status int, msg string) {
-	h.respondWithJSON(w, status, map[string]string{"error": msg})
+type updateProfilePayload struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
-func (h *Handler) respondWithJSON(w http.ResponseWriter, status int, payload interface{}) {
-	response, err := json.Marshal(payload)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error": "Erro de serialização JSON interno"}`))
+type updatePasswordPayload struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// UpdateProfile atualiza as informações do usuário.
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(UserIDKey).(string)
+	if !ok || userID == "" {
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Não autorizado")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write(response)
+
+	var payload updateProfilePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		return
+	}
+
+	user, err := h.service.UpdateProfile(r.Context(), userID, payload.Name, payload.Email)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, user)
+}
+
+// UpdatePassword altera a senha do usuário logado.
+func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(UserIDKey).(string)
+	if !ok || userID == "" {
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	var payload updatePasswordPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		return
+	}
+
+	err := h.service.UpdatePassword(r.Context(), userID, payload.CurrentPassword, payload.NewPassword)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Senha atualizada com sucesso"})
+}
+
+// DeleteUser exclui a conta do usuário e limpa os cookies.
+func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(UserIDKey).(string)
+	if !ok || userID == "" {
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	cookie, err := r.Cookie("refresh_token")
+	if err == nil && cookie != nil {
+		_ = h.service.RevokeRefreshToken(r.Context(), cookie.Value)
+	}
+
+	err = h.service.DeleteUser(r.Context(), userID)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.clearTokenCookies(w)
+	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Conta excluída com sucesso"})
 }

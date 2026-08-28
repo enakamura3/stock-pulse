@@ -24,6 +24,8 @@ type Service interface {
 	GenerateLinkToken(ctx context.Context, userID uuid.UUID) (string, error)
 	LinkAccountWithToken(ctx context.Context, token string, chatID int64) error
 	GetUserIDByChatID(ctx context.Context, chatID int64) (uuid.UUID, error)
+	GetChatIDByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
+	UnlinkAccount(ctx context.Context, userID uuid.UUID) error
 
 	SetConversationState(ctx context.Context, chatID int64, state ConversationState) error
 	GetConversationState(ctx context.Context, chatID int64) (*ConversationState, error)
@@ -44,9 +46,7 @@ func NewService(repo Repository, rdb *redis.Client) Service {
 
 func (s *service) GenerateLinkToken(ctx context.Context, userID uuid.UUID) (string, error) {
 	bytes := make([]byte, 16)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
+	rand.Read(bytes)
 	token := hex.EncodeToString(bytes)
 
 	err := s.redis.Set(ctx, "telegram_link:"+token, userID.String(), 10*time.Minute).Err()
@@ -142,4 +142,17 @@ func (s *service) GetActivePortfolio(ctx context.Context, chatID int64) (string,
 		return "", fmt.Errorf("failed to get active portfolio from redis: %w", err)
 	}
 	return val, nil
+}
+
+func (s *service) GetChatIDByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return s.repo.GetChatIDByUserID(ctx, userID)
+}
+
+func (s *service) UnlinkAccount(ctx context.Context, userID uuid.UUID) error {
+	chatID, err := s.repo.GetChatIDByUserID(ctx, userID)
+	if err == nil && chatID != 0 {
+		key := fmt.Sprintf("telegram_active_portfolio:%d", chatID)
+		_ = s.redis.Del(ctx, key).Err()
+	}
+	return s.repo.UnlinkAccount(ctx, userID)
 }

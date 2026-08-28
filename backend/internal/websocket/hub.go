@@ -29,7 +29,7 @@ type Client struct {
 
 // WSMessage representa o formato de mensagem recebido do frontend.
 type WSMessage struct {
-	Action  string   `json:"action"`  // "subscribe" ou "unsubscribe"
+	Action  string   `json:"action"` // "subscribe" ou "unsubscribe"
 	Symbols []string `json:"symbols"`
 }
 
@@ -228,6 +228,8 @@ func (h *Hub) broadcastQuotes(ctx context.Context) {
 	for ticker := range uniqueTickers {
 		wg.Add(1)
 		go func(t string) {
+			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
 			defer wg.Done()
 			quote, err := h.marketSvc.GetQuote(ctx, t)
 			if err != nil {

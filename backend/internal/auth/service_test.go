@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redismock/v9"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -38,6 +39,30 @@ func (m *MockUserRepository) GetUserByID(ctx context.Context, id string) (*User,
 		return args.Get(0).(*User), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) GetUserByIDWithHash(ctx context.Context, id string) (*User, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) != nil {
+		return args.Get(0).(*User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) UpdateUser(ctx context.Context, id, name, email string) (*User, error) {
+	args := m.Called(ctx, id, name, email)
+	if args.Get(0) != nil {
+		return args.Get(0).(*User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	return m.Called(ctx, id, passwordHash).Error(0)
+}
+
+func (m *MockUserRepository) DeleteUser(ctx context.Context, id string) error {
+	return m.Called(ctx, id).Error(0)
 }
 
 func setupService() (*Service, *MockUserRepository, redismock.ClientMock) {
@@ -91,7 +116,7 @@ func TestService_Login(t *testing.T) {
 		s, repo, _ := setupService()
 		hash, _ := hashPassword("right_password", defaultParams)
 		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(&User{PasswordHash: hash}, nil)
-		
+
 		_, _, _, err := s.Login(context.Background(), "test@test.com", "wrong_password")
 		assert.EqualError(t, err, "e-mail ou senha incorretos")
 	})
@@ -101,7 +126,7 @@ func TestService_Login(t *testing.T) {
 		hash, _ := hashPassword("password", defaultParams)
 		user := &User{ID: "1", Email: "test@test.com", PasswordHash: hash}
 		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
-		
+
 		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetVal("OK")
 
 		resUser, access, refresh, err := s.Login(context.Background(), "test@test.com", "password")
@@ -114,27 +139,38 @@ func TestService_Login(t *testing.T) {
 	})
 }
 
-func TestService_GenerateRefreshToken(t *testing.T) {
-	s, _, rdbMock := setupService()
-	rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetErr(errors.New("redis error"))
-	
-	_, err := s.GenerateRefreshToken(context.Background(), "1")
-	assert.EqualError(t, err, "redis error")
+func TestService_Login_RefreshTokenError(t *testing.T) {
+	s, repo, rdbMock := setupService()
+	hash, _ := hashPassword("password", defaultParams)
+	user := &User{ID: "1", Email: "test@test.com", PasswordHash: hash}
+	repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
+	rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetErr(errors.New("redis err"))
+
+	_, _, _, err := s.Login(context.Background(), "test@test.com", "password")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "falha ao gerar refresh token")
 }
 
-func TestService_ValidateRefreshToken(t *testing.T) {
+func TestService_ValidateRefreshToken_Expired(t *testing.T) {
 	s, _, rdbMock := setupService()
-	rdbMock.ExpectGet("refresh_token:valid").SetVal("1")
-	
-	id, err := s.ValidateRefreshToken(context.Background(), "valid")
-	assert.NoError(t, err)
-	assert.Equal(t, "1", id)
+	rdbMock.ExpectGet("refresh_token:expired").SetErr(redis.Nil)
+
+	_, err := s.ValidateRefreshToken(context.Background(), "expired")
+	assert.EqualError(t, err, "sessão expirada ou inválida")
+}
+
+func TestService_ValidateRefreshToken_Error(t *testing.T) {
+	s, _, rdbMock := setupService()
+	rdbMock.ExpectGet("refresh_token:invalid").SetErr(errors.New("redis err"))
+
+	_, err := s.ValidateRefreshToken(context.Background(), "invalid")
+	assert.Error(t, err)
 }
 
 func TestService_RevokeRefreshToken(t *testing.T) {
 	s, _, rdbMock := setupService()
 	rdbMock.ExpectDel("refresh_token:token").SetVal(1)
-	
+
 	err := s.RevokeRefreshToken(context.Background(), "token")
 	assert.NoError(t, err)
 }
@@ -142,7 +178,7 @@ func TestService_RevokeRefreshToken(t *testing.T) {
 func TestService_GetUserByID(t *testing.T) {
 	s, repo, _ := setupService()
 	repo.On("GetUserByID", mock.Anything, "1").Return(&User{ID: "1"}, nil)
-	
+
 	user, err := s.GetUserByID(context.Background(), "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "1", user.ID)
@@ -163,4 +199,71 @@ func TestComparePasswordAndHash(t *testing.T) {
 	// Invalid format
 	_, err = comparePasswordAndHash("test1234", "invalid")
 	assert.Error(t, err)
+}
+
+func TestService_UpdateProfile(t *testing.T) {
+	t.Run("Empty fields", func(t *testing.T) {
+		s, _, _ := setupService()
+		_, err := s.UpdateProfile(context.Background(), "1", "", "test@test.com")
+		assert.EqualError(t, err, "todos os campos são obrigatórios")
+	})
+
+	t.Run("Email already in use", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByEmail", mock.Anything, "other@test.com").Return(&User{ID: "2", Email: "other@test.com"}, nil)
+		_, err := s.UpdateProfile(context.Background(), "1", "NewName", "other@test.com")
+		assert.EqualError(t, err, "este e-mail já está cadastrado por outro usuário")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByEmail", mock.Anything, "new@test.com").Return(nil, errors.New("not found"))
+		repo.On("UpdateUser", mock.Anything, "1", "NewName", "new@test.com").Return(&User{ID: "1", Name: "NewName", Email: "new@test.com"}, nil)
+
+		user, err := s.UpdateProfile(context.Background(), "1", "NewName", "new@test.com")
+		assert.NoError(t, err)
+		assert.Equal(t, "NewName", user.Name)
+		assert.Equal(t, "new@test.com", user.Email)
+	})
+}
+
+func TestService_UpdatePassword(t *testing.T) {
+	t.Run("Short new password", func(t *testing.T) {
+		s, _, _ := setupService()
+		err := s.UpdatePassword(context.Background(), "1", "old", "123")
+		assert.EqualError(t, err, "a nova senha deve ter no mínimo 6 caracteres")
+	})
+
+	t.Run("User not found", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(nil, errors.New("not found"))
+		err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
+		assert.Error(t, err)
+	})
+
+	t.Run("Wrong current password", func(t *testing.T) {
+		s, repo, _ := setupService()
+		hash, _ := hashPassword("rightpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		err := s.UpdatePassword(context.Background(), "1", "wrongpassword", "newpassword")
+		assert.EqualError(t, err, "senha atual incorreta")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _ := setupService()
+		hash, _ := hashPassword("oldpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		repo.On("UpdatePassword", mock.Anything, "1", mock.Anything).Return(nil)
+
+		err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
+		assert.NoError(t, err)
+	})
+}
+
+func TestService_DeleteUser(t *testing.T) {
+	s, repo, _ := setupService()
+	repo.On("DeleteUser", mock.Anything, "1").Return(nil)
+
+	err := s.DeleteUser(context.Background(), "1")
+	assert.NoError(t, err)
 }

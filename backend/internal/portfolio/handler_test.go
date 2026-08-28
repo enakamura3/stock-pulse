@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -43,6 +44,10 @@ func (m *MockPortfolioService) GetPortfolioDetails(ctx context.Context, portfoli
 		return args.Get(0).(*Portfolio), args.Get(1).([]Position), args.Error(2)
 	}
 	return nil, nil, args.Error(2)
+}
+
+func (m *MockPortfolioService) SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error {
+	return m.Called(ctx, portfolioID, userID).Error(0)
 }
 
 func (m *MockPortfolioService) AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error) {
@@ -173,7 +178,7 @@ func TestHandler_GetPortfolios(t *testing.T) {
 func TestHandler_GetPortfolioDetails(t *testing.T) {
 	t.Run("Missing Params", func(t *testing.T) {
 		h, _ := setupHandlerTest()
-		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/", nil), "u1", nil)
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/", nil), "u1", map[string]string{"id": ""})
 		rec := httptest.NewRecorder()
 		h.GetPortfolio(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -217,8 +222,17 @@ func TestHandler_AddTransaction(t *testing.T) {
 
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("AddTransaction", mock.Anything, "u1", mock.Anything).Return(nil, errors.New("err"))
-		body := `{"ticker": "AAPL", "type": "BUY"}`
+		s.On("AddTransaction", mock.Anything, "u1", mock.Anything).Return((*Transaction)(nil), errors.New("err"))
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Negative Fee", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "fee": -5}`
 		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
 		rec := httptest.NewRecorder()
 		h.AddTransaction(rec, req)
@@ -234,12 +248,30 @@ func TestHandler_AddTransaction(t *testing.T) {
 		h.AddTransaction(rec, req)
 		assert.Equal(t, http.StatusCreated, rec.Code)
 	})
+
+	t.Run("Invalid Type", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "INVALID", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Invalid Quantity", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 0, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
 }
 
 func TestHandler_GetTransactions(t *testing.T) {
 	t.Run("Missing Params", func(t *testing.T) {
 		h, _ := setupHandlerTest()
-		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios//transactions", nil), "u1", nil)
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios//transactions", nil), "u1", map[string]string{"id": ""})
 		rec := httptest.NewRecorder()
 		h.GetTransactions(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -265,6 +297,14 @@ func TestHandler_GetTransactions(t *testing.T) {
 }
 
 func TestHandler_DeletePortfolio(t *testing.T) {
+	t.Run("Missing Params", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("DELETE", "/portfolios/", nil), "u1", map[string]string{"id": ""})
+		rec := httptest.NewRecorder()
+		h.DeletePortfolio(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("DeletePortfolio", mock.Anything, "p1", "u1").Return(errors.New("err"))
@@ -287,7 +327,7 @@ func TestHandler_DeletePortfolio(t *testing.T) {
 func TestHandler_DeleteTransaction(t *testing.T) {
 	t.Run("Missing Params", func(t *testing.T) {
 		h, _ := setupHandlerTest()
-		req := reqWithUserAndParams(httptest.NewRequest("DELETE", "/portfolios//transactions/", nil), "u1", nil)
+		req := reqWithUserAndParams(httptest.NewRequest("DELETE", "/portfolios//transactions/", nil), "u1", map[string]string{"id": "", "txId": ""})
 		rec := httptest.NewRecorder()
 		h.DeleteTransaction(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -296,7 +336,7 @@ func TestHandler_DeleteTransaction(t *testing.T) {
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("DeleteTransaction", mock.Anything, "tx1", "p1", "u1").Return(errors.New("err"))
-		req := reqWithUserAndParams(httptest.NewRequest("DELETE", "/portfolios/p1/transactions/tx1", nil), "u1", map[string]string{"id": "p1", "tx_id": "tx1"})
+		req := reqWithUserAndParams(httptest.NewRequest("DELETE", "/portfolios/p1/transactions/tx1", nil), "u1", map[string]string{"id": "p1", "txId": "tx1"})
 		rec := httptest.NewRecorder()
 		h.DeleteTransaction(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -315,7 +355,7 @@ func TestHandler_DeleteTransaction(t *testing.T) {
 func TestHandler_GetPortfolioPerformance(t *testing.T) {
 	t.Run("Missing Params", func(t *testing.T) {
 		h, _ := setupHandlerTest()
-		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios//performance", nil), "u1", nil)
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios//performance", nil), "u1", map[string]string{"id": ""})
 		rec := httptest.NewRecorder()
 		h.GetPerformance(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -332,8 +372,16 @@ func TestHandler_GetPortfolioPerformance(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("GetPortfolioPerformance", mock.Anything, "p1", "u1", "1M", mock.Anything).Return([]PerformancePoint{}, nil)
-		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/performance?period=1M", nil), "u1", map[string]string{"id": "p1"})
+		s.On("GetPortfolioPerformance", mock.Anything, "p1", "u1", "ALL", []string(nil)).Return([]PerformancePoint{}, nil)
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/performance", nil), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.GetPerformance(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+	t.Run("With Tickers", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("GetPortfolioPerformance", mock.Anything, "p1", "u1", "1M", []string{"AAPL", "GOOG"}).Return([]PerformancePoint{}, nil)
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/performance?period=1M&tickers=AAPL,GOOG", nil), "u1", map[string]string{"id": "p1"})
 		rec := httptest.NewRecorder()
 		h.GetPerformance(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -346,9 +394,8 @@ func (f failMarshal) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("err")
 }
 func TestHandler_RespondWithJSON_Error(t *testing.T) {
-	h, _ := setupHandlerTest()
 	rec := httptest.NewRecorder()
-	h.respondWithJSON(rec, http.StatusOK, failMarshal{})
+	httputils.RespondWithJSON(rec, http.StatusOK, failMarshal{})
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
@@ -380,13 +427,236 @@ func TestHandler_Unauthorized(t *testing.T) {
 }
 
 func (m *MockPortfolioService) UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error {
-	return nil
+	args := m.Called(ctx, userID, portfolioID, txID, tx)
+	return args.Error(0)
 }
 
 func (m *MockPortfolioService) BulkAddTransactions(ctx context.Context, userID, portfolioID string, file multipart.File) (*BulkImportResult, error) {
-	return &BulkImportResult{Success: 1, Errors: []string{}}, nil
+	args := m.Called(ctx, userID, portfolioID, file)
+	if args.Get(0) != nil {
+		return args.Get(0).(*BulkImportResult), args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 func (m *MockPortfolioService) GetFixedIncomeService() fixedincome.Service {
+	args := m.Called()
+	if args.Get(0) != nil {
+		return args.Get(0).(fixedincome.Service)
+	}
 	return nil
+}
+
+func TestHandler_CtxOrDefault(t *testing.T) {
+	ctx := ctxOrDefault(nil)
+	assert.NotNil(t, ctx)
+}
+
+func TestHandler_UpdateTransaction(t *testing.T) {
+	t.Run("Missing Params", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios//transactions/", nil), "u1", map[string]string{"id": "", "txId": ""})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Unauthorized", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString("{}"))
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Invalid JSON", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString("invalid")), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Invalid Type", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "INVALID", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Invalid Quantity", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 0, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("UpdateTransaction", mock.Anything, "u1", "p1", "tx1", mock.Anything).Return(errors.New("err"))
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("UpdateTransaction", mock.Anything, "u1", "p1", "tx1", mock.Anything).Return(nil)
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "invalid-date"}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+func TestHandler_BulkImportTransactions(t *testing.T) {
+	t.Run("Missing Params", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios//bulk", nil), "u1", map[string]string{"id": ""})
+		rec := httptest.NewRecorder()
+		h.BulkImportTransactions(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Unauthorized", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := httptest.NewRequest("POST", "/portfolios/p1/bulk", nil)
+		rec := httptest.NewRecorder()
+		h.BulkImportTransactions(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Invalid Multipart", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/bulk", bytes.NewBufferString("invalid body")), "u1", map[string]string{"id": "p1"})
+		req.Header.Set("Content-Type", "multipart/form-data; boundary=invalid")
+		rec := httptest.NewRecorder()
+		h.BulkImportTransactions(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Wrong File Name", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, _ := writer.CreateFormFile("wrong_file", "test.csv")
+		part.Write([]byte("ticker,type\nAAPL,BUY"))
+		writer.Close()
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/bulk", body), "u1", map[string]string{"id": "p1"})
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		rec := httptest.NewRecorder()
+		h.BulkImportTransactions(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, _ := writer.CreateFormFile("file", "test.csv")
+		part.Write([]byte("ticker,type\nAAPL,BUY"))
+		writer.Close()
+
+		s.On("BulkAddTransactions", mock.Anything, "u1", "p1", mock.Anything).Return((*BulkImportResult)(nil), errors.New("err"))
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/bulk", body), "u1", map[string]string{"id": "p1"})
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		rec := httptest.NewRecorder()
+		h.BulkImportTransactions(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, _ := writer.CreateFormFile("file", "test.csv")
+		part.Write([]byte("ticker,type\nAAPL,BUY"))
+		writer.Close()
+
+		s.On("BulkAddTransactions", mock.Anything, "u1", "p1", mock.Anything).Return(&BulkImportResult{Success: 1}, nil)
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/bulk", body), "u1", map[string]string{"id": "p1"})
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		rec := httptest.NewRecorder()
+		h.BulkImportTransactions(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+func TestHandler_GetDividends(t *testing.T) {
+	t.Run("Missing Params", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios//dividends", nil), "u1", map[string]string{"id": ""})
+		rec := httptest.NewRecorder()
+		h.GetDividends(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Unauthorized", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := httptest.NewRequest("GET", "/portfolios/p1/dividends", nil)
+		rec := httptest.NewRecorder()
+		h.GetDividends(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("GetPortfolioDividends", mock.Anything, "p1", "u1").Return(([]CalculatedDividend)(nil), errors.New("err"))
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/dividends", nil), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.GetDividends(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("GetPortfolioDividends", mock.Anything, "p1", "u1").Return([]CalculatedDividend{}, nil)
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/portfolios/p1/dividends", nil), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.GetDividends(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+func TestHandler_SetDefaultPortfolio(t *testing.T) {
+	t.Run("Unauthorized", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := httptest.NewRequest("PUT", "/portfolios/p1/default", nil)
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("Missing Params", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios//default", nil), "u1", map[string]string{"id": ""})
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("SetDefaultPortfolio", mock.Anything, "p1", "u1").Return(errors.New("err"))
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/default", nil), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("SetDefaultPortfolio", mock.Anything, "p1", "u1").Return(nil)
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/default", nil), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.SetDefaultPortfolio(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
 }

@@ -446,7 +446,7 @@ erDiagram
         decimal gross_amount "precision 15 scale 6"
         decimal net_amount "precision 15 scale 6"
         decimal split_factor "precision 10 scale 4"
-        date ex_date
+        date cum_date
         timestamp created_at
     }
 

@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 import { FixedIncomePosition, PerformancePoint } from './types';
 import { formatMoney, formatPercentage } from './helpers';
+import { apiFetch } from '@/lib/api';
+import { usePortfolioOptional } from '@/context/PortfolioContext';
 
 interface FixedIncomeTabProps {
   portfolioId: string;
   onLaunchOperation: () => void;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: FixedIncomeTabProps) {
   const [positions, setPositions] = useState<FixedIncomePosition[]>([]);
@@ -25,52 +25,123 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
   const [redeemDate, setRedeemDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isSubmittingRedeem, setIsSubmittingRedeem] = useState(false);
 
-  useEffect(() => {
+  type SortKey = 'institution' | 'rate' | 'start_date' | 'maturity_date' | 'total_invested' | 'gross_value' | 'net_value' | 'net_return_percent';
+  type SortDir = 'asc' | 'desc';
+
+  const [sortKey, setSortKey] = useState<SortKey>('institution');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const sortedPositions = [...positions].sort((a, b) => {
+    let aVal: number | string = 0;
+    let bVal: number | string = 0;
+    switch (sortKey) {
+      case 'institution': aVal = a.asset?.institution || ''; bVal = b.asset?.institution || ''; break;
+      case 'rate': aVal = a.asset?.rate ?? 0; bVal = b.asset?.rate ?? 0; break;
+      case 'start_date': aVal = a.start_date || ''; bVal = b.start_date || ''; break;
+      case 'maturity_date': aVal = a.asset?.maturity_date || ''; bVal = b.asset?.maturity_date || ''; break;
+      case 'total_invested': aVal = a.total_invested ?? 0; bVal = b.total_invested ?? 0; break;
+      case 'gross_value': aVal = a.gross_value ?? 0; bVal = b.gross_value ?? 0; break;
+      case 'net_value': aVal = a.net_value ?? 0; bVal = b.net_value ?? 0; break;
+      case 'net_return_percent': aVal = a.net_return_percent ?? 0; bVal = b.net_return_percent ?? 0; break;
+    }
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+    return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+  });
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
+    return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+  const portfolioContext = usePortfolioOptional();
+
+  const fetchPositions = useCallback(async () => {
     if (!portfolioId) return;
-
-    const fetchPositions = async () => {
-      setIsLoading(true);
-      try {
-        const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/positions`, {
-          credentials: 'include',
-          cache: 'no-store',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setPositions(data || []);
-        } else {
-          console.error("Failed to fetch fixed income positions");
-        }
-      } catch (err) {
-        console.error("Error fetching fixed income positions:", err);
-      } finally {
-        setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/positions`);
+      if (res.ok) {
+        const data = await res.json();
+        setPositions(data || []);
+      } else {
+        console.error("Failed to fetch fixed income positions");
       }
-    };
-
-    fetchPositions();
+    } catch (err) {
+      console.error("Error fetching fixed income positions:", err);
+    } finally {
+      setIsLoading(false);
+    }
   }, [portfolioId]);
 
-  useEffect(() => {
+  const fetchPerformance = useCallback(async () => {
     if (!portfolioId) return;
-    const fetchPerformance = async () => {
-      setIsLoadingPerformance(true);
-      try {
-        const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/performance?period=${period}`, {
-          credentials: 'include',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setPerformanceData(data || []);
-        }
-      } catch (err) {
-        console.error("Error fetching fixed income performance:", err);
-      } finally {
-        setIsLoadingPerformance(false);
+    setIsLoadingPerformance(true);
+    try {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/performance?period=${period}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPerformanceData(data || []);
       }
-    };
-    fetchPerformance();
+    } catch (err) {
+      console.error("Error fetching fixed income performance:", err);
+    } finally {
+      setIsLoadingPerformance(false);
+    }
   }, [portfolioId, period]);
+
+  useEffect(() => {
+    fetchPositions();
+  }, [fetchPositions]);
+
+  useEffect(() => {
+    fetchPerformance();
+  }, [fetchPerformance]);
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/bulk`, {
+        method: "POST",
+        body: formData
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.errors?.length > 0) {
+          alert(`Importados com sucesso: ${data.success}\nFalhas:\n- ${data.errors.join("\n- ")}`);
+        } else {
+          alert(`Importação concluída com sucesso! ${data.success} registros importados.`);
+        }
+        await fetchPositions();
+        await fetchPerformance();
+        if (portfolioContext) {
+          await portfolioContext.loadPortfolioDetails(portfolioId);
+          await portfolioContext.loadDividends(portfolioId);
+        }
+      } else {
+        alert("Erro ao enviar arquivo.");
+      }
+    } catch (err) {
+      alert("Erro de conexão.");
+    }
+    
+    e.target.value = '';
+  };
 
   const confirmRedeem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,8 +151,6 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
       return;
     }
 
-    // Validação básica: não pode resgatar mais que o valor líquido atual (simplificação)
-    // Na prática, o backend que dita a regra, mas ajuda no frontend
     if (Number(redeemAmount) > redeemTarget.net_value) {
       if (!confirm(`O valor solicitado (R$ ${Number(redeemAmount).toFixed(2)}) é maior que o saldo líquido atual (R$ ${redeemTarget.net_value.toFixed(2)}). Deseja prosseguir mesmo assim?`)) {
         return;
@@ -90,20 +159,24 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
 
     setIsSubmittingRedeem(true);
     try {
-      const res = await fetch(`${API_URL}/portfolios/${portfolioId}/fixed-income/assets/${redeemTarget.asset.id}/transactions`, {
+      const res = await apiFetch(`/portfolios/${portfolioId}/fixed-income/assets/${redeemTarget.asset.id}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'REDEMPTION',
           amount: Number(redeemAmount),
           date: new Date(redeemDate).toISOString()
-        }),
-        credentials: 'include'
+        })
       });
 
       if (res.ok) {
         alert('Resgate realizado com sucesso!');
-        window.location.reload();
+        await fetchPositions();
+        await fetchPerformance();
+        if (portfolioContext) {
+          await portfolioContext.loadPortfolioDetails(portfolioId);
+          await portfolioContext.loadDividends(portfolioId);
+        }
       } else {
         const data = await res.json();
         alert(`Erro ao resgatar: ${data.error || 'Erro desconhecido'}`);
@@ -135,7 +208,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
           </div>
           <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
             {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? '#000' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+              <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
                 {p}
               </button>
             ))}
@@ -159,28 +232,38 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
       <div className="card flex-col gap-md" style={{ flex: '2 1 600px', minHeight: '380px' }}>
         <div className="flex-row justify-between items-center mb-lg">
           <h3 className="card-title">🏛️ Posições de Renda Fixa</h3>
-          <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
-            + Nova Aplicação
-          </button>
+          <div className="flex-row gap-sm">
+            <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+              📥 Importar CSV
+              <input 
+                type="file" accept=".csv" style={{ display: 'none' }}
+                onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
+                onChange={handleBulkImport} 
+              />
+            </label>
+            <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
+              + Nova Aplicação
+            </button>
+          </div>
         </div>
         <div className="table-container flex-col" style={{ flex: 1 }}>
         {positions.length > 0 ? (
           <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>Instituição / Produto</th>
-                <th className="text-right">Taxa</th>
-                <th className="text-right">Aplicação</th>
-                <th className="text-right">Vencimento</th>
-                <th className="text-right">Valor Aplicado</th>
-                <th className="text-right">Valor Bruto</th>
-                <th className="text-right">Valor Líquido</th>
-                <th className="text-right">Rent. (%)</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => handleSort('institution')}>Instituição / Produto {sortIcon('institution')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('rate')}>Taxa {sortIcon('rate')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('start_date')}>Aplicação {sortIcon('start_date')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('maturity_date')}>Vencimento {sortIcon('maturity_date')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('total_invested')}>Valor Aplicado {sortIcon('total_invested')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('gross_value')}>Valor Bruto {sortIcon('gross_value')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_value')}>Valor Líquido {sortIcon('net_value')}</th>
+                <th className="text-right" style={{ cursor: 'pointer' }} onClick={() => handleSort('net_return_percent')}>Rent. (%) {sortIcon('net_return_percent')}</th>
                 <th className="text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {positions.map(pos => {
+              {sortedPositions.map(pos => {
                 const isMatured = pos.is_matured;
                 const isZeroDate = pos.asset.maturity_date && pos.asset.maturity_date.startsWith('0001');
                 const isNearMaturity = !isZeroDate && pos.days_to_maturity <= 30 && !isMatured;
@@ -189,11 +272,11 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
                 let statusLabel = null;
                 
                 if (isMatured) {
-                  rowStyle = { backgroundColor: 'rgba(255, 60, 60, 0.05)' };
-                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: '#ff4d4f'}}>(Vencido)</span>;
+                  rowStyle = { backgroundColor: 'var(--color-danger-bg)' };
+                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: 'var(--color-danger)'}}>(Vencido)</span>;
                 } else if (isNearMaturity) {
-                  rowStyle = { backgroundColor: 'rgba(250, 173, 20, 0.05)' };
-                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: '#faad14'}}>(Vence em {pos.days_to_maturity}d)</span>;
+                  rowStyle = { backgroundColor: 'var(--color-warning-bg)' };
+                  statusLabel = <span className="text-xs ml-sm font-bold" style={{color: 'var(--color-warning)'}}>(Vence em {pos.days_to_maturity}d)</span>;
                 }
 
                 let rateStr = '';
@@ -225,8 +308,8 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
                     </td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{formatMoney(pos.total_invested, 'BRL')}</td>
                     <td className="text-right" style={{ fontFamily: 'monospace' }}>{formatMoney(pos.gross_value, 'BRL')}</td>
-                    <td className="text-right font-bold" style={{ fontFamily: 'monospace', color: '#00e676' }}>{formatMoney(pos.net_value, 'BRL')}</td>
-                    <td className="text-right font-bold" style={{ color: pos.net_return_percent >= 0 ? '#00e676' : '#ff3d00' }}>
+                    <td className="text-right font-bold" style={{ fontFamily: 'monospace', color: 'var(--color-success)' }}>{formatMoney(pos.net_value, 'BRL')}</td>
+                    <td className="text-right font-bold" style={{ color: pos.net_return_percent >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
                       {formatPercentage(pos.net_return_percent)}
                     </td>
                     <td className="text-center">
@@ -236,7 +319,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
                           setRedeemAmount(pos.net_value);
                           setRedeemDate(new Date().toISOString().split('T')[0]);
                         }} 
-                        style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', background: 'rgba(255, 61, 0, 0.1)', color: '#ff3d00', border: '1px solid rgba(255, 61, 0, 0.3)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                        style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid rgba(var(--danger-rgb), 0.3)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                       >
                         RESGATAR
                       </button>

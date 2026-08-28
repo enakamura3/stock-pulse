@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { CalculatedDividend } from './types';
 import { getAssetCategory, formatMoney } from './helpers';
 import dynamic from 'next/dynamic';
+import AnnualSummary from './AnnualSummary';
 
-const DividendsChart = dynamic(() => import('@/components/DividendsChart'), { ssr: false });
+const DividendsMatrix = dynamic(() => import('./DividendsMatrix'), { ssr: false });
+
+type SortField = 'status' | 'ticker' | 'category' | 'type' | 'cum_date' | 'payment_date' | 'quantity' | 'per_share_amount' | 'gross_amount' | 'net_amount';
+type SortOrder = 'asc' | 'desc';
 
 interface DividendsHistoryProps {
   dividends: CalculatedDividend[];
+  allDividends?: CalculatedDividend[];
   filterDivYear: string;
   setFilterDivYear: (y: string) => void;
   filterDivMonth: string;
@@ -16,22 +21,220 @@ interface DividendsHistoryProps {
 }
 
 export default function DividendsHistory({
-  dividends, filterDivYear, setFilterDivYear, filterDivMonth, setFilterDivMonth, availableYears, isLoadingDividends
+  dividends, allDividends = [], filterDivYear, setFilterDivYear, filterDivMonth, setFilterDivMonth, availableYears, isLoadingDividends
 }: DividendsHistoryProps) {
 
-  const totalRV = dividends.filter(d => !d.is_accrued).reduce((acc, curr) => acc + curr.net_amount, 0);
-  const totalRF = dividends.filter(d => d.is_accrued).reduce((acc, curr) => acc + curr.net_amount, 0);
+  // Função utilitária para checar pagamento
+  const isPaid = (div: CalculatedDividend) => {
+    if (!div.payment_date || div.payment_date.startsWith('0001')) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [year, month, day] = div.payment_date.split('T')[0].split('-');
+    const payDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    return payDate <= today;
+  };
+
+  const formatType = (div: CalculatedDividend) => {
+    if (div.is_accrued) return 'Juros';
+    if (!div.type) return 'Dividendo';
+    const lower = div.type.toLowerCase();
+    if (lower.includes('jcp')) return 'JCP';
+    if (lower.includes('rendimento')) return 'Rendimento';
+    if (lower.includes('amorti')) return 'Amortização';
+    return div.type.charAt(0).toUpperCase() + div.type.slice(1).toLowerCase();
+  };
+
+  const [sortField, setSortField] = useState<SortField>('payment_date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const consolidatedDividends = useMemo(() => {
+    const map = new Map<string, CalculatedDividend>();
+    const monthlyYieldMap = new Map<string, CalculatedDividend>();
+    const others: CalculatedDividend[] = [];
+    
+    dividends.forEach(div => {
+      const typeUpper = (div.asset_type || '').toUpperCase();
+      const isMonthlyYield = typeUpper === 'FII' || typeUpper === 'FIAGRO' || typeUpper === 'ETF' || typeUpper === 'ETF_BR';
+      const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
+      const yearMonth = dateStr ? dateStr.substring(0, 7) : 'unknown'; // ex: '2026-03'
+      const key = `${div.ticker}-${yearMonth}`;
+
+      if (div.asset_type === 'TESOURO') {
+        if (map.has(key)) {
+          const existing = map.get(key)!;
+          existing.gross_amount += (Number(div.gross_amount) || 0);
+          existing.net_amount += (Number(div.net_amount) || 0);
+          if (div.payment_date && new Date(div.payment_date) > new Date(existing.payment_date)) {
+             existing.payment_date = div.payment_date;
+          }
+          if (div.cum_date && new Date(div.cum_date) > new Date(existing.cum_date)) {
+             existing.cum_date = div.cum_date;
+          }
+        } else {
+          map.set(key, { ...div });
+        }
+      } else if (isMonthlyYield) {
+        if (!monthlyYieldMap.has(key)) {
+          monthlyYieldMap.set(key, { ...div });
+        }
+      } else {
+        others.push(div);
+      }
+    });
+    return [...others, ...Array.from(monthlyYieldMap.values()), ...Array.from(map.values())];
+  }, [dividends]);
+
+  const sortedDividends = useMemo(() => {
+    return [...consolidatedDividends].sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      switch (sortField) {
+        case 'status':
+          valA = isPaid(a);
+          valB = isPaid(b);
+          break;
+        case 'ticker':
+          valA = a.ticker || '';
+          valB = b.ticker || '';
+          break;
+        case 'category': {
+          let catA = getAssetCategory(a.asset_type || '');
+          if (a.asset_type === 'TESOURO') catA = 'Tesouro Direto';
+          else if (catA === 'Desconhecido') catA = a.is_accrued ? 'Renda Fixa' : 'Outros';
+          
+          let catB = getAssetCategory(b.asset_type || '');
+          if (b.asset_type === 'TESOURO') catB = 'Tesouro Direto';
+          else if (catB === 'Desconhecido') catB = b.is_accrued ? 'Renda Fixa' : 'Outros';
+          
+          valA = catA;
+          valB = catB;
+          break;
+        }
+        case 'type':
+          valA = formatType(a);
+          valB = formatType(b);
+          break;
+        case 'cum_date':
+          valA = a.cum_date ? new Date(a.cum_date).getTime() : 0;
+          valB = b.cum_date ? new Date(b.cum_date).getTime() : 0;
+          break;
+        case 'payment_date':
+          const hasA = a.payment_date && !a.payment_date.startsWith('0001');
+          const hasB = b.payment_date && !b.payment_date.startsWith('0001');
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          valA = new Date(a.payment_date).getTime();
+          valB = new Date(b.payment_date).getTime();
+          break;
+        case 'quantity':
+          valA = a.is_accrued ? 0 : Number(a.quantity) || 0;
+          valB = b.is_accrued ? 0 : Number(b.quantity) || 0;
+          break;
+        case 'per_share_amount':
+          valA = a.is_accrued ? 0 : Number(a.per_share_amount) || 0;
+          valB = b.is_accrued ? 0 : Number(b.per_share_amount) || 0;
+          break;
+        case 'gross_amount':
+          valA = Number(a.gross_amount) || 0;
+          valB = Number(b.gross_amount) || 0;
+          break;
+        case 'net_amount':
+          valA = Number(a.net_amount) || 0;
+          valB = Number(b.net_amount) || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (valA === valB) return 0;
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        const compare = valA.localeCompare(valB);
+        return sortOrder === 'asc' ? compare : -compare;
+      }
+
+      if (typeof valA === 'boolean' && typeof valB === 'boolean') {
+        const compare = valA === valB ? 0 : valA ? 1 : -1;
+        return sortOrder === 'asc' ? compare : -compare;
+      }
+
+      return sortOrder === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [consolidatedDividends, sortField, sortOrder]);
+
+  const renderSortIndicator = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortOrder === 'asc' ? ' ▲' : ' ▼';
+  };
+
+  // Agrupamentos e Reduções
+  const stats = useMemo(() => {
+    const s = {
+      totalPaid: 0, totalPending: 0,
+      rvPaid: 0, rvPending: 0,
+      rfPaid: 0, rfPending: 0,
+      types: {} as Record<string, number>
+    };
+
+    consolidatedDividends.forEach(d => {
+      const paid = isPaid(d);
+      const amt = d.net_amount;
+      
+      let groupStr = getAssetCategory(d.asset_type || '');
+      if (d.asset_type === 'TESOURO') groupStr = 'Tesouro Direto';
+      else if (groupStr === 'Desconhecido') groupStr = d.is_accrued ? 'Renda Fixa' : 'Outros';
+
+      if (paid) s.totalPaid += amt; else s.totalPending += amt;
+      
+      if (d.is_accrued) {
+        if (paid) s.rfPaid += amt; else s.rfPending += amt;
+      } else {
+        if (paid) s.rvPaid += amt; else s.rvPending += amt;
+      }
+
+      if (s.types[groupStr]) s.types[groupStr] += amt;
+      else s.types[groupStr] = amt;
+    });
+
+    return s;
+  }, [consolidatedDividends]);
 
   return (
     <div className="flex-col gap-lg">
+      <AnnualSummary
+        dividends={allDividends.length > 0 ? allDividends : dividends}
+        selectedYear={filterDivYear}
+        setSelectedYear={setFilterDivYear}
+        availableYears={availableYears}
+      />
+
+      <DividendsMatrix 
+        data={allDividends.length > 0 ? allDividends : dividends} 
+        onYearClick={(y) => { setFilterDivYear(y); setFilterDivMonth('Todos'); }}
+        onMonthClick={(y, m) => { setFilterDivYear(y); setFilterDivMonth(m); }}
+        activeYear={filterDivYear}
+        activeMonth={filterDivMonth}
+      />
+
       <div className="card">
         <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
-          <h3 className="card-title">💰 Histórico de Proventos</h3>
+          <h3 className="card-title">🧾 Detalhamento e Lançamentos</h3>
           <div className="flex-row gap-sm">
             <select
               value={filterDivYear}
               onChange={(e) => setFilterDivYear(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: 'var(--option-bg)', color: 'var(--option-color)', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
             >
               <option value="Todos">Todos os Anos</option>
               {availableYears.map(year => (
@@ -41,7 +244,7 @@ export default function DividendsHistory({
             <select
               value={filterDivMonth}
               onChange={(e) => setFilterDivMonth(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: '#1E293B', color: '#FFFFFF', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: 'var(--option-bg)', color: 'var(--option-color)', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
             >
               <option value="Todos">Todos os Meses</option>
               {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
@@ -55,81 +258,116 @@ export default function DividendsHistory({
           <div className="text-center text-secondary p-xl">Carregando proventos...</div>
         ) : dividends.length > 0 ? (
           <>
-            <div className="flex-row gap-md mb-lg flex-wrap">
-              <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
-                <div className="text-secondary text-xs mb-xs">Proventos RV (Caixa Livre)</div>
-                <div className="font-bold text-xl" style={{ color: '#00e676' }}>{formatMoney(totalRV, 'BRL')}</div>
+            {/* Main KPIs */}
+            <div className="flex-row gap-md mb-md flex-wrap">
+              <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+                <div className="text-secondary text-sm mb-sm font-bold">Proventos (Renda Variável)</div>
+                <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--color-success)', letterSpacing: '-0.5px' }}>{formatMoney(stats.rvPaid + stats.rvPending, 'BRL')}</div>
+                <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>
+                  <span style={{ color: 'var(--color-success)' }}>Pago: {formatMoney(stats.rvPaid, 'BRL')}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Pend: {formatMoney(stats.rvPending, 'BRL')}</span>
+                </div>
               </div>
-              <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
-                <div className="text-secondary text-xs mb-xs">Rendimento RF (Juros Retidos)</div>
-                <div className="font-bold text-xl" style={{ color: '#FFB300' }}>{formatMoney(totalRF, 'BRL')}</div>
+              <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+                <div className="text-secondary text-sm mb-sm font-bold">Juros Acumulados (Renda Fixa)</div>
+                <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--color-warning)', letterSpacing: '-0.5px' }}>{formatMoney(stats.rfPaid + stats.rfPending, 'BRL')}</div>
+                <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>
+                  <span style={{ color: 'var(--color-warning)' }}>Acumulado: {formatMoney(stats.rfPaid, 'BRL')}</span>
+                </div>
               </div>
-              <div className="card" style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '1rem', border: '1px solid var(--panel-border)' }}>
-                <div className="text-secondary text-xs mb-xs">Geração de Valor Total</div>
-                <div className="font-bold text-xl">{formatMoney(totalRV + totalRF, 'BRL')}</div>
+              <div className="card" style={{ flex: '1', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+                <div className="text-secondary text-sm mb-sm font-bold">Total Consolidado</div>
+                <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{formatMoney(stats.totalPaid + stats.totalPending, 'BRL')}</div>
+                <div className="text-sm text-secondary" style={{ display: 'flex', gap: '1rem' }}>
+                  <span style={{ color: 'var(--color-success)' }}>Pago: {formatMoney(stats.totalPaid, 'BRL')}</span>
+                  <span style={{ color: 'var(--color-warning)' }}>Pend: {formatMoney(stats.totalPending, 'BRL')}</span>
+                </div>
               </div>
             </div>
 
-            <div style={{ height: '350px', marginBottom: '2rem' }}>
-              <DividendsChart data={dividends} />
-            </div>
-            
-            <div className="table-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '8px' }}>
-              <table className="data-table">
+            {/* Table */}
+            <div className="table-container mt-lg" style={{ border: '1px solid var(--panel-border)', borderRadius: '12px', overflow: 'hidden' }}>
+              <style>{`
+                .dividends-table th { padding: 0.75rem 1rem !important; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); background: rgba(255,255,255,0.02); cursor: pointer; user-select: none; transition: background 0.2s, color 0.2s; }
+                .dividends-table th:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+                .dividends-table th.active-sort { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+                .dividends-table td { padding: 1rem 1rem !important; font-size: 0.875rem; border-top: 1px solid rgba(255,255,255,0.03); }
+                .dividends-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+                .badge-pill { border-radius: 20px; padding: 0.25rem 0.6rem; font-size: 0.7rem; font-weight: 600; display: inline-block; }
+                .num-col { font-variant-numeric: tabular-nums; }
+              `}</style>
+              <table className="data-table dividends-table w-full">
                 <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <th className="text-center">Ativo</th>
-                    <th className="text-center">Papel</th>
-                    <th className="text-center">Tipo</th>
-                    <th className="text-center">Data Com</th>
-                    <th className="text-center">Pagamento</th>
-                    <th className="text-center">Qtd</th>
-                    <th className="text-right">Vlr / Cota</th>
-                    <th className="text-right">Vlr Bruto</th>
-                    <th className="text-right">Vlr Líquido</th>
+                  <tr>
+                    <th className={`text-center ${sortField === 'status' ? 'active-sort' : ''}`} onClick={() => handleSort('status')}>Status{renderSortIndicator('status')}</th>
+                    <th className={`text-center ${sortField === 'ticker' ? 'active-sort' : ''}`} onClick={() => handleSort('ticker')}>Ativo{renderSortIndicator('ticker')}</th>
+                    <th className={`text-center ${sortField === 'category' ? 'active-sort' : ''}`} onClick={() => handleSort('category')}>Categoria{renderSortIndicator('category')}</th>
+                    <th className={`text-center ${sortField === 'type' ? 'active-sort' : ''}`} onClick={() => handleSort('type')}>Tipo{renderSortIndicator('type')}</th>
+                    <th className={`text-center ${sortField === 'cum_date' ? 'active-sort' : ''}`} onClick={() => handleSort('cum_date')}>Data Com{renderSortIndicator('cum_date')}</th>
+                    <th className={`text-center ${sortField === 'payment_date' ? 'active-sort' : ''}`} onClick={() => handleSort('payment_date')}>Pagamento{renderSortIndicator('payment_date')}</th>
+                    <th className={`text-center ${sortField === 'quantity' ? 'active-sort' : ''}`} onClick={() => handleSort('quantity')}>Qtd{renderSortIndicator('quantity')}</th>
+                    <th className={`text-right ${sortField === 'per_share_amount' ? 'active-sort' : ''}`} onClick={() => handleSort('per_share_amount')}>Vlr / Cota{renderSortIndicator('per_share_amount')}</th>
+                    <th className={`text-right ${sortField === 'gross_amount' ? 'active-sort' : ''}`} onClick={() => handleSort('gross_amount')}>Vlr Bruto{renderSortIndicator('gross_amount')}</th>
+                    <th className={`text-right ${sortField === 'net_amount' ? 'active-sort' : ''}`} onClick={() => handleSort('net_amount')}>Vlr Líquido{renderSortIndicator('net_amount')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dividends.map((div, i) => (
-                    <tr key={i}>
-                      <td className="text-center font-semibold">{div.ticker}</td>
-                      <td className="text-center text-secondary text-xs">{div.is_accrued ? 'Renda Fixa' : getAssetCategory(div.asset_type)}</td>
-                      <td className="text-center">
-                        <span className="badge" style={{
-                          backgroundColor: div.is_accrued ? 'rgba(255, 179, 0, 0.15)' :
-                                          !div.type ? 'rgba(255,255,255,0.1)' : 
-                                          div.type.toLowerCase().includes('jcp') ? 'rgba(255, 152, 0, 0.15)' :
-                                          div.type.toLowerCase().includes('rendimento') ? 'rgba(156, 39, 176, 0.15)' :
-                                          div.type.toLowerCase().includes('amorti') ? 'rgba(244, 67, 54, 0.15)' :
-                                          'rgba(33, 150, 243, 0.15)',
-                          color: div.is_accrued ? '#FFB300' :
-                                 !div.type ? '#aaa' : 
-                                 div.type.toLowerCase().includes('jcp') ? '#ff9800' :
-                                 div.type.toLowerCase().includes('rendimento') ? '#e040fb' :
-                                 div.type.toLowerCase().includes('amorti') ? '#ff5252' :
-                                 '#64b5f6'
-                        }}>
-                          {div.is_accrued ? '🏦 JUROS ACUMULADOS' : (div.type || 'DIVIDENDO')}
-                        </span>
-                      </td>
-                      <td className="text-center text-secondary text-xs">{new Date(div.ex_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
-                      <td className="text-center text-secondary text-xs">{(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
-                      <td className="text-center font-semibold">{div.is_accrued ? '--' : div.quantity}</td>
-                      <td className="text-right font-semibold">{div.is_accrued ? '--' : formatMoney(div.per_share_amount, div.currency)}</td>
-                      <td className="text-right">
-                        {formatMoney(div.gross_amount, div.currency)}
-                        {div.currency === 'BRL' && div.original_gross_amount && (
-                          <div className="text-xs text-secondary">(US$ {div.original_gross_amount.toFixed(2)})</div>
-                        )}
-                      </td>
-                      <td className="text-right font-bold text-success">
-                        {formatMoney(div.net_amount, div.currency)}
-                        {div.currency === 'BRL' && div.original_net_amount && (
-                          <div className="text-xs" style={{ color: 'rgba(0, 230, 118, 0.7)' }}>(US$ {div.original_net_amount.toFixed(2)})</div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {sortedDividends.map((div, i) => {
+                    const paid = isPaid(div);
+                    const typeStr = formatType(div);
+                    return (
+                      <tr key={i}>
+                        <td className="text-center">
+                          {paid ? (
+                            <span className="badge badge-pill" style={{ backgroundColor: 'var(--color-success-bg)', color: 'var(--color-success)' }}>Pago</span>
+                          ) : (
+                            <span className="badge badge-pill" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>Pendente</span>
+                          )}
+                        </td>
+                        <td className="text-center font-bold" style={{ color: 'var(--text-primary)' }}>{div.ticker}</td>
+                        <td className="text-center text-secondary">
+                          {(() => {
+                            let cat = getAssetCategory(div.asset_type || '');
+                            if (div.asset_type === 'TESOURO') cat = 'Tesouro Direto';
+                            else if (cat === 'Desconhecido') cat = div.is_accrued ? 'Renda Fixa' : 'Outros';
+                            return cat;
+                          })()}
+                        </td>
+                        <td className="text-center">
+                          <span className="badge badge-pill" style={{
+                            backgroundColor: div.is_accrued ? 'var(--color-info-bg)' :
+                                            typeStr === 'JCP' ? 'var(--color-warning-bg)' :
+                                            typeStr === 'Rendimento' ? 'var(--accent-bg)' :
+                                            typeStr === 'Amortização' ? 'var(--color-danger-bg)' :
+                                            'var(--color-success-bg)',
+                            color: div.is_accrued ? 'var(--color-info)' :
+                                   typeStr === 'JCP' ? 'var(--color-warning)' :
+                                   typeStr === 'Rendimento' ? 'var(--accent-color)' :
+                                   typeStr === 'Amortização' ? 'var(--color-danger)' :
+                                   'var(--color-success)'
+                          }}>
+                            {typeStr}
+                          </span>
+                        </td>
+                        <td className="text-center text-secondary num-col">{new Date(div.cum_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
+                        <td className="text-center text-secondary num-col">{(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
+                        <td className="text-center font-semibold num-col">{div.is_accrued ? '--' : Number(div.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}</td>
+                        <td className="text-right font-semibold num-col">{div.is_accrued ? '--' : formatMoney(div.per_share_amount, div.currency)}</td>
+                        <td className="text-right num-col">
+                          {formatMoney(div.gross_amount, div.currency)}
+                          {div.currency === 'BRL' && div.original_gross_amount && (
+                            <div className="text-xs text-secondary mt-xs">(US$ {div.original_gross_amount.toFixed(2)})</div>
+                          )}
+                        </td>
+                        <td className="text-right font-bold text-success num-col">
+                          {formatMoney(div.net_amount, div.currency)}
+                          {div.currency === 'BRL' && div.original_net_amount && (
+                            <div className="text-xs mt-xs" style={{ color: 'rgba(0, 230, 118, 0.7)' }}>(US$ {div.original_net_amount.toFixed(2)})</div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -138,7 +376,7 @@ export default function DividendsHistory({
           <div className="text-center text-secondary p-xl">
             <span className="text-2xl block mb-sm">🏜️</span>
             <p>Nenhum provento recebido ainda.</p>
-            <p className="text-xs opacity-70">Aguarde a "Data Com" das suas ações para começar a receber!</p>
+            <p className="text-xs opacity-70">Aguarde a &quot;Data Com&quot; das suas ações para começar a receber!</p>
           </div>
         )}
       </div>

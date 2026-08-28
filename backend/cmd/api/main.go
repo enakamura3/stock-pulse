@@ -16,24 +16,30 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/onigiri/stock-pulse/backend/internal/alert"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 	"github.com/onigiri/stock-pulse/backend/internal/docs"
-	"github.com/onigiri/stock-pulse/backend/internal/mail"
+
+	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
-	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"github.com/onigiri/stock-pulse/backend/internal/telegram"
 	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
 	"github.com/onigiri/stock-pulse/backend/internal/websocket"
+	"github.com/onigiri/stock-pulse/backend/internal/worker"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
 
 func main() {
+	if err := config.Load(); err != nil {
+		log.Fatalf("Erro de configuração inicial (Fail-Fast): %v", err)
+	}
+
 	// Inicialização do Logger Estruturado JSON (slog) - Fase 4
-	logLevelStr := os.Getenv("LOG_LEVEL")
+	logLevelStr := config.Envs.LogLevel
 	var level slog.Level
 	switch strings.ToLower(logLevelStr) {
 	case "debug":
@@ -61,7 +67,7 @@ func main() {
 	defer dbPool.Close()
 
 	// Inicialização do Redis (Cache & Session)
-	redisURL := os.Getenv("REDIS_URL")
+	redisURL := config.Envs.RedisURL
 	if redisURL == "" {
 		redisURL = "localhost:6379" // Fallback local de dev
 	}
@@ -76,7 +82,7 @@ func main() {
 	defer rdb.Close()
 
 	// Configuração de Segredos
-	jwtSecret := os.Getenv("JWT_SECRET")
+	jwtSecret := config.Envs.JWTSecret
 	if jwtSecret == "" {
 		log.Fatal("Variável de ambiente JWT_SECRET é obrigatória e não foi configurada.")
 	}
@@ -106,19 +112,34 @@ func main() {
 	// Inicialização de Camadas de Renda Fixa (Fase 5)
 	fiRepo := fixedincome.NewRepository(dbPool)
 	fiBcbClient := fixedincome.NewBCBClient()
+	fiAnbimaClient := fixedincome.NewAnbimaClient()
 	fiService := fixedincome.NewService(fiRepo, fiBcbClient)
 	fiHandler := fixedincome.NewHandler(fiService, fiRepo)
-	fiWorker := fixedincome.NewWorker(fiRepo, fiBcbClient)
+
+	// Configuração do Registro Dinâmico de Índices (Gateways com Fallback)
+	bcbProvider := fixedincome.NewBCBProvider(fiBcbClient)
+	brapiProvider := fixedincome.NewBrapiProvider()
+	yahooProvider := fixedincome.NewYahooFinanceIndexProvider()
+	indexRegistry := fixedincome.NewIndexRegistry()
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "CDI", PrimaryProvider: bcbProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SELIC", PrimaryProvider: bcbProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IPCA", PrimaryProvider: bcbProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IFIX", PrimaryProvider: brapiProvider, FallbackProvider: yahooProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "IBOV", PrimaryProvider: brapiProvider, FallbackProvider: yahooProvider})
+	indexRegistry.Register(fixedincome.IndexerConfig{Name: "SP500", PrimaryProvider: yahooProvider})
+
+	fiWorker := fixedincome.NewWorker(fiRepo, indexRegistry)
+	fiAnbimaWorker := fixedincome.NewAnbimaHolidayWorker(fiRepo, fiAnbimaClient)
 
 	// Inicialização de Camadas de Portfólio & Daily Worker
+	uow := database.NewUnitOfWork(dbPool)
 	portfolioRepo := portfolio.NewRepository(dbPool)
-	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider, fiService)
+	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider, fiService, uow)
 	portfolioHandler := portfolio.NewHandler(portfolioService)
 	portfolioWorker := portfolio.NewDailyWorker(portfolioRepo, marketProvider)
 	dividendWorker := portfolio.NewDividendWorker(portfolioRepo, marketService)
 
 	// Inicialização das Camadas da Fase 3 (Alertas & Tempo Real)
-	mailService := mail.NewService()
 
 	wsHub := websocket.NewHub(marketService)
 	wsHandler := websocket.NewHandler(wsHub)
@@ -126,32 +147,47 @@ func main() {
 	alertRepo := alert.NewRepository(dbPool)
 	alertService := alert.NewService(alertRepo, marketProvider)
 	alertHandler := alert.NewHandler(alertService)
-	
+
 	historyService := history.NewService(portfolioService, fiService)
 	historyHandler := history.NewHandler(historyService)
-	alertWorker := alert.NewAlertWorker(alertRepo, marketService, mailService)
 
 	// Telegram Bot
 	telegramRepo := telegram.NewRepository(dbPool)
 	telegramService := telegram.NewService(telegramRepo, rdb)
 	telegramHandlers := telegram.NewHandlers(telegramService, portfolioService, marketService, fiService)
-	telegramBot, err := telegram.NewBotRunner(os.Getenv("TELEGRAM_BOT_TOKEN"), telegramHandlers)
+	telegramBot, err := telegram.NewBotRunner(config.Envs.TelegramBotToken, telegramHandlers)
 	if err != nil {
 		slog.Error("Failed to start telegram bot", "err", err)
 	}
 	telegramHttpHandler := telegram.NewHTTPHandler(telegramService, telegramBot.GetUsername())
+
+	alertWorker := alert.NewAlertWorker(alertRepo, marketService, telegramBot)
 
 	// Inicialização da Documentação API Swagger (Fase 4)
 	docsHandler := docs.NewHandler("docs/openapi.yaml")
 
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
+	workerManager := worker.NewManager()
+	getInterval := func(envKey string, defaultInterval time.Duration) time.Duration {
+		if val := os.Getenv(envKey); val != "" {
+			if d, err := time.ParseDuration(val); err == nil {
+				return d
+			}
+		}
+		return defaultInterval
+	}
 
-	go portfolioWorker.Start(workerCtx)
-	go dividendWorker.Start(workerCtx)
-	go fiWorker.Start(workerCtx)
+	workerManager.Register(worker.NewWorker("DividendWorker", "Sincroniza proventos (dividendos, JCP, rendimentos) com fontes externas", getInterval("DIVIDEND_WORKER_INTERVAL", 6*time.Hour), dividendWorker.SyncAllDividends))
+	workerManager.Register(worker.NewWorker("DailyWorker", "Atualiza cotações e calcula a performance diária de todas as carteiras", getInterval("DAILY_WORKER_INTERVAL", 6*time.Hour), portfolioWorker.Run))
+	workerManager.Register(worker.NewWorker("FixedIncomeWorker", "Sincroniza taxas e séries históricas de índices de renda fixa (CDI, SELIC, IPCA, etc.)", getInterval("FI_WORKER_INTERVAL", 6*time.Hour), fiWorker.SyncRates))
+	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", "Sincroniza a tabela de feriados nacionais da ANBIMA para cálculos de dias úteis", getInterval("ANBIMA_WORKER_INTERVAL", 6*time.Hour), fiAnbimaWorker.SyncHolidays))
+	workerManager.Register(worker.NewWorker("AlertWorker", "Verifica os alertas de preços ativos e dispara notificações de push/Telegram", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
+
+	workerManager.StartAll(workerCtx)
+	workerHandler := worker.NewHandler(workerManager)
+
 	go wsHub.Start(workerCtx)
-	go alertWorker.Start(workerCtx)
 	if telegramBot != nil {
 		go telegramBot.Start()
 	}
@@ -195,9 +231,18 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(customMiddleware.AuthRequired([]byte(jwtSecret)))
 
-			// Cotações e Busca
+			// Gestão de Usuário
+			r.Route("/user", func(r chi.Router) {
+				r.Put("/profile", authHandler.UpdateProfile)
+				r.Put("/password", authHandler.UpdatePassword)
+				r.Delete("/", authHandler.DeleteUser)
+			})
+
+			// Cotações, Busca e Benchmarks
 			r.Get("/quotes/{ticker}", marketHandler.GetQuote)
 			r.Get("/assets/search", marketHandler.Search)
+			r.Get("/market/benchmarks", marketHandler.GetBenchmarks)
+			r.Post("/market/quotes/invalidate", marketHandler.InvalidateCache)
 
 			// Favoritos / Watchlists
 			r.Get("/watchlists", watchlistHandler.GetWatchlists)
@@ -211,6 +256,7 @@ func main() {
 			r.Get("/portfolios", portfolioHandler.GetPortfolios)
 			r.Post("/portfolios", portfolioHandler.CreatePortfolio)
 			r.Get("/portfolios/{id}", portfolioHandler.GetPortfolio)
+			r.Put("/portfolios/{id}/default", portfolioHandler.SetDefaultPortfolio)
 			r.Delete("/portfolios/{id}", portfolioHandler.DeletePortfolio)
 			r.Get("/portfolios/{id}/transactions", portfolioHandler.GetTransactions)
 			r.Post("/portfolios/{id}/transactions", portfolioHandler.AddTransaction)
@@ -236,7 +282,14 @@ func main() {
 
 			// Integração Telegram
 			r.Route("/telegram", func(r chi.Router) {
+				r.Get("/status", telegramHttpHandler.GetTelegramStatus)
 				r.Post("/link", telegramHttpHandler.GenerateLinkToken)
+				r.Delete("/link", telegramHttpHandler.UnlinkTelegram)
+			})
+
+			// Workers / System Management
+			r.Route("/workers", func(r chi.Router) {
+				workerHandler.RegisterRoutes(r)
 			})
 		})
 	})

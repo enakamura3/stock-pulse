@@ -6,25 +6,36 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
-type StockAnalysisScraper struct {
-	client *http.Client
+// StockAnalysisRawDividend contém os dados crus da tabela HTML do StockAnalysis.
+type StockAnalysisRawDividend struct {
+	ExDivDate  string // "Jan 2, 2006" (formato US)
+	Amount     string // "$1.25" ou "1.25 BRL"
+	RecordDate string // "Jan 5, 2006", "-", "n/a", ou ""
+	PayDate    string // "Feb 1, 2006"
 }
 
-func NewStockAnalysisScraper() *StockAnalysisScraper {
-	return &StockAnalysisScraper{
-		client: &http.Client{Timeout: 15 * time.Second},
+type StockAnalysisClient struct {
+	httpClient *http.Client
+}
+
+func NewStockAnalysisClient() *StockAnalysisClient {
+	return &StockAnalysisClient{
+		httpClient: &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
-
-func (s *StockAnalysisScraper) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
+// FetchDividends busca a tabela de dividendos do StockAnalysis.
+// A URL é escolhida com base no ticker e assetType:
+//   - .SA       → stockanalysis.com/quote/bvmf/{symbol}/dividend/
+//   - ETF_US    → stockanalysis.com/etf/{symbol}/dividend/
+//   - STOCK_US  → stockanalysis.com/stocks/{symbol}/dividend/
+func (c *StockAnalysisClient) FetchDividends(ctx context.Context, ticker string, assetType string) ([]StockAnalysisRawDividend, error) {
 	var url string
 	if strings.HasSuffix(strings.ToUpper(ticker), ".SA") {
 		symbol := strings.ToLower(strings.TrimSuffix(ticker, ".SA"))
@@ -46,7 +57,7 @@ func (s *StockAnalysisScraper) GetDividends(ctx context.Context, ticker string, 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 	req.Header.Set("Accept", "text/html")
 
-	resp, err := s.client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +77,7 @@ func (s *StockAnalysisScraper) GetDividends(ctx context.Context, ticker string, 
 		return nil, err
 	}
 
-	var events []DividendEvent
-	layout := "Jan 2, 2006"
+	var rawDividends []StockAnalysisRawDividend
 
 	doc.Find("table tbody tr").Each(func(i int, sel *goquery.Selection) {
 		tds := sel.Find("td")
@@ -75,45 +85,22 @@ func (s *StockAnalysisScraper) GetDividends(ctx context.Context, ticker string, 
 			return
 		}
 
-		exDateStr := strings.TrimSpace(tds.Eq(2).Text()) // Record Date
-		if exDateStr == "-" || exDateStr == "n/a" || exDateStr == "" {
-			exDateStr = strings.TrimSpace(tds.Eq(0).Text()) // Fallback to Ex-Div Date
-		}
-		amountStr := strings.TrimSpace(tds.Eq(1).Text())
-		payDateStr := strings.TrimSpace(tds.Eq(3).Text())
+		exDivDate := strings.TrimSpace(tds.Eq(0).Text())
+		amount := strings.TrimSpace(tds.Eq(1).Text())
+		recordDate := strings.TrimSpace(tds.Eq(2).Text())
+		payDate := strings.TrimSpace(tds.Eq(3).Text())
 
-		exDate, err := time.Parse(layout, exDateStr)
-		if err != nil {
-			return
-		}
-
-		amtStr := strings.ReplaceAll(amountStr, "$", "")
-		amtStr = strings.ReplaceAll(amtStr, " BRL", "")
-		amtStr = strings.TrimSpace(amtStr)
-		amount, err := strconv.ParseFloat(amtStr, 64)
-		if err != nil {
-			return
-		}
-
-		paymentDate := exDate
-		if payDateStr != "-" && payDateStr != "n/a" && payDateStr != "" {
-			pd, err := time.Parse(layout, payDateStr)
-			if err == nil {
-				paymentDate = pd
-			}
-		}
-
-		events = append(events, DividendEvent{
-			Date:        exDate,
-			PaymentDate: paymentDate,
-			Amount:      amount,
-			Type:        "Dividendo",
+		rawDividends = append(rawDividends, StockAnalysisRawDividend{
+			ExDivDate:  exDivDate,
+			Amount:     amount,
+			RecordDate: recordDate,
+			PayDate:    payDate,
 		})
 	})
 
-	if len(events) == 0 {
+	if len(rawDividends) == 0 {
 		return nil, fmt.Errorf("dados de histórico não encontrados ou vazios na tabela do stockanalysis")
 	}
 
-	return events, nil
+	return rawDividends, nil
 }

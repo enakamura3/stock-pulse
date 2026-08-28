@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
@@ -53,7 +54,10 @@ func (s *Service) CreateAlert(ctx context.Context, userID string, ticker string,
 
 	// 1. Tenta recuperar o ID do ativo no banco de dados local
 	assetID, err := s.repo.GetAssetByTicker(ctx, ticker)
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("erro ao consultar ativo no banco: %w", err)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
 		// 2. Se o ativo for inédito, consulta no provedor Yahoo Finance para validar sua existência
 		log.Printf("[Alerts] Ativo %s não encontrado localmente. Validando no Yahoo Finance...", ticker)
 		quote, err := s.marketProvider.GetQuote(ctx, ticker)
