@@ -5,14 +5,14 @@ import (
 	"strings"
 )
 
-// FloatEquals compara dois floats com margem de tolerância financeira (1e-6).
+// FloatEquals compara dois floats com margem de tolerância financeira (FinancialEpsilon).
 func FloatEquals(a, b float64) bool {
-	return math.Abs(a-b) < 1e-6
+	return math.Abs(a-b) < FinancialEpsilon
 }
 
 // FloatIsZero verifica se um float é matematicamente zero (dentro da tolerância).
 func FloatIsZero(v float64) bool {
-	return math.Abs(v) < 1e-6
+	return math.Abs(v) < FinancialEpsilon
 }
 
 // DetermineAssetType define a categoria oficial do ativo (STOCK_BR, FII, FIAGRO, ETF_BR, BDR, STOCK_US, ETF_US, CRYPTO).
@@ -76,7 +76,7 @@ func UpdatePositionOnTransaction(
 		txCostInBase := nativeCost * fxRate
 		newQty = currentQty + txQty
 		newTotalCost = currentTotalCost + txCostInBase
-		if newQty > 1e-6 {
+		if newQty > FinancialEpsilon {
 			newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
 		} else {
 			newAvgPrice = txUnitPrice
@@ -84,7 +84,7 @@ func UpdatePositionOnTransaction(
 
 	case "SELL":
 		remainingQty := currentQty - txQty
-		if remainingQty > 1e-6 && currentQty > 1e-6 {
+		if remainingQty > FinancialEpsilon && currentQty > FinancialEpsilon {
 			newQty = remainingQty
 			newTotalCost = currentTotalCost * (remainingQty / currentQty)
 			newAvgPrice = currentAvgPrice
@@ -96,7 +96,7 @@ func UpdatePositionOnTransaction(
 		}
 
 	case "SPLIT":
-		if currentQty > 1e-6 && txQty > 1e-6 {
+		if currentQty > FinancialEpsilon && txQty > FinancialEpsilon {
 			newQty = currentQty * txQty
 			newTotalCost = currentTotalCost
 			newAvgPrice = currentAvgPrice / txQty
@@ -107,7 +107,7 @@ func UpdatePositionOnTransaction(
 		}
 
 	case "REVERSE_SPLIT":
-		if currentQty > 1e-6 && txQty > 1e-6 {
+		if currentQty > FinancialEpsilon && txQty > FinancialEpsilon {
 			newQty = math.Floor(currentQty / txQty)
 			newTotalCost = currentTotalCost
 			newAvgPrice = currentAvgPrice * txQty
@@ -122,7 +122,7 @@ func UpdatePositionOnTransaction(
 		txCostInBase := nativeCost * fxRate
 		newQty = currentQty + txQty
 		newTotalCost = currentTotalCost + txCostInBase
-		if newQty > 1e-6 {
+		if newQty > FinancialEpsilon {
 			newAvgPrice = ((currentQty * currentAvgPrice) + nativeCost) / newQty
 		} else {
 			newAvgPrice = currentAvgPrice
@@ -146,7 +146,7 @@ func CalculatePositionMetrics(quantity, currentPrice, totalCost, fxRate float64)
 	currentValue = quantity * currentPrice * fxRate
 	profitLoss = currentValue - totalCost
 
-	if totalCost > 1e-6 {
+	if totalCost > FinancialEpsilon {
 		returnPercent = (profitLoss / totalCost) * 100.0
 	} else {
 		returnPercent = 0.0
@@ -157,10 +157,10 @@ func CalculatePositionMetrics(quantity, currentPrice, totalCost, fxRate float64)
 
 // CalculateValuationRatios calcula os múltiplos fundamentalistas P/VP e P/L (P/E).
 func CalculateValuationRatios(currentPrice, bookValue, eps float64) (pvp, pe float64) {
-	if bookValue > 1e-6 {
+	if bookValue > FinancialEpsilon {
 		pvp = currentPrice / bookValue
 	}
-	if eps > 1e-6 {
+	if eps > FinancialEpsilon {
 		pe = currentPrice / eps
 	}
 	return pvp, pe
@@ -189,7 +189,7 @@ func CalculateDailyFixedIncomeRate(indexer string, rate float64, benchmarkAnnual
 	case indexerUpper == "CDI" || indexerUpper == "POS":
 		effectiveAnnualRate = (benchmarkAnnualRate / 100.0) * (rate / 100.0)
 	case indexerUpper == "SELIC":
-		if benchmarkAnnualRate > 1e-6 {
+		if benchmarkAnnualRate > FinancialEpsilon {
 			effectiveAnnualRate = benchmarkAnnualRate / 100.0
 		} else {
 			effectiveAnnualRate = rate / 100.0
@@ -205,13 +205,13 @@ func CalculateDailyFixedIncomeRate(indexer string, rate float64, benchmarkAnnual
 	}
 
 	// r_dia = (1 + r_anual)^(1/252) - 1
-	dailyRate := math.Pow(1.0+effectiveAnnualRate, 1.0/252.0) - 1.0
+	dailyRate := math.Pow(1.0+effectiveAnnualRate, 1.0/BusinessDaysPerYear) - 1.0
 	return dailyRate
 }
 
 // CalculateEstimatedDailyGain calcula o ganho financeiro estimado em 1 dia útil para a posição de renda fixa.
 func CalculateEstimatedDailyGain(netValue float64, dailyRate float64) float64 {
-	if netValue < 1e-6 || dailyRate < 1e-6 {
+	if netValue < FinancialEpsilon || dailyRate < FinancialEpsilon {
 		return 0.0
 	}
 	return netValue * dailyRate

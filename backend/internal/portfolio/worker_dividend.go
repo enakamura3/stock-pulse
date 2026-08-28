@@ -5,6 +5,8 @@ import (
 	"log"
 	"math"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 )
 
 type DividendWorker struct {
@@ -19,34 +21,28 @@ func NewDividendWorker(repo PortfolioRepository, ms MarketService) *DividendWork
 	}
 }
 
-func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
-	log.Println("[DividendWorker] Iniciando sincronização de dividendos de mercado...")
-
+func (w *DividendWorker) SyncAllDividends(ctx context.Context) error {
 	assets, err := w.repo.GetAllAssets(ctx)
 	if err != nil {
-		log.Printf("[DividendWorker] Erro ao buscar ativos: %v", err)
-		return
+		return err
 	}
 
-	log.Printf("[DividendWorker] Encontrados %d ativos ativos no banco de dados.", len(assets))
+	log.Printf("[DividendWorker] Iniciando sincronização para %d ativos", len(assets))
 
 	for _, asset := range assets {
-		// Use the market service to fetch the dividends (which uses scrapers or Yahoo as fallback)
-		// We use a new background context with timeout for each asset to prevent hanging
+		if asset.Ticker == "" {
+			continue
+		}
+
 		assetCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-
-		log.Printf("[DividendWorker] Buscando proventos para o ativo %s (Tipo: %s)...", asset.Ticker, asset.AssetType)
-
 		events, err := w.marketService.GetDividends(assetCtx, asset.Ticker, asset.AssetType)
 		if err != nil {
-			log.Printf("[DividendWorker] Aviso: falha ao buscar proventos para %s: %v", asset.Ticker, err)
+			log.Printf("[DividendWorker] Erro ao buscar dividendos para %s: %v", asset.Ticker, err)
 			cancel()
 			continue
 		}
 
-		log.Printf("[DividendWorker] Ativo %s: Encontrados %d proventos na origem.", asset.Ticker, len(events))
-
-		successCount := 0
+		var successCount int
 		for i, ev := range events {
 			existingEvents, err := w.repo.GetAssetEventsByDate(assetCtx, asset.ID, ev.Date)
 			if err != nil {
@@ -64,7 +60,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 				}
 
 				diff := math.Abs(existing.GrossAmount - ev.Amount)
-				if diff <= 0.05 {
+				if diff <= calculator.FuzzyMatchGrossAmountThreshold {
 					if minDiff == -1 || diff < minDiff {
 						minDiff = diff
 						bestMatch = existing
@@ -73,7 +69,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 			}
 
 			if bestMatch != nil {
-				if minDiff < 1e-6 && bestMatch.PaymentDate.Equal(ev.PaymentDate) {
+				if minDiff < calculator.FinancialEpsilon && bestMatch.PaymentDate.Equal(ev.PaymentDate) {
 					successCount++
 					continue
 				}
@@ -116,4 +112,5 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 	}
 
 	log.Println("[DividendWorker] Sincronização finalizada.")
+	return nil
 }
