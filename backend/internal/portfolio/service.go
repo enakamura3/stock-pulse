@@ -436,7 +436,7 @@ func (s *Service) getCurrencyRate(ctx context.Context, fromCurrency, toCurrency 
 
 // resolveTransactionExchangeRate resolve a taxa de câmbio histórica para uma transação se não informada pelo usuário.
 func (s *Service) resolveTransactionExchangeRate(ctx context.Context, currency, baseCurrency string, executedAt time.Time, existingRate float64) float64 {
-	if existingRate > 1e-6 {
+	if existingRate > calculator.FinancialEpsilon {
 		return existingRate
 	}
 
@@ -448,7 +448,7 @@ func (s *Service) resolveTransactionExchangeRate(ctx context.Context, currency, 
 	log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, executedAt)
 
 	rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, executedAt)
-	if err != nil || rate <= 1e-6 {
+	if err != nil || rate <= calculator.FinancialEpsilon {
 		log.Printf("[Portfolio] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
 		s.BackfillGap(ctx, currencyPair, executedAt)
 
@@ -456,7 +456,7 @@ func (s *Service) resolveTransactionExchangeRate(ctx context.Context, currency, 
 		rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, executedAt)
 	}
 
-	if err == nil && rate > 1e-6 {
+	if err == nil && rate > calculator.FinancialEpsilon {
 		log.Printf("[Portfolio] Câmbio encontrado na base: %.4f", rate)
 		return rate
 	}

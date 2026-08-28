@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 )
 
 // GetPortfolioDividends calcula todos os dividendos (históricos e futuros) com base na posição da carteira na data com-dividendo (cum-dividend date).
@@ -89,14 +91,14 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 				// Regras de Impostos
 				if divCurrency == "USD" {
 					// EUA: 30% retido na fonte
-					netAmount = grossAmount * 0.70
+					netAmount = grossAmount * calculator.USWithholdingNetFactor
 				} else if divCurrency == "BRL" {
 					if div.Type == "JCP" {
 						// JCP: 15% de imposto retido na fonte
-						netAmount = grossAmount * 0.85
+						netAmount = grossAmount * calculator.B3WithholdingNetFactor
 					} else if strings.HasPrefix(txs[0].AssetType, "ETF") {
 						// Exceção: ETFs na B3 que sofrem tributação de 15% nos dividendos retidos na fonte
-						netAmount = grossAmount * 0.85
+						netAmount = grossAmount * calculator.B3WithholdingNetFactor
 					} else {
 						// Dividendos, Rendimentos (FII), Amortização: 0% de imposto
 						netAmount = grossAmount
@@ -117,7 +119,7 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 					// 1. Se a Data de Pagamento está definida e já ocorreu no passado: usa o câmbio histórico da PaymentDate
 					if !div.PaymentDate.IsZero() && !div.PaymentDate.After(now) {
 						fx, err := s.marketService.GetHistoricalExchangeRate(ctx, div.PaymentDate)
-						if err == nil && fx > 1e-6 {
+						if err == nil && fx > calculator.FinancialEpsilon {
 							exchangeRate = fx
 						} else {
 							exchangeRate = s.getCurrencyRate(ctx, "USD", "BRL")

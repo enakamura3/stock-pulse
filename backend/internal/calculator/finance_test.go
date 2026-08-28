@@ -300,3 +300,22 @@ func TestUpdatePositionOnTransaction_ForeignCurrencyAndETFs(t *testing.T) {
 		t.Errorf("Foreign Complete Sell failed: got qty=%.2f, cost=%.2f, avg=%.2f (expected 0, 0, 0)", qty, totalCost, avgPrice)
 	}
 }
+
+func TestDomainConstants(t *testing.T) {
+	if FinancialEpsilon != 1e-6 {
+		t.Errorf("expected FinancialEpsilon to be 1e-6, got %v", FinancialEpsilon)
+	}
+	if BusinessDaysPerYear != 252.0 {
+		t.Errorf("expected BusinessDaysPerYear to be 252.0, got %v", BusinessDaysPerYear)
+	}
+	if FuzzyMatchGrossAmountThreshold != 0.05 {
+		t.Errorf("expected FuzzyMatchGrossAmountThreshold to be 0.05, got %v", FuzzyMatchGrossAmountThreshold)
+	}
+	if USWithholdingTaxRate != 0.30 || !FloatEquals(USWithholdingNetFactor, 0.70) {
+		t.Errorf("expected US tax rates to be 0.30 and 0.70, got %v and %v", USWithholdingTaxRate, USWithholdingNetFactor)
+	}
+	if B3WithholdingTaxRate != 0.15 || !FloatEquals(B3WithholdingNetFactor, 0.85) {
+		t.Errorf("expected B3 tax rates to be 0.15 and 0.85, got %v and %v", B3WithholdingTaxRate, B3WithholdingNetFactor)
+	}
+}
+

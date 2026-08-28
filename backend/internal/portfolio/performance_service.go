@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 )
 
@@ -165,7 +166,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			dailyTickers[tx.AssetID] = tx.Ticker
 
 			rate := tx.ExchangeRate
-			if rate <= 1e-6 {
+			if rate <= calculator.FinancialEpsilon {
 				rate = 1.0
 			}
 
@@ -202,7 +203,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				cost := dailyCosts[assetID]
 
 				// Se o preço não for encontrado, usa o custo médio de aquisição como fallback temporário
-				if math.Abs(price) < 1e-6 && qty > 0 {
+				if math.Abs(price) < calculator.FinancialEpsilon && qty > 0 {
 					price = cost / qty
 				}
 
@@ -210,13 +211,13 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				rate := 1.0
 				if dailyCurrencies[assetID] != p.BaseCurrency && p.BaseCurrency == "BRL" && usdBrlID != "" {
 					rate = getPriceLOCF(usdBrlID, currDate)
-					if math.Abs(rate) < 1e-6 {
+					if math.Abs(rate) < calculator.FinancialEpsilon {
 						rate = 5.0 // Fallback seguro
 					}
 				}
 
 				adjFactor := dailySplitAdjustments[assetID]
-				if math.Abs(adjFactor) < 1e-6 {
+				if math.Abs(adjFactor) < calculator.FinancialEpsilon {
 					adjFactor = 1.0
 				}
 				adjustedQty := qty * adjFactor
@@ -274,7 +275,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			for _, tx := range txs {
 				if tx.ExecutedAt.Year() == d.Year() && tx.ExecutedAt.Month() == d.Month() && tx.ExecutedAt.Day() == d.Day() {
 					rate := tx.ExchangeRate
-					if rate <= 1e-6 {
+					if rate <= calculator.FinancialEpsilon {
 						rate = 1.0
 					}
 					if tx.Type == "BUY" {
@@ -287,7 +288,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 		}
 
 		var dailyReturn float64 = 0.0
-		if idx > 0 && prevValue > 1e-6 {
+		if idx > 0 && prevValue > calculator.FinancialEpsilon {
 			// Retorno diário isolando fluxos de caixa externos (TWRR)
 			dailyReturn = (pt.Value - dailyCashFlow - prevValue) / prevValue
 		}
@@ -456,7 +457,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				pt.IpcaReturnPct = (ipcaCumulativeFactor - 1.0) * 100.0
 
 				// IFIX
-				if ifixInit > 1e-6 {
+				if ifixInit > calculator.FinancialEpsilon {
 					ifixVal := getIndexLOCF(d, ifixMap)
 					if ifixVal > 0 {
 						pt.IfixReturnPct = ((ifixVal - ifixInit) / ifixInit) * 100.0
@@ -464,7 +465,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				}
 
 				// Ibovespa
-				if ibovInit > 1e-6 {
+				if ibovInit > calculator.FinancialEpsilon {
 					ibovVal := getIndexLOCF(d, ibovMap)
 					if ibovVal > 0 {
 						pt.IbovReturnPct = ((ibovVal - ibovInit) / ibovInit) * 100.0
@@ -472,12 +473,12 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				}
 
 				// S&P 500
-				if sp500Init > 1e-6 {
+				if sp500Init > calculator.FinancialEpsilon {
 					sp500Val := getIndexLOCF(d, sp500Map)
 					if sp500Val > 0 {
 						if p.BaseCurrency == "BRL" {
 							sp500ValBrl := sp500Val * getUsdBrlLOCF(d)
-							if sp500InitBrl > 1e-6 {
+							if sp500InitBrl > calculator.FinancialEpsilon {
 								pt.Sp500ReturnPct = ((sp500ValBrl - sp500InitBrl) / sp500InitBrl) * 100.0
 							}
 						} else {
