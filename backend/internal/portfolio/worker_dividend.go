@@ -21,10 +21,11 @@ func NewDividendWorker(repo PortfolioRepository, ms MarketService) *DividendWork
 	}
 }
 
-func (w *DividendWorker) SyncAllDividends(ctx context.Context) error {
+func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 	assets, err := w.repo.GetAllAssets(ctx)
 	if err != nil {
-		return err
+		log.Printf("[DividendWorker] Erro ao buscar ativos: %v", err)
+		return
 	}
 
 	log.Printf("[DividendWorker] Iniciando sincronização para %d ativos", len(assets))
@@ -112,5 +113,4 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) error {
 	}
 
 	log.Println("[DividendWorker] Sincronização finalizada.")
-	return nil
 }
