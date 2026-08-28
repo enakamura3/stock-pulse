@@ -436,10 +436,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 
 			for idx := range finalPoints {
 				pt := &finalPoints[idx]
-				d, err := time.Parse("2006-01-02", pt.Date)
-				if err != nil {
-					continue
-				}
+				d, _ := time.Parse("2006-01-02", pt.Date)
 
 				if idx > 0 {
 					// CDI: acumula fator diário apenas em dias úteis
