@@ -195,3 +195,41 @@ func TestService_EdgeCases(t *testing.T) {
 	err := svc.SetConversationState(context.Background(), 111, state)
 	assert.ErrorContains(t, err, "failed to marshal conversation state")
 }
+
+func TestService_GetChatIDByUserID_And_Unlink(t *testing.T) {
+	t.Run("GetChatIDByUserID", func(t *testing.T) {
+		svc, repo, _, _ := setupServiceTest(t)
+		uID := uuid.New()
+		repo.On("GetChatIDByUserID", mock.Anything, uID).Return(int64(98765), nil)
+
+		chatID, err := svc.GetChatIDByUserID(context.Background(), uID)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(98765), chatID)
+	})
+
+	t.Run("UnlinkAccount with active portfolio in redis", func(t *testing.T) {
+		svc, repo, mr, _ := setupServiceTest(t)
+		uID := uuid.New()
+		chatID := int64(98765)
+		mr.Set("telegram_active_portfolio:98765", "p1")
+
+		repo.On("GetChatIDByUserID", mock.Anything, uID).Return(chatID, nil)
+		repo.On("UnlinkAccount", mock.Anything, uID).Return(nil)
+
+		err := svc.UnlinkAccount(context.Background(), uID)
+		assert.NoError(t, err)
+		assert.False(t, mr.Exists("telegram_active_portfolio:98765"))
+	})
+
+	t.Run("UnlinkAccount when chatID is not found", func(t *testing.T) {
+		svc, repo, _, _ := setupServiceTest(t)
+		uID := uuid.New()
+
+		repo.On("GetChatIDByUserID", mock.Anything, uID).Return(int64(0), assert.AnError)
+		repo.On("UnlinkAccount", mock.Anything, uID).Return(nil)
+
+		err := svc.UnlinkAccount(context.Background(), uID)
+		assert.NoError(t, err)
+	})
+}
+

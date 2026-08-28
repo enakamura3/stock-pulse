@@ -14,7 +14,10 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 		return c.Edit("⚠️ Módulo de Renda Fixa não está ativo.")
 	}
 
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil || len(portfolios) == 0 {

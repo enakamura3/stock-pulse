@@ -16,7 +16,10 @@ import (
 
 func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	defer c.Respond()
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil || len(portfolios) == 0 {
@@ -259,7 +262,10 @@ func getMacroCategoryKey(assetType, ticker string) string {
 
 func (h *Handlers) HandleChangePortfolio(c telebot.Context) error {
 	defer c.Respond()
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil || len(portfolios) == 0 {
@@ -282,7 +288,10 @@ func (h *Handlers) HandleChangePortfolio(c telebot.Context) error {
 
 func (h *Handlers) handleSelectedPortfolio(c telebot.Context, portfolioID string) error {
 	defer c.Respond()
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil {

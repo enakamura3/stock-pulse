@@ -181,4 +181,73 @@ func TestHTTPHandler_UnlinkTelegram(t *testing.T) {
 		json.NewDecoder(rec.Body).Decode(&resp)
 		assert.Equal(t, "Telegram desvinculado com sucesso", resp["message"])
 	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		svc := new(MockService)
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("DELETE", "/telegram/link", nil)
+		rec := httptest.NewRecorder()
+		h.UnlinkTelegram(rec, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("invalid user id", func(t *testing.T) {
+		svc := new(MockService)
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("DELETE", "/telegram/link", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, "not-a-uuid")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		h.UnlinkTelegram(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("service error", func(t *testing.T) {
+		svc := new(MockService)
+		userID := uuid.New()
+		svc.On("UnlinkAccount", mock.Anything, userID).Return(assert.AnError)
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("DELETE", "/telegram/link", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, userID.String())
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		h.UnlinkTelegram(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
 }
+
+func TestHTTPHandler_GetTelegramStatus_Errors(t *testing.T) {
+	t.Run("unauthorized", func(t *testing.T) {
+		svc := new(MockService)
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("GET", "/telegram/status", nil)
+		rec := httptest.NewRecorder()
+		h.GetTelegramStatus(rec, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("invalid user id", func(t *testing.T) {
+		svc := new(MockService)
+		h := NewHTTPHandler(svc, "bot")
+
+		req := httptest.NewRequest("GET", "/telegram/status", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, "invalid-uuid")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		h.GetTelegramStatus(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+}
+

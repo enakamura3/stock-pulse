@@ -112,7 +112,10 @@ func formatPerShareAmount(p *message.Printer, amount float64) string {
 }
 
 func (h *Handlers) fetchDividends(c telebot.Context) ([]portfolio.CalculatedDividend, string, error) {
-	userIDStr := c.Get("user_id").(string)
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return nil, "", err
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
 	if err != nil || len(portfolios) == 0 {
