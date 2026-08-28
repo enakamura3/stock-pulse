@@ -305,31 +305,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	tx.AssetID = assetID
 
 	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
-	if tx.ExchangeRate <= 0 {
-		if currency != p.BaseCurrency {
-			currencyPair := fmt.Sprintf("%s%s=X", currency, p.BaseCurrency)
-			log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, tx.ExecutedAt)
-
-			rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
-			if err != nil || rate <= 0 {
-				log.Printf("[Portfolio] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
-				s.BackfillGap(ctx, currencyPair, tx.ExecutedAt)
-
-				// Tenta buscar novamente
-				rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
-			}
-
-			if err == nil && rate > 0 {
-				tx.ExchangeRate = rate
-				log.Printf("[Portfolio] Câmbio encontrado na base: %.4f", rate)
-			} else {
-				log.Printf("[Portfolio] Aviso: Falha ao buscar câmbio histórico após backfill (%v). Usando fallback de 1.0", err)
-				tx.ExchangeRate = 1.0
-			}
-		} else {
-			tx.ExchangeRate = 1.0
-		}
-	}
+	tx.ExchangeRate = s.resolveTransactionExchangeRate(ctx, currency, p.BaseCurrency, tx.ExecutedAt, tx.ExchangeRate)
 
 	if tx.Type == "SELL" {
 		tx.TotalCost = (tx.Quantity * tx.UnitPrice) - tx.Fee
@@ -515,6 +491,37 @@ func (s *Service) getCurrencyRate(ctx context.Context, fromCurrency, toCurrency 
 	return 1.0
 }
 
+// resolveTransactionExchangeRate resolve a taxa de câmbio histórica para uma transação se não informada pelo usuário.
+func (s *Service) resolveTransactionExchangeRate(ctx context.Context, currency, baseCurrency string, executedAt time.Time, existingRate float64) float64 {
+	if existingRate > 1e-6 {
+		return existingRate
+	}
+
+	if currency == baseCurrency || currency == "" || baseCurrency == "" {
+		return 1.0
+	}
+
+	currencyPair := fmt.Sprintf("%s%s=X", currency, baseCurrency)
+	log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, executedAt)
+
+	rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, executedAt)
+	if err != nil || rate <= 1e-6 {
+		log.Printf("[Portfolio] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
+		s.BackfillGap(ctx, currencyPair, executedAt)
+
+		// Tenta buscar novamente
+		rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, executedAt)
+	}
+
+	if err == nil && rate > 1e-6 {
+		log.Printf("[Portfolio] Câmbio encontrado na base: %.4f", rate)
+		return rate
+	}
+
+	log.Printf("[Portfolio] Aviso: Falha ao buscar câmbio histórico após backfill (%v). Usando fallback de 1.0", err)
+	return 1.0
+}
+
 // UpdateTransaction edita uma transação existente de um portfólio.
 func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error {
 	// Anti-IDOR: Valida se a carteira pertence ao usuário logado
@@ -535,31 +542,7 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 	tx.AssetID = assetID
 
 	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
-	if tx.ExchangeRate <= 0 {
-		if currency != p.BaseCurrency {
-			currencyPair := fmt.Sprintf("%s%s=X", currency, p.BaseCurrency)
-			log.Printf("[Portfolio-Update] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, tx.ExecutedAt)
-
-			rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
-			if err != nil || rate <= 0 {
-				log.Printf("[Portfolio-Update] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
-				s.BackfillGap(ctx, currencyPair, tx.ExecutedAt)
-
-				// Tenta buscar novamente
-				rate, err = s.repo.GetExchangeRateByDate(ctx, currencyPair, tx.ExecutedAt)
-			}
-
-			if err == nil && rate > 0 {
-				tx.ExchangeRate = rate
-				log.Printf("[Portfolio-Update] Câmbio encontrado na base: %.4f", rate)
-			} else {
-				log.Printf("[Portfolio-Update] Aviso: Falha ao buscar câmbio histórico após backfill (%v). Usando fallback de 1.0", err)
-				tx.ExchangeRate = 1.0
-			}
-		} else {
-			tx.ExchangeRate = 1.0
-		}
-	}
+	tx.ExchangeRate = s.resolveTransactionExchangeRate(ctx, currency, p.BaseCurrency, tx.ExecutedAt, tx.ExchangeRate)
 
 	tx.ID = txID
 	tx.PortfolioID = portfolioID

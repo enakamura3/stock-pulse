@@ -735,5 +735,53 @@ func TestServiceCoverage_GetPortfolioPerformance_FutureTxAllPeriod(t *testing.T)
 	assert.Empty(t, pts)
 }
 
+func TestServiceCoverage_ResolveTransactionExchangeRate(t *testing.T) {
+	s, repo, _, _ := setupServiceTest()
+	now := time.Now()
+
+	t.Run("existing rate > 0", func(t *testing.T) {
+		rate := s.resolveTransactionExchangeRate(context.Background(), "USD", "BRL", now, 5.45)
+		assert.Equal(t, 5.45, rate)
+	})
+
+	t.Run("same currency or empty", func(t *testing.T) {
+		assert.Equal(t, 1.0, s.resolveTransactionExchangeRate(context.Background(), "BRL", "BRL", now, 0))
+		assert.Equal(t, 1.0, s.resolveTransactionExchangeRate(context.Background(), "", "BRL", now, 0))
+		assert.Equal(t, 1.0, s.resolveTransactionExchangeRate(context.Background(), "USD", "", now, 0))
+	})
+
+	t.Run("first fetch success", func(t *testing.T) {
+		repo.On("GetExchangeRateByDate", mock.Anything, "EURBRL=X", now).Return(6.10, nil).Once()
+
+		rate := s.resolveTransactionExchangeRate(context.Background(), "EUR", "BRL", now, 0)
+		assert.Equal(t, 6.10, rate)
+	})
+
+	t.Run("second fetch success after backfill", func(t *testing.T) {
+		repo.On("GetExchangeRateByDate", mock.Anything, "GBPBRL=X", now).Return(0.0, errors.New("not found")).Once()
+		repo.On("GetAssetByTicker", mock.Anything, "GBPBRL=X").Return("gbpbrl-id", nil).Once()
+		repo.On("GetOldestPriceDate", mock.Anything, "gbpbrl-id").Return(time.Time{}, errors.New("err")).Once()
+		repo.On("GetDailyPrices", mock.Anything, "gbpbrl-id", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil).Once()
+		repo.On("SaveDailyPrices", mock.Anything, "gbpbrl-id", mock.Anything).Return(nil).Once()
+		repo.On("GetExchangeRateByDate", mock.Anything, "GBPBRL=X", now).Return(7.25, nil).Once()
+
+		rate := s.resolveTransactionExchangeRate(context.Background(), "GBP", "BRL", now, 0)
+		assert.Equal(t, 7.25, rate)
+	})
+
+	t.Run("both fetch fail fallback to 1.0", func(t *testing.T) {
+		repo.On("GetExchangeRateByDate", mock.Anything, "JPYBRL=X", now).Return(0.0, errors.New("not found")).Once()
+		repo.On("GetAssetByTicker", mock.Anything, "JPYBRL=X").Return("jpybrl-id", nil).Once()
+		repo.On("GetOldestPriceDate", mock.Anything, "jpybrl-id").Return(time.Time{}, errors.New("err")).Once()
+		repo.On("GetDailyPrices", mock.Anything, "jpybrl-id", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil).Once()
+		repo.On("SaveDailyPrices", mock.Anything, "jpybrl-id", mock.Anything).Return(nil).Once()
+		repo.On("GetExchangeRateByDate", mock.Anything, "JPYBRL=X", now).Return(0.0, errors.New("still not found")).Once()
+
+		rate := s.resolveTransactionExchangeRate(context.Background(), "JPY", "BRL", now, 0)
+		assert.Equal(t, 1.0, rate)
+	})
+}
+
+
 
 
