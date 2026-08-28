@@ -2,12 +2,9 @@ package portfolio
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -26,11 +23,11 @@ func determineAssetType(ticker, name, currency string) string {
 	return calculator.DetermineAssetType(ticker, name, currency)
 }
 
-// PortfolioRepository define as operações de banco de dados para a carteira.
+// PortfolioRepository define as operações de banco necessárias para o portfólio.
 type PortfolioRepository interface {
 	CreatePortfolio(ctx context.Context, userID, name, baseCurrency string) (*Portfolio, error)
 	GetPortfoliosByUserID(ctx context.Context, userID string) ([]Portfolio, error)
-	GetPortfolioByID(ctx context.Context, id, userID string) (*Portfolio, error)
+	GetPortfolioByID(ctx context.Context, portfolioID, userID string) (*Portfolio, error)
 	SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error
 	DeletePortfolio(ctx context.Context, id, userID string) error
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
@@ -58,6 +55,8 @@ type MarketService interface {
 	GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error)
 	GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error)
 	GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error)
+	GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error)
+	GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error)
 }
 
 // Service gerencia as regras de negócio de carteiras, transações e histórico.
@@ -66,7 +65,6 @@ type Service struct {
 	marketService  MarketService
 	marketProvider market.QuoteProvider
 	fiService      fixedincome.Service
-	httpClient     *http.Client
 	uow            database.UnitOfWork
 }
 
@@ -77,10 +75,7 @@ func NewService(repo PortfolioRepository, marketService MarketService, marketPro
 		marketService:  marketService,
 		marketProvider: marketProvider,
 		fiService:      fiService,
-		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-		uow: uow,
+		uow:            uow,
 	}
 }
 
@@ -391,72 +386,20 @@ type PerformancePoint struct {
 
 
 
-// BackfillHistoricalPrices realiza a chamada histórica ao Yahoo e grava os dados usando 10 anos de histórico diário.
+// BackfillHistoricalPrices busca e persiste até 10 anos de histórico diário do ativo via MarketService.
 func (s *Service) BackfillHistoricalPrices(ctx context.Context, assetID, ticker string) error {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
-	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=10y", url.PathEscape(ticker))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	historicalPrices, err := s.marketService.GetHistoricalPrices(ctx, ticker, "10y")
 	if err != nil {
 		return err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("provedor yahoo retornou status %d", resp.StatusCode)
-	}
-
-	var data struct {
-		Chart struct {
-			Result []struct {
-				Timestamp  []int64 `json:"timestamp"`
-				Indicators struct {
-					Quote []struct {
-						Close []*float64 `json:"close"`
-					} `json:"quote"`
-				} `json:"indicators"`
-			} `json:"result"`
-			Error interface{} `json:"error"`
-		} `json:"chart"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return err
-	}
-
-	if data.Chart.Error != nil {
-		return fmt.Errorf("erro no provedor: %v", data.Chart.Error)
-	}
-
-	if len(data.Chart.Result) == 0 {
-		return errors.New("resultado histórico vazio")
-	}
-
-	res := data.Chart.Result[0]
-	if len(res.Timestamp) == 0 || len(res.Indicators.Quote) == 0 {
-		return errors.New("série histórica sem timestamps ou quotes")
-	}
-
-	closes := res.Indicators.Quote[0].Close
-	if len(res.Timestamp) != len(closes) {
-		return errors.New("inconsistência de tamanho nos dados históricos do provedor")
 	}
 
 	var prices []DailyPrice
-	for i := range res.Timestamp {
-		if closes[i] == nil {
-			continue // Ignora dias sem cotação
-		}
+	for _, hp := range historicalPrices {
 		prices = append(prices, DailyPrice{
 			AssetID:    assetID,
-			PriceDate:  time.Unix(res.Timestamp[i], 0).UTC(),
-			ClosePrice: *closes[i],
+			PriceDate:  hp.Date,
+			ClosePrice: hp.Close,
 		})
 	}
 
@@ -640,69 +583,17 @@ func (s *Service) BackfillGap(ctx context.Context, ticker string, missingDate ti
 		return nil // Sem gap para baixar
 	}
 
-	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&period1=%d&period2=%d", url.PathEscape(ticker), period1, period2)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	historicalPrices, err := s.marketService.GetHistoricalPricesBetween(ctx, ticker, period1, period2)
 	if err != nil {
 		return err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("provedor yahoo retornou status %d", resp.StatusCode)
-	}
-
-	var data struct {
-		Chart struct {
-			Result []struct {
-				Timestamp  []int64 `json:"timestamp"`
-				Indicators struct {
-					Quote []struct {
-						Close []*float64 `json:"close"`
-					} `json:"quote"`
-				} `json:"indicators"`
-			} `json:"result"`
-			Error interface{} `json:"error"`
-		} `json:"chart"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return err
-	}
-
-	if data.Chart.Error != nil {
-		return fmt.Errorf("erro no provedor: %v", data.Chart.Error)
-	}
-
-	if len(data.Chart.Result) == 0 {
-		return errors.New("resultado histórico vazio")
-	}
-
-	res := data.Chart.Result[0]
-	if len(res.Timestamp) == 0 || len(res.Indicators.Quote) == 0 {
-		return errors.New("série histórica sem timestamps ou quotes")
-	}
-
-	closes := res.Indicators.Quote[0].Close
-	if len(res.Timestamp) != len(closes) {
-		return errors.New("inconsistência de tamanho nos dados históricos do provedor")
 	}
 
 	var prices []DailyPrice
-	for i := range res.Timestamp {
-		if closes[i] == nil {
-			continue
-		}
+	for _, hp := range historicalPrices {
 		prices = append(prices, DailyPrice{
 			AssetID:    assetID,
-			PriceDate:  time.Unix(res.Timestamp[i], 0).UTC(),
-			ClosePrice: *closes[i],
+			PriceDate:  hp.Date,
+			ClosePrice: hp.Close,
 		})
 	}
 

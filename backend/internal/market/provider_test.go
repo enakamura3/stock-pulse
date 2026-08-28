@@ -223,3 +223,144 @@ func TestProvider_DoError(t *testing.T) {
 	_, err = p.GetQuote(ctx, "AAPL")
 	assert.Error(t, err)
 }
+
+func TestProvider_GetHistoricalPrices(t *testing.T) {
+	t.Run("Success with default range", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			assert.Contains(t, r.URL.Path, "AAPL")
+			assert.Contains(t, r.URL.RawQuery, "range=10y")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"chart": {
+					"result": [{
+						"timestamp": [1700000000, 1700086400],
+						"indicators": {
+							"quote": [{
+								"close": [150.5, null]
+							}]
+						}
+					}]
+				}
+			}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		prices, err := p.GetHistoricalPrices(context.Background(), "AAPL", "")
+		assert.NoError(t, err)
+		assert.Len(t, prices, 1) // null close is filtered out
+		assert.Equal(t, int64(1700000000), prices[0].Timestamp)
+		assert.Equal(t, 150.5, prices[0].Close)
+	})
+
+	t.Run("GetHistoricalPricesBetween Success", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			assert.Contains(t, r.URL.RawQuery, "period1=1600000000")
+			assert.Contains(t, r.URL.RawQuery, "period2=1700000000")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"chart": {
+					"result": [{
+						"timestamp": [1650000000],
+						"indicators": {
+							"quote": [{
+								"close": [160.0]
+							}]
+						}
+					}]
+				}
+			}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		prices, err := p.GetHistoricalPricesBetween(context.Background(), "AAPL", 1600000000, 1700000000)
+		assert.NoError(t, err)
+		assert.Len(t, prices, 1)
+		assert.Equal(t, 160.0, prices[0].Close)
+	})
+
+	t.Run("HTTP Error", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		_, err := p.GetHistoricalPrices(context.Background(), "AAPL", "5y")
+		assert.ErrorContains(t, err, "status 500")
+	})
+
+	t.Run("JSON Error", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{broken json`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		_, err := p.GetHistoricalPrices(context.Background(), "AAPL", "10y")
+		assert.Error(t, err)
+	})
+
+	t.Run("Provider Error", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"chart": {"error": "symbol not found"}}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		_, err := p.GetHistoricalPrices(context.Background(), "AAPL", "10y")
+		assert.ErrorContains(t, err, "erro no provedor")
+	})
+
+	t.Run("Empty Result", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"chart": {"result": []}}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		_, err := p.GetHistoricalPrices(context.Background(), "AAPL", "10y")
+		assert.ErrorContains(t, err, "resultado histórico vazio")
+	})
+
+	t.Run("Empty Timestamps or Quotes", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"chart": {"result": [{"timestamp": [], "indicators": {"quote": []}}]}}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		_, err := p.GetHistoricalPrices(context.Background(), "AAPL", "10y")
+		assert.ErrorContains(t, err, "sem timestamps ou quotes")
+	})
+
+	t.Run("Length Inconsistency", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"chart": {"result": [{"timestamp": [1, 2], "indicators": {"quote": [{"close": [10.0]}]}}]}}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		_, err := p.GetHistoricalPrices(context.Background(), "AAPL", "10y")
+		assert.ErrorContains(t, err, "inconsistência de tamanho")
+	})
+
+	t.Run("Context error and Do error", func(t *testing.T) {
+		p := NewYahooFinanceProvider()
+		_, err := p.GetHistoricalPrices(nil, "AAPL", "10y")
+		assert.Error(t, err)
+
+		p.client.Transport = &mockTransport{serverURL: "http://127.0.0.1:0"}
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+		defer cancel()
+		_, err = p.GetHistoricalPrices(ctx, "AAPL", "10y")
+		assert.Error(t, err)
+	})
+}
+

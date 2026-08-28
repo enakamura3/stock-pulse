@@ -42,6 +42,22 @@ func (m *MockQuoteProvider) GetDividends(ctx context.Context, ticker string, ass
 	return nil, args.Error(1)
 }
 
+func (m *MockQuoteProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuoteProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func setupServiceTest() (*Service, *MockQuoteProvider, *redis.Client, redismock.ClientMock) {
 	config.Envs.RedisTTLQuotes = 60 * time.Second
 	config.Envs.RedisTTLFundamentals = 12 * time.Hour
@@ -195,4 +211,43 @@ func TestService_InvalidateQuoteCache(t *testing.T) {
 		assert.Equal(t, int64(1), removed)
 	})
 }
+
+func TestService_GetHistoricalPrices(t *testing.T) {
+	s, mp, _, _ := setupServiceTest()
+
+	t.Run("GetHistoricalPrices delegates to provider", func(t *testing.T) {
+		expected := []HistoricalPrice{
+			{Timestamp: 1700000000, Close: 35.50},
+		}
+		mp.On("GetHistoricalPrices", mock.Anything, "PETR4.SA", "10y").Return(expected, nil).Once()
+
+		res, err := s.GetHistoricalPrices(context.Background(), "PETR4.SA", "10y")
+		assert.NoError(t, err)
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("GetHistoricalPricesBetween delegates to provider", func(t *testing.T) {
+		expected := []HistoricalPrice{
+			{Timestamp: 1700000000, Close: 35.50},
+		}
+		mp.On("GetHistoricalPricesBetween", mock.Anything, "PETR4.SA", int64(1690000000), int64(1700000000)).Return(expected, nil).Once()
+
+		res, err := s.GetHistoricalPricesBetween(context.Background(), "PETR4.SA", 1690000000, 1700000000)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, res)
+	})
+}
+
+func TestMockProvider_HistoricalMethods(t *testing.T) {
+	mockProv := NewMockProvider()
+	hp1, err := mockProv.GetHistoricalPrices(context.Background(), "AAPL", "10y")
+	assert.NoError(t, err)
+	assert.Empty(t, hp1)
+
+	hp2, err := mockProv.GetHistoricalPricesBetween(context.Background(), "AAPL", 100, 200)
+	assert.NoError(t, err)
+	assert.Empty(t, hp2)
+}
+
+
 

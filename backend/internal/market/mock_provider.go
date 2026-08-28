@@ -94,3 +94,12 @@ func (m *MockProvider) SearchAssets(ctx context.Context, query string) ([]Search
 		},
 	}, nil
 }
+
+func (m *MockProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+	return []HistoricalPrice{}, nil
+}
+
+func (m *MockProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+	return []HistoricalPrice{}, nil
+}
+

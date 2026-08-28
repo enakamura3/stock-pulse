@@ -3,9 +3,6 @@ package portfolio
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -176,6 +173,22 @@ func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, ass
 	return args.Get(0).([]market.DividendEvent), args.Error(1)
 }
 
+func (m *MockMarketService) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketService) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 type MockMarketProvider struct {
 	mock.Mock
 }
@@ -191,6 +204,22 @@ func (m *MockMarketProvider) GetQuote(ctx context.Context, ticker string) (*mark
 func (m *MockMarketProvider) SearchAssets(ctx context.Context, query string) ([]market.SearchResult, error) {
 	args := m.Called(ctx, query)
 	return args.Get(0).([]market.SearchResult), args.Error(1)
+}
+
+func (m *MockMarketProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 func (m *MockMarketProvider) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
@@ -565,146 +594,47 @@ func TestService_GetPortfolioPerformance(t *testing.T) {
 	})
 }
 
-// Backfill Test - We need httptest
+// Backfill Test
 func TestService_BackfillHistoricalPrices(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{
-				"chart": {
-					"result": [{
-						"timestamp": [1609459200],
-						"indicators": {
-							"quote": [{
-								"close": [150.0]
-							}]
-						}
-					}]
-				}
-			}`))
-		}))
-		defer server.Close()
+		s, repo, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
 
-		s, repo, _, _ := setupServiceTest()
-
-		// To mock the URL call, we intercept transport
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 		assert.NoError(t, err)
 	})
 
-	t.Run("HTTP Error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusInternalServerError)
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+	t.Run("Market Service Error", func(t *testing.T) {
+		s, _, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{}, errors.New("market error")).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "status 500")
+		assert.ErrorContains(t, err, "market error")
 	})
 
-	t.Run("JSON Error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`invalid`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+	t.Run("Empty Prices", func(t *testing.T) {
+		s, _, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{}, nil).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.Error(t, err)
-	})
-
-	t.Run("Provider Error Message", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"error": "not found"}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "not found")
-	})
-
-	t.Run("Empty Result", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": []}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "vazio")
-	})
-
-	t.Run("Missing Indicators", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": [{"timestamp": []}]}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "sem timestamps")
-	})
-
-	t.Run("Inconsistent Lengths", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": [{"timestamp": [1, 2], "indicators": {"quote": [{"close": [1]}]}}]}}`))
-		}))
-		defer server.Close()
-
-		s, _, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "inconsistência")
+		assert.NoError(t, err)
 	})
 
 	t.Run("Save Error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"chart": {"result": [{"timestamp": [1], "indicators": {"quote": [{"close": [1]}]}}]}}`))
-		}))
-		defer server.Close()
+		s, repo, ms, _ := setupServiceTest()
+		ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
 
-		s, repo, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
-
-		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db error"))
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db error")).Once()
 
 		err := s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
-		assert.ErrorContains(t, err, "falha ao gravar")
+		assert.ErrorContains(t, err, "falha ao gravar histórico")
 	})
-}
-
-// Mock transport to reroute requests
-type mockTransport struct {
-	serverURL string
-}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.URL.Scheme = "http"
-	req.URL.Host = strings.TrimPrefix(m.serverURL, "http://")
-	return http.DefaultTransport.RoundTrip(req)
 }
 
 func (m *MockMarketService) GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error) {
@@ -812,47 +742,40 @@ func TestService_BackfillGap(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("HTTP Error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusInternalServerError)
-		}))
-		defer server.Close()
-
-		s, repo, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+	t.Run("Market Service Error", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
 		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
 		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
+		ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("market gap error")).Once()
 
 		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
-		assert.ErrorContains(t, err, "status 500")
+		assert.ErrorContains(t, err, "market gap error")
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{
-				"chart": {
-					"result": [{
-						"timestamp": [1609459200],
-						"indicators": {
-							"quote": [{
-								"close": [150.0]
-							}]
-						}
-					}]
-				}
-			}`))
-		}))
-		defer server.Close()
-
-		s, repo, _, _ := setupServiceTest()
-		s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+		s, repo, ms, _ := setupServiceTest()
 		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
 		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
-		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil)
+		ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(nil).Once()
 
 		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
 		assert.NoError(t, err)
+	})
+
+	t.Run("Save Error", func(t *testing.T) {
+		s, repo, ms, _ := setupServiceTest()
+		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
+		ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{
+			{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+		}, nil).Once()
+		repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("db save error")).Once()
+
+		err := s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
+		assert.ErrorContains(t, err, "falha ao gravar histórico")
 	})
 }
 

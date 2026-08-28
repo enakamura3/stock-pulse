@@ -83,6 +83,22 @@ func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]m
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketService) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketService) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 // Tests
 
 func setupServiceTest() (*Service, *MockAlertRepo, *MockMarketService) {

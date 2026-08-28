@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -32,10 +33,19 @@ type SearchResult struct {
 	Type     string `json:"type"`
 }
 
+// HistoricalPrice representa uma cotação de fechamento diária histórica.
+type HistoricalPrice struct {
+	Timestamp int64     `json:"timestamp"`
+	Date      time.Time `json:"date"`
+	Close     float64   `json:"close"`
+}
+
 // QuoteProvider define o contrato para fornecer cotações, buscas de ativos e eventos corporativos.
 type QuoteProvider interface {
 	GetQuote(ctx context.Context, symbol string) (*Quote, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
+	GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error)
+	GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error)
 }
 
 // YahooFinanceProvider implementa QuoteProvider consumindo endpoints públicos do Yahoo Finance.
@@ -203,3 +213,89 @@ func (y *YahooFinanceProvider) SearchAssets(ctx context.Context, query string) (
 
 	return results, nil
 }
+
+// GetHistoricalPrices busca série histórica diária baseada em um range (ex: "10y", "5y", "1y").
+func (y *YahooFinanceProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	if rangePeriod == "" {
+		rangePeriod = "10y"
+	}
+	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=%s", url.PathEscape(symbol), url.QueryEscape(rangePeriod))
+	return y.fetchHistoricalPricesFromURL(ctx, apiURL)
+}
+
+// GetHistoricalPricesBetween busca série histórica diária entre dois timestamps Unix.
+func (y *YahooFinanceProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&period1=%d&period2=%d", url.PathEscape(symbol), period1, period2)
+	return y.fetchHistoricalPricesFromURL(ctx, apiURL)
+}
+
+func (y *YahooFinanceProvider) fetchHistoricalPricesFromURL(ctx context.Context, apiURL string) ([]HistoricalPrice, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	resp, err := y.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("provedor yahoo retornou status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Chart struct {
+			Result []struct {
+				Timestamp  []int64 `json:"timestamp"`
+				Indicators struct {
+					Quote []struct {
+						Close []*float64 `json:"close"`
+					} `json:"quote"`
+				} `json:"indicators"`
+			} `json:"result"`
+			Error interface{} `json:"error"`
+		} `json:"chart"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	if data.Chart.Error != nil {
+		return nil, fmt.Errorf("erro no provedor: %v", data.Chart.Error)
+	}
+
+	if len(data.Chart.Result) == 0 {
+		return nil, errors.New("resultado histórico vazio")
+	}
+
+	res := data.Chart.Result[0]
+	if len(res.Timestamp) == 0 || len(res.Indicators.Quote) == 0 {
+		return nil, errors.New("série histórica sem timestamps ou quotes")
+	}
+
+	closes := res.Indicators.Quote[0].Close
+	if len(res.Timestamp) != len(closes) {
+		return nil, errors.New("inconsistência de tamanho nos dados históricos do provedor")
+	}
+
+	var prices []HistoricalPrice
+	for i := range res.Timestamp {
+		if closes[i] == nil {
+			continue // Ignora dias sem cotação
+		}
+		prices = append(prices, HistoricalPrice{
+			Timestamp: res.Timestamp[i],
+			Date:      time.Unix(res.Timestamp[i], 0).UTC(),
+			Close:     *closes[i],
+		})
+	}
+
+	return prices, nil
+}
+
