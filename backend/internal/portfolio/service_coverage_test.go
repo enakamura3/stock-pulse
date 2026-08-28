@@ -782,6 +782,68 @@ func TestServiceCoverage_ResolveTransactionExchangeRate(t *testing.T) {
 	})
 }
 
+func TestServiceCoverage_ExtraEdgeCases(t *testing.T) {
+	t.Run("GetPortfolios auto set default when none is default", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfoliosByUserID", mock.Anything, "u1").Return([]Portfolio{
+			{ID: "p1", Name: "Port 1", IsDefault: false},
+			{ID: "p2", Name: "Port 2", IsDefault: false},
+		}, nil).Once()
+		repo.On("SetDefaultPortfolio", mock.Anything, "p1", "u1").Return(nil).Once()
+
+		ports, err := s.GetPortfolios(context.Background(), "u1")
+		assert.NoError(t, err)
+		assert.Len(t, ports, 2)
+		assert.True(t, ports[0].IsDefault)
+	})
+
+	t.Run("AddTransaction Sell with fee", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "PETR4").Return("petr-id", "BRL", nil).Once()
+		repo.On("GetDailyPrices", mock.Anything, "petr-id", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil).Maybe()
+		repo.On("GetOldestPriceDate", mock.Anything, "petr-id").Return(time.Time{}, nil).Maybe()
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Type == "SELL" && tx.TotalCost == (10*30)-5
+		})).Return(&Transaction{ID: "tx1", TotalCost: 295.0}, nil).Once()
+
+		tx := &Transaction{
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "SELL",
+			Quantity:    10,
+			UnitPrice:   30,
+			Fee:         5,
+			ExecutedAt:  time.Now(),
+		}
+		res, err := s.AddTransaction(context.Background(), "u1", tx)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+	})
+
+	t.Run("UpdateTransaction Sell with fee", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "PETR4").Return("petr-id", "BRL", nil).Once()
+		repo.On("GetOldestPriceDate", mock.Anything, "petr-id").Return(time.Time{}, nil).Maybe()
+		repo.On("UpdateTransaction", mock.Anything, mock.MatchedBy(func(tx Transaction) bool {
+			return tx.Type == "SELL" && tx.TotalCost == (10*30)-5
+		})).Return(nil).Once()
+
+		tx := &Transaction{
+			Ticker:     "PETR4",
+			Type:       "SELL",
+			Quantity:   10,
+			UnitPrice:  30,
+			Fee:        5,
+			ExecutedAt: time.Now(),
+		}
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", tx)
+		assert.NoError(t, err)
+	})
+}
+
+
 
 
 
