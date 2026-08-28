@@ -3,8 +3,6 @@ package portfolio
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -14,14 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-type MockHTTPTransport struct {
-	Err error
-}
-
-func (m *MockHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return nil, m.Err
-}
 
 func TestServiceCoverage_DetermineAssetType(t *testing.T) {
 	assert.Equal(t, "ETF_BR", determineAssetType("SPYI11.SA", "SPYI", "BRL"))
@@ -174,12 +164,12 @@ func TestServiceCoverage_GetPortfolioDetails_Transactions(t *testing.T) {
 }
 
 func TestServiceCoverage_AddTransaction_Fallback(t *testing.T) {
-	s, repo, _, mp := setupServiceTest()
+	s, repo, ms, mp := setupServiceTest()
 
-	// Simulate HTTP failure for BackfillHistoricalPrices
-	s.httpClient = &http.Client{
-		Transport: &MockHTTPTransport{Err: errors.New("http err")},
-	}
+	ms.On("GetHistoricalPrices", mock.Anything, "NEW-USD", "10y").Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
+	ms.On("GetHistoricalPrices", mock.Anything, "USDBRL=X", "10y").Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
+	ms.On("GetHistoricalPricesBetween", mock.Anything, "USDBRL=X", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
+
 	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", pgx.ErrNoRows)
 
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
@@ -207,92 +197,32 @@ func TestServiceCoverage_AddTransaction_Fallback(t *testing.T) {
 }
 
 func TestServiceCoverage_BackfillPrices(t *testing.T) {
-	s, repo, _, _ := setupServiceTest()
+	s, repo, ms, _ := setupServiceTest()
 	repo.On("SaveDailyPrices", mock.Anything, "a1", mock.Anything).Return(errors.New("save err"))
+	ms.On("GetHistoricalPrices", mock.Anything, "AAPL", "10y").Return([]market.HistoricalPrice{
+		{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+	}, nil)
+
 	_ = s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
-			"chart": {
-				"result": [{
-					"timestamp": [1609459200, 1609545600],
-					"indicators": {
-						"quote": [{
-							"close": [150.0, null]
-						}]
-					}
-				}]
-			}
-		}`))
-	}))
-	defer server.Close()
-
-	s.httpClient.Transport = &mockTransport{serverURL: server.URL}
+	ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{
+		{Date: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), Close: 150.0},
+	}, nil)
 	repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now(), nil)
 
 	_ = s.BackfillGap(context.Background(), "AAPL", time.Now().AddDate(0, 0, -10))
-	_ = s.BackfillHistoricalPrices(context.Background(), "a1", "AAPL")
 }
 
 func TestServiceCoverage_BackfillGap_Errors(t *testing.T) {
-	s, repo, _, _ := setupServiceTest()
+	s, repo, ms, _ := setupServiceTest()
 	repo.On("GetAssetByTicker", mock.Anything, "INVALID").Return("", errors.New("err"))
 	repo.On("CreateAsset", mock.Anything, "INVALID", "INVALID", "CURRENCY", "BRL").Return("", errors.New("create err"))
 	_ = s.BackfillGap(context.Background(), "INVALID", time.Now())
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`invalid json`))
-	}))
-	defer server.Close()
-	s.httpClient.Transport = &mockTransport{serverURL: server.URL}
 	repo.On("GetAssetByTicker", mock.Anything, "TEST1").Return("t1", nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "t1").Return(time.Now(), nil)
-	_ = s.BackfillGap(context.Background(), "TEST1", time.Now().AddDate(0, 0, -10))
-
-	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"chart": {"error": {"description": "err"}}}`))
-	}))
-	defer server2.Close()
-	s.httpClient.Transport = &mockTransport{serverURL: server2.URL}
-	_ = s.BackfillGap(context.Background(), "TEST1", time.Now().AddDate(0, 0, -10))
-
-	server3 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"chart": {"result": []}}`))
-	}))
-	defer server3.Close()
-	s.httpClient.Transport = &mockTransport{serverURL: server3.URL}
-	_ = s.BackfillGap(context.Background(), "TEST1", time.Now().AddDate(0, 0, -10))
-
-	server4 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"chart": {"result": [{"timestamp": []}]}}`))
-	}))
-	defer server4.Close()
-	s.httpClient.Transport = &mockTransport{serverURL: server4.URL}
-	_ = s.BackfillGap(context.Background(), "TEST1", time.Now().AddDate(0, 0, -10))
-
-	server5 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
-			"chart": {
-				"result": [{
-					"timestamp": [1609459200, 1609545600],
-					"indicators": {
-						"quote": [{
-							"close": [150.0]
-						}]
-					}
-				}]
-			}
-		}`))
-	}))
-	defer server5.Close()
-	s.httpClient.Transport = &mockTransport{serverURL: server5.URL}
+	ms.On("GetHistoricalPricesBetween", mock.Anything, "TEST1", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("err")).Once()
 	_ = s.BackfillGap(context.Background(), "TEST1", time.Now().AddDate(0, 0, -10))
 }
 
@@ -306,11 +236,9 @@ func TestServiceCoverage_GetCurrencyRate(t *testing.T) {
 }
 
 func TestServiceCoverage_UpdateTransaction_BackfillError(t *testing.T) {
-	s, repo, _, _ := setupServiceTest()
+	s, repo, ms, _ := setupServiceTest()
 
-	s.httpClient = &http.Client{
-		Transport: &MockHTTPTransport{Err: errors.New("http err")},
-	}
+	ms.On("GetHistoricalPricesBetween", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("gap err")).Maybe()
 
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
 	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "BRL", nil)
@@ -373,11 +301,11 @@ func TestServiceCoverage_GetPortfolioPerformance_FutureTx(t *testing.T) {
 }
 
 func TestServiceCoverage_AddTransaction_TotalFail(t *testing.T) {
-	s, repo, _, mp := setupServiceTest()
+	s, repo, ms, mp := setupServiceTest()
 
-	s.httpClient = &http.Client{
-		Transport: &MockHTTPTransport{Err: errors.New("http err")},
-	}
+	ms.On("GetHistoricalPrices", mock.Anything, "NEW-USD", "10y").Return([]market.HistoricalPrice{}, errors.New("fail")).Maybe()
+	ms.On("GetHistoricalPrices", mock.Anything, "USDBRL=X", "10y").Return([]market.HistoricalPrice{}, errors.New("fail")).Maybe()
+	ms.On("GetHistoricalPricesBetween", mock.Anything, "USDBRL=X", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("fail")).Maybe()
 
 	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", pgx.ErrNoRows)
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
@@ -404,24 +332,8 @@ func TestServiceCoverage_AddTransaction_TotalFail(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestServiceCoverage_BackfillHistoricalPrices_BadURL(t *testing.T) {
-	s, _, _, _ := setupServiceTest()
-	// nil context makes NewRequestWithContext fail
-	err := s.BackfillHistoricalPrices(nil, "a1", "AAPL")
-	assert.Error(t, err)
-}
-
-func TestServiceCoverage_BackfillGap_BadURL(t *testing.T) {
-	s, repo, _, _ := setupServiceTest()
-	repo.On("GetAssetByTicker", mock.Anything, mock.Anything).Return("a1", nil)
-	repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now().AddDate(0, 0, 1), nil)
-
-	err := s.BackfillGap(nil, "AAPL", time.Now())
-	assert.Error(t, err)
-}
-
 func TestServiceCoverage_AddTransaction_BackfillGap(t *testing.T) {
-	s, repo, _, _ := setupServiceTest()
+	s, repo, ms, _ := setupServiceTest()
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
 	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
 	repo.On("CreateTransaction", mock.Anything, mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
@@ -433,10 +345,7 @@ func TestServiceCoverage_AddTransaction_BackfillGap(t *testing.T) {
 
 	// Fail the BackfillGap
 	repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
-
-	s.httpClient = &http.Client{
-		Transport: &MockHTTPTransport{Err: errors.New("http err")},
-	}
+	ms.On("GetHistoricalPricesBetween", mock.Anything, "AAPL", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
 
 	tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 150, Currency: "USD", ExecutedAt: oldestDate.AddDate(0, 0, -1)}
 	_, err := s.AddTransaction(context.Background(), "u1", tx)
@@ -445,11 +354,9 @@ func TestServiceCoverage_AddTransaction_BackfillGap(t *testing.T) {
 }
 
 func TestServiceCoverage_UpdateTransaction_ExchangeFallback(t *testing.T) {
-	s, repo, _, _ := setupServiceTest()
+	s, repo, ms, _ := setupServiceTest()
 
-	s.httpClient = &http.Client{
-		Transport: &MockHTTPTransport{Err: errors.New("http err")},
-	}
+	ms.On("GetHistoricalPricesBetween", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
 
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
 	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "BRL", nil)
@@ -736,7 +643,8 @@ func TestServiceCoverage_GetPortfolioPerformance_FutureTxAllPeriod(t *testing.T)
 }
 
 func TestServiceCoverage_ResolveTransactionExchangeRate(t *testing.T) {
-	s, repo, _, _ := setupServiceTest()
+	s, repo, ms, _ := setupServiceTest()
+	ms.On("GetHistoricalPricesBetween", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, nil).Maybe()
 	now := time.Now()
 
 	t.Run("existing rate > 0", func(t *testing.T) {

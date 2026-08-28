@@ -33,6 +33,22 @@ func (m *MockQuoteProviderForBenchmarks) SearchAssets(ctx context.Context, query
 	return nil, args.Error(1)
 }
 
+func (m *MockQuoteProviderForBenchmarks) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, rangePeriod)
+	if args.Get(0) != nil {
+		return args.Get(0).([]HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuoteProviderForBenchmarks) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, symbol, period1, period2)
+	if args.Get(0) != nil {
+		return args.Get(0).([]HistoricalPrice), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func TestService_GetBenchmarks(t *testing.T) {
 	mr, err := miniredis.Run()
 	assert.NoError(t, err)

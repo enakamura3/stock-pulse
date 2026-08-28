@@ -313,3 +313,14 @@ func (s *Service) InvalidateQuoteCache(ctx context.Context, symbols []string) (i
 	return deleted, nil
 }
 
+// GetHistoricalPrices busca série histórica diária do provedor de mercado.
+func (s *Service) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+	return s.provider.GetHistoricalPrices(ctx, symbol, rangePeriod)
+}
+
+// GetHistoricalPricesBetween busca série histórica delimitada por timestamps Unix do provedor de mercado.
+func (s *Service) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+	return s.provider.GetHistoricalPricesBetween(ctx, symbol, period1, period2)
+}
+
+
