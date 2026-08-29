@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -1084,4 +1085,56 @@ func TestTWRR_NegativeReturn(t *testing.T) {
 
 	lastPoint := res[len(res)-1]
 	assert.Less(t, lastPoint.ReturnPct, 0.0, "queda de preço deve resultar em ReturnPct negativo")
+}
+
+type mockMultipartFile struct {
+	*bytes.Reader
+}
+
+func (m *mockMultipartFile) Close() error {
+	return nil
+}
+
+func TestService_BulkAddTransactions(t *testing.T) {
+	s, repo, ms, _ := setupServiceTest()
+
+	t.Run("Portfolio Not Found", func(t *testing.T) {
+		repo.On("GetPortfolioByID", mock.Anything, "p-err", "u1").Return(nil, errors.New("err"))
+		file := &mockMultipartFile{bytes.NewReader([]byte("date;ticker;type;qty;price"))}
+		_, err := s.BulkAddTransactions(context.Background(), "u1", "p-err", file)
+		assert.ErrorContains(t, err, "carteira não encontrada")
+	})
+
+	t.Run("CSV Read Error (Empty)", func(t *testing.T) {
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		file := &mockMultipartFile{bytes.NewReader([]byte(""))}
+		_, err := s.BulkAddTransactions(context.Background(), "u1", "p1", file)
+		assert.ErrorContains(t, err, "arquivo CSV vazio")
+	})
+
+	t.Run("CSV Parsing and Validation Errors", func(t *testing.T) {
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "PETR4.SA").Return("a1", "BRL", nil)
+		repo.On("GetAssetByTicker", mock.Anything, "PETR4.SA").Return("a1", nil)
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("c1", nil)
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
+		repo.On("CreateTransaction", mock.Anything, mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
+		ms.On("GetHistoricalPrices", mock.Anything, "PETR4.SA", "10y").Return([]market.HistoricalPrice{}, nil).Maybe()
+
+		csvContent := "Data;Ticker;Tipo;Quantidade;Preco;Cambio;Taxa\n" +
+			"invalid_row\n" +
+			";;;;\n" +
+			"2024-01-10;PETR4.SA;INVALID;10;30.0\n" +
+			"2024-01-10;PETR4.SA;BUY;-5;30.0\n" +
+			"2024-01-10;PETR4.SA;BUY;10;-10.0\n" +
+			"invalid_date;PETR4.SA;BUY;10;30.0\n" +
+			"2024-01-10;PETR4.SA;BUY;10;30.0;1.0;2.5\n" +
+			"10/01/2024;PETR4.SA;BUY;10;30.0;1.0;2.5\n"
+
+		file := &mockMultipartFile{bytes.NewReader([]byte(csvContent))}
+		res, err := s.BulkAddTransactions(context.Background(), "u1", "p1", file)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, res.Success)
+		assert.Len(t, res.Errors, 6)
+	})
 }
