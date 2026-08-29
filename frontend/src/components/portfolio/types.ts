@@ -32,6 +32,8 @@ export interface Position {
   dividend_yield?: number;
 }
 
+export type TransactionType = 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS' | string;
+
 export interface Transaction {
   id: string;
   portfolio_id: string;
@@ -40,7 +42,7 @@ export interface Transaction {
   asset_name?: string;
   asset_type?: string;
   currency?: string;
-  type: string; // "BUY" ou "SELL"
+  type: TransactionType;
   quantity: number;
   unit_price: number;
   total_cost: number;
