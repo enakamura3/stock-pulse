@@ -14,7 +14,7 @@ import (
 )
 
 func TestServiceCoverage_DetermineAssetType(t *testing.T) {
-	assert.Equal(t, "ETF_BR", determineAssetType("SPYI11.SA", "SPYI", "BRL"))
+	assert.Equal(t, "ETF_BR", determineAssetType("SPYI11.SA", "SPYI ETF", "BRL"))
 }
 
 func TestServiceCoverage_GetPortfolioDividends_ErrorAssetEvents(t *testing.T) {

@@ -17,7 +17,7 @@ func FloatIsZero(v float64) bool {
 
 // DetermineAssetType define a categoria oficial do ativo (STOCK_BR, FII, FIAGRO, ETF_BR, BDR, STOCK_US, ETF_US, CRYPTO).
 func DetermineAssetType(ticker, name, currency string) string {
-	if strings.Contains(ticker, "-") {
+	if strings.Contains(ticker, "-") || strings.ToUpper(currency) == "CRYPTO" {
 		return "CRYPTO"
 	}
 
@@ -36,24 +36,28 @@ func DetermineAssetType(ticker, name, currency string) string {
 
 	if strings.HasSuffix(ticker, "11.SA") {
 		lowerName := strings.ToLower(name)
-		isEtf := strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "ishares") || strings.Contains(lowerName, "índice") || strings.Contains(lowerName, "indice")
-		isFiagro := strings.Contains(lowerName, "fiagro") || strings.Contains(lowerName, "agro")
-		isFii := strings.Contains(lowerName, "fii") || strings.Contains(lowerName, "fundo") || strings.Contains(lowerName, "fdo") || strings.Contains(lowerName, "imob") || strings.Contains(lowerName, "lajes") || strings.Contains(lowerName, "shopping")
 
+		// Units de Ações brasileiras (ex: Taesa TAEE11, Santander SANB11, Sanepar SAPR11, Klabin KLBN11)
+		if strings.Contains(lowerName, "unit") || strings.Contains(lowerName, "unt") {
+			return "STOCK_BR"
+		}
+
+		isEtf := strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "ishares") ||
+			strings.Contains(lowerName, "índice") || strings.Contains(lowerName, "indice") ||
+			strings.Contains(lowerName, "sp500") || strings.Contains(lowerName, "nasdaq") ||
+			strings.Contains(lowerName, "bovespa") || strings.Contains(lowerName, "hashdex") ||
+			strings.Contains(lowerName, "trend") || strings.Contains(lowerName, "investo")
 		if isEtf {
 			return "ETF_BR"
 		}
+
+		isFiagro := strings.Contains(lowerName, "fiagro") || strings.Contains(lowerName, "agro")
 		if isFiagro {
 			return "FIAGRO"
 		}
 
-		tickerUpper := strings.ToUpper(ticker)
-		if isFii || tickerUpper == "MXRF11.SA" || tickerUpper == "HGLG11.SA" || tickerUpper == "KNRI11.SA" || tickerUpper == "BTLG11.SA" || tickerUpper == "XPML11.SA" || tickerUpper == "VISC11.SA" {
-			return "FII"
-		}
-		if tickerUpper == "SPYI11.SA" || tickerUpper == "QQQI11.SA" || tickerUpper == "IVVB11.SA" || tickerUpper == "NASD11.SA" || tickerUpper == "BOVA11.SA" {
-			return "ETF_BR"
-		}
+		// A grande maioria de ativos 11.SA na B3 são Fundos Imobiliários (FIIs)
+		return "FII"
 	}
 
 	return "STOCK_BR"

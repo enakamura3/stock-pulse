@@ -3,7 +3,7 @@ package portfolio
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"sort"
 	"strings"
@@ -26,22 +26,22 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 		return nil, err
 	}
 
-	// Agrupa transações por ticker para facilitar processamento cronológico
-	txByTicker := make(map[string][]Transaction)
+	// Agrupa transações por ativo (Ticker)
+	txsByTicker := make(map[string][]Transaction)
 	for _, tx := range transactions {
-		txByTicker[tx.Ticker] = append(txByTicker[tx.Ticker], tx)
+		txsByTicker[tx.Ticker] = append(txsByTicker[tx.Ticker], tx)
 	}
 
 	var results []CalculatedDividend
 
-	// Para cada ativo, buscamos os proventos e iteramos para calcular
-	for ticker, txs := range txByTicker {
+	// Itera por cada ativo para buscar os proventos e aplicar os eventos societários
+	for ticker, txs := range txsByTicker {
 		// Ordena transações cronologicamente
 		sort.Slice(txs, func(i, j int) bool {
 			return txs[i].ExecutedAt.Before(txs[j].ExecutedAt)
 		})
 
-		// A moeda base do ativo (BRL ou USD)
+		// Moeda base do ativo (default BRL caso vazio)
 		currency := "BRL"
 		if len(txs) > 0 && txs[0].Currency != "" {
 			currency = txs[0].Currency
@@ -49,7 +49,7 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 
 		divs, err := s.repo.GetAssetEvents(ctx, txs[0].AssetID)
 		if err != nil {
-			log.Printf("Aviso: falha ao buscar dividendos locais para %s: %v", ticker, err)
+			slog.WarnContext(ctx, "falha ao buscar dividendos locais para ativo", slog.String("ticker", ticker), slog.Any("error", err))
 			continue
 		}
 

@@ -48,7 +48,7 @@ func TestDetermineAssetType(t *testing.T) {
 		{"NASD11.SA", "Nasdaq 11 ETF", "BRL", "ETF_BR"},
 		{"BOVA11.SA", "iShares Ibovespa ETF", "BRL", "ETF_BR"},
 		{"ETF11.SA", "ETF Generico", "BRL", "ETF_BR"},
-		{"SPYI11.SA", "", "BRL", "ETF_BR"},
+		{"UNKNOWN11.SA", "", "BRL", "FII"},
 		{"IND11.SA", "Fundo de Índice", "BRL", "ETF_BR"},
 		{"FDO11.SA", "Fdo Imob", "BRL", "FII"},
 		{"LAJ11.SA", "Lajes Corporativas", "BRL", "FII"},

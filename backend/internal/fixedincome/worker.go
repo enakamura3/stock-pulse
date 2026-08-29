@@ -2,7 +2,7 @@ package fixedincome
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -60,7 +60,12 @@ func (w *Worker) SyncRates(ctx context.Context) {
 
 			rates, err := w.registry.Fetch(ctx, indexer, currentStart, currentEnd)
 			if err != nil {
-				log.Printf("fixedincome worker: erro ao buscar dados de %s (%s a %s): %v", indexer, currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02"), err)
+				slog.ErrorContext(ctx, "fixedincome worker: erro ao buscar dados de indexador",
+					slog.String("indexer", indexer),
+					slog.String("start", currentStart.Format("2006-01-02")),
+					slog.String("end", currentEnd.Format("2006-01-02")),
+					slog.Any("error", err),
+				)
 			} else if len(rates) > 0 {
 				// Filtra finais de semana para economizar espaço e evitar inconsistências (exceto IPCA que é mensal)
 				var filteredRates []IndexRate
@@ -75,9 +80,14 @@ func (w *Worker) SyncRates(ctx context.Context) {
 				if len(filteredRates) > 0 {
 					err = w.repo.SaveIndexRates(ctx, filteredRates)
 					if err != nil {
-						log.Printf("fixedincome worker: erro ao salvar taxas no banco para %s: %v", indexer, err)
+						slog.ErrorContext(ctx, "fixedincome worker: erro ao salvar taxas no banco", slog.String("indexer", indexer), slog.Any("error", err))
 					} else {
-						log.Printf("fixedincome worker: sucesso ao sincronizar %d registros para %s (%s a %s)", len(filteredRates), indexer, currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02"))
+						slog.InfoContext(ctx, "fixedincome worker: sucesso ao sincronizar registros",
+							slog.Int("count", len(filteredRates)),
+							slog.String("indexer", indexer),
+							slog.String("start", currentStart.Format("2006-01-02")),
+							slog.String("end", currentEnd.Format("2006-01-02")),
+						)
 					}
 				}
 			}

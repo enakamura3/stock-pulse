@@ -3,7 +3,7 @@ package fixedincome
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -33,7 +33,7 @@ func (w *AnbimaHolidayWorker) SyncHolidays(ctx context.Context) {
 	// Verifica quais anos já têm dados
 	seeded, err := w.repo.GetSeededHolidayYears(ctx)
 	if err != nil {
-		log.Printf("AnbimaHolidayWorker: failed to check seeded years: %v", err)
+		slog.ErrorContext(ctx, "AnbimaHolidayWorker: failed to check seeded years", slog.Any("error", err))
 		return
 	}
 
@@ -49,12 +49,12 @@ func (w *AnbimaHolidayWorker) SyncHolidays(ctx context.Context) {
 		}
 
 		if err := w.syncYear(ctx, year); err != nil {
-			log.Printf("AnbimaHolidayWorker: failed to sync year %d: %v", year, err)
+			slog.ErrorContext(ctx, "AnbimaHolidayWorker: failed to sync year", slog.Int("year", year), slog.Any("error", err))
 			// Continua para o próximo ano mesmo em caso de erro
 			continue
 		}
 
-		log.Printf("AnbimaHolidayWorker: seeded holidays for %d", year)
+		slog.InfoContext(ctx, "AnbimaHolidayWorker: seeded holidays for year", slog.Int("year", year))
 
 		// Pausa entre requisições para não sobrecarregar a BrasilAPI
 		select {

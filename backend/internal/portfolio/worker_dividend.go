@@ -2,7 +2,7 @@ package portfolio
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"math"
 	"time"
 
@@ -24,11 +24,11 @@ func NewDividendWorker(repo PortfolioRepository, ms MarketService) *DividendWork
 func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 	assets, err := w.repo.GetAllAssets(ctx)
 	if err != nil {
-		log.Printf("[DividendWorker] Erro ao buscar ativos: %v", err)
+		slog.ErrorContext(ctx, "erro ao buscar ativos para sincronização de dividendos", slog.Any("error", err))
 		return
 	}
 
-	log.Printf("[DividendWorker] Iniciando sincronização para %d ativos", len(assets))
+	slog.InfoContext(ctx, "iniciando sincronização de dividendos", slog.Int("assets_count", len(assets)))
 
 	for _, asset := range assets {
 		if asset.Ticker == "" {
@@ -38,7 +38,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		assetCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		events, err := w.marketService.GetDividends(assetCtx, asset.Ticker, asset.AssetType)
 		if err != nil {
-			log.Printf("[DividendWorker] Erro ao buscar dividendos para %s: %v", asset.Ticker, err)
+			slog.WarnContext(assetCtx, "erro ao buscar dividendos para ativo", slog.String("ticker", asset.Ticker), slog.Any("error", err))
 			cancel()
 			continue
 		}
@@ -47,7 +47,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		for i, ev := range events {
 			existingEvents, err := w.repo.GetAssetEventsByDate(assetCtx, asset.ID, ev.Date)
 			if err != nil {
-				log.Printf("[DividendWorker] Erro ao buscar dividendos existentes para %s em %s: %v", asset.Ticker, ev.Date, err)
+				slog.ErrorContext(assetCtx, "erro ao buscar dividendos existentes", slog.String("ticker", asset.Ticker), slog.Time("date", ev.Date), slog.Any("error", err))
 				continue
 			}
 
@@ -78,8 +78,13 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 				// Update existing
 				err = w.repo.UpdateAssetEventValueByID(assetCtx, bestMatch.ID, ev.Amount, ev.Amount, ev.PaymentDate)
 				if err != nil {
-					log.Printf("[DividendWorker] Erro ao atualizar dividendo (Fuzzy Match) %d/%d (ID: %s) para %s: %v",
-						i+1, len(events), bestMatch.ID, asset.Ticker, err)
+					slog.ErrorContext(assetCtx, "erro ao atualizar dividendo (Fuzzy Match)",
+						slog.Int("current", i+1),
+						slog.Int("total", len(events)),
+						slog.String("id", bestMatch.ID),
+						slog.String("ticker", asset.Ticker),
+						slog.Any("error", err),
+					)
 				} else {
 					successCount++
 				}
@@ -94,8 +99,15 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 					PaymentDate: ev.PaymentDate,
 				})
 				if err != nil {
-					log.Printf("[DividendWorker] Erro ao salvar novo dividendo %d/%d (DataCom: %s, Tipo: %s, Valor: %.4f) para %s: %v",
-						i+1, len(events), ev.Date.Format("2006-01-02"), ev.Type, ev.Amount, asset.Ticker, err)
+					slog.ErrorContext(assetCtx, "erro ao salvar novo dividendo",
+						slog.Int("current", i+1),
+						slog.Int("total", len(events)),
+						slog.String("cum_date", ev.Date.Format("2006-01-02")),
+						slog.String("type", ev.Type),
+						slog.Float64("amount", ev.Amount),
+						slog.String("ticker", asset.Ticker),
+						slog.Any("error", err),
+					)
 				} else {
 					successCount++
 				}
@@ -103,7 +115,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		}
 
 		if successCount > 0 {
-			log.Printf("[DividendWorker] Sincronizados %d proventos para %s", successCount, asset.Ticker)
+			slog.InfoContext(assetCtx, "proventos sincronizados para ativo", slog.Int("count", successCount), slog.String("ticker", asset.Ticker))
 		}
 
 		cancel()
@@ -112,5 +124,5 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		time.Sleep(2 * time.Second)
 	}
 
-	log.Println("[DividendWorker] Sincronização finalizada.")
+	slog.InfoContext(ctx, "sincronização de dividendos finalizada")
 }

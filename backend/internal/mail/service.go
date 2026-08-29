@@ -2,7 +2,7 @@ package mail
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/smtp"
 
 	"github.com/onigiri/stock-pulse/backend/internal/config"
@@ -209,10 +209,10 @@ func (s *Service) SendAlertEmail(to string, userName string, ticker string, asse
 	// Envia o e-mail (sem autenticação local de desenvolvimento, suportando SMTP anônimo do Mailpit)
 	err := SendMailFunc(addr, nil, s.from, []string{to}, []byte(message))
 	if err != nil {
-		log.Printf("[SMTP] Falha ao enviar alerta por e-mail para %s: %v", to, err)
+		slog.Error("falha ao enviar alerta por e-mail", slog.String("to", to), slog.Any("error", err))
 		return err
 	}
 
-	log.Printf("[SMTP] Alerta de preço para %s enviado com sucesso para %s", ticker, to)
+	slog.Info("alerta de preço enviado com sucesso por e-mail", slog.String("ticker", ticker), slog.String("to", to))
 	return nil
 }

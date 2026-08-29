@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -115,7 +115,7 @@ func (s *Service) GetPortfolios(ctx context.Context, userID string) ([]Portfolio
 
 	// UX Onboarding: Cria portfólio "Principal" se o usuário acabou de criar a conta
 	if len(lists) == 0 {
-		log.Printf("[Portfolio] Usuário %s não possui carteiras. Criando padrão 'Principal' BRL...", userID)
+		slog.InfoContext(ctx, "usuário não possui carteiras, criando padrão 'Principal'", slog.String("user_id", userID))
 		p, err := s.repo.CreatePortfolio(ctx, userID, "Principal", "BRL")
 		if err != nil {
 			return nil, fmt.Errorf("falha ao criar portfólio de onboarding: %w", err)
@@ -215,7 +215,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 				// Injeta cotações em tempo real e calcula rentabilidade
 				quote, err := s.marketService.GetQuote(ctx, pos.Ticker)
 				if err != nil {
-					log.Printf("[Portfolio] Erro ao recuperar cotação atual para %s: %v", pos.Ticker, err)
+					slog.WarnContext(ctx, "erro ao recuperar cotação atual para ativo", slog.String("ticker", pos.Ticker), slog.Any("error", err))
 					mu.Lock()
 					activePositions = append(activePositions, *pos)
 					mu.Unlock()
@@ -282,7 +282,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Importa metadados do Yahoo Finance
-		log.Printf("[Portfolio] Ativo %s não existe na base. Importando...", tx.Ticker)
+		slog.InfoContext(ctx, "ativo não existe na base, importando", slog.String("ticker", tx.Ticker))
 		quote, err := s.marketProvider.GetQuote(ctx, tx.Ticker)
 		if err != nil {
 			return nil, fmt.Errorf("ativo '%s' não encontrado no mercado: %w", tx.Ticker, err)
@@ -320,20 +320,20 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		// Verifica se o histórico já existe no banco
 		existing, err := s.repo.GetDailyPrices(bgCtx, id, time.Now().AddDate(0, 0, -7), time.Now())
 		if err == nil && len(existing) > 0 {
-			log.Printf("[Backfill] Ativo %s já possui histórico recente.", ticker)
+			slog.InfoContext(bgCtx, "ativo já possui histórico recente", slog.String("ticker", ticker))
 
 			// Se possui histórico recente, vamos verificar se a transação é mais antiga que o nosso buraco
 			oldestDate, err := s.repo.GetOldestPriceDate(bgCtx, id)
 			if err == nil && !oldestDate.IsZero() && tx.ExecutedAt.Before(oldestDate) {
-				log.Printf("[Backfill] Transação antiga detectada. Disparando BackfillGap para o ativo %s tapar o buraco até %s", ticker, oldestDate.Format("2006-01-02"))
+				slog.InfoContext(bgCtx, "transação antiga detectada, disparando BackfillGap", slog.String("ticker", ticker), slog.String("oldest_date", oldestDate.Format("2006-01-02")))
 				if err := s.BackfillGap(bgCtx, ticker, tx.ExecutedAt); err != nil {
-					log.Printf("[Backfill] Falha ao rodar BackfillGap de %s: %v", ticker, err)
+					slog.ErrorContext(bgCtx, "falha ao rodar BackfillGap", slog.String("ticker", ticker), slog.Any("error", err))
 				}
 			}
 		} else {
-			log.Printf("[Backfill] Iniciando preenchimento histórico máximo (max) para %s...", ticker)
+			slog.InfoContext(bgCtx, "iniciando preenchimento histórico máximo para ativo", slog.String("ticker", ticker))
 			if err := s.BackfillHistoricalPrices(bgCtx, id, ticker); err != nil {
-				log.Printf("[Backfill] Falha ao rodar backfill histórico de %s: %v", ticker, err)
+				slog.ErrorContext(bgCtx, "falha ao rodar backfill histórico", slog.String("ticker", ticker), slog.Any("error", err))
 			}
 		}
 
@@ -344,9 +344,9 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 				usdBrlID, err = s.repo.CreateAsset(bgCtx, "USDBRL=X", "USD/BRL Currency Pair", "CURRENCY", "BRL")
 			}
 			if err == nil {
-				log.Printf("[Backfill] Iniciando preenchimento cambial de USDBRL=X para carteira BRL...")
+				slog.InfoContext(bgCtx, "iniciando preenchimento cambial de USDBRL=X para carteira BRL")
 				if err := s.BackfillHistoricalPrices(bgCtx, usdBrlID, "USDBRL=X"); err != nil {
-					log.Printf("[Backfill] Falha ao rodar backfill histórico de USDBRL=X: %v", err)
+					slog.ErrorContext(bgCtx, "falha ao rodar backfill histórico de USDBRL=X", slog.Any("error", err))
 				}
 			}
 		}
@@ -408,7 +408,7 @@ func (s *Service) BackfillHistoricalPrices(ctx context.Context, assetID, ticker 
 		if err != nil {
 			return fmt.Errorf("falha ao gravar histórico no banco: %w", err)
 		}
-		log.Printf("[Backfill] Sincronizados %d preços históricos para o ativo %s", len(prices), ticker)
+		slog.InfoContext(ctx, "preços históricos sincronizados", slog.Int("count", len(prices)), slog.String("ticker", ticker))
 	}
 
 	return nil
@@ -445,11 +445,11 @@ func (s *Service) resolveTransactionExchangeRate(ctx context.Context, currency, 
 	}
 
 	currencyPair := fmt.Sprintf("%s%s=X", currency, baseCurrency)
-	log.Printf("[Portfolio] Buscando câmbio histórico para %s na data %s no banco de dados...", currencyPair, executedAt)
+	slog.InfoContext(ctx, "buscando câmbio histórico no banco de dados", slog.String("pair", currencyPair), slog.String("date", executedAt.Format("2006-01-02")))
 
 	rate, err := s.repo.GetExchangeRateByDate(ctx, currencyPair, executedAt)
 	if err != nil || rate <= calculator.FinancialEpsilon {
-		log.Printf("[Portfolio] Taxa não encontrada na base. Disparando Micro-Backfill para tapar o buraco...")
+		slog.InfoContext(ctx, "taxa cambial não encontrada na base, disparando Micro-Backfill")
 		s.BackfillGap(ctx, currencyPair, executedAt)
 
 		// Tenta buscar novamente
@@ -457,11 +457,11 @@ func (s *Service) resolveTransactionExchangeRate(ctx context.Context, currency, 
 	}
 
 	if err == nil && rate > calculator.FinancialEpsilon {
-		log.Printf("[Portfolio] Câmbio encontrado na base: %.4f", rate)
+		slog.InfoContext(ctx, "câmbio encontrado na base", slog.Float64("rate", rate))
 		return rate
 	}
 
-	log.Printf("[Portfolio] Aviso: Falha ao buscar câmbio histórico após backfill (%v). Usando fallback de 1.0", err)
+	slog.WarnContext(ctx, "falha ao buscar câmbio histórico após backfill, usando fallback 1.0", slog.Any("error", err))
 	return 1.0
 }
 
@@ -508,9 +508,9 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 
 		oldestDate, err := s.repo.GetOldestPriceDate(bgCtx, id)
 		if err == nil && !oldestDate.IsZero() && tx.ExecutedAt.Before(oldestDate) {
-			log.Printf("[Backfill-Update] Transação antiga detectada. Disparando BackfillGap para o ativo %s", ticker)
+			slog.InfoContext(bgCtx, "transação antiga detectada, disparando BackfillGap", slog.String("ticker", ticker))
 			if err := s.BackfillGap(bgCtx, ticker, tx.ExecutedAt); err != nil {
-				log.Printf("[Backfill-Update] Falha ao rodar BackfillGap de %s: %v", ticker, err)
+				slog.ErrorContext(bgCtx, "falha ao rodar BackfillGap", slog.String("ticker", ticker), slog.Any("error", err))
 			}
 		}
 	}(tx.AssetID, tx.Ticker, currency)
@@ -602,7 +602,7 @@ func (s *Service) BackfillGap(ctx context.Context, ticker string, missingDate ti
 		if err != nil {
 			return fmt.Errorf("falha ao gravar histórico no banco: %w", err)
 		}
-		log.Printf("[Micro-Backfill] Sincronizados %d preços para cobrir o buraco de %s", len(prices), ticker)
+		slog.InfoContext(ctx, "preços sincronizados para cobrir gap", slog.Int("count", len(prices)), slog.String("ticker", ticker))
 	}
 
 	return nil
