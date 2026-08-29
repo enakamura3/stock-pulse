@@ -134,33 +134,35 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 		return 0.0
 	}
 
+	// Precomputa fatores acumulados de split/reverse-split futuros: O(T)
+	futureSplitFactors := make(map[string]float64)
+	for _, tx := range txs {
+		if (tx.Type == "SPLIT" || tx.Type == "REVERSE_SPLIT") && tx.Quantity > 0 {
+			if futureSplitFactors[tx.AssetID] == 0 {
+				futureSplitFactors[tx.AssetID] = 1.0
+			}
+			if tx.Type == "SPLIT" {
+				futureSplitFactors[tx.AssetID] *= tx.Quantity
+			} else {
+				futureSplitFactors[tx.AssetID] /= tx.Quantity
+			}
+		}
+	}
+
+	// Estruturas de controle de posição acumulada
+	runningQuantities := make(map[string]float64)
+	runningCosts := make(map[string]float64)
+	dailyCurrencies := make(map[string]string)
+	dailyTickers := make(map[string]string)
+
+	txIdx := 0
+
 	for !currDate.After(endDate) {
 		dayStr := currDate.Format("2006-01-02")
 
-		// Consolida as quantidades de ativos e custos acumulados até este dia específico
-		dailyQuantities := make(map[string]float64)
-		dailyCosts := make(map[string]float64)
-		dailyCurrencies := make(map[string]string)
-		dailyTickers := make(map[string]string)
-
-		dailySplitAdjustments := make(map[string]float64)
-
-		for _, tx := range txs {
-			// Ignora transações ocorridas após a data analisada, mas acumula o fator de split futuro
-			if tx.ExecutedAt.After(currDate) {
-				if tx.Type == "SPLIT" && tx.Quantity > 0 {
-					if dailySplitAdjustments[tx.AssetID] == 0 {
-						dailySplitAdjustments[tx.AssetID] = 1.0
-					}
-					dailySplitAdjustments[tx.AssetID] *= tx.Quantity
-				} else if tx.Type == "REVERSE_SPLIT" && tx.Quantity > 0 {
-					if dailySplitAdjustments[tx.AssetID] == 0 {
-						dailySplitAdjustments[tx.AssetID] = 1.0
-					}
-					dailySplitAdjustments[tx.AssetID] /= tx.Quantity
-				}
-				continue
-			}
+		// Avança o ponteiro de transações consumindo todas as transações até currDate: O(T) amortizado
+		for txIdx < len(txs) && !txs[txIdx].ExecutedAt.After(currDate) {
+			tx := txs[txIdx]
 
 			dailyCurrencies[tx.AssetID] = tx.Currency
 			dailyTickers[tx.AssetID] = tx.Ticker
@@ -171,36 +173,46 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			}
 
 			if tx.Type == "BUY" || tx.Type == "BONUS" {
-				dailyQuantities[tx.AssetID] += tx.Quantity
-				dailyCosts[tx.AssetID] += ((tx.Quantity * tx.UnitPrice) + tx.Fee) * rate
+				runningQuantities[tx.AssetID] += tx.Quantity
+				runningCosts[tx.AssetID] += ((tx.Quantity * tx.UnitPrice) + tx.Fee) * rate
 			} else if tx.Type == "SELL" {
-				if dailyQuantities[tx.AssetID] >= tx.Quantity {
-					dailyQuantities[tx.AssetID] -= tx.Quantity
+				if runningQuantities[tx.AssetID] >= tx.Quantity {
+					runningQuantities[tx.AssetID] -= tx.Quantity
 					// Reduz o custo proporcionalmente
-					dailyCosts[tx.AssetID] = dailyQuantities[tx.AssetID] * (dailyCosts[tx.AssetID] / (dailyQuantities[tx.AssetID] + tx.Quantity))
+					runningCosts[tx.AssetID] = runningQuantities[tx.AssetID] * (runningCosts[tx.AssetID] / (runningQuantities[tx.AssetID] + tx.Quantity))
 				} else {
-					dailyQuantities[tx.AssetID] = 0
-					dailyCosts[tx.AssetID] = 0
+					runningQuantities[tx.AssetID] = 0
+					runningCosts[tx.AssetID] = 0
 				}
 			} else if tx.Type == "SPLIT" {
-				if dailyQuantities[tx.AssetID] > 0 && tx.Quantity > 0 {
-					dailyQuantities[tx.AssetID] = dailyQuantities[tx.AssetID] * tx.Quantity
+				if runningQuantities[tx.AssetID] > 0 && tx.Quantity > 0 {
+					runningQuantities[tx.AssetID] = runningQuantities[tx.AssetID] * tx.Quantity
+				}
+				// O split agora ocorreu no passado, remove do multiplicador futuro
+				if tx.Quantity > 0 && futureSplitFactors[tx.AssetID] > 0 {
+					futureSplitFactors[tx.AssetID] /= tx.Quantity
 				}
 			} else if tx.Type == "REVERSE_SPLIT" {
-				if dailyQuantities[tx.AssetID] > 0 && tx.Quantity > 0 {
-					dailyQuantities[tx.AssetID] = math.Floor(dailyQuantities[tx.AssetID] / tx.Quantity)
+				if runningQuantities[tx.AssetID] > 0 && tx.Quantity > 0 {
+					runningQuantities[tx.AssetID] = math.Floor(runningQuantities[tx.AssetID] / tx.Quantity)
+				}
+				// O grupamento agora ocorreu no passado, remove do multiplicador futuro
+				if tx.Quantity > 0 && futureSplitFactors[tx.AssetID] > 0 {
+					futureSplitFactors[tx.AssetID] *= tx.Quantity
 				}
 			}
+
+			txIdx++
 		}
 
 		// Calcula valor total de mercado e custo investido para a data analisada
 		var totalMarketValue float64
 		var totalInvested float64
 
-		for assetID, qty := range dailyQuantities {
+		for assetID, qty := range runningQuantities {
 			if qty > 0 {
 				price := getPriceLOCF(assetID, currDate)
-				cost := dailyCosts[assetID]
+				cost := runningCosts[assetID]
 
 				// Se o preço não for encontrado, usa o custo médio de aquisição como fallback temporário
 				if math.Abs(price) < calculator.FinancialEpsilon && qty > 0 {
@@ -216,7 +228,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 					}
 				}
 
-				adjFactor := dailySplitAdjustments[assetID]
+				adjFactor := futureSplitFactors[assetID]
 				if math.Abs(adjFactor) < calculator.FinancialEpsilon {
 					adjFactor = 1.0
 				}
@@ -263,29 +275,28 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 		return finalPoints, nil
 	}
 
-	// 1. TWRR da Carteira dentro da janela finalPoints
+	// Precomputa o fluxo de caixa diário das transações: O(T)
+	dailyCashFlowMap := make(map[string]float64)
+	for _, tx := range txs {
+		rate := tx.ExchangeRate
+		if rate <= calculator.FinancialEpsilon {
+			rate = 1.0
+		}
+		dateKey := tx.ExecutedAt.Format("2006-01-02")
+		if tx.Type == "BUY" {
+			dailyCashFlowMap[dateKey] += tx.TotalCost * rate
+		} else if tx.Type == "SELL" {
+			dailyCashFlowMap[dateKey] -= tx.TotalCost * rate
+		}
+	}
+
+	// 1. TWRR da Carteira dentro da janela finalPoints: O(D)
 	var cumulativeTWRR float64 = 0.0
 	var prevValue float64 = 0.0
 
 	for idx := range finalPoints {
 		pt := &finalPoints[idx]
-		d, err := time.Parse("2006-01-02", pt.Date)
-		var dailyCashFlow float64
-		if err == nil {
-			for _, tx := range txs {
-				if tx.ExecutedAt.Year() == d.Year() && tx.ExecutedAt.Month() == d.Month() && tx.ExecutedAt.Day() == d.Day() {
-					rate := tx.ExchangeRate
-					if rate <= calculator.FinancialEpsilon {
-						rate = 1.0
-					}
-					if tx.Type == "BUY" {
-						dailyCashFlow += tx.TotalCost * rate
-					} else if tx.Type == "SELL" {
-						dailyCashFlow -= tx.TotalCost * rate
-					}
-				}
-			}
-		}
+		dailyCashFlow := dailyCashFlowMap[pt.Date]
 
 		var dailyReturn float64 = 0.0
 		if idx > 0 && prevValue > calculator.FinancialEpsilon {
@@ -425,10 +436,7 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 
 			for idx := range finalPoints {
 				pt := &finalPoints[idx]
-				d, err := time.Parse("2006-01-02", pt.Date)
-				if err != nil {
-					continue
-				}
+				d, _ := time.Parse("2006-01-02", pt.Date)
 
 				if idx > 0 {
 					// CDI: acumula fator diário apenas em dias úteis
