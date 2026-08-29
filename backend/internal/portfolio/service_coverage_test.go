@@ -522,27 +522,24 @@ func TestServiceCoverage_GetPortfolioPerformance_Benchmarks_BRL(t *testing.T) {
 		{AssetID: "a1", PriceDate: now, ClosePrice: 35.0},
 	}, nil)
 
-	// Mock benchmark rates
-	fiService.On("GetIndexRates", mock.Anything, "CDI", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
-		{Date: startDate, Rate: 0.05},
-		{Date: now, Rate: 0.05},
-	}, nil)
-	fiService.On("GetIndexRates", mock.Anything, "IPCA", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
-		{Date: startDate, Rate: 0.40},
-		{Date: now, Rate: 0.45},
-	}, nil)
-	fiService.On("GetIndexRates", mock.Anything, "IFIX", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
-		{Date: startDate, Rate: 3000.0},
-		{Date: now, Rate: 3050.0},
-	}, nil)
-	fiService.On("GetIndexRates", mock.Anything, "IBOV", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
-		{Date: startDate, Rate: 120000.0},
-		{Date: now, Rate: 125000.0},
-	}, nil)
-	fiService.On("GetIndexRates", mock.Anything, "SP500", mock.Anything, mock.Anything).Return([]fixedincome.IndexRate{
-		{Date: startDate, Rate: 5000.0},
-		{Date: now, Rate: 5200.0},
-	}, nil)
+	// Mock benchmark rates para todos os dias do período
+	var cdiRates, ipcaRates, ifixRates, ibovRates, sp500Rates []fixedincome.IndexRate
+	for d := startDate; !d.After(now); d = d.AddDate(0, 0, 1) {
+		cdiRates = append(cdiRates, fixedincome.IndexRate{Date: d, Rate: 0.05})
+		ipcaRates = append(ipcaRates, fixedincome.IndexRate{Date: d, Rate: 0.40})
+		ifixRates = append(ifixRates, fixedincome.IndexRate{Date: d, Rate: 3000.0})
+		ibovRates = append(ibovRates, fixedincome.IndexRate{Date: d, Rate: 120000.0})
+		sp500Rates = append(sp500Rates, fixedincome.IndexRate{Date: d, Rate: 5000.0})
+	}
+	ifixRates[len(ifixRates)-1].Rate = 3050.0
+	ibovRates[len(ibovRates)-1].Rate = 125000.0
+	sp500Rates[len(sp500Rates)-1].Rate = 5200.0
+
+	fiService.On("GetIndexRates", mock.Anything, "CDI", mock.Anything, mock.Anything).Return(cdiRates, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IPCA", mock.Anything, mock.Anything).Return(ipcaRates, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IFIX", mock.Anything, mock.Anything).Return(ifixRates, nil)
+	fiService.On("GetIndexRates", mock.Anything, "IBOV", mock.Anything, mock.Anything).Return(ibovRates, nil)
+	fiService.On("GetIndexRates", mock.Anything, "SP500", mock.Anything, mock.Anything).Return(sp500Rates, nil)
 
 	pts, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
 	assert.NoError(t, err)
