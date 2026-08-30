@@ -9,6 +9,8 @@ import {
   exportDailyReportCSV,
   DEFAULT_ANNUAL_CDI,
   DEFAULT_ANNUAL_SELIC,
+  determineAssetTypeLocal,
+  ASSET_TYPE_OPTIONS,
 } from '../helpers';
 
 describe('Portfolio Helpers', () => {
@@ -259,6 +261,56 @@ describe('Portfolio Helpers', () => {
       const csvDefault = exportDailyReportCSV([]);
       expect(csvDefault).toContain('--- RENDA VARIÁVEL ---');
       expect(csvDefault).not.toContain('--- RENDA FIXA PRIVADA ---');
+    });
+  });
+
+  describe('determineAssetTypeLocal', () => {
+    it('infers CRYPTO correctly', () => {
+      expect(determineAssetTypeLocal('BTC-USD', 'Bitcoin', 'USD')).toBe('CRYPTO');
+      expect(determineAssetTypeLocal('SOL', 'Solana', 'CRYPTO')).toBe('CRYPTO');
+    });
+
+    it('infers US stocks and ETFs correctly', () => {
+      expect(determineAssetTypeLocal('AAPL', 'Apple Inc.', 'USD')).toBe('STOCK_US');
+      expect(determineAssetTypeLocal('SPY', 'SPDR S&P 500 ETF Trust', 'USD')).toBe('ETF_US');
+      expect(determineAssetTypeLocal('QQQ', 'Invesco QQQ Trust', 'USD')).toBe('ETF_US');
+    });
+
+    it('infers BDRs correctly', () => {
+      expect(determineAssetTypeLocal('AAPL34.SA', 'Apple Inc BDR', 'BRL')).toBe('BDR');
+      expect(determineAssetTypeLocal('MSFT35.SA', 'Microsoft BDR', 'BRL')).toBe('BDR');
+      expect(determineAssetTypeLocal('GOGL39.SA', 'Alphabet BDR', 'BRL')).toBe('BDR');
+    });
+
+    it('infers Brazilian 11.SA assets properly (Fiagro, ETF, FII, Stock)', () => {
+      expect(determineAssetTypeLocal('VGIA11.SA', 'Valora FIAGRO', 'BRL')).toBe('FIAGRO');
+      expect(determineAssetTypeLocal('BOVA11.SA', 'iShares Ibovespa ETF', 'BRL')).toBe('ETF_BR');
+      expect(determineAssetTypeLocal('IVVB11.SA', 'iShares S&P 500 Fundo de Índice', 'BRL')).toBe('ETF_BR');
+      expect(determineAssetTypeLocal('HGLG11.SA', 'CSHG Logística Fundo Imobiliário', 'BRL')).toBe('FII');
+      expect(determineAssetTypeLocal('MXRF11.SA', 'Maxi Renda FII', 'BRL')).toBe('FII');
+      expect(determineAssetTypeLocal('TAEE11.SA', 'Transmissora Aliança de Energia Elétrica S.A.', 'BRL')).toBe('STOCK_BR');
+      expect(determineAssetTypeLocal('SANB11.SA', 'Banco Santander Brasil S.A.', 'BRL')).toBe('STOCK_BR');
+      expect(determineAssetTypeLocal('UNKNOWN11.SA', '', 'BRL')).toBe('STOCK_BR');
+    });
+
+    it('infers standard Brazilian equities correctly', () => {
+      expect(determineAssetTypeLocal('PETR4.SA', 'Petrobras PN', 'BRL')).toBe('STOCK_BR');
+      expect(determineAssetTypeLocal('VALE3.SA', 'Vale ON', 'BRL')).toBe('STOCK_BR');
+    });
+
+    it('contains all 8 market asset type options', () => {
+      expect(ASSET_TYPE_OPTIONS).toHaveLength(8);
+      const values = ASSET_TYPE_OPTIONS.map((o) => o.value);
+      expect(values).toEqual([
+        'STOCK_BR',
+        'FII',
+        'FIAGRO',
+        'ETF_BR',
+        'BDR',
+        'STOCK_US',
+        'ETF_US',
+        'CRYPTO',
+      ]);
     });
   });
 });

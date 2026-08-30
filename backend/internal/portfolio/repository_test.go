@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/assert"
 )
@@ -637,6 +638,63 @@ func TestRepository_AssetEvents(t *testing.T) {
 
 		err := repo.UpdateAssetEventValueByID(context.Background(), "e1", 2.0, 2.0, pay)
 		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestRepository_GetAssetMetadataByTicker(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	t.Run("Success", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "ticker", "name", "asset_type", "currency"}).
+			AddRow("a1", "PETR4.SA", "Petrobras", "STOCK_BR", "BRL")
+		mock.ExpectQuery(`SELECT id, ticker, name, asset_type, currency FROM asset WHERE ticker = UPPER\(\$1\)`).
+			WithArgs("PETR4.SA").
+			WillReturnRows(rows)
+
+		meta, err := repo.GetAssetMetadataByTicker(context.Background(), "PETR4.SA")
+		assert.NoError(t, err)
+		assert.NotNil(t, meta)
+		assert.Equal(t, "a1", meta.ID)
+		assert.Equal(t, "STOCK_BR", meta.AssetType)
+		assert.Equal(t, "BRL", meta.Currency)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT id, ticker, name, asset_type, currency FROM asset WHERE ticker = UPPER\(\$1\)`).
+			WithArgs("INVALID").
+			WillReturnError(pgx.ErrNoRows)
+
+		meta, err := repo.GetAssetMetadataByTicker(context.Background(), "INVALID")
+		assert.Error(t, err)
+		assert.Nil(t, meta)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestRepository_UpdateAssetType(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	t.Run("Success", func(t *testing.T) {
+		mock.ExpectExec(`UPDATE asset SET asset_type = \$1, updated_at = NOW\(\) WHERE id = \$2`).
+			WithArgs("FII", "a1").
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+		err := repo.UpdateAssetType(context.Background(), "a1", "FII")
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		mock.ExpectExec(`UPDATE asset SET asset_type = \$1, updated_at = NOW\(\) WHERE id = \$2`).
+			WithArgs("FII", "a1").
+			WillReturnError(errors.New("db error"))
+
+		err := repo.UpdateAssetType(context.Background(), "a1", "FII")
+		assert.Error(t, err)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }

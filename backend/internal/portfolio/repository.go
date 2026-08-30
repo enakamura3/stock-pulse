@@ -419,6 +419,33 @@ func (r *Repository) GetAssetAndCurrencyByTicker(ctx context.Context, ticker str
 	return id, currency, nil
 }
 
+// AssetMetadata representa os metadados de um ativo cadastrado no sistema.
+type AssetMetadata struct {
+	ID        string `json:"id"`
+	Ticker    string `json:"ticker"`
+	Name      string `json:"name"`
+	AssetType string `json:"asset_type"`
+	Currency  string `json:"currency"`
+}
+
+// GetAssetMetadataByTicker busca os metadados completos de um ativo pelo ticker.
+func (r *Repository) GetAssetMetadataByTicker(ctx context.Context, ticker string) (*AssetMetadata, error) {
+	var meta AssetMetadata
+	query := `SELECT id, ticker, name, asset_type, currency FROM asset WHERE ticker = UPPER($1)`
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, ticker).Scan(&meta.ID, &meta.Ticker, &meta.Name, &meta.AssetType, &meta.Currency)
+	if err != nil {
+		return nil, err
+	}
+	return &meta, nil
+}
+
+// UpdateAssetType atualiza a categoria (asset_type) de um ativo cadastrado.
+func (r *Repository) UpdateAssetType(ctx context.Context, assetID, assetType string) error {
+	query := `UPDATE asset SET asset_type = $1, updated_at = NOW() WHERE id = $2`
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, assetType, assetID)
+	return err
+}
+
 // CreateAsset cadastra localmente um novo ativo.
 func (r *Repository) CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error) {
 	query := `

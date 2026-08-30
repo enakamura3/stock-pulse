@@ -1,5 +1,6 @@
 import React from 'react';
 import { SearchResult } from '../types';
+import { ASSET_TYPE_OPTIONS } from '../helpers';
 
 export interface TransactionModalProps {
   showTxModal: boolean;
@@ -7,6 +8,8 @@ export interface TransactionModalProps {
   editingTxId: string | null;
   setEditingTxId: (id: string | null) => void;
   txTicker: string;
+  txAssetType: string;
+  setTxAssetType: (t: string) => void;
   searchQuery: string;
   setSearchQuery: (s: string) => void;
   isSearching: boolean;
@@ -37,6 +40,8 @@ export default function TransactionModal({
   editingTxId,
   setEditingTxId,
   txTicker,
+  txAssetType,
+  setTxAssetType,
   searchQuery,
   setSearchQuery,
   isSearching,
@@ -246,6 +251,29 @@ export default function TransactionModal({
                 🗜️ AGRUP.
               </button>
             </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Tipo do Ativo
+              <span className="text-sm opacity-60" style={{ marginLeft: '0.4rem', fontWeight: 'normal' }}>
+                (classificação oficial de mercado)
+              </span>
+            </label>
+            <select
+              className="form-input"
+              value={txAssetType}
+              onChange={(e) => setTxAssetType(e.target.value)}
+              disabled={isAddingTx}
+              required
+            >
+              <option value="" disabled>Selecione a categoria do ativo...</option>
+              {ASSET_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value} style={{ background: '#1c1f24' }}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex-row flex-wrap gap-md">

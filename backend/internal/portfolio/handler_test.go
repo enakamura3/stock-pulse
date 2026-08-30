@@ -94,6 +94,14 @@ func (m *MockPortfolioService) GetPortfolioDividends(ctx context.Context, portfo
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioService) GetAssetMetadata(ctx context.Context, ticker string) (*AssetMetadata, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).(*AssetMetadata), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func setupHandlerTest() (*Handler, *MockPortfolioService) {
 	s := new(MockPortfolioService)
 	return NewHandler(s), s
@@ -265,6 +273,29 @@ func TestHandler_AddTransaction(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.AddTransaction(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Invalid Asset Type", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "asset_type": "INVALID_TYPE", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Tipo de ativo inválido")
+	})
+
+	t.Run("Success with Valid Asset Type", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("AddTransaction", mock.Anything, "u1", mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.AssetType == "FII"
+		})).Return(&Transaction{ID: "tx-fii"}, nil)
+
+		body := `{"ticker": "HGLG11.SA", "type": "BUY", "asset_type": "FII", "quantity": 10, "unit_price": 160}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusCreated, rec.Code)
 	})
 }
 
@@ -658,5 +689,36 @@ func TestHandler_SetDefaultPortfolio(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.SetDefaultPortfolio(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+func TestHandler_GetAssetMetadata(t *testing.T) {
+	t.Run("Missing Ticker", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/assets/", nil), "u1", map[string]string{"ticker": ""})
+		rec := httptest.NewRecorder()
+		h.GetAssetMetadata(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("GetAssetMetadata", mock.Anything, "INVALID").Return((*AssetMetadata)(nil), errors.New("not found"))
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/assets/INVALID", nil), "u1", map[string]string{"ticker": "INVALID"})
+		rec := httptest.NewRecorder()
+		h.GetAssetMetadata(rec, req)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("GetAssetMetadata", mock.Anything, "PETR4.SA").Return(&AssetMetadata{
+			ID: "a1", Ticker: "PETR4.SA", Name: "Petrobras", AssetType: "STOCK_BR", Currency: "BRL",
+		}, nil)
+		req := reqWithUserAndParams(httptest.NewRequest("GET", "/assets/PETR4.SA", nil), "u1", map[string]string{"ticker": "PETR4.SA"})
+		rec := httptest.NewRecorder()
+		h.GetAssetMetadata(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "STOCK_BR")
 	})
 }

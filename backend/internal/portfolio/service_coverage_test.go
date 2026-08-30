@@ -170,7 +170,7 @@ func TestServiceCoverage_AddTransaction_Fallback(t *testing.T) {
 	ms.On("GetHistoricalPrices", mock.Anything, "USDBRL=X", "10y").Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
 	ms.On("GetHistoricalPricesBetween", mock.Anything, "USDBRL=X", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
 
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", pgx.ErrNoRows)
+	repo.On("GetAssetMetadataByTicker", mock.Anything, "NEW-USD").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
 
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
 	mp.On("GetQuote", mock.Anything, "NEW-USD").Return(&market.Quote{Currency: "USD", Name: "New Coin"}, nil)
@@ -241,7 +241,7 @@ func TestServiceCoverage_UpdateTransaction_BackfillError(t *testing.T) {
 	ms.On("GetHistoricalPricesBetween", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("gap err")).Maybe()
 
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "BRL", nil)
+	repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "STOCK_BR"}, nil)
 	repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
 	repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Now().Add(24*time.Hour), nil)
 	repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("a1", nil)
@@ -265,7 +265,7 @@ func TestServiceCoverage_UpdateTransaction_BackfillError(t *testing.T) {
 func TestServiceCoverage_UpdateTransaction_DBError(t *testing.T) {
 	s, repo, _, _ := setupServiceTest()
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
+	repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return(&AssetMetadata{ID: "a1", Currency: "USD", AssetType: "STOCK_US"}, nil)
 	repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(errors.New("db error"))
 
 	tx := &Transaction{Ticker: "AAPL", Type: "BUY", ExecutedAt: time.Now(), Currency: "USD"}
@@ -307,7 +307,7 @@ func TestServiceCoverage_AddTransaction_TotalFail(t *testing.T) {
 	ms.On("GetHistoricalPrices", mock.Anything, "USDBRL=X", "10y").Return([]market.HistoricalPrice{}, errors.New("fail")).Maybe()
 	ms.On("GetHistoricalPricesBetween", mock.Anything, "USDBRL=X", mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("fail")).Maybe()
 
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "NEW-USD").Return("", "", pgx.ErrNoRows)
+	repo.On("GetAssetMetadataByTicker", mock.Anything, "NEW-USD").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
 	mp.On("SearchAssets", mock.Anything, "NEW-USD").Return([]market.SearchResult{}, nil)
 	mp.On("GetQuote", mock.Anything, "NEW-USD").Return(&market.Quote{Currency: "USD", Name: "New Coin"}, nil)
 	repo.On("CreateAsset", mock.Anything, "NEW-USD", "New Coin", "CRYPTO", "USD").Return("new-a", nil)
@@ -335,7 +335,7 @@ func TestServiceCoverage_AddTransaction_TotalFail(t *testing.T) {
 func TestServiceCoverage_AddTransaction_BackfillGap(t *testing.T) {
 	s, repo, ms, _ := setupServiceTest()
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
+	repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return(&AssetMetadata{ID: "a1", Currency: "USD", AssetType: "STOCK_US"}, nil)
 	repo.On("CreateTransaction", mock.Anything, mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
 
 	// To enter the if block:
@@ -359,7 +359,7 @@ func TestServiceCoverage_UpdateTransaction_ExchangeFallback(t *testing.T) {
 	ms.On("GetHistoricalPricesBetween", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]market.HistoricalPrice{}, errors.New("http err")).Maybe()
 
 	repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-	repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "BRL", nil)
+	repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "STOCK_BR"}, nil)
 	repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
 
 	repo.On("GetExchangeRateByDate", mock.Anything, "BRLUSD=X", mock.Anything).Return(0.0, errors.New("err")).Once()
@@ -705,7 +705,7 @@ func TestServiceCoverage_ExtraEdgeCases(t *testing.T) {
 	t.Run("AddTransaction Sell with fee", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "PETR4").Return("petr-id", "BRL", nil).Once()
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4").Return(&AssetMetadata{ID: "petr-id", Currency: "BRL", AssetType: "STOCK_BR"}, nil).Once()
 		repo.On("GetDailyPrices", mock.Anything, "petr-id", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil).Maybe()
 		repo.On("GetOldestPriceDate", mock.Anything, "petr-id").Return(time.Time{}, nil).Maybe()
 		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
@@ -729,7 +729,7 @@ func TestServiceCoverage_ExtraEdgeCases(t *testing.T) {
 	t.Run("UpdateTransaction Sell with fee", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "PETR4").Return("petr-id", "BRL", nil).Once()
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4").Return(&AssetMetadata{ID: "petr-id", Currency: "BRL", AssetType: "STOCK_BR"}, nil).Once()
 		repo.On("GetOldestPriceDate", mock.Anything, "petr-id").Return(time.Time{}, nil).Maybe()
 		repo.On("UpdateTransaction", mock.Anything, mock.MatchedBy(func(tx Transaction) bool {
 			return tx.Type == "SELL" && tx.TotalCost == (10*30)-5

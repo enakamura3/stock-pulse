@@ -39,6 +39,8 @@ type PortfolioRepository interface {
 	GetDailyPricesBatch(ctx context.Context, assetIDs []string, startDate, endDate time.Time) ([]DailyPrice, error)
 	GetAssetByTicker(ctx context.Context, ticker string) (string, error)
 	GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error)
+	GetAssetMetadataByTicker(ctx context.Context, ticker string) (*AssetMetadata, error)
+	UpdateAssetType(ctx context.Context, assetID, assetType string) error
 	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
 	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
 	UpsertAssetEvent(ctx context.Context, event AssetEvent) error
@@ -276,10 +278,11 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	}
 
 	// Busca ou cria o ativo na base local
-	assetID, currency, err := s.repo.GetAssetAndCurrencyByTicker(ctx, tx.Ticker)
+	meta, err := s.repo.GetAssetMetadataByTicker(ctx, tx.Ticker)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("erro ao consultar ativo no banco: %w", err)
 	}
+	var assetID, currency string
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Importa metadados do Yahoo Finance
 		slog.InfoContext(ctx, "ativo não existe na base, importando", slog.String("ticker", tx.Ticker))
@@ -288,13 +291,26 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 			return nil, fmt.Errorf("ativo '%s' não encontrado no mercado: %w", tx.Ticker, err)
 		}
 
-		assetType := determineAssetType(tx.Ticker, quote.Name, quote.Currency)
+		assetType := tx.AssetType
+		if assetType == "" {
+			assetType = determineAssetType(tx.Ticker, quote.Name, quote.Currency)
+		}
 
 		assetID, err = s.repo.CreateAsset(ctx, tx.Ticker, quote.Name, assetType, quote.Currency)
 		if err != nil {
 			return nil, fmt.Errorf("erro ao registrar ativo localmente: %w", err)
 		}
 		currency = quote.Currency
+	} else {
+		assetID = meta.ID
+		currency = meta.Currency
+		if tx.AssetType != "" && tx.AssetType != meta.AssetType {
+			if err := s.repo.UpdateAssetType(ctx, meta.ID, tx.AssetType); err != nil {
+				slog.WarnContext(ctx, "falha ao atualizar tipo do ativo", slog.String("ticker", tx.Ticker), slog.Any("error", err))
+			} else {
+				slog.InfoContext(ctx, "tipo do ativo atualizado pelo usuário", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType))
+			}
+		}
 	}
 
 	tx.AssetID = assetID
@@ -478,11 +494,20 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 		return errors.New("ticker do ativo inválido")
 	}
 
-	assetID, currency, err := s.repo.GetAssetAndCurrencyByTicker(ctx, tx.Ticker)
+	meta, err := s.repo.GetAssetMetadataByTicker(ctx, tx.Ticker)
 	if err != nil {
 		return errors.New("ativo não encontrado na base")
 	}
-	tx.AssetID = assetID
+	tx.AssetID = meta.ID
+	currency := meta.Currency
+
+	if tx.AssetType != "" && tx.AssetType != meta.AssetType {
+		if err := s.repo.UpdateAssetType(ctx, meta.ID, tx.AssetType); err != nil {
+			slog.WarnContext(ctx, "falha ao atualizar tipo do ativo na edição", slog.String("ticker", tx.Ticker), slog.Any("error", err))
+		} else {
+			slog.InfoContext(ctx, "tipo do ativo atualizado na edição de transação", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType))
+		}
+	}
 
 	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
 	tx.ExchangeRate = s.resolveTransactionExchangeRate(ctx, currency, p.BaseCurrency, tx.ExecutedAt, tx.ExchangeRate)
@@ -606,4 +631,13 @@ func (s *Service) BackfillGap(ctx context.Context, ticker string, missingDate ti
 	}
 
 	return nil
+}
+
+// GetAssetMetadata retorna os metadados cadastrados de um ativo pelo ticker.
+func (s *Service) GetAssetMetadata(ctx context.Context, ticker string) (*AssetMetadata, error) {
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	if ticker == "" {
+		return nil, errors.New("ticker inválido")
+	}
+	return s.repo.GetAssetMetadataByTicker(ctx, ticker)
 }
