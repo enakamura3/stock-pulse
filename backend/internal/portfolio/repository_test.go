@@ -698,3 +698,184 @@ func TestRepository_UpdateAssetType(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
+
+func TestRepository_SetDefaultPortfolio_Branches(t *testing.T) {
+	t.Run("Portfolio Not Found or Query Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM portfolio WHERE id = \$1 AND user_id = \$2\)`).
+			WithArgs("p1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
+
+		err := repo.SetDefaultPortfolio(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "não encontrado ou permissão negada")
+	})
+
+	t.Run("Reset Defaults Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM portfolio WHERE id = \$1 AND user_id = \$2\)`).
+			WithArgs("p1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+		mock.ExpectExec(`UPDATE portfolio SET is_default = false WHERE user_id = \$1`).
+			WithArgs("u1").
+			WillReturnError(errors.New("db reset error"))
+
+		err := repo.SetDefaultPortfolio(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "erro ao resetar carteiras padrão")
+	})
+
+	t.Run("Set Default Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM portfolio WHERE id = \$1 AND user_id = \$2\)`).
+			WithArgs("p1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+		mock.ExpectExec(`UPDATE portfolio SET is_default = false WHERE user_id = \$1`).
+			WithArgs("u1").
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+		mock.ExpectExec(`UPDATE portfolio SET is_default = true WHERE id = \$1 AND user_id = \$2`).
+			WithArgs("p1", "u1").
+			WillReturnError(errors.New("db set error"))
+
+		err := repo.SetDefaultPortfolio(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "erro ao definir carteira padrão")
+	})
+}
+
+func TestRepository_DeletePortfolio_ReelectDefault(t *testing.T) {
+	t.Run("Default Deleted Successfully and Re-elected", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
+			WithArgs("p1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"is_default"}).AddRow(true))
+
+		mock.ExpectExec(`DELETE FROM portfolio`).
+			WithArgs("p1", "u1").
+			WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+		mock.ExpectExec(`UPDATE portfolio SET is_default = true WHERE id = \( SELECT id FROM portfolio WHERE user_id = \$1 ORDER BY created_at ASC LIMIT 1 \)`).
+			WithArgs("u1").
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+		err := repo.DeletePortfolio(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Default Deleted Re-election Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
+			WithArgs("p1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"is_default"}).AddRow(true))
+
+		mock.ExpectExec(`DELETE FROM portfolio`).
+			WithArgs("p1", "u1").
+			WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+		mock.ExpectExec(`UPDATE portfolio SET is_default = true WHERE id = \( SELECT id FROM portfolio WHERE user_id = \$1 ORDER BY created_at ASC LIMIT 1 \)`).
+			WithArgs("u1").
+			WillReturnError(errors.New("reelect error"))
+
+		err := repo.DeletePortfolio(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "erro ao re-eleger carteira padrão")
+	})
+
+	t.Run("Delete Portfolio Exec Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`SELECT is_default FROM portfolio WHERE id = \$1 AND user_id = \$2`).
+			WithArgs("p1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"is_default"}).AddRow(false))
+
+		mock.ExpectExec(`DELETE FROM portfolio`).
+			WithArgs("p1", "u1").
+			WillReturnError(errors.New("db delete error"))
+
+		err := repo.DeletePortfolio(context.Background(), "p1", "u1")
+		assert.ErrorContains(t, err, "db delete error")
+	})
+}
+
+func TestRepository_AssetEvents_Branches(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	cum := time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("Upsert Zero Payment Date", func(t *testing.T) {
+		ev := AssetEvent{
+			AssetID:     "a1",
+			Type:        "Dividendo",
+			GrossAmount: 1.0,
+			NetAmount:   1.0,
+			CumDate:     cum,
+		}
+		mock.ExpectExec(`INSERT INTO asset_event`).
+			WithArgs(ev.AssetID, ev.Type, ev.GrossAmount, ev.NetAmount, ev.CumDate, nil).
+			WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+		err := repo.UpsertAssetEvent(context.Background(), ev)
+		assert.NoError(t, err)
+	})
+
+	t.Run("GetAssetEvents Query Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at FROM asset_event WHERE asset_id = \$1`).
+			WithArgs("a1").
+			WillReturnError(errors.New("query error"))
+
+		_, err := repo.GetAssetEvents(context.Background(), "a1")
+		assert.Error(t, err)
+	})
+
+	t.Run("GetAssetEvents Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "asset_id", "type", "gross_amount", "net_amount", "cum_date", "payment_date", "updated_at"}).
+			AddRow("e1", "a1", "Dividendo", 1.0, 1.0, cum, "badtime", time.Now())
+		mock.ExpectQuery(`SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at FROM asset_event WHERE asset_id = \$1`).
+			WithArgs("a1").
+			WillReturnRows(rows)
+
+		_, err := repo.GetAssetEvents(context.Background(), "a1")
+		assert.Error(t, err)
+	})
+
+	t.Run("GetAssetEventsByDate Query Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at FROM asset_event WHERE asset_id = \$1 AND cum_date = \$2`).
+			WithArgs("a1", cum).
+			WillReturnError(errors.New("query error"))
+
+		_, err := repo.GetAssetEventsByDate(context.Background(), "a1", cum)
+		assert.Error(t, err)
+	})
+
+	t.Run("GetAssetEventsByDate Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "asset_id", "type", "gross_amount", "net_amount", "cum_date", "payment_date", "updated_at"}).
+			AddRow("e1", "a1", "Dividendo", 1.0, 1.0, cum, "badtime", time.Now())
+		mock.ExpectQuery(`SELECT id, asset_id, type, gross_amount, net_amount, cum_date, payment_date, updated_at FROM asset_event WHERE asset_id = \$1 AND cum_date = \$2`).
+			WithArgs("a1", cum).
+			WillReturnRows(rows)
+
+		_, err := repo.GetAssetEventsByDate(context.Background(), "a1", cum)
+		assert.Error(t, err)
+	})
+
+	t.Run("UpdateAssetEventValueByID Zero Payment Date", func(t *testing.T) {
+		mock.ExpectExec(`UPDATE asset_event SET gross_amount = \$1, net_amount = \$2, payment_date = \$3`).
+			WithArgs(2.0, 2.0, nil, "e1").
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+		err := repo.UpdateAssetEventValueByID(context.Background(), "e1", 2.0, 2.0, time.Time{})
+		assert.NoError(t, err)
+	})
+}

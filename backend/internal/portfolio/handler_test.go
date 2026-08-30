@@ -545,6 +545,28 @@ func TestHandler_UpdateTransaction(t *testing.T) {
 		h.UpdateTransaction(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
+
+	t.Run("Invalid Asset Type", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "asset_type": "INVALID_TYPE", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Tipo de ativo inválido")
+	})
+
+	t.Run("Success with Valid Asset Type", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("UpdateTransaction", mock.Anything, "u1", "p1", "tx1", mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.AssetType == "STOCK_BR"
+		})).Return(nil)
+		body := `{"ticker": "PETR4.SA", "type": "BUY", "asset_type": "STOCK_BR", "quantity": 10, "unit_price": 38}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
 }
 
 func TestHandler_BulkImportTransactions(t *testing.T) {
