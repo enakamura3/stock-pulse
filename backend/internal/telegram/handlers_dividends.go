@@ -454,9 +454,6 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 				monthsDivisor = 12
 			} else if y == currentYear {
 				monthsDivisor = currentMonth
-				if monthsDivisor < 1 {
-					monthsDivisor = 1
-				}
 			} else {
 				monthsDivisor = 12
 			}
