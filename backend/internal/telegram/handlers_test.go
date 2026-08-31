@@ -162,6 +162,19 @@ func (m *MockMarketSvc) GetQuote(ctx context.Context, ticker string) (*market.Qu
 	return nil, args.Error(1)
 }
 
+func (m *MockMarketSvc) GetBenchmarks(ctx context.Context) (*market.MarketBenchmarks, error) {
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetBenchmarks" {
+			args := m.Called(ctx)
+			if args.Get(0) != nil {
+				return args.Get(0).(*market.MarketBenchmarks), args.Error(1)
+			}
+			return nil, args.Error(1)
+		}
+	}
+	return nil, nil
+}
+
 type MockFixedIncomeSvc struct {
 	mock.Mock
 }

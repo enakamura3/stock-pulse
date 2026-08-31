@@ -1064,3 +1064,198 @@ func TestHandlePortfolioSummary_IncludesTreasury(t *testing.T) {
 		assert.Contains(t, sentMsg, "10.000,00")
 	})
 }
+
+func TestHandlePortfolioSummary_WithBenchmarks(t *testing.T) {
+	h, svc, portSvc, mSvc, fiSvc := setupHandlersTest()
+
+	t.Run("displays benchmarks when available", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Minha Carteira", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		positions := []portfolio.Position{
+			{Ticker: "PETR4", Quantity: 100, CurrentPrice: 30, CurrentValue: 3000, TotalCost: 2500, Type: "STOCK_BR"},
+		}
+		portSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolios[0], positions, nil).Once()
+		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return([]fixedincome.Position{}, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
+
+		benchmarks := &market.MarketBenchmarks{
+			IBOV:   &market.BenchmarkItem{Symbol: "^BVSP", Name: "Ibovespa", ChangePercent: 1.25},
+			IFIX:   &market.BenchmarkItem{Symbol: "IFIX.SA", Name: "IFIX", ChangePercent: -0.45},
+			SP500:  &market.BenchmarkItem{Symbol: "^GSPC", Name: "S&P 500", ChangePercent: 0.0},
+			USDBRL: &market.BenchmarkItem{Symbol: "BRL=X", Name: "Dólar", ChangePercent: 0.85},
+		}
+		mSvc.On("GetBenchmarks", mock.Anything).Return(benchmarks, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Benchmarks do Dia") &&
+				strings.Contains(msg, "IBOV") &&
+				strings.Contains(msg, "IFIX") &&
+				strings.Contains(msg, "S&P 500") &&
+				strings.Contains(msg, "Dólar")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandlePortfolioSummary(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "Benchmarks do Dia")
+		assert.Contains(t, sentMsg, "+1,25%")
+		assert.Contains(t, sentMsg, "-0,45%")
+	})
+}
+
+func TestHandleAssetList(t *testing.T) {
+	h, svc, portSvc, _, _ := setupHandlersTest()
+
+	t.Run("success with pagination", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Data").Return("0")
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Minha Carteira", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		positions := []portfolio.Position{
+			{Ticker: "PETR4", Quantity: 100, CurrentPrice: 30, CurrentValue: 3000, TotalCost: 2500, DailyChangePercent: 2.5},
+			{Ticker: "VALE3", Quantity: 50, CurrentPrice: 60, CurrentValue: 3000, TotalCost: 3200, DailyChangePercent: -1.2},
+			{Ticker: "WEGE3", Quantity: 10, CurrentPrice: 40, CurrentValue: 400, TotalCost: 400, DailyChangePercent: 0.0},
+		}
+		portSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolios[0], positions, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Ativos: Minha Carteira") &&
+				strings.Contains(msg, "PETR4") &&
+				strings.Contains(msg, "VALE3")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleAssetList(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "Página 1 de 1")
+		assert.Contains(t, sentMsg, "PETR4")
+	})
+
+	t.Run("empty positions", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Data").Return("0")
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Minha Carteira", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		portSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolios[0], []portfolio.Position{}, nil).Once()
+
+		mCtx.On("Edit", "📋 *Ativos: Minha Carteira*\n\nNenhum ativo encontrado nesta carteira.", mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleAssetList(mCtx)
+		assert.NoError(t, err)
+	})
+}
+
+func TestHandleHistory_Filter(t *testing.T) {
+	h, svc, portSvc, _, _ := setupHandlersTest()
+
+	t.Run("filter BUY only", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Data").Return("0:BUY")
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Minha Carteira", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		now := time.Now()
+		txs := []portfolio.Transaction{
+			{ID: "t1", Ticker: "PETR4", Type: "BUY", ExecutedAt: now, Quantity: 10, UnitPrice: 30, TotalCost: 300},
+			{ID: "t2", Ticker: "VALE3", Type: "SELL", ExecutedAt: now, Quantity: 5, UnitPrice: 60, TotalCost: 300},
+		}
+		portSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(txs, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Compras") && strings.Contains(msg, "PETR4") && !strings.Contains(msg, "VALE3")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleHistory(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "PETR4")
+		assert.NotContains(t, sentMsg, "VALE3")
+	})
+
+	t.Run("filter SELL only", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Data").Return("0:SELL")
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Minha Carteira", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		now := time.Now()
+		txs := []portfolio.Transaction{
+			{ID: "t1", Ticker: "PETR4", Type: "BUY", ExecutedAt: now, Quantity: 10, UnitPrice: 30, TotalCost: 300},
+			{ID: "t2", Ticker: "VALE3", Type: "SELL", ExecutedAt: now, Quantity: 5, UnitPrice: 60, TotalCost: 300},
+		}
+		portSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(txs, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Vendas") && strings.Contains(msg, "VALE3") && !strings.Contains(msg, "PETR4")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleHistory(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "VALE3")
+		assert.NotContains(t, sentMsg, "PETR4")
+	})
+
+	t.Run("filter SELL with no results", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Data").Return("0:SELL")
+
+		portfolios := []portfolio.Portfolio{
+			{ID: "p1", Name: "Minha Carteira", IsDefault: true},
+		}
+		portSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		now := time.Now()
+		txs := []portfolio.Transaction{
+			{ID: "t1", Ticker: "PETR4", Type: "BUY", ExecutedAt: now, Quantity: 10, UnitPrice: 30, TotalCost: 300},
+		}
+		portSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(txs, nil).Once()
+
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Nenhuma operação encontrada")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleHistory(mCtx)
+		assert.NoError(t, err)
+	})
+}
