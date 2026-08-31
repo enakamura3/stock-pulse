@@ -341,6 +341,24 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		successMenu.Inline(successMenu.Row(btnAlertsList, btnMenuBack))
 
 		return c.Send(successMsg, telebot.ModeMarkdown, successMenu)
+
+	case "QUOTE_EXPECT_TICKER":
+		ticker := strings.ToUpper(text)
+		quote, err := h.marketSvc.GetQuote(context.Background(), ticker)
+		if err != nil {
+			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
+		}
+
+		_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+
+		msg := formatQuoteMessage(ticker, quote)
+
+		replyMenu := &telebot.ReplyMarkup{}
+		btnNew := replyMenu.Data("🔍 Consultar Outro", "btn_cotacao")
+		btnMenuBtn := replyMenu.Data("🏠 Menu", "btn_menu")
+		replyMenu.Inline(replyMenu.Row(btnNew, btnMenuBtn))
+
+		return c.Send(msg, telebot.ModeMarkdown, replyMenu)
 	}
 
 	return nil

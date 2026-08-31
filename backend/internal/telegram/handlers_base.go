@@ -61,6 +61,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 
 	bot.Handle("/start", h.HandleStart)
 	bot.Handle("/menu", h.HandleMenu)
+	bot.Handle("/cotacao", h.HandleQuote)
 
 	// Callback dos Inline Keyboards estáticos
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
@@ -75,6 +76,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_alert_create", h.HandleAlertCreate)
 	bot.Handle("\fbtn_alert_cond_above", h.HandleAlertConditionAbove)
 	bot.Handle("\fbtn_alert_cond_below", h.HandleAlertConditionBelow)
+	bot.Handle("\fbtn_cotacao", h.HandleQuoteStart)
 	bot.Handle("\fbtn_change_portfolio", h.HandleChangePortfolio)
 	bot.Handle("\fbtn_menu", h.HandleMenuCallback)
 	bot.Handle("\fbtn_cancel_op", h.HandleCancelOperation)
