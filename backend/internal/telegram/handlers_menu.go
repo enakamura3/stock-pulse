@@ -61,6 +61,7 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 	btnRendaFixa := menu.Data("🏛️ Renda Fixa", "btn_renda_fixa")
 	btnOperacao := menu.Data("💵 Lançar Operação", "btn_operacao")
 	btnAlertas := menu.Data("🔔 Meus Alertas", "btn_alerts")
+	btnCotacao := menu.Data("📈 Cotação Rápida", "btn_cotacao")
 
 	rows := []telebot.Row{
 		menu.Row(btnResumo),
@@ -69,6 +70,7 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 		menu.Row(btnRendaFixa),
 		menu.Row(btnOperacao),
 		menu.Row(btnAlertas),
+		menu.Row(btnCotacao),
 	}
 
 	if len(portfolios) > 1 {
