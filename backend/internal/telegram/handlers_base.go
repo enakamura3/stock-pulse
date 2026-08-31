@@ -20,6 +20,7 @@ type PortfolioService interface {
 
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
+	GetBenchmarks(ctx context.Context) (*market.MarketBenchmarks, error)
 }
 
 type FixedIncomeService interface {
@@ -53,6 +54,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 
 	// Callback dos Inline Keyboards estáticos
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
+	bot.Handle("\fbtn_ativos", h.HandleAssetList)
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
 	bot.Handle("\fbtn_history", h.HandleHistory)
 	bot.Handle("\fbtn_renda_fixa", h.HandleFixedIncome)

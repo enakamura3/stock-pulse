@@ -316,17 +316,22 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_proventos")
 	btnAno := menu.Data("📅 Agrupar por Ano", "btn_divs_year")
 	btnMes := menu.Data("📆 Agrupar por Mês", "btn_divs_month")
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 
 	if len(divs) > 0 {
-		menu.Inline(menu.Row(btnAno, btnMes), menu.Row(btnBack))
+		menu.Inline(menu.Row(btnRefresh), menu.Row(btnAno, btnMes), menu.Row(btnBack))
 	} else {
-		menu.Inline(menu.Row(btnBack))
+		menu.Inline(menu.Row(btnRefresh), menu.Row(btnBack))
 	}
 
-	return c.Edit(msg, telebot.ModeMarkdown, menu)
+	err = c.Edit(msg, telebot.ModeMarkdown, menu)
+	if err != nil && strings.Contains(err.Error(), "message is not modified") {
+		return nil
+	}
+	return err
 }
 
 func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
@@ -449,9 +454,6 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 				monthsDivisor = 12
 			} else if y == currentYear {
 				monthsDivisor = currentMonth
-				if monthsDivisor < 1 {
-					monthsDivisor = 1
-				}
 			} else {
 				monthsDivisor = 12
 			}

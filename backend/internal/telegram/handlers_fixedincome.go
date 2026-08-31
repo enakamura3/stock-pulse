@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"strings"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -71,7 +72,7 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 
 		taxa := ""
 		if pos.Asset.DebtType == "POS" {
-			taxa = p.Sprintf("%.2f%% %s", pos.Asset.Rate, pos.Asset.Indexer)
+			taxa = p.Sprintf("%.2f%% do %s", pos.Asset.Rate, pos.Asset.Indexer)
 		} else {
 			taxa = p.Sprintf("%.2f%% a.a.", pos.Asset.Rate)
 		}
@@ -98,8 +99,13 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_renda_fixa")
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
-	menu.Inline(menu.Row(btnBack))
+	menu.Inline(menu.Row(btnRefresh), menu.Row(btnBack))
 
-	return c.Edit(msg, telebot.ModeMarkdown, menu)
+	err = c.Edit(msg, telebot.ModeMarkdown, menu)
+	if err != nil && strings.Contains(err.Error(), "message is not modified") {
+		return nil
+	}
+	return err
 }

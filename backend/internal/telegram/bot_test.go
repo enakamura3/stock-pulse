@@ -1,7 +1,10 @@
 package telegram
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,6 +25,29 @@ func TestBotRunner_SendAlertMessage(t *testing.T) {
 		err := runner.SendAlertMessage(123, "User", "AAPL", "Apple", 155.0, 150.0, "BELOW", "USD")
 		assert.NoError(t, err)
 	})
+
+	t.Run("Mock server SendAlertMessage ABOVE and BELOW", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 1, "chat": {"id": 123}}}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		errAbove := runner.SendAlertMessage(123, "User", "AAPL", "Apple", 155.0, 150.0, "ABOVE", "USD")
+		assert.NoError(t, errAbove)
+
+		errBelow := runner.SendAlertMessage(123, "User", "PETR4", "Petrobras", 25.0, 30.0, "BELOW", "BRL")
+		assert.NoError(t, errBelow)
+	})
 }
 
 func TestBotRunner_LifecycleAndUsername(t *testing.T) {
@@ -29,6 +55,20 @@ func TestBotRunner_LifecycleAndUsername(t *testing.T) {
 		runner, err := NewBotRunner("", nil)
 		assert.NoError(t, err)
 		assert.Nil(t, runner)
+	})
+
+	t.Run("NewBotRunner invalid token returns error", func(t *testing.T) {
+		h, _, _, _, _ := setupHandlersTest()
+		runner, err := NewBotRunner("invalid_token_xyz", h)
+		assert.Error(t, err)
+		assert.Nil(t, runner)
+	})
+
+	t.Run("NewBotRunnerWithSettings success", func(t *testing.T) {
+		h, _, _, _, _ := setupHandlersTest()
+		runner, err := NewBotRunnerWithSettings(telebot.Settings{Offline: true}, h)
+		assert.NoError(t, err)
+		assert.NotNil(t, runner)
 	})
 
 	t.Run("Start and Stop on nil runner", func(t *testing.T) {
@@ -43,6 +83,19 @@ func TestBotRunner_LifecycleAndUsername(t *testing.T) {
 		runner.Start()
 		runner.Stop()
 		assert.Empty(t, runner.GetUsername())
+	})
+
+	t.Run("GetUsername with user", func(t *testing.T) {
+		b, err := telebot.NewBot(telebot.Settings{Offline: true})
+		assert.NoError(t, err)
+		b.Me = &telebot.User{Username: "test_bot"}
+
+		runner := &BotRunner{bot: b}
+		assert.Equal(t, "test_bot", runner.GetUsername())
+
+		go runner.Start()
+		time.Sleep(10 * time.Millisecond)
+		runner.Stop()
 	})
 }
 

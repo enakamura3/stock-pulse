@@ -21,11 +21,13 @@ func NewBotRunner(token string, handlers *Handlers) (*BotRunner, error) {
 		return nil, nil
 	}
 
-	pref := telebot.Settings{
+	return NewBotRunnerWithSettings(telebot.Settings{
 		Token:  token,
 		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
-	}
+	}, handlers)
+}
 
+func NewBotRunnerWithSettings(pref telebot.Settings, handlers *Handlers) (*BotRunner, error) {
 	b, err := telebot.NewBot(pref)
 	if err != nil {
 		return nil, err

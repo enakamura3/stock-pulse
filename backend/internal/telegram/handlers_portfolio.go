@@ -209,33 +209,166 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		}
 	}
 
-	if len(positions) > 0 {
-		msg += p.Sprintf("\n📋 *Resumo Completo (Ativos)*\n")
-		posByValue := make([]portfolio.Position, len(positions))
-		copy(posByValue, positions)
-		sort.Slice(posByValue, func(i, j int) bool {
-			return posByValue[i].CurrentValue > posByValue[j].CurrentValue
-		})
-
-		for _, pos := range posByValue {
-			var symbol string
-			if pos.DailyChangePercent > 0 {
-				symbol = "🟢"
-			} else if pos.DailyChangePercent < 0 {
-				symbol = "🔴"
-			} else {
-				symbol = "⚪"
+	if h.marketSvc != nil {
+		if benchmarks, err := h.marketSvc.GetBenchmarks(context.Background()); err == nil && benchmarks != nil {
+			var bmItems []struct {
+				name          string
+				changePercent float64
+			}
+			if benchmarks.IBOV != nil {
+				bmItems = append(bmItems, struct {
+					name          string
+					changePercent float64
+				}{name: "IBOV", changePercent: benchmarks.IBOV.ChangePercent})
+			}
+			if benchmarks.IFIX != nil {
+				bmItems = append(bmItems, struct {
+					name          string
+					changePercent float64
+				}{name: "IFIX", changePercent: benchmarks.IFIX.ChangePercent})
+			}
+			if benchmarks.SP500 != nil {
+				bmItems = append(bmItems, struct {
+					name          string
+					changePercent float64
+				}{name: "S&P 500", changePercent: benchmarks.SP500.ChangePercent})
+			}
+			if benchmarks.USDBRL != nil {
+				bmItems = append(bmItems, struct {
+					name          string
+					changePercent float64
+				}{name: "Dólar", changePercent: benchmarks.USDBRL.ChangePercent})
 			}
 
-			msg += p.Sprintf("%s `%s`: *R$ %.2f* (%+.2f%%)\n", symbol, pos.Ticker, pos.CurrentValue, pos.DailyChangePercent)
+			if len(bmItems) > 0 {
+				msg += "\n📊 *Benchmarks do Dia*\n"
+				for _, item := range bmItems {
+					var symbol string
+					if item.changePercent > 1e-6 {
+						symbol = "🟢"
+					} else if item.changePercent < -1e-6 {
+						symbol = "🔴"
+					} else {
+						symbol = "⚪"
+					}
+					msg += p.Sprintf("• %s *%s:* %+.2f%%\n", symbol, item.name, item.changePercent)
+				}
+			}
 		}
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_resumo")
+	btnAtivos := menu.Data("📋 Todos os Ativos", "btn_ativos")
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
-	menu.Inline(menu.Row(btnBack))
+	menu.Inline(menu.Row(btnRefresh, btnAtivos), menu.Row(btnBack))
 
-	return c.Edit(msg, telebot.ModeMarkdown, menu)
+	err = c.Edit(msg, telebot.ModeMarkdown, menu)
+	if err != nil && strings.Contains(err.Error(), "message is not modified") {
+		return nil
+	}
+	return err
+}
+
+func (h *Handlers) HandleAssetList(c telebot.Context) error {
+	defer c.Respond()
+	pageStr := c.Data()
+	page := 0
+	if pageStr != "" {
+		fmt.Sscanf(pageStr, "%d", &page)
+	}
+
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
+	}
+
+	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	_, positions, err := h.portfolioSvc.GetPortfolioDetails(context.Background(), portfolioID, userIDStr)
+	if err != nil {
+		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
+		return c.Edit("❌ Ocorreu um erro ao buscar sua carteira.")
+	}
+
+	if len(positions) == 0 {
+		menu := &telebot.ReplyMarkup{}
+		btnBack := menu.Data("⬅️ Voltar ao Resumo", "btn_resumo")
+		btnMenu := menu.Data("🏠 Menu", "btn_menu")
+		menu.Inline(menu.Row(btnBack, btnMenu))
+		return c.Edit(fmt.Sprintf("📋 *Ativos: %s*\n\nNenhum ativo encontrado nesta carteira.", portfolioName), telebot.ModeMarkdown, menu)
+	}
+
+	posByValue := make([]portfolio.Position, len(positions))
+	copy(posByValue, positions)
+	sort.Slice(posByValue, func(i, j int) bool {
+		return posByValue[i].CurrentValue > posByValue[j].CurrentValue
+	})
+
+	pageSize := 10
+	totalPages := (len(posByValue) + pageSize - 1) / pageSize
+	if page < 0 {
+		page = 0
+	}
+	start := page * pageSize
+	if start >= len(posByValue) {
+		start = 0
+		page = 0
+	}
+	end := start + pageSize
+	if end > len(posByValue) {
+		end = len(posByValue)
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("📋 *Ativos: %s*\n_Página %d de %d_\n\n", portfolioName, page+1, totalPages)
+
+	for _, pos := range posByValue[start:end] {
+		var symbol string
+		if pos.DailyChangePercent > 1e-6 {
+			symbol = "🟢"
+		} else if pos.DailyChangePercent < -1e-6 {
+			symbol = "🔴"
+		} else {
+			symbol = "⚪"
+		}
+
+		totalReturn := 0.0
+		if pos.TotalCost > 1e-6 {
+			totalReturn = ((pos.CurrentValue - pos.TotalCost) / pos.TotalCost) * 100
+		}
+
+		msg += p.Sprintf("%s `%s`: *R$ %.2f* | Dia: %+.2f%% | L/P: %+.2f%%\n",
+			symbol, pos.Ticker, pos.CurrentValue, pos.DailyChangePercent, totalReturn)
+	}
+
+	menu := &telebot.ReplyMarkup{}
+	var navBtns []telebot.Btn
+	if start > 0 {
+		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_ativos", fmt.Sprintf("%d", page-1)))
+	}
+	if end < len(posByValue) {
+		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_ativos", fmt.Sprintf("%d", page+1)))
+	}
+
+	var rows []telebot.Row
+	if len(navBtns) > 0 {
+		rows = append(rows, menu.Row(navBtns...))
+	}
+	btnBack := menu.Data("⬅️ Voltar ao Resumo", "btn_resumo")
+	btnMenu := menu.Data("🏠 Menu", "btn_menu")
+	rows = append(rows, menu.Row(btnBack, btnMenu))
+	menu.Inline(rows...)
+
+	err = c.Edit(msg, telebot.ModeMarkdown, menu)
+	if err != nil && strings.Contains(err.Error(), "message is not modified") {
+		return nil
+	}
+	return err
 }
 
 func getMacroCategoryKey(assetType, ticker string) string {
