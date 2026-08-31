@@ -17,7 +17,7 @@ func FloatIsZero(v float64) bool {
 
 // DetermineAssetType define a categoria oficial do ativo (STOCK_BR, FII, FIAGRO, ETF_BR, BDR, STOCK_US, ETF_US, CRYPTO).
 func DetermineAssetType(ticker, name, currency string) string {
-	if strings.Contains(ticker, "-") {
+	if strings.Contains(ticker, "-") || strings.ToUpper(currency) == "CRYPTO" {
 		return "CRYPTO"
 	}
 
@@ -36,24 +36,40 @@ func DetermineAssetType(ticker, name, currency string) string {
 
 	if strings.HasSuffix(ticker, "11.SA") {
 		lowerName := strings.ToLower(name)
-		isEtf := strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "ishares") || strings.Contains(lowerName, "índice") || strings.Contains(lowerName, "indice")
-		isFiagro := strings.Contains(lowerName, "fiagro") || strings.Contains(lowerName, "agro")
-		isFii := strings.Contains(lowerName, "fii") || strings.Contains(lowerName, "fundo") || strings.Contains(lowerName, "fdo") || strings.Contains(lowerName, "imob") || strings.Contains(lowerName, "lajes") || strings.Contains(lowerName, "shopping")
 
-		if isEtf {
-			return "ETF_BR"
-		}
-		if isFiagro {
+		// 1. Fiagros (ex: VGIA11, KNCA11, RURA11)
+		if strings.Contains(lowerName, "fiagro") || strings.Contains(lowerName, "agro") {
 			return "FIAGRO"
 		}
 
-		tickerUpper := strings.ToUpper(ticker)
-		if isFii || tickerUpper == "MXRF11.SA" || tickerUpper == "HGLG11.SA" || tickerUpper == "KNRI11.SA" || tickerUpper == "BTLG11.SA" || tickerUpper == "XPML11.SA" || tickerUpper == "VISC11.SA" {
-			return "FII"
-		}
-		if tickerUpper == "SPYI11.SA" || tickerUpper == "QQQI11.SA" || tickerUpper == "IVVB11.SA" || tickerUpper == "NASD11.SA" || tickerUpper == "BOVA11.SA" {
+		// 2. ETFs da B3 (ex: BOVA11, SMAL11, IVVB11, HASH11, SPYI11, QQQI11)
+		isEtf := strings.Contains(lowerName, "etf") || strings.Contains(lowerName, "ishares") ||
+			strings.Contains(lowerName, "índice") || strings.Contains(lowerName, "indice") ||
+			strings.Contains(lowerName, "sp500") || strings.Contains(lowerName, "nasdaq") ||
+			strings.Contains(lowerName, "bovespa") || strings.Contains(lowerName, "hashdex") ||
+			strings.Contains(lowerName, "trend") || strings.Contains(lowerName, "investo")
+		if isEtf {
 			return "ETF_BR"
 		}
+
+		// 3. Fundos Imobiliários (FIIs) - identificados por termos explícitos imobiliários/fundo
+		isFii := strings.Contains(lowerName, "fii") ||
+			strings.Contains(lowerName, "fundo") ||
+			strings.Contains(lowerName, "fdo") ||
+			strings.Contains(lowerName, "imob") ||
+			strings.Contains(lowerName, "lajes") ||
+			strings.Contains(lowerName, "shopping") ||
+			strings.Contains(lowerName, "logística") ||
+			strings.Contains(lowerName, "logistica") ||
+			strings.Contains(lowerName, "tijolo") ||
+			strings.Contains(lowerName, "recebíveis") ||
+			strings.Contains(lowerName, "recebiveis")
+		if isFii {
+			return "FII"
+		}
+
+		// 4. Se não for FII, ETF ou Fiagro, trata como Unit de Ação Brasileira (ex: TAEE11, SANB11, SAPR11, KLBN11)
+		return "STOCK_BR"
 	}
 
 	return "STOCK_BR"

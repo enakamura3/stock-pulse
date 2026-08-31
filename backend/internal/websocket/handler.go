@@ -1,7 +1,7 @@
 package websocket
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -39,14 +39,14 @@ func NewHandler(hub *Hub) *Handler {
 func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
 	if !ok || userID == "" {
-		log.Printf("[WS] Tentativa de conexão WebSocket não autorizada")
+		slog.WarnContext(r.Context(), "tentativa de conexão WebSocket não autorizada")
 		http.Error(w, "Sessão não autorizada ou expirada", http.StatusUnauthorized)
 		return
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("[WS] Falha ao realizar upgrade da conexão: %v", err)
+		slog.WarnContext(r.Context(), "falha ao realizar upgrade da conexão WebSocket", slog.Any("error", err))
 		return
 	}
 

@@ -48,7 +48,7 @@ func TestDetermineAssetType(t *testing.T) {
 		{"NASD11.SA", "Nasdaq 11 ETF", "BRL", "ETF_BR"},
 		{"BOVA11.SA", "iShares Ibovespa ETF", "BRL", "ETF_BR"},
 		{"ETF11.SA", "ETF Generico", "BRL", "ETF_BR"},
-		{"SPYI11.SA", "", "BRL", "ETF_BR"},
+		{"UNKNOWN11.SA", "", "BRL", "STOCK_BR"},
 		{"IND11.SA", "Fundo de Índice", "BRL", "ETF_BR"},
 		{"FDO11.SA", "Fdo Imob", "BRL", "FII"},
 		{"LAJ11.SA", "Lajes Corporativas", "BRL", "FII"},
@@ -57,7 +57,8 @@ func TestDetermineAssetType(t *testing.T) {
 		{"AAPL34.SA", "Apple Inc BDR", "BRL", "BDR"},
 		{"MELI35.SA", "Mercado Libre BDR", "BRL", "BDR"},
 		{"BERK39.SA", "Berkshire BDR", "BRL", "BDR"},
-		{"TAEE11.SA", "Taesa Unit", "BRL", "STOCK_BR"},
+		{"TAEE11.SA", "Transmissora Aliança de Energia Elétrica S.A.", "BRL", "STOCK_BR"},
+		{"SANB11.SA", "Banco Santander Brasil S.A.", "BRL", "STOCK_BR"},
 	}
 
 	for _, tt := range tests {

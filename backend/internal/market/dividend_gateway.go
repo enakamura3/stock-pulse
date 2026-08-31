@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -48,12 +48,9 @@ func NewDividendGateway(
 		"ETF_BR": {
 			{source: b3, role: "primary"},
 			{source: stockAnalysis, role: "secondary"},
-			{source: yahoo, role: "fallback"},
 		},
 		"BDR": {
 			{source: stockAnalysis, role: "primary"},
-			{source: fundamentus, role: "secondary"},
-			{source: yahoo, role: "fallback"},
 		},
 		"STOCK_US": {
 			{source: stockAnalysis, role: "primary"},
@@ -76,6 +73,7 @@ func NewDividendGateway(
 }
 
 func (g *DividendGateway) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
 	cacheKey := fmt.Sprintf("dividends:%s", ticker)
 
 	// 1. Verificar cache Redis
@@ -83,12 +81,12 @@ func (g *DividendGateway) GetDividends(ctx context.Context, ticker string, asset
 	if err == nil {
 		var cached []DividendEvent
 		if err := json.Unmarshal([]byte(val), &cached); err == nil {
-			log.Printf("[Redis] CACHE HIT proventos para %s", ticker)
+			slog.DebugContext(ctx, "cache hit proventos", slog.String("ticker", ticker))
 			return cached, nil
 		}
 	}
 
-	log.Printf("[Redis] CACHE MISS proventos para %s. Consultando rotas...", ticker)
+	slog.InfoContext(ctx, "cache miss proventos, consultando rotas", slog.String("ticker", ticker))
 
 	// 2. Buscar rota
 	assetTypeUpper := strings.ToUpper(assetType)
@@ -134,7 +132,7 @@ func (g *DividendGateway) GetDividends(ctx context.Context, ticker string, asset
 			}
 			// Se continuou falhando, tenta fallback
 			if (fetchErr != nil || len(events) == 0) && fallback != nil {
-				log.Printf("[Market] Falha nas rotas primárias/secundárias para %s. Usando fallback %s.", ticker, fallback.Name())
+				slog.WarnContext(ctx, "falha nas rotas primárias/secundárias, usando fallback", slog.String("ticker", ticker), slog.String("fallback", fallback.Name()))
 				events, fetchErr = fallback.GetDividends(ctx, ticker, assetType)
 			}
 		}

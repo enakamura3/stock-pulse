@@ -241,6 +241,7 @@ func main() {
 			// Cotações, Busca e Benchmarks
 			r.Get("/quotes/{ticker}", marketHandler.GetQuote)
 			r.Get("/assets/search", marketHandler.Search)
+			r.Get("/assets/{ticker}", portfolioHandler.GetAssetMetadata)
 			r.Get("/market/benchmarks", marketHandler.GetBenchmarks)
 			r.Post("/market/quotes/invalidate", marketHandler.InvalidateCache)
 

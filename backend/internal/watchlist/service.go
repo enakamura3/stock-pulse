@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/onigiri/stock-pulse/backend/internal/market"
@@ -63,7 +63,7 @@ func (s *Service) GetWatchlists(ctx context.Context, userID string) ([]Watchlist
 
 	// UX Onboarding: Cria lista "Favoritos" se o usuário acabou de criar a conta
 	if len(lists) == 0 {
-		log.Printf("[Watchlist] Usuário %s não possui listas. Criando padrão 'Favoritos'...", userID)
+		slog.InfoContext(ctx, "usuário não possui listas, criando padrão 'Favoritos'", slog.String("user_id", userID))
 		w, err := s.repo.CreateWatchlist(ctx, userID, "Favoritos")
 		if err != nil {
 			return nil, fmt.Errorf("falha ao criar watchlist de onboarding: %w", err)
@@ -91,7 +91,7 @@ func (s *Service) GetWatchlist(ctx context.Context, id, userID string) (*Watchli
 	for i := range items {
 		quote, err := s.marketService.GetQuote(ctx, items[i].Ticker)
 		if err != nil {
-			log.Printf("[Watchlist] Falha ao injetar cotação para %s: %v", items[i].Ticker, err)
+			slog.WarnContext(ctx, "falha ao injetar cotação para item da watchlist", slog.String("ticker", items[i].Ticker), slog.Any("error", err))
 			continue
 		}
 		items[i].Price = quote.Price
@@ -131,7 +131,7 @@ func (s *Service) AddAssetToWatchlist(ctx context.Context, watchlistID, userID, 
 	assetID, err := s.repo.GetAssetByTicker(ctx, ticker)
 	if err != nil {
 		// Passo 2: Se não existir, busca metadados ricos do Yahoo Finance (Auto-Import/Onboarding)
-		log.Printf("[Watchlist] Ativo %s não existe localmente. Buscando metadados no Yahoo...", ticker)
+		slog.InfoContext(ctx, "ativo não existe localmente, buscando metadados no provedor", slog.String("ticker", ticker))
 		quote, err := s.marketProvider.GetQuote(ctx, ticker)
 		if err != nil {
 			return nil, fmt.Errorf("ativo '%s' não foi encontrado ou não é suportado pelo provedor de mercado: %w", ticker, err)
@@ -149,7 +149,7 @@ func (s *Service) AddAssetToWatchlist(ctx context.Context, watchlistID, userID, 
 		if err != nil {
 			return nil, fmt.Errorf("erro ao registrar novo ativo no banco: %w", err)
 		}
-		log.Printf("[Watchlist] Ativo %s cadastrado com sucesso sob ID %s", ticker, assetID)
+		slog.InfoContext(ctx, "ativo cadastrado com sucesso", slog.String("ticker", ticker), slog.String("asset_id", assetID))
 	}
 
 	// Passo 4: Vincula o ativo na Watchlist do usuário

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"sort"
 	"strings"
@@ -320,23 +320,23 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				var errIdx error
 				cdiRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "CDI", startT, endT)
 				if errIdx != nil {
-					log.Printf("portfolio performance: benchmark CDI indisponível (%v) — execute o sync de índices", errIdx)
+					slog.WarnContext(ctx, "portfolio performance: benchmark CDI indisponível — execute o sync de índices", slog.Any("error", errIdx))
 				}
 				ipcaRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "IPCA", startT, endT)
 				if errIdx != nil {
-					log.Printf("portfolio performance: benchmark IPCA indisponível (%v)", errIdx)
+					slog.WarnContext(ctx, "portfolio performance: benchmark IPCA indisponível", slog.Any("error", errIdx))
 				}
 				ifixRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "IFIX", startT, endT)
 				if errIdx != nil {
-					log.Printf("portfolio performance: benchmark IFIX indisponível (%v)", errIdx)
+					slog.WarnContext(ctx, "portfolio performance: benchmark IFIX indisponível", slog.Any("error", errIdx))
 				}
 				ibovRatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "IBOV", startT, endT)
 				if errIdx != nil {
-					log.Printf("portfolio performance: benchmark IBOV indisponível (%v)", errIdx)
+					slog.WarnContext(ctx, "portfolio performance: benchmark IBOV indisponível", slog.Any("error", errIdx))
 				}
 				sp500RatesRaw, errIdx = s.fiService.GetIndexRates(ctx, "SP500", startT, endT)
 				if errIdx != nil {
-					log.Printf("portfolio performance: benchmark SP500 indisponível (%v)", errIdx)
+					slog.WarnContext(ctx, "portfolio performance: benchmark SP500 indisponível", slog.Any("error", errIdx))
 				}
 			}
 

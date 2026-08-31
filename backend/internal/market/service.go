@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -26,7 +26,6 @@ type Service struct {
 
 // NewService cria uma nova instância de Service com TTLs configuráveis.
 func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
-
 	b3Client := NewB3Client()
 	fundamentusClient := NewFundamentusClient()
 	stockAnalysisClient := NewStockAnalysisClient()
@@ -50,7 +49,7 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 	}
 }
 
-// GetQuoteWithCacheStatus resgata a cotação e indica se foi hit ou miss no cache.
+// GetQuoteWithCacheStatus retorna os dados de cotação atual e um boolean indicando se o resultado veio do cache (Redis).
 func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error) {
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
 	if symbol == "" {
@@ -64,13 +63,13 @@ func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*
 	if err == nil && val != "" {
 		var cachedQuote Quote
 		if err := json.Unmarshal([]byte(val), &cachedQuote); err == nil {
-			log.Printf("[Redis] CACHE HIT para o ativo %s", symbol)
+			slog.DebugContext(ctx, "cache hit para ativo", slog.String("symbol", symbol))
 			return &cachedQuote, true, nil
 		}
 	}
 
 	// Se deu erro ou cache miss, busca do provedor externo
-	log.Printf("[Redis] CACHE MISS para o ativo %s. Consultando provedor...", symbol)
+	slog.InfoContext(ctx, "cache miss para ativo, consultando provedor", slog.String("symbol", symbol))
 	quote, err := s.provider.GetQuote(ctx, symbol)
 	if err != nil {
 		return nil, false, err
@@ -81,9 +80,9 @@ func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*
 	if err == nil {
 		err = s.rdb.Set(ctx, key, quoteJSON, s.ttlQuotes).Err()
 		if err != nil {
-			log.Printf("[Redis] Erro ao salvar cache para %s: %v", symbol, err)
+			slog.WarnContext(ctx, "erro ao salvar cache de cotação", slog.String("symbol", symbol), slog.Any("error", err))
 		} else {
-			log.Printf("[Redis] Novo cache salvo para %s com sucesso", symbol)
+			slog.DebugContext(ctx, "novo cache salvo com sucesso", slog.String("symbol", symbol))
 		}
 	}
 
@@ -235,7 +234,7 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 	}
 
 	// Se deu erro ou cache miss, faz scraping
-	log.Printf("[Redis] CACHE MISS fundamentos %s. Rodando Scraper...", symbol)
+	slog.InfoContext(ctx, "cache miss fundamentos, executando scraper", slog.String("symbol", symbol))
 	fund, err := s.scraper.GetFundamentals(ctx, symbol)
 	if err != nil {
 		return nil, err
@@ -258,7 +257,7 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 	if err == nil {
 		err = s.rdb.Set(ctx, key, fundJSON, s.ttlFundamentals).Err()
 		if err != nil {
-			log.Printf("[Redis] Erro ao salvar cache de fundamentos para %s: %v", symbol, err)
+			slog.WarnContext(ctx, "erro ao salvar cache de fundamentos", slog.String("symbol", symbol), slog.Any("error", err))
 		}
 	}
 
@@ -280,7 +279,7 @@ func (s *Service) InvalidateQuoteCache(ctx context.Context, symbols []string) (i
 		for {
 			keys, nextCursor, err := s.rdb.Scan(ctx, cursor, "quote:*", 100).Result()
 			if err != nil {
-				log.Printf("[Redis] Erro ao escanear chaves de cotações para invalidação: %v", err)
+				slog.ErrorContext(ctx, "erro ao escanear chaves de cotações para invalidação", slog.Any("error", err))
 				break
 			}
 			if len(keys) > 0 {

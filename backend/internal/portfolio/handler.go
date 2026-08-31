@@ -27,6 +27,7 @@ type PortfolioService interface {
 	DeletePortfolio(ctx context.Context, id, userID string) error
 	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string, filterTickers []string) ([]PerformancePoint, error)
 	GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]CalculatedDividend, error)
+	GetAssetMetadata(ctx context.Context, ticker string) (*AssetMetadata, error)
 
 	// Utilizado especificamente pelo Handler para recuperar transações puras
 	GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
@@ -49,8 +50,20 @@ type portfolioPayload struct {
 	BaseCurrency string `json:"base_currency"`
 }
 
+var validAssetTypes = map[string]bool{
+	"STOCK_BR": true,
+	"FII":      true,
+	"FIAGRO":   true,
+	"ETF_BR":   true,
+	"BDR":      true,
+	"STOCK_US": true,
+	"ETF_US":   true,
+	"CRYPTO":   true,
+}
+
 type transactionPayload struct {
 	Ticker       string  `json:"ticker"`
+	AssetType    string  `json:"asset_type,omitempty"`
 	Type         string  `json:"type"` // "BUY" ou "SELL"
 	Quantity     float64 `json:"quantity"`
 	UnitPrice    float64 `json:"unit_price"`
@@ -214,6 +227,12 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	payload.AssetType = strings.ToUpper(strings.TrimSpace(payload.AssetType))
+	if payload.AssetType != "" && !validAssetTypes[payload.AssetType] {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de ativo inválido")
+		return
+	}
+
 	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
 	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" {
 		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT, REVERSE_SPLIT ou BONUS")
@@ -250,6 +269,7 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	tx := &Transaction{
 		PortfolioID:  portfolioID,
 		Ticker:       payload.Ticker,
+		AssetType:    payload.AssetType,
 		Type:         payload.Type,
 		Quantity:     payload.Quantity,
 		UnitPrice:    payload.UnitPrice,
@@ -358,6 +378,12 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	payload.AssetType = strings.ToUpper(strings.TrimSpace(payload.AssetType))
+	if payload.AssetType != "" && !validAssetTypes[payload.AssetType] {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de ativo inválido")
+		return
+	}
+
 	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
 		httputils.RespondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits e bônus)")
 		return
@@ -385,6 +411,7 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 
 	tx := &Transaction{
 		Ticker:       payload.Ticker,
+		AssetType:    payload.AssetType,
 		Type:         payload.Type,
 		Quantity:     payload.Quantity,
 		UnitPrice:    payload.UnitPrice,
@@ -399,6 +426,24 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Transação atualizada com sucesso"})
+}
+
+// GetAssetMetadata retorna os metadados cadastrados do ativo (ID, tipo, moeda) pelo ticker.
+func (h *Handler) GetAssetMetadata(w http.ResponseWriter, r *http.Request) {
+	ticker := chi.URLParam(r, "ticker")
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	if ticker == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Ticker é obrigatório")
+		return
+	}
+
+	meta, err := h.service.GetAssetMetadata(r.Context(), ticker)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusNotFound, "Ativo não encontrado")
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, meta)
 }
 
 // BulkImportTransactions processa um arquivo CSV contendo múltiplas transações.

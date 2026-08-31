@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -105,6 +106,19 @@ func (m *MockPortfolioRepo) GetAssetByTicker(ctx context.Context, ticker string)
 func (m *MockPortfolioRepo) GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error) {
 	args := m.Called(ctx, ticker)
 	return args.String(0), args.String(1), args.Error(2)
+}
+
+func (m *MockPortfolioRepo) GetAssetMetadataByTicker(ctx context.Context, ticker string) (*AssetMetadata, error) {
+	args := m.Called(ctx, ticker)
+	if args.Get(0) != nil {
+		return args.Get(0).(*AssetMetadata), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockPortfolioRepo) UpdateAssetType(ctx context.Context, assetID, assetType string) error {
+	args := m.Called(ctx, assetID, assetType)
+	return args.Error(0)
 }
 
 func (m *MockPortfolioRepo) CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error) {
@@ -434,9 +448,43 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("Existing Asset", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return(&AssetMetadata{ID: "a1", Currency: "USD", AssetType: "STOCK_US"}, nil)
 
 		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
+		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
+
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, nil)
+
+		res, err := s.AddTransaction(context.Background(), "u1", tx)
+		assert.NoError(t, err)
+		assert.Equal(t, "tx1", res.ID)
+	})
+
+	t.Run("Existing Asset with Type Update", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
+		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(nil)
+
+		tx := &Transaction{PortfolioID: "p1", Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35}
+		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
+
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, nil)
+
+		res, err := s.AddTransaction(context.Background(), "u1", tx)
+		assert.NoError(t, err)
+		assert.Equal(t, "tx1", res.ID)
+	})
+
+	t.Run("Existing Asset with Type Update Failure", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
+		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(errors.New("db error"))
+
+		tx := &Transaction{PortfolioID: "p1", Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35}
 		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
 
 		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
@@ -450,7 +498,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("Asset Lookup DB Error", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("db connection failed"))
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return((*AssetMetadata)(nil), errors.New("db connection failed"))
 
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
 		assert.ErrorContains(t, err, "erro ao consultar ativo no banco")
@@ -459,7 +507,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New Asset - Provider Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", pgx.ErrNoRows)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(nil, errors.New("err"))
 
 		_, err := s.AddTransaction(context.Background(), "u1", &Transaction{PortfolioID: "p1", Ticker: "AAPL"})
@@ -469,7 +517,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New Crypto Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "BTC-USD").Return("", "", pgx.ErrNoRows)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "BTC-USD").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "BTC-USD").Return(&market.Quote{Currency: "USD", Name: "Bitcoin"}, nil)
 		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "CRYPTO", "USD").Return("", errors.New("err"))
 
@@ -480,7 +528,7 @@ func TestService_AddTransaction(t *testing.T) {
 	t.Run("New US Equity Asset - Repo Error", func(t *testing.T) {
 		s, repo, _, mp := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", pgx.ErrNoRows)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Currency: "USD", Name: "Apple"}, nil)
 		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "STOCK_US", "USD").Return("", errors.New("err"))
 
@@ -488,10 +536,27 @@ func TestService_AddTransaction(t *testing.T) {
 		assert.ErrorContains(t, err, "erro ao registrar ativo")
 	})
 
+	t.Run("New Asset with Custom AssetType", func(t *testing.T) {
+		s, repo, _, mp := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "HGLG11.SA").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
+		mp.On("GetQuote", mock.Anything, "HGLG11.SA").Return(&market.Quote{Currency: "BRL", Name: "CSHG Logística"}, nil)
+		repo.On("CreateAsset", mock.Anything, "HGLG11.SA", "CSHG Logística", "FII", "BRL").Return("hglg-id", nil)
+
+		tx := &Transaction{PortfolioID: "p1", Ticker: "HGLG11.SA", AssetType: "FII", Quantity: 10, UnitPrice: 160}
+		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx-hglg"}, nil)
+		repo.On("GetDailyPrices", mock.Anything, "hglg-id", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "hglg-id").Return(time.Time{}, nil)
+
+		res, err := s.AddTransaction(context.Background(), "u1", tx)
+		assert.NoError(t, err)
+		assert.Equal(t, "tx-hglg", res.ID)
+	})
+
 	t.Run("Create Tx Error", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return(&AssetMetadata{ID: "a1", Currency: "USD", AssetType: "STOCK_US"}, nil)
 
 		tx := &Transaction{PortfolioID: "p1", Ticker: "AAPL", Quantity: 10, UnitPrice: 150}
 		repo.On("CreateTransaction", mock.Anything, tx).Return((*Transaction)(nil), errors.New("db error"))
@@ -688,7 +753,7 @@ func TestService_UpdateTransaction(t *testing.T) {
 	t.Run("Asset Not Found", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("", "", errors.New("err"))
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return((*AssetMetadata)(nil), errors.New("err"))
 		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL"})
 		assert.ErrorContains(t, err, "ativo não encontrado na base")
 	})
@@ -696,12 +761,56 @@ func TestService_UpdateTransaction(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "USD"}, nil)
-		repo.On("GetAssetAndCurrencyByTicker", mock.Anything, "AAPL").Return("a1", "USD", nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "AAPL").Return(&AssetMetadata{ID: "a1", Currency: "USD", AssetType: "STOCK_US"}, nil)
 		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
 		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err")) // Ignore background
 
 		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "AAPL", Quantity: 10, UnitPrice: 150})
 		assert.NoError(t, err)
+	})
+
+	t.Run("Success with Type Update", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
+		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(nil)
+		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err"))
+
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35})
+		assert.NoError(t, err)
+	})
+
+	t.Run("Success with Type Update Error (Non-fatal)", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
+		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(errors.New("db fail"))
+		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err"))
+
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35})
+		assert.NoError(t, err)
+	})
+}
+
+func TestService_GetAssetMetadata(t *testing.T) {
+	t.Run("Invalid Ticker", func(t *testing.T) {
+		s, _, _, _ := setupServiceTest()
+		_, err := s.GetAssetMetadata(context.Background(), "")
+		assert.ErrorContains(t, err, "ticker inválido")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4.SA").Return(&AssetMetadata{
+			ID: "a1", Ticker: "PETR4.SA", Name: "Petrobras", AssetType: "STOCK_BR", Currency: "BRL",
+		}, nil)
+
+		meta, err := s.GetAssetMetadata(context.Background(), "petr4.sa")
+		assert.NoError(t, err)
+		assert.NotNil(t, meta)
+		assert.Equal(t, "STOCK_BR", meta.AssetType)
 	})
 }
 
@@ -1084,4 +1193,56 @@ func TestTWRR_NegativeReturn(t *testing.T) {
 
 	lastPoint := res[len(res)-1]
 	assert.Less(t, lastPoint.ReturnPct, 0.0, "queda de preço deve resultar em ReturnPct negativo")
+}
+
+type mockMultipartFile struct {
+	*bytes.Reader
+}
+
+func (m *mockMultipartFile) Close() error {
+	return nil
+}
+
+func TestService_BulkAddTransactions(t *testing.T) {
+	s, repo, ms, _ := setupServiceTest()
+
+	t.Run("Portfolio Not Found", func(t *testing.T) {
+		repo.On("GetPortfolioByID", mock.Anything, "p-err", "u1").Return(nil, errors.New("err"))
+		file := &mockMultipartFile{bytes.NewReader([]byte("date;ticker;type;qty;price"))}
+		_, err := s.BulkAddTransactions(context.Background(), "u1", "p-err", file)
+		assert.ErrorContains(t, err, "carteira não encontrada")
+	})
+
+	t.Run("CSV Read Error (Empty)", func(t *testing.T) {
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		file := &mockMultipartFile{bytes.NewReader([]byte(""))}
+		_, err := s.BulkAddTransactions(context.Background(), "u1", "p1", file)
+		assert.ErrorContains(t, err, "arquivo CSV vazio")
+	})
+
+	t.Run("CSV Parsing and Validation Errors", func(t *testing.T) {
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "STOCK_BR"}, nil)
+		repo.On("GetAssetByTicker", mock.Anything, "PETR4.SA").Return("a1", nil)
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("c1", nil)
+		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
+		repo.On("CreateTransaction", mock.Anything, mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
+		ms.On("GetHistoricalPrices", mock.Anything, "PETR4.SA", "10y").Return([]market.HistoricalPrice{}, nil).Maybe()
+
+		csvContent := "Data;Ticker;Tipo;Quantidade;Preco;Cambio;Taxa\n" +
+			"invalid_row\n" +
+			";;;;\n" +
+			"2024-01-10;PETR4.SA;INVALID;10;30.0\n" +
+			"2024-01-10;PETR4.SA;BUY;-5;30.0\n" +
+			"2024-01-10;PETR4.SA;BUY;10;-10.0\n" +
+			"invalid_date;PETR4.SA;BUY;10;30.0\n" +
+			"2024-01-10;PETR4.SA;BUY;10;30.0;1.0;2.5\n" +
+			"10/01/2024;PETR4.SA;BUY;10;30.0;1.0;2.5\n"
+
+		file := &mockMultipartFile{bytes.NewReader([]byte(csvContent))}
+		res, err := s.BulkAddTransactions(context.Background(), "u1", "p1", file)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, res.Success)
+		assert.Len(t, res.Errors, 6)
+	})
 }

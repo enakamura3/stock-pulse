@@ -24,6 +24,8 @@ export interface ModalsProps {
   editingTxId?: string | null;
   setEditingTxId?: (id: string | null) => void;
   txTicker?: string;
+  txAssetType?: string;
+  setTxAssetType?: (t: string) => void;
   searchQuery?: string;
   setSearchQuery?: (s: string) => void;
   isSearching?: boolean;
@@ -95,6 +97,8 @@ export default function Modals(props: ModalsProps) {
   const editingTxId = props.editingTxId !== undefined ? props.editingTxId : (context?.editingTxId ?? null);
   const setEditingTxId = props.setEditingTxId ?? context?.setEditingTxId ?? (() => {});
   const txTicker = props.txTicker ?? context?.txTicker ?? '';
+  const txAssetType = props.txAssetType ?? context?.txAssetType ?? '';
+  const setTxAssetType = props.setTxAssetType ?? context?.setTxAssetType ?? (() => {});
   const searchQuery = props.searchQuery ?? context?.searchQuery ?? '';
   const setSearchQuery = props.setSearchQuery ?? context?.setSearchQuery ?? (() => {});
   const isSearching = props.isSearching ?? context?.isSearching ?? false;
@@ -186,6 +190,8 @@ export default function Modals(props: ModalsProps) {
         editingTxId={editingTxId}
         setEditingTxId={setEditingTxId}
         txTicker={txTicker}
+        txAssetType={txAssetType}
+        setTxAssetType={setTxAssetType}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         isSearching={isSearching}

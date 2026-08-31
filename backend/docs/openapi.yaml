@@ -164,6 +164,26 @@ paths:
         '200':
           description: Resultados da busca textual
 
+  /assets/{ticker}:
+    get:
+      summary: Obter metadados cadastrados do ativo (categoria, moeda, nome)
+      tags:
+        - Dados de Mercado
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+            example: PETR4.SA
+      responses:
+        '200':
+          description: Metadados do ativo cadastrado
+        '404':
+          description: Ativo não encontrado
+
   /market/benchmarks:
     get:
       summary: Obter benchmarks e índices de mercado em tempo real
@@ -479,6 +499,10 @@ paths:
                 ticker:
                   type: string
                   example: VALE3.SA
+                asset_type:
+                  type: string
+                  enum: [STOCK_BR, FII, FIAGRO, ETF_BR, BDR, STOCK_US, ETF_US, CRYPTO]
+                  example: STOCK_BR
                 type:
                   type: string
                   enum: [BUY, SELL, SPLIT, REVERSE_SPLIT, BONUS]

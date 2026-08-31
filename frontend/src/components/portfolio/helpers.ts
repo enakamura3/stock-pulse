@@ -1,5 +1,79 @@
 import type { Position, FixedIncomePosition, TreasuryPosition } from './types';
 
+export const ASSET_TYPE_OPTIONS = [
+  { value: 'STOCK_BR', label: 'Ação (B3) — ex: PETR4, TAEE11, SANB11' },
+  { value: 'FII', label: 'FII – Fundo Imobiliário — ex: HGLG11, MXRF11' },
+  { value: 'FIAGRO', label: 'Fiagro — ex: VGIA11, KNCA11' },
+  { value: 'ETF_BR', label: 'ETF Nacional (B3) — ex: BOVA11, SMAL11, IVVB11' },
+  { value: 'BDR', label: 'BDR — ex: AAPL34, MSFT34' },
+  { value: 'STOCK_US', label: 'Ação Internacional (EUA) — ex: AAPL, MSFT' },
+  { value: 'ETF_US', label: 'ETF Internacional (EUA) — ex: SPY, QQQ, VOO' },
+  { value: 'CRYPTO', label: 'Criptoativo — ex: BTC-USD, ETH-BRL' },
+] as const;
+
+export function determineAssetTypeLocal(ticker: string, name: string, currency: string): string {
+  const upperTicker = (ticker || '').toUpperCase().trim();
+  const upperCurrency = (currency || '').toUpperCase().trim();
+  const lowerName = (name || '').toLowerCase().trim();
+
+  if (upperTicker.includes('-') || upperCurrency === 'CRYPTO') {
+    return 'CRYPTO';
+  }
+
+  if (!upperTicker.endsWith('.SA')) {
+    if (lowerName.includes('etf') || lowerName.includes('trust') || lowerName.includes('fund')) {
+      return 'ETF_US';
+    }
+    return 'STOCK_US';
+  }
+
+  // É do Brasil (.SA)
+  if (upperTicker.endsWith('34.SA') || upperTicker.endsWith('35.SA') || upperTicker.endsWith('39.SA')) {
+    return 'BDR';
+  }
+
+  if (upperTicker.endsWith('11.SA')) {
+    if (lowerName.includes('fiagro') || lowerName.includes('agro')) {
+      return 'FIAGRO';
+    }
+
+    const isEtf =
+      lowerName.includes('etf') ||
+      lowerName.includes('ishares') ||
+      lowerName.includes('índice') ||
+      lowerName.includes('indice') ||
+      lowerName.includes('sp500') ||
+      lowerName.includes('nasdaq') ||
+      lowerName.includes('bovespa') ||
+      lowerName.includes('hashdex') ||
+      lowerName.includes('trend') ||
+      lowerName.includes('investo');
+    if (isEtf) {
+      return 'ETF_BR';
+    }
+
+    const isFii =
+      lowerName.includes('fii') ||
+      lowerName.includes('fundo') ||
+      lowerName.includes('fdo') ||
+      lowerName.includes('imob') ||
+      lowerName.includes('lajes') ||
+      lowerName.includes('shopping') ||
+      lowerName.includes('logística') ||
+      lowerName.includes('logistica') ||
+      lowerName.includes('tijolo') ||
+      lowerName.includes('recebíveis') ||
+      lowerName.includes('recebiveis');
+    if (isFii) {
+      return 'FII';
+    }
+
+    return 'STOCK_BR';
+  }
+
+  return 'STOCK_BR';
+}
+
 export const getAssetCategory = (dbType: string) => {
   switch (dbType) {
     case 'STOCK_BR': return 'Ações (B3)';

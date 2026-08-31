@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -23,22 +23,22 @@ type AlertRepository interface {
 	ToggleAlertStatus(ctx context.Context, id string, userID string) (string, error)
 }
 
-// Service implementa as regras de negócio para a gestão de alertas de preço.
+// Service implementa a lógica de negócios para gerenciamento e criação de alertas de preços.
 type Service struct {
 	repo           AlertRepository
 	marketProvider market.QuoteProvider
 }
 
-// NewService inicializa o Alert Service.
-func NewService(repo AlertRepository, marketProvider market.QuoteProvider) *Service {
+// NewService cria uma nova instância de AlertService.
+func NewService(repo AlertRepository, provider market.QuoteProvider) *Service {
 	return &Service{
 		repo:           repo,
-		marketProvider: marketProvider,
+		marketProvider: provider,
 	}
 }
 
-// CreateAlert valida e cria um novo alerta de preço, importando o ativo caso seja inédito localmente.
-func (s *Service) CreateAlert(ctx context.Context, userID string, ticker string, targetPrice float64, condition string) (*Alert, error) {
+// CreateAlert valida dados, auto-descobre o ativo se necessário e persiste o alerta.
+func (s *Service) CreateAlert(ctx context.Context, userID, ticker string, targetPrice float64, condition string) (*Alert, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
 	condition = strings.ToUpper(strings.TrimSpace(condition))
 
@@ -59,7 +59,7 @@ func (s *Service) CreateAlert(ctx context.Context, userID string, ticker string,
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		// 2. Se o ativo for inédito, consulta no provedor Yahoo Finance para validar sua existência
-		log.Printf("[Alerts] Ativo %s não encontrado localmente. Validando no Yahoo Finance...", ticker)
+		slog.InfoContext(ctx, "ativo não encontrado localmente, validando no provedor", slog.String("ticker", ticker))
 		quote, err := s.marketProvider.GetQuote(ctx, ticker)
 		if err != nil {
 			return nil, fmt.Errorf("o ativo '%s' não existe ou não é suportado pelo provedor de mercado: %w", ticker, err)
@@ -77,7 +77,7 @@ func (s *Service) CreateAlert(ctx context.Context, userID string, ticker string,
 		if err != nil {
 			return nil, fmt.Errorf("erro ao registrar o novo ativo no banco de dados: %w", err)
 		}
-		log.Printf("[Alerts] Novo ativo %s cadastrado com ID %s", ticker, assetID)
+		slog.InfoContext(ctx, "novo ativo cadastrado com sucesso", slog.String("ticker", ticker), slog.String("asset_id", assetID))
 	}
 
 	// 4. Cria e salva o alerta como ACTIVE
