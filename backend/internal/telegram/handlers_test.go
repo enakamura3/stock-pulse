@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/onigiri/stock-pulse/backend/internal/alert"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
@@ -195,22 +196,53 @@ func (m *MockFixedIncomeSvc) GetTreasuryPositions(ctx context.Context, portfolio
 	return nil, args.Error(1)
 }
 
-func setupHandlersTest() (*Handlers, *MockService, *MockPortfolioService, *MockMarketSvc, *MockFixedIncomeSvc) {
+type MockAlertSvc struct {
+	mock.Mock
+}
+
+func (m *MockAlertSvc) CreateAlert(ctx context.Context, userID, ticker string, targetPrice float64, condition string) (*alert.Alert, error) {
+	args := m.Called(ctx, userID, ticker, targetPrice, condition)
+	if args.Get(0) != nil {
+		return args.Get(0).(*alert.Alert), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockAlertSvc) GetAlerts(ctx context.Context, userID string) ([]*alert.Alert, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) != nil {
+		return args.Get(0).([]*alert.Alert), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockAlertSvc) DeleteAlert(ctx context.Context, id string, userID string) error {
+	args := m.Called(ctx, id, userID)
+	return args.Error(0)
+}
+
+func (m *MockAlertSvc) ToggleAlert(ctx context.Context, id string, userID string) (string, error) {
+	args := m.Called(ctx, id, userID)
+	return args.String(0), args.Error(1)
+}
+
+func setupHandlersTest() (*Handlers, *MockService, *MockPortfolioService, *MockMarketSvc, *MockFixedIncomeSvc, *MockAlertSvc) {
 	svc := new(MockService)
 	pSvc := new(MockPortfolioService)
 	mSvc := new(MockMarketSvc)
 	fiSvc := new(MockFixedIncomeSvc)
-	return NewHandlers(svc, pSvc, mSvc, fiSvc), svc, pSvc, mSvc, fiSvc
+	alertSvc := new(MockAlertSvc)
+	return NewHandlers(svc, pSvc, mSvc, fiSvc, alertSvc), svc, pSvc, mSvc, fiSvc, alertSvc
 }
 
 func TestHandlers_Register(t *testing.T) {
 	bot, _ := telebot.NewBot(telebot.Settings{Offline: true})
-	h, _, _, _, _ := setupHandlersTest()
+	h, _, _, _, _, _ := setupHandlersTest()
 	h.Register(bot)
 }
 
 func TestHandlers_HandleStart(t *testing.T) {
-	h, svc, _, _, _ := setupHandlersTest()
+	h, svc, _, _, _, _ := setupHandlersTest()
 
 	t.Run("no args", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -259,7 +291,7 @@ func TestHandlers_HandleStart(t *testing.T) {
 }
 
 func TestHandlers_GetUserID(t *testing.T) {
-	h, _, _, _, _ := setupHandlersTest()
+	h, _, _, _, _, _ := setupHandlersTest()
 
 	t.Run("valid user_id", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -318,7 +350,7 @@ func TestHandlers_GetUserID(t *testing.T) {
 }
 
 func TestHandlers_Unauthenticated_Handlers(t *testing.T) {
-	h, _, _, _, _ := setupHandlersTest()
+	h, _, _, _, _, _ := setupHandlersTest()
 
 	t.Run("HandlePortfolioSummary unauthenticated", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
