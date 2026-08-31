@@ -83,6 +83,21 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 		return h.handleSelectedQty(c, qtyStr)
 	}
 
+	if strings.HasPrefix(data, "btn_alert_toggle_") {
+		alertID := strings.TrimPrefix(data, "btn_alert_toggle_")
+		return h.handleAlertToggle(c, alertID)
+	}
+
+	if strings.HasPrefix(data, "btn_alert_del_") {
+		alertID := strings.TrimPrefix(data, "btn_alert_del_")
+		return h.handleAlertDelete(c, alertID)
+	}
+
+	if strings.HasPrefix(data, "btn_alert_cond_") {
+		condition := strings.TrimPrefix(data, "btn_alert_cond_")
+		return h.handleAlertCondition(c, strings.ToUpper(condition))
+	}
+
 	return nil
 }
 
@@ -102,13 +117,16 @@ func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error 
 	btnSell := menu.Data("🔴 Venda", "btn_sell")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 
-	menu.Inline(menu.Row(btnBuy, btnSell), menu.Row(btnCancel))
+	menu.Inline(
+		menu.Row(btnBuy, btnSell),
+		menu.Row(btnCancel),
+	)
 
-	msg := fmt.Sprintf("Operação para *%s*.\n\nÉ uma operação de *Compra* ou *Venda*?", ticker)
+	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", ticker)
 	if c.Callback() != nil {
-		return c.Edit(msg, telebot.ModeMarkdown, menu)
+		return c.Edit(text, telebot.ModeMarkdown, menu)
 	}
-	return c.Send(msg, telebot.ModeMarkdown, menu)
+	return c.Send(text, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleNewAsset(c telebot.Context) error {
@@ -133,26 +151,32 @@ func (h *Handlers) HandleSetTypeSell(c telebot.Context) error {
 	return h.handleSetType(c, "SELL")
 }
 
-func (h *Handlers) handleSetType(c telebot.Context, txType string) error {
+func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 	defer c.Respond()
 	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
 	if err != nil || state == nil {
 		return c.Edit("⚠️ Nenhuma operação em andamento.")
 	}
 
-	state.Type = txType
+	state.Type = opType
 	state.Step = "EXPECT_QTY"
 	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
 
 	menu := &telebot.ReplyMarkup{}
-	btnQ1 := menu.Data("1", "btn_qty_1")
-	btnQ10 := menu.Data("10", "btn_qty_10")
-	btnQ100 := menu.Data("100", "btn_qty_100")
+	b1 := menu.Data("1", "btn_qty_1")
+	b5 := menu.Data("5", "btn_qty_5")
+	b10 := menu.Data("10", "btn_qty_10")
+	b50 := menu.Data("50", "btn_qty_50")
+	b100 := menu.Data("100", "btn_qty_100")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 
-	menu.Inline(menu.Row(btnQ1, btnQ10, btnQ100), menu.Row(btnCancel))
+	menu.Inline(
+		menu.Row(b1, b5, b10),
+		menu.Row(b50, b100),
+		menu.Row(btnCancel),
+	)
 
-	return c.Edit("Qual a quantidade negociada?\n\nEscolha abaixo ou digite o valor:", menu)
+	return c.Edit("Qual a quantidade negociada? (Escolha abaixo ou digite o valor no chat):", menu)
 }
 
 func (h *Handlers) handleSelectedQty(c telebot.Context, qtyStr string) error {
@@ -253,6 +277,68 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		successMenu := &telebot.ReplyMarkup{}
 		btnMenu := successMenu.Data("🏠 Voltar ao Menu", "btn_menu")
 		successMenu.Inline(successMenu.Row(btnMenu))
+
+		return c.Send(successMsg, telebot.ModeMarkdown, successMenu)
+
+	case "ALERT_EXPECT_TICKER":
+		ticker := strings.ToUpper(text)
+		_, err := h.marketSvc.GetQuote(context.Background(), ticker)
+		if err != nil {
+			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
+		}
+
+		state.Ticker = ticker
+		state.Step = "ALERT_EXPECT_COND"
+		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+
+		condMenu := &telebot.ReplyMarkup{}
+		btnAbove := condMenu.Data("🟢 Acima de (>=)", "btn_alert_cond_above")
+		btnBelow := condMenu.Data("🔴 Abaixo de (<=)", "btn_alert_cond_below")
+		btnCancelOp := condMenu.Data("❌ Cancelar", "btn_cancel_op")
+		condMenu.Inline(
+			condMenu.Row(btnAbove, btnBelow),
+			condMenu.Row(btnCancelOp),
+		)
+
+		return c.Send(fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", ticker), telebot.ModeMarkdown, condMenu)
+
+	case "ALERT_EXPECT_PRICE":
+		text = strings.ReplaceAll(text, ",", ".")
+		var price float64
+		if _, err := fmt.Sscanf(text, "%f", &price); err != nil || price <= 0 {
+			return c.Send("⚠️ Preço inválido. Por favor, envie apenas o número positivo (ex: 35.50):", menu)
+		}
+
+		userIDStr, err := h.getUserID(c)
+		if err != nil {
+			return err
+		}
+
+		createdAlert, err := h.alertSvc.CreateAlert(context.Background(), userIDStr, state.Ticker, price, state.Type)
+		if err != nil {
+			slog.Error("Erro ao criar alerta via telegram", "error", err)
+			return c.Send("❌ Ocorreu um erro ao salvar o alerta. Tente novamente mais tarde.", menu)
+		}
+
+		_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+
+		condStr := "acima de"
+		if createdAlert.Condition == "BELOW" {
+			condStr = "abaixo de"
+		}
+		curr := createdAlert.Currency
+		if curr == "" {
+			curr = "BRL"
+		}
+
+		p := message.NewPrinter(language.BrazilianPortuguese)
+		successMsg := p.Sprintf("✅ *Alerta Criado com Sucesso!*\n\n• Ativo: `%s`\n• Condição: Quando estiver %s %s %.2f",
+			createdAlert.Ticker, condStr, getCurrencySymbol(curr), createdAlert.TargetPrice)
+
+		successMenu := &telebot.ReplyMarkup{}
+		btnAlertsList := successMenu.Data("🔔 Meus Alertas", "btn_alerts")
+		btnMenuBack := successMenu.Data("🏠 Menu", "btn_menu")
+		successMenu.Inline(successMenu.Row(btnAlertsList, btnMenuBack))
 
 		return c.Send(successMsg, telebot.ModeMarkdown, successMenu)
 	}

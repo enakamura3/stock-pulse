@@ -58,14 +58,14 @@ func TestBotRunner_LifecycleAndUsername(t *testing.T) {
 	})
 
 	t.Run("NewBotRunner invalid token returns error", func(t *testing.T) {
-		h, _, _, _, _ := setupHandlersTest()
+		h, _, _, _, _, _ := setupHandlersTest()
 		runner, err := NewBotRunner("invalid_token_xyz", h)
 		assert.Error(t, err)
 		assert.Nil(t, runner)
 	})
 
 	t.Run("NewBotRunnerWithSettings success", func(t *testing.T) {
-		h, _, _, _, _ := setupHandlersTest()
+		h, _, _, _, _, _ := setupHandlersTest()
 		runner, err := NewBotRunnerWithSettings(telebot.Settings{Offline: true}, h)
 		assert.NoError(t, err)
 		assert.NotNil(t, runner)

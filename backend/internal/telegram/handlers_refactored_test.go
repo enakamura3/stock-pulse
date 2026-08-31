@@ -18,7 +18,7 @@ import (
 )
 
 func TestHandlers_AuthMiddleware(t *testing.T) {
-	h, svc, _, _, _ := setupHandlersTest()
+	h, svc, _, _, _, _ := setupHandlersTest()
 
 	t.Run("ignore /start message", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -98,7 +98,7 @@ func TestHandlers_AuthMiddleware(t *testing.T) {
 }
 
 func TestHandlers_HandleMenuAndCallback(t *testing.T) {
-	h, svc, pSvc, _, _ := setupHandlersTest()
+	h, svc, pSvc, _, _, _ := setupHandlersTest()
 
 	t.Run("HandleMenu - no portfolios", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -159,7 +159,7 @@ func TestHandlers_HandleMenuAndCallback(t *testing.T) {
 }
 
 func TestHandlers_PortfolioSummaryAndSelection(t *testing.T) {
-	h, svc, pSvc, _, fiSvc := setupHandlersTest()
+	h, svc, pSvc, _, fiSvc, _ := setupHandlersTest()
 
 	t.Run("HandlePortfolioSummary - no portfolios", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -254,7 +254,7 @@ func TestHandlers_PortfolioSummaryAndSelection(t *testing.T) {
 }
 
 func TestHandlers_Dividends(t *testing.T) {
-	h, svc, pSvc, _, _ := setupHandlersTest()
+	h, svc, pSvc, _, _, _ := setupHandlersTest()
 
 	t.Run("HandleDividends - success", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -396,7 +396,7 @@ func TestHandlers_Dividends(t *testing.T) {
 }
 
 func TestHandlers_HistoryAndFixedIncome(t *testing.T) {
-	h, svc, pSvc, _, fiSvc := setupHandlersTest()
+	h, svc, pSvc, _, fiSvc, _ := setupHandlersTest()
 
 	t.Run("HandleHistory - success", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -474,7 +474,7 @@ func TestHandlers_HistoryAndFixedIncome(t *testing.T) {
 }
 
 func TestHandlers_Operations(t *testing.T) {
-	h, svc, pSvc, mSvc, _ := setupHandlersTest()
+	h, svc, pSvc, mSvc, _, _ := setupHandlersTest()
 
 	t.Run("HandleCancelOperation - success", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -648,7 +648,7 @@ func TestGetCurrencySymbolAndAbbreviate(t *testing.T) {
 }
 
 func TestHandlers_ExtraErrors(t *testing.T) {
-	h, svc, pSvc, _, fiSvc := setupHandlersTest()
+	h, svc, pSvc, _, fiSvc, _ := setupHandlersTest()
 
 	t.Run("fetchDividends - no portfolios", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -831,7 +831,7 @@ func TestHandlers_ExtraErrors(t *testing.T) {
 }
 
 func TestHandlers_TextErrors(t *testing.T) {
-	h, svc, pSvc, mSvc, _ := setupHandlersTest()
+	h, svc, pSvc, mSvc, _, _ := setupHandlersTest()
 
 	t.Run("HandleText - state nil", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -901,7 +901,7 @@ func TestHandlers_TextErrors(t *testing.T) {
 }
 
 func TestHandlers_DynamicCallbackExtra(t *testing.T) {
-	h, svc, pSvc, _, _ := setupHandlersTest()
+	h, svc, pSvc, _, _, _ := setupHandlersTest()
 
 	t.Run("HandleDynamicCallback - dispatch btn_sel_port_", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -994,7 +994,7 @@ func TestGetMacroCategoryKey(t *testing.T) {
 }
 
 func TestHandleHistory_WithFee(t *testing.T) {
-	h, svc, portSvc, _, _ := setupHandlersTest()
+	h, svc, portSvc, _, _, _ := setupHandlersTest()
 
 	t.Run("renders transaction history with fee when fee > 0", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -1027,7 +1027,7 @@ func TestHandleHistory_WithFee(t *testing.T) {
 }
 
 func TestHandlePortfolioSummary_IncludesTreasury(t *testing.T) {
-	h, svc, portSvc, _, fiSvc := setupHandlersTest()
+	h, svc, portSvc, _, fiSvc, _ := setupHandlersTest()
 
 	t.Run("includes treasury positions in portfolio total value and breakdown", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -1068,7 +1068,7 @@ func TestHandlePortfolioSummary_IncludesTreasury(t *testing.T) {
 }
 
 func TestHandlePortfolioSummary_WithBenchmarks(t *testing.T) {
-	h, svc, portSvc, mSvc, fiSvc := setupHandlersTest()
+	h, svc, portSvc, mSvc, fiSvc, _ := setupHandlersTest()
 
 	t.Run("displays benchmarks when available", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -1115,7 +1115,7 @@ func TestHandlePortfolioSummary_WithBenchmarks(t *testing.T) {
 }
 
 func TestHandleAssetList(t *testing.T) {
-	h, svc, portSvc, _, _ := setupHandlersTest()
+	h, svc, portSvc, _, _, _ := setupHandlersTest()
 
 	t.Run("success with pagination", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -1171,7 +1171,7 @@ func TestHandleAssetList(t *testing.T) {
 }
 
 func TestHandleHistory_Filter(t *testing.T) {
-	h, svc, portSvc, _, _ := setupHandlersTest()
+	h, svc, portSvc, _, _, _ := setupHandlersTest()
 
 	t.Run("filter BUY only", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -1263,7 +1263,7 @@ func TestHandleHistory_Filter(t *testing.T) {
 }
 
 func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
-	h, svc, portSvc, _, fiSvc := setupHandlersTest()
+	h, svc, portSvc, _, fiSvc, _ := setupHandlersTest()
 
 	t.Run("resolveActivePortfolio all branches", func(t *testing.T) {
 		ctx := context.Background()
@@ -1557,7 +1557,7 @@ func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
 }
 
 func TestHandlers_DeepBranchCoverage(t *testing.T) {
-	h, svc, portSvc, mSvc, fiSvc := setupHandlersTest()
+	h, svc, portSvc, mSvc, fiSvc, _ := setupHandlersTest()
 
 	t.Run("HandleDividends with multiple currencies, >5 items, empty currency, zero qty", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
@@ -1888,7 +1888,7 @@ func TestHandlers_DeepBranchCoverage(t *testing.T) {
 	})
 
 	t.Run("HandleFixedIncome nil service", func(t *testing.T) {
-		hNilFI := NewHandlers(svc, portSvc, mSvc, nil)
+		hNilFI := NewHandlers(svc, portSvc, mSvc, nil, nil)
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 		mCtx.On("Edit", "⚠️ Módulo de Renda Fixa não está ativo.", mock.Anything).Return(nil).Once()
