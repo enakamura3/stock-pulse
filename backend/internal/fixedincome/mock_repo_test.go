@@ -46,6 +46,11 @@ func (m *MockFullRepo) DeleteAsset(ctx context.Context, assetID string) error {
 	return args.Error(0)
 }
 
+func (m *MockFullRepo) ValidatePortfolioOwnership(ctx context.Context, portfolioID, userID string) error {
+	args := m.Called(ctx, portfolioID, userID)
+	return args.Error(0)
+}
+
 func (m *MockFullRepo) CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error) {
 	args := m.Called(ctx, tx)
 	if args.Get(0) == nil {
