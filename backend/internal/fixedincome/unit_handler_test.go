@@ -100,6 +100,22 @@ func (m *mockService) BulkAddTransactions(ctx context.Context, portfolioID strin
 	return args.Get(0).(*BulkImportResult), args.Error(1)
 }
 
+func (m *mockService) BulkAddTreasuryTransactions(ctx context.Context, portfolioID string, file multipart.File) (*BulkImportResult, error) {
+	args := m.Called(ctx, portfolioID, file)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*BulkImportResult), args.Error(1)
+}
+
+func (m *mockService) ExportTreasuryTransactions(ctx context.Context, portfolioID string) ([]byte, error) {
+	args := m.Called(ctx, portfolioID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]byte), args.Error(1)
+}
+
 func (m *mockService) GetRawTransactions(ctx context.Context, portfolioID string) ([]Transaction, error) {
 	args := m.Called(ctx, portfolioID)
 	if args.Get(0) == nil {
@@ -511,6 +527,16 @@ func TestHandler_EmptyPortfolioID_Branches(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.getTreasuryMonthlyYields(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// bulkImportTreasuryTransactions
+	w = httptest.NewRecorder()
+	h.bulkImportTreasuryTransactions(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// exportTreasuryTransactions
+	w = httptest.NewRecorder()
+	h.exportTreasuryTransactions(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestHandler_NilSliceFallbacks(t *testing.T) {
@@ -780,3 +806,92 @@ func TestHandler_AdditionalErrorBranches(t *testing.T) {
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+func TestHandler_BulkImportTreasuryTransactions(t *testing.T) {
+	_, svc, repo, r := setupHandlerTest()
+	repo.On("ValidatePortfolioOwnership", mock.Anything, "p1", "u1").Return(nil)
+
+	// 1. Invalid multipart
+	req := authReq(httptest.NewRequest("POST", "/portfolios/p1/treasury/bulk", bytes.NewBufferString("not multipart")), "u1")
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=bad_boundary")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// 2. Missing file field
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	writer.WriteField("other", "val")
+	writer.Close()
+	req = authReq(httptest.NewRequest("POST", "/portfolios/p1/treasury/bulk", &buf), "u1")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// 3. Service error (500)
+	buf.Reset()
+	writer = multipart.NewWriter(&buf)
+	part, _ := writer.CreateFormFile("file", "treasury.csv")
+	part.Write([]byte("date;ticker;type;quantity;price\n"))
+	writer.Close()
+	svc.On("BulkAddTreasuryTransactions", mock.Anything, "p1", mock.Anything).Return(nil, errors.New("import error")).Once()
+	req = authReq(httptest.NewRequest("POST", "/portfolios/p1/treasury/bulk", &buf), "u1")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	// 4. Success (200)
+	buf.Reset()
+	writer = multipart.NewWriter(&buf)
+	part, _ = writer.CreateFormFile("file", "treasury.csv")
+	part.Write([]byte("date;ticker;type;quantity;price\n"))
+	writer.Close()
+	svc.On("BulkAddTreasuryTransactions", mock.Anything, "p1", mock.Anything).Return(&BulkImportResult{Success: 2}, nil).Once()
+	req = authReq(httptest.NewRequest("POST", "/portfolios/p1/treasury/bulk", &buf), "u1")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// 5. Partial content (206)
+	buf.Reset()
+	writer = multipart.NewWriter(&buf)
+	part, _ = writer.CreateFormFile("file", "treasury.csv")
+	part.Write([]byte("date;ticker;type;quantity;price\n"))
+	writer.Close()
+	svc.On("BulkAddTreasuryTransactions", mock.Anything, "p1", mock.Anything).Return(&BulkImportResult{
+		Success: 1,
+		Errors:  []string{"row 2 invalid"},
+	}, nil).Once()
+	req = authReq(httptest.NewRequest("POST", "/portfolios/p1/treasury/bulk", &buf), "u1")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusPartialContent, w.Code)
+}
+
+func TestHandler_ExportTreasuryTransactions(t *testing.T) {
+	_, svc, repo, r := setupHandlerTest()
+	repo.On("ValidatePortfolioOwnership", mock.Anything, "p1", "u1").Return(nil)
+
+	// 1. Service error (500)
+	svc.On("ExportTreasuryTransactions", mock.Anything, "p1").Return(nil, errors.New("export error")).Once()
+	req := authReq(httptest.NewRequest("GET", "/portfolios/p1/treasury/export", nil), "u1")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	// 2. Success (200)
+	csvData := []byte("Date;Ticker;Type;Quantity;UnitPrice\n2026-01-15;Tesouro Selic 2029;SUBSCRIPTION;1;14000\n")
+	svc.On("ExportTreasuryTransactions", mock.Anything, "p1").Return(csvData, nil).Once()
+	req = authReq(httptest.NewRequest("GET", "/portfolios/p1/treasury/export", nil), "u1")
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "text/csv; charset=utf-8", w.Header().Get("Content-Type"))
+	assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment; filename=\"tesouro-direto-p1.csv\"")
+	assert.Equal(t, csvData, w.Body.Bytes())
+}
+

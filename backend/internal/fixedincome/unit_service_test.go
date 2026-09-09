@@ -254,3 +254,29 @@ func TestService_CalculateMonthlyYields(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, yields)
 }
+
+func TestService_TriggerBackfill(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Nil bcbClient
+	svcNil := NewService(&MockFullRepo{}, nil)
+	svcNil.TriggerBackfill(ctx, "CDI", time.Now().AddDate(0, 0, -10))
+
+	// 2. Normal execution with latest rate after penúltimo dia and rates fetched
+	mockRepo := &MockFullRepo{}
+	mockBcb := &mockBCB{}
+	svc := NewService(mockRepo, mockBcb)
+
+	rates := []IndexRate{{Date: time.Now(), Rate: 0.05}}
+	mockRepo.On("GetLatestIndexRate", ctx, "CDI").Return(&IndexRate{Date: time.Now()}, nil).Once()
+	mockBcb.On("FetchRates", ctx, "CDI", mock.Anything, mock.Anything).Return(rates, nil).Once()
+	mockRepo.On("SaveIndexRates", ctx, rates).Return(nil).Once()
+
+	svc.TriggerBackfill(ctx, "CDI", time.Now().AddDate(0, 0, -10))
+
+	// 3. Normal execution where latest rate is nil and rates fetch errors
+	mockRepo.On("GetLatestIndexRate", ctx, "SELIC").Return(nil, errors.New("not found")).Once()
+	mockBcb.On("FetchRates", ctx, "SELIC", mock.Anything, mock.Anything).Return(nil, errors.New("bcb error")).Once()
+
+	svc.TriggerBackfill(ctx, "SELIC", time.Now().AddDate(0, 0, -10))
+}
