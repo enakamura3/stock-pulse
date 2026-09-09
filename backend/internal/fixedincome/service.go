@@ -134,6 +134,9 @@ func (s *service) DeleteTransaction(ctx context.Context, portfolioID, txID strin
 }
 
 func (s *service) TriggerBackfill(ctx context.Context, indexer string, startDate time.Time) {
+	if s.bcbClient == nil {
+		return
+	}
 	// Pega até a data atual
 	endDate := time.Now()
 

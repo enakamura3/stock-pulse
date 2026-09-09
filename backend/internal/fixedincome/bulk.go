@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"math"
 	"mime/multipart"
 	"strconv"
 	"strings"
@@ -96,7 +97,7 @@ func (s *service) BulkAddTransactions(ctx context.Context, portfolioID string, f
 		// Busca ou cria o ativo baseado nos dados
 		var targetAsset *Asset
 		for i, a := range existingAssets {
-			if a.Institution == assetName && a.Indexer == indexer && a.Rate == rate {
+			if a.Institution == assetName && a.Indexer == indexer && math.Abs(a.Rate-rate) < 1e-6 {
 				targetAsset = &existingAssets[i]
 				break
 			}
