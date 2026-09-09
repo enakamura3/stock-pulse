@@ -331,7 +331,9 @@ func (r *Repository) SaveDailyPrices(ctx context.Context, assetID string, prices
 	query := `
 		INSERT INTO asset_daily_price (asset_id, price_date, close_price, created_at)
 		VALUES ($1, $2, $3, NOW())
-		ON CONFLICT (asset_id, price_date) DO NOTHING
+		ON CONFLICT (asset_id, price_date) DO UPDATE
+		SET close_price = EXCLUDED.close_price
+		WHERE ABS(asset_daily_price.close_price - EXCLUDED.close_price) > 1e-6
 	`
 
 	for _, p := range prices {

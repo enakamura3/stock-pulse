@@ -14,6 +14,8 @@ type DailyWorker struct {
 	marketProvider market.QuoteProvider
 }
 
+var loadLocation = time.LoadLocation
+
 // NewDailyWorker cria uma nova instância do DailyWorker.
 func NewDailyWorker(repo PortfolioRepository, marketProvider market.QuoteProvider) *DailyWorker {
 	return &DailyWorker{
@@ -39,7 +41,11 @@ func (w *DailyWorker) Run(ctx context.Context) {
 
 	slog.Info("Sincronizando preços diários de ativos em lote", "count", len(assets))
 
-	now := time.Now().UTC()
+	loc, err := loadLocation("America/Sao_Paulo")
+	if err != nil {
+		loc = time.FixedZone("BRT", -3*60*60)
+	}
+	now := time.Now().In(loc)
 	// Normaliza a data (DATE) zerando as frações de hora para conformidade PostgreSQL
 	priceDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
@@ -54,6 +60,11 @@ func (w *DailyWorker) Run(ctx context.Context) {
 		quote, err := w.marketProvider.GetQuote(ctx, asset.Ticker)
 		if err != nil {
 			slog.Error("Erro ao obter cotação diária do provedor de mercado", "ticker", asset.Ticker, "error", err)
+			continue
+		}
+
+		if quote == nil || quote.Price <= 1e-6 {
+			slog.Warn("Cotação inválida ou nula recebida para o ativo", "ticker", asset.Ticker)
 			continue
 		}
 
