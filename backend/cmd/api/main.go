@@ -220,10 +220,10 @@ func main() {
 		r.Get("/swagger/openapi.yaml", docsHandler.ServeYAML)
 
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", authHandler.Register)
-			r.Post("/login", authHandler.Login)
+			r.With(customMiddleware.RateLimitAuthRegister(rdb)).Post("/register", authHandler.Register)
+			r.With(customMiddleware.RateLimitAuthLogin(rdb)).Post("/login", authHandler.Login)
 			r.Post("/logout", authHandler.Logout)
-			r.Post("/refresh", authHandler.Refresh)
+			r.With(customMiddleware.RateLimitAuthRefresh(rdb)).Post("/refresh", authHandler.Refresh)
 			r.With(customMiddleware.AuthRequired([]byte(jwtSecret))).Get("/me", authHandler.Me)
 		})
 
@@ -284,7 +284,7 @@ func main() {
 			// Integração Telegram
 			r.Route("/telegram", func(r chi.Router) {
 				r.Get("/status", telegramHttpHandler.GetTelegramStatus)
-				r.Post("/link", telegramHttpHandler.GenerateLinkToken)
+				r.With(customMiddleware.RateLimitTelegramLink(rdb)).Post("/link", telegramHttpHandler.GenerateLinkToken)
 				r.Delete("/link", telegramHttpHandler.UnlinkTelegram)
 			})
 
