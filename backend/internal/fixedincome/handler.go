@@ -3,9 +3,12 @@ package fixedincome
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
+	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
 type Handler struct {
@@ -20,8 +23,29 @@ func NewHandler(service Service, repo Repository) *Handler {
 	}
 }
 
+func (h *Handler) portfolioAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := r.Context().Value(auth.UserIDKey).(string)
+		if !ok || userID == "" {
+			httputils.RespondWithError(w, http.StatusUnauthorized, "Não autorizado")
+			return
+		}
+		portfolioID := chi.URLParam(r, "portfolioID")
+		if portfolioID == "" {
+			httputils.RespondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+			return
+		}
+		if err := h.repo.ValidatePortfolioOwnership(r.Context(), portfolioID, userID); err != nil {
+			httputils.RespondWithError(w, http.StatusNotFound, "Carteira não encontrada ou permissão negada")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Route("/portfolios/{portfolioID}/fixed-income", func(r chi.Router) {
+		r.Use(h.portfolioAuthMiddleware)
 		r.Get("/positions", h.getPositions)
 		r.Get("/performance", h.getPerformance)
 		r.Get("/monthly-yields", h.getMonthlyYields)
@@ -34,6 +58,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	})
 
 	r.Route("/portfolios/{portfolioID}/treasury", func(r chi.Router) {
+		r.Use(h.portfolioAuthMiddleware)
 		r.Get("/positions", h.getTreasuryPositions)
 		r.Get("/transactions", h.getTreasuryTransactions)
 		r.Post("/transactions", h.createTreasuryTransaction)
@@ -47,47 +72,45 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 func (h *Handler) getMonthlyYields(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
 	yields, err := h.service.CalculateMonthlyYields(r.Context(), portfolioID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if yields == nil {
 		yields = []MonthlyYield{}
 	}
-	json.NewEncoder(w).Encode(yields)
+	httputils.RespondWithJSON(w, http.StatusOK, yields)
 }
 
 func (h *Handler) getPositions(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
 	positions, err := h.service.GetPortfolioPositions(r.Context(), portfolioID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if positions == nil {
 		positions = []Position{}
 	}
-	json.NewEncoder(w).Encode(positions)
+	httputils.RespondWithJSON(w, http.StatusOK, positions)
 }
 
 func (h *Handler) getPerformance(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
@@ -98,15 +121,14 @@ func (h *Handler) getPerformance(w http.ResponseWriter, r *http.Request) {
 
 	performance, err := h.service.GetPortfolioPerformance(r.Context(), portfolioID, period)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if performance == nil {
 		performance = []PerformancePoint{}
 	}
-	json.NewEncoder(w).Encode(performance)
+	httputils.RespondWithJSON(w, http.StatusOK, performance)
 }
 
 func (h *Handler) createAsset(w http.ResponseWriter, r *http.Request) {
@@ -114,28 +136,33 @@ func (h *Handler) createAsset(w http.ResponseWriter, r *http.Request) {
 
 	var asset Asset
 	if err := json.NewDecoder(r.Body).Decode(&asset); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	asset.PortfolioID = portfolioID
 
 	created, err := h.service.CreateAsset(r.Context(), &asset)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(created)
+	httputils.RespondWithJSON(w, http.StatusCreated, created)
 }
 
 func (h *Handler) deleteAsset(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
 	assetID := chi.URLParam(r, "assetID")
 
-	err := h.repo.DeleteAsset(r.Context(), assetID)
+	asset, err := h.repo.GetAssetByID(r.Context(), assetID)
+	if err != nil || asset == nil || asset.PortfolioID != portfolioID {
+		httputils.RespondWithError(w, http.StatusNotFound, "Ativo não encontrado na carteira informada")
+		return
+	}
+
+	err = h.repo.DeleteAsset(r.Context(), assetID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -143,24 +170,29 @@ func (h *Handler) deleteAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createTransaction(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
 	assetID := chi.URLParam(r, "assetID")
+
+	asset, err := h.repo.GetAssetByID(r.Context(), assetID)
+	if err != nil || asset == nil || asset.PortfolioID != portfolioID {
+		httputils.RespondWithError(w, http.StatusNotFound, "Ativo não encontrado na carteira informada")
+		return
+	}
 
 	var tx Transaction
 	if err := json.NewDecoder(r.Body).Decode(&tx); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	tx.AssetID = assetID
 
 	created, err := h.service.CreateTransaction(r.Context(), &tx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(created)
+	httputils.RespondWithJSON(w, http.StatusCreated, created)
 }
 
 func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +207,7 @@ func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -187,10 +219,10 @@ func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
 
 	err := h.service.UpdateTransaction(r.Context(), portfolioID, txID, &tx, payload.MaturityDate)
 	if err != nil {
-		if err.Error() == "unauthorized: transaction does not belong to the portfolio" {
-			http.Error(w, err.Error(), http.StatusForbidden)
+		if strings.Contains(err.Error(), "unauthorized") {
+			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -204,10 +236,10 @@ func (h *Handler) deleteTransaction(w http.ResponseWriter, r *http.Request) {
 
 	err := h.service.DeleteTransaction(r.Context(), portfolioID, txID)
 	if err != nil {
-		if err.Error() == "unauthorized: transaction does not belong to the portfolio" {
-			http.Error(w, err.Error(), http.StatusForbidden)
+		if strings.Contains(err.Error(), "unauthorized") {
+			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -218,130 +250,136 @@ func (h *Handler) deleteTransaction(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) bulkImportTransactions(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "ID da carteira é obrigatório", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
 		return
 	}
 
 	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
 	if err != nil {
-		http.Error(w, "Erro ao ler o formulário", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "Erro ao ler o formulário")
 		return
 	}
 
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "Arquivo CSV é obrigatório", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "Arquivo CSV é obrigatório")
 		return
 	}
 	defer file.Close()
 
 	res, err := h.service.BulkAddTransactions(r.Context(), portfolioID, file)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	status := http.StatusOK
 	if len(res.Errors) > 0 {
-		w.WriteHeader(http.StatusPartialContent)
-	} else {
-		w.WriteHeader(http.StatusOK)
+		status = http.StatusPartialContent
 	}
-	json.NewEncoder(w).Encode(res)
+	httputils.RespondWithJSON(w, status, res)
 }
 
 func (h *Handler) getTreasuryPositions(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
 	positions, err := h.service.GetTreasuryPositions(r.Context(), portfolioID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(positions)
+	if positions == nil {
+		positions = []TreasuryPosition{}
+	}
+	httputils.RespondWithJSON(w, http.StatusOK, positions)
 }
 
 func (h *Handler) getTreasuryTransactions(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
 	transactions, err := h.service.GetTreasuryTransactions(r.Context(), portfolioID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(transactions)
+	if transactions == nil {
+		transactions = []TreasuryTxRequest{}
+	}
+	httputils.RespondWithJSON(w, http.StatusOK, transactions)
 }
 
 func (h *Handler) createTreasuryTransaction(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
 	var req TreasuryTxRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	res, err := h.service.CreateTreasuryTransaction(r.Context(), portfolioID, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(res)
+	httputils.RespondWithJSON(w, http.StatusCreated, res)
 }
 
 func (h *Handler) getTreasuryPerformance(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
 	performance, err := h.service.GetTreasuryPerformance(r.Context(), portfolioID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(performance)
+	if performance == nil {
+		performance = []TreasuryPerfPoint{}
+	}
+	httputils.RespondWithJSON(w, http.StatusOK, performance)
 }
 
 func (h *Handler) updateTreasuryTransaction(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	txID := chi.URLParam(r, "txID")
 	if portfolioID == "" || txID == "" {
-		http.Error(w, "portfolioID and txID are required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID and txID are required")
 		return
 	}
 
 	var req TreasuryTxRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	err := h.service.UpdateTreasuryTransaction(r.Context(), portfolioID, txID, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if strings.Contains(err.Error(), "unauthorized") {
+			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
+		} else {
+			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 
@@ -352,13 +390,17 @@ func (h *Handler) deleteTreasuryTransaction(w http.ResponseWriter, r *http.Reque
 	portfolioID := chi.URLParam(r, "portfolioID")
 	txID := chi.URLParam(r, "txID")
 	if portfolioID == "" || txID == "" {
-		http.Error(w, "portfolioID and txID are required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID and txID are required")
 		return
 	}
 
 	err := h.service.DeleteTreasuryTransaction(r.Context(), portfolioID, txID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if strings.Contains(err.Error(), "unauthorized") {
+			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
+		} else {
+			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 
@@ -368,19 +410,18 @@ func (h *Handler) deleteTreasuryTransaction(w http.ResponseWriter, r *http.Reque
 func (h *Handler) getTreasuryMonthlyYields(w http.ResponseWriter, r *http.Request) {
 	portfolioID := chi.URLParam(r, "portfolioID")
 	if portfolioID == "" {
-		http.Error(w, "portfolioID is required", http.StatusBadRequest)
+		httputils.RespondWithError(w, http.StatusBadRequest, "portfolioID is required")
 		return
 	}
 
 	yields, err := h.service.GetTreasuryMonthlyYields(r.Context(), portfolioID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if yields == nil {
 		yields = []MonthlyYield{}
 	}
-	json.NewEncoder(w).Encode(yields)
+	httputils.RespondWithJSON(w, http.StatusOK, yields)
 }

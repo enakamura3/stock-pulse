@@ -15,6 +15,7 @@ type Repository interface {
 	GetAssetByID(ctx context.Context, assetID string) (*Asset, error)
 	UpdateAsset(ctx context.Context, asset *Asset) error
 	DeleteAsset(ctx context.Context, assetID string) error
+	ValidatePortfolioOwnership(ctx context.Context, portfolioID, userID string) error
 
 	CreateTransaction(ctx context.Context, tx *Transaction) (*Transaction, error)
 	GetTransactionsByAsset(ctx context.Context, assetID string) ([]Transaction, error)
@@ -751,4 +752,17 @@ func (r *repository) GetRedemptionsForAsset(ctx context.Context, tx pgx.Tx, port
 		redemptions = append(redemptions, t)
 	}
 	return redemptions, nil
+}
+
+func (r *repository) ValidatePortfolioOwnership(ctx context.Context, portfolioID, userID string) error {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM portfolio WHERE id = $1 AND user_id = $2)`
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, portfolioID, userID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("carteira não encontrada ou permissão negada")
+	}
+	return nil
 }
