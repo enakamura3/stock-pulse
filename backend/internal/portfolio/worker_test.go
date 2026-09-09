@@ -65,6 +65,24 @@ func TestDailyWorker_Run(t *testing.T) {
 		worker.Run(context.Background())
 	})
 
+	t.Run("Timezone Fallback", func(t *testing.T) {
+		oldLoad := loadLocation
+		defer func() { loadLocation = oldLoad }()
+		loadLocation = func(name string) (*time.Location, error) {
+			return nil, errors.New("tz error")
+		}
+
+		repo := new(MockPortfolioRepo)
+		mp := new(MockMarketService)
+		worker := NewDailyWorker(repo, mp)
+
+		assets := []AssetCompact{{ID: "a1", Ticker: "AAPL"}}
+		repo.On("GetAllAssets", mock.Anything).Return(assets, nil)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		worker.Run(ctx)
+	})
+
 	t.Run("Success", func(t *testing.T) {
 		repo := new(MockPortfolioRepo)
 		mp := new(MockMarketService)
@@ -132,4 +150,22 @@ func TestDailyWorker_Run(t *testing.T) {
 		// Should return before calling GetQuote because of the 350ms wait and ctx.Done
 		mp.AssertNotCalled(t, "GetQuote")
 	})
+
+	t.Run("Nil or Zero Quote Price", func(t *testing.T) {
+		repo := new(MockPortfolioRepo)
+		mp := new(MockMarketService)
+		worker := NewDailyWorker(repo, mp)
+
+		assets := []AssetCompact{
+			{ID: "a1", Ticker: "ZERO"},
+			{ID: "a2", Ticker: "NIL"},
+		}
+		repo.On("GetAllAssets", mock.Anything).Return(assets, nil)
+		mp.On("GetQuote", mock.Anything, "ZERO").Return(&market.Quote{Price: 0.0}, nil)
+		mp.On("GetQuote", mock.Anything, "NIL").Return((*market.Quote)(nil), nil)
+
+		worker.Run(context.Background())
+		repo.AssertNotCalled(t, "SaveDailyPrices")
+	})
 }
+
