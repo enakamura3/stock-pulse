@@ -361,10 +361,7 @@ func (s *service) ExportTreasuryTransactions(ctx context.Context, portfolioID st
 	writer := csv.NewWriter(&buf)
 	writer.Comma = ';'
 
-	err = writer.Write([]string{"Date", "Ticker", "Type", "Quantity", "UnitPrice", "ContractedRate", "TreasuryType", "MaturityDate", "HasCoupons"})
-	if err != nil {
-		return nil, fmt.Errorf("erro ao escrever cabeçalho CSV: %w", err)
-	}
+	_ = writer.Write([]string{"Date", "Ticker", "Type", "Quantity", "UnitPrice", "ContractedRate", "TreasuryType", "MaturityDate", "HasCoupons"})
 
 	for _, tx := range txs {
 		record := []string{
@@ -378,16 +375,10 @@ func (s *service) ExportTreasuryTransactions(ctx context.Context, portfolioID st
 			tx.MaturityDate,
 			strconv.FormatBool(tx.HasCoupons),
 		}
-		if err := writer.Write(record); err != nil {
-			return nil, fmt.Errorf("erro ao escrever registro CSV: %w", err)
-		}
+		_ = writer.Write(record)
 	}
 
 	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return nil, fmt.Errorf("erro ao finalizar CSV: %w", err)
-	}
-
 	return buf.Bytes(), nil
 }
 
