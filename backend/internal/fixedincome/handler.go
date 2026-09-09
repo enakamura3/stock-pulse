@@ -2,6 +2,7 @@ package fixedincome
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -66,6 +67,8 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Delete("/transactions/{txID}", h.deleteTreasuryTransaction)
 		r.Get("/performance", h.getTreasuryPerformance)
 		r.Get("/monthly-yields", h.getTreasuryMonthlyYields)
+		r.Post("/bulk", h.bulkImportTreasuryTransactions)
+		r.Get("/export", h.exportTreasuryTransactions)
 	})
 }
 
@@ -425,3 +428,57 @@ func (h *Handler) getTreasuryMonthlyYields(w http.ResponseWriter, r *http.Reques
 	}
 	httputils.RespondWithJSON(w, http.StatusOK, yields)
 }
+
+func (h *Handler) bulkImportTreasuryTransactions(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+		return
+	}
+
+	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Erro ao ler o formulário")
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Arquivo CSV é obrigatório")
+		return
+	}
+	defer file.Close()
+
+	res, err := h.service.BulkAddTreasuryTransactions(r.Context(), portfolioID, file)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	status := http.StatusOK
+	if len(res.Errors) > 0 {
+		status = http.StatusPartialContent
+	}
+	httputils.RespondWithJSON(w, status, res)
+}
+
+func (h *Handler) exportTreasuryTransactions(w http.ResponseWriter, r *http.Request) {
+	portfolioID := chi.URLParam(r, "portfolioID")
+	if portfolioID == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+		return
+	}
+
+	csvBytes, err := h.service.ExportTreasuryTransactions(r.Context(), portfolioID)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	filename := fmt.Sprintf("tesouro-direto-%s.csv", portfolioID)
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.WriteHeader(http.StatusOK)
+	w.Write(csvBytes)
+}
+

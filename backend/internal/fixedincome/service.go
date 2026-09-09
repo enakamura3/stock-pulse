@@ -35,6 +35,8 @@ type Service interface {
 	GetTreasuryPerformance(ctx context.Context, portfolioID string) ([]TreasuryPerfPoint, error)
 	GetIndexRates(ctx context.Context, indexer string, startDate, endDate time.Time) ([]IndexRate, error)
 	GetTreasuryMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error)
+	BulkAddTreasuryTransactions(ctx context.Context, portfolioID string, file multipart.File) (*BulkImportResult, error)
+	ExportTreasuryTransactions(ctx context.Context, portfolioID string) ([]byte, error)
 }
 
 type service struct {
