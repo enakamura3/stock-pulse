@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatCurrencyInput, parsePastedCurrency } from '../helpers';
 
 export interface FixedIncomeModalProps {
   showFIModal: boolean;
@@ -183,16 +184,16 @@ export default function FixedIncomeModal({
               <input
                 className="form-input"
                 type="text"
+                inputMode="numeric"
                 value={fiAmount}
-                onChange={(e) => {
-                  let val = e.target.value.replace(/\D/g, '');
-                  if (!val) {
-                    setFiAmount('');
-                    return;
+                onChange={(e) => setFiAmount(formatCurrencyInput(e.target.value))}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData('text');
+                  const formatted = parsePastedCurrency(text);
+                  if (formatted) {
+                    e.preventDefault();
+                    setFiAmount(formatted);
                   }
-                  const num = Number(val) / 100;
-                  const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                  setFiAmount(formatted);
                 }}
                 placeholder="Ex: 5.000,00"
                 required

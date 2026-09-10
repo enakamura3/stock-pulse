@@ -13,7 +13,7 @@ import {
   UnifiedTransaction,
   TreasuryPosition,
 } from '@/components/portfolio/types';
-import { getAssetCategory, determineAssetTypeLocal } from '@/components/portfolio/helpers';
+import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput } from '@/components/portfolio/helpers';
 
 interface PortfolioContextType {
   // Data
@@ -491,11 +491,11 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedQty = parseFloat(txQuantity.toString());
-    const parsedPrice = parseFloat(txUnitPrice.toString());
-    const parsedFee = parseFloat(txFee.toString());
+    const parsedPrice = parseCurrency(txUnitPrice);
+    const parsedFee = parseCurrency(txFee);
     const parsedRate = parseFloat(txExchangeRate.toString());
 
-    if (!txTicker || isNaN(parsedQty) || parsedQty <= 0 || (txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 0))) {
+    if (!txTicker || isNaN(parsedQty) || parsedQty <= 1e-6 || (txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 1e-6))) {
       return alert('Preencha todos os campos obrigatórios corretamente.');
     }
 
@@ -516,8 +516,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
           type: txType,
           quantity: parsedQty,
           unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
-          fee: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT' || txType === 'BONUS' || isNaN(parsedFee) || parsedFee < 0) ? 0.0 : parsedFee,
-          exchange_rate: isNaN(parsedRate) || parsedRate <= 0 ? 0.0 : parsedRate,
+          fee: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT' || txType === 'BONUS' || isNaN(parsedFee) || parsedFee <= 1e-6) ? 0.0 : parsedFee,
+          exchange_rate: isNaN(parsedRate) || parsedRate <= 1e-6 ? 0.0 : parsedRate,
           executed_at: txExecutedAt,
         }), cache: 'no-store',
       });
@@ -593,7 +593,10 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     }
     
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxAssetType(tx.asset_type || ''); setTxType(tx.type as any);
-    setTxQuantity(tx.quantity || 0); setTxUnitPrice(tx.unit_price || 0); setTxFee(tx.fee || 0); setTxExchangeRate(tx.exchange_rate || 0);
+    setTxQuantity(tx.quantity || 0);
+    setTxUnitPrice(formatCurrencyInput(tx.unit_price || ''));
+    setTxFee(formatCurrencyInput(tx.fee || ''));
+    setTxExchangeRate(tx.exchange_rate || 0);
     setSelectedAssetCurrency(tx.currency || 'BRL');
     setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
   };

@@ -11,6 +11,9 @@ import {
   DEFAULT_ANNUAL_SELIC,
   determineAssetTypeLocal,
   ASSET_TYPE_OPTIONS,
+  formatCurrencyInput,
+  parseCurrency,
+  parsePastedCurrency,
 } from '../helpers';
 
 describe('Portfolio Helpers', () => {
@@ -311,6 +314,92 @@ describe('Portfolio Helpers', () => {
         'ETF_US',
         'CRYPTO',
       ]);
+    });
+  });
+
+  describe('formatCurrencyInput (ATM style mask)', () => {
+    it('shifts decimal from right to left as digits are typed', () => {
+      expect(formatCurrencyInput('2')).toBe('0,02');
+      expect(formatCurrencyInput('0,023')).toBe('0,23');
+      expect(formatCurrencyInput('0,235')).toBe('2,35');
+      expect(formatCurrencyInput('2,350')).toBe('23,50');
+      expect(formatCurrencyInput('2350')).toBe('23,50');
+      expect(formatCurrencyInput('235000')).toBe('2.350,00');
+    });
+
+    it('handles backspacing correctly', () => {
+      // User has 2,35 and presses backspace -> input becomes 2,3 -> digits 23 -> 0,23
+      expect(formatCurrencyInput('2,3')).toBe('0,23');
+      // User has 0,23 and presses backspace -> 0,2 -> 0,02
+      expect(formatCurrencyInput('0,2')).toBe('0,02');
+      // User has 0,02 and presses backspace -> 0,0 -> digits 00 -> empty
+      expect(formatCurrencyInput('0,0')).toBe('');
+    });
+
+    it('returns empty string for zero, empty or non-digit input', () => {
+      expect(formatCurrencyInput('')).toBe('');
+      expect(formatCurrencyInput('0')).toBe('');
+      expect(formatCurrencyInput('0,00')).toBe('');
+      expect(formatCurrencyInput('abc')).toBe('');
+      expect(formatCurrencyInput(undefined)).toBe('');
+      expect(formatCurrencyInput(null)).toBe('');
+    });
+
+    it('formats existing numbers when loaded into edit mode', () => {
+      expect(formatCurrencyInput(2.35)).toBe('2,35');
+      expect(formatCurrencyInput(23.5)).toBe('23,50');
+      expect(formatCurrencyInput(1250.75)).toBe('1.250,75');
+      expect(formatCurrencyInput(0)).toBe('');
+    });
+  });
+
+  describe('parseCurrency', () => {
+    it('parses formatted Brazilian currency strings correctly', () => {
+      expect(parseCurrency('2,35')).toBe(2.35);
+      expect(parseCurrency('23,50')).toBe(23.5);
+      expect(parseCurrency('1.234,56')).toBe(1234.56);
+      expect(parseCurrency('R$ 2.350,00')).toBe(2350);
+    });
+
+    it('parses international format and raw numbers', () => {
+      expect(parseCurrency('2.35')).toBe(2.35);
+      expect(parseCurrency(2.35)).toBe(2.35);
+      expect(parseCurrency('1,234.56')).toBe(1234.56);
+    });
+
+    it('returns 0 for empty, null, undefined or zero inputs', () => {
+      expect(parseCurrency('')).toBe(0);
+      expect(parseCurrency(null)).toBe(0);
+      expect(parseCurrency(undefined)).toBe(0);
+      expect(parseCurrency(0)).toBe(0);
+      expect(parseCurrency('invalid')).toBe(0);
+    });
+  });
+
+  describe('parsePastedCurrency', () => {
+    it('handles pasted numbers with comma or dot decimals', () => {
+      expect(parsePastedCurrency('2,35')).toBe('2,35');
+      expect(parsePastedCurrency('2.35')).toBe('2,35');
+      expect(parsePastedCurrency('23.5')).toBe('23,50');
+      expect(parsePastedCurrency('1234.56')).toBe('1.234,56');
+      expect(parsePastedCurrency('1.234,56')).toBe('1.234,56');
+    });
+
+    it('handles pasted integers by adding ,00', () => {
+      expect(parsePastedCurrency('25')).toBe('25,00');
+      expect(parsePastedCurrency('100')).toBe('100,00');
+    });
+
+    it('cleans currency symbols from pasted content', () => {
+      expect(parsePastedCurrency('R$ 23,50')).toBe('23,50');
+      expect(parsePastedCurrency('$ 50.00')).toBe('50,00');
+      expect(parsePastedCurrency('R$ 1.250,50')).toBe('1.250,50');
+    });
+
+    it('returns empty string for invalid pastes', () => {
+      expect(parsePastedCurrency('')).toBe('');
+      expect(parsePastedCurrency('abc')).toBe('');
+      expect(parsePastedCurrency('0')).toBe('');
     });
   });
 });
