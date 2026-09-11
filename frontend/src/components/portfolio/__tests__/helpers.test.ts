@@ -14,6 +14,8 @@ import {
   formatCurrencyInput,
   parseCurrency,
   parsePastedCurrency,
+  formatExchangeRateInput,
+  parsePastedExchangeRate,
 } from '../helpers';
 
 describe('Portfolio Helpers', () => {
@@ -417,6 +419,60 @@ describe('Portfolio Helpers', () => {
       expect(parsePastedCurrency('')).toBe('');
       expect(parsePastedCurrency('abc')).toBe('');
       expect(parsePastedCurrency('0')).toBe('');
+    });
+  });
+
+  describe('formatExchangeRateInput (ATM style mask, 4 decimal places)', () => {
+    it('shifts decimal from right to left as digits are typed (4 places)', () => {
+      expect(formatExchangeRateInput('5')).toBe('0,0005');
+      expect(formatExchangeRateInput('52')).toBe('0,0052');
+      expect(formatExchangeRateInput('525')).toBe('0,0525');
+      expect(formatExchangeRateInput('5250')).toBe('0,5250');
+      expect(formatExchangeRateInput('52500')).toBe('5,2500');
+      expect(formatExchangeRateInput('525000')).toBe('52,5000');
+    });
+
+    it('handles backspacing correctly', () => {
+      // 5,2500 -> backspace -> 0,5250 -> backspace -> 0,0525
+      expect(formatExchangeRateInput('5,250')).toBe('0,5250');
+      expect(formatExchangeRateInput('0,525')).toBe('0,0525');
+      expect(formatExchangeRateInput('0,000')).toBe('');
+    });
+
+    it('returns empty string for zero, empty or non-digit input', () => {
+      expect(formatExchangeRateInput('')).toBe('');
+      expect(formatExchangeRateInput('0')).toBe('');
+      expect(formatExchangeRateInput('0,0000')).toBe('');
+      expect(formatExchangeRateInput('abc')).toBe('');
+      expect(formatExchangeRateInput(undefined)).toBe('');
+      expect(formatExchangeRateInput(null)).toBe('');
+    });
+
+    it('formats existing numbers when loaded into edit mode', () => {
+      expect(formatExchangeRateInput(5.25)).toBe('5,2500');
+      expect(formatExchangeRateInput(5.2534)).toBe('5,2534');
+      expect(formatExchangeRateInput(1.0)).toBe('1,0000');
+      expect(formatExchangeRateInput(0)).toBe('');
+    });
+  });
+
+  describe('parsePastedExchangeRate', () => {
+    it('handles pasted numbers with comma or dot decimals (4 places)', () => {
+      expect(parsePastedExchangeRate('5.25')).toBe('5,2500');
+      expect(parsePastedExchangeRate('5,25')).toBe('5,2500');
+      expect(parsePastedExchangeRate('5,2500')).toBe('5,2500');
+      expect(parsePastedExchangeRate('5.2500')).toBe('5,2500');
+    });
+
+    it('handles pasted integers by adding ,0000', () => {
+      expect(parsePastedExchangeRate('5')).toBe('5,0000');
+      expect(parsePastedExchangeRate('10')).toBe('10,0000');
+    });
+
+    it('returns empty string for invalid pastes', () => {
+      expect(parsePastedExchangeRate('')).toBe('');
+      expect(parsePastedExchangeRate('abc')).toBe('');
+      expect(parsePastedExchangeRate('0')).toBe('');
     });
   });
 });

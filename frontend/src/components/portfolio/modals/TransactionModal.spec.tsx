@@ -296,9 +296,9 @@ describe('TransactionModal', () => {
     );
 
     expect(screen.getByText(/Taxa Cambial USDBRL/i)).toBeInTheDocument();
-    const rateInput = screen.getByPlaceholderText('Ex: 5.2500');
-    fireEvent.change(rateInput, { target: { value: '5.4500' } });
-    expect(setTxExchangeRateMock).toHaveBeenCalledWith('5.4500');
+    const rateInput = screen.getByPlaceholderText('Ex: 5,2500');
+    fireEvent.change(rateInput, { target: { value: '54500' } });
+    expect(setTxExchangeRateMock).toHaveBeenCalledWith('5,4500');
   });
 
   it('shows submitting state when isAddingTx is true and calls submit handler', () => {

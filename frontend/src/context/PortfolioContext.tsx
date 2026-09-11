@@ -13,7 +13,7 @@ import {
   UnifiedTransaction,
   TreasuryPosition,
 } from '@/components/portfolio/types';
-import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput } from '@/components/portfolio/helpers';
+import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatExchangeRateInput } from '@/components/portfolio/helpers';
 
 interface PortfolioContextType {
   // Data
@@ -493,7 +493,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     const parsedQty = parseFloat(txQuantity.toString());
     const parsedPrice = parseCurrency(txUnitPrice);
     const parsedFee = parseCurrency(txFee);
-    const parsedRate = parseFloat(txExchangeRate.toString());
+    const parsedRate = parseCurrency(txExchangeRate);
 
     if (!txTicker || isNaN(parsedQty) || parsedQty <= 1e-6 || (txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 1e-6))) {
       return alert('Preencha todos os campos obrigatórios corretamente.');
@@ -596,7 +596,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     setTxQuantity(tx.quantity || 0);
     setTxUnitPrice(formatCurrencyInput(tx.unit_price ?? 0));
     setTxFee(formatCurrencyInput(tx.fee ?? 0));
-    setTxExchangeRate(tx.exchange_rate || 0);
+    setTxExchangeRate(formatExchangeRateInput(tx.exchange_rate ?? 0));
     setSelectedAssetCurrency(tx.currency || 'BRL');
     setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
   };
