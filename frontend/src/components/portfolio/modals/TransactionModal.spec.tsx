@@ -299,6 +299,23 @@ describe('TransactionModal', () => {
     const rateInput = screen.getByPlaceholderText('Ex: 5,2500');
     fireEvent.change(rateInput, { target: { value: '54500' } });
     expect(setTxExchangeRateMock).toHaveBeenCalledWith('5,4500');
+
+    // Paste valid exchange rate
+    fireEvent.paste(rateInput, {
+      clipboardData: {
+        getData: (format: string) => (format === 'text' ? '5.65' : ''),
+      },
+    });
+    expect(setTxExchangeRateMock).toHaveBeenCalledWith('5,6500');
+
+    // Paste invalid / empty does not update exchange rate
+    setTxExchangeRateMock.mockClear();
+    fireEvent.paste(rateInput, {
+      clipboardData: {
+        getData: () => '',
+      },
+    });
+    expect(setTxExchangeRateMock).not.toHaveBeenCalled();
   });
 
   it('shows submitting state when isAddingTx is true and calls submit handler', () => {
