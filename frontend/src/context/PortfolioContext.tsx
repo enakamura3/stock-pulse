@@ -555,7 +555,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       const txRes = await apiFetch(`/portfolios/${activePortfolioId}/fixed-income/assets/${asset.id}/transactions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'SUBSCRIPTION', amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
+          type: 'SUBSCRIPTION', amount: parseCurrency(fiAmount), date: fiApplicationDate ? new Date(fiApplicationDate).toISOString() : new Date().toISOString()
         }), cache: 'no-store'
       });
 
@@ -594,8 +594,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxAssetType(tx.asset_type || ''); setTxType(tx.type as any);
     setTxQuantity(tx.quantity || 0);
-    setTxUnitPrice(formatCurrencyInput(tx.unit_price || ''));
-    setTxFee(formatCurrencyInput(tx.fee || ''));
+    setTxUnitPrice(formatCurrencyInput(tx.unit_price ?? 0));
+    setTxFee(formatCurrencyInput(tx.fee ?? 0));
     setTxExchangeRate(tx.exchange_rate || 0);
     setSelectedAssetCurrency(tx.currency || 'BRL');
     setTxExecutedAt(tx.date ? tx.date.split('T')[0] : ''); setShowTxModal(true);
@@ -610,7 +610,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: fiTxType,
-          amount: parseFloat(fiAmount.toString().replace(/\./g, '').replace(',', '.')),
+          amount: parseCurrency(fiAmount),
           date: new Date(fiApplicationDate).toISOString(),
           maturity_date: fiMaturityDate ? new Date(fiMaturityDate).toISOString() : undefined
         }), cache: 'no-store'
