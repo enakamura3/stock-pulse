@@ -353,10 +353,11 @@ export default function TransactionModal({
 
           {selectedAssetCurrency && kpiCurrency && selectedAssetCurrency !== kpiCurrency && (
             <div className="form-group">
-              <label className="form-label text-warning" style={{ color: '#ffc107' }}>
+              <label htmlFor="tx-exchange-rate" className="form-label text-warning" style={{ color: '#ffc107' }}>
                 Taxa Cambial {selectedAssetCurrency}{kpiCurrency}
               </label>
               <input
+                id="tx-exchange-rate"
                 className="form-input"
                 type="number"
                 step="any"
@@ -373,8 +374,9 @@ export default function TransactionModal({
           )}
 
           <div className="form-group">
-            <label className="form-label">Data de Execução</label>
+            <label htmlFor="tx-executed-at" className="form-label">Data de Execução</label>
             <input
+              id="tx-executed-at"
               className="form-input"
               type="date"
               value={txExecutedAt}

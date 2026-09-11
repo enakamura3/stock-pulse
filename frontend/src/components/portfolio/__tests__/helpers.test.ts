@@ -148,6 +148,22 @@ describe('Portfolio Helpers', () => {
           daily_change_percent: 1.12,
           fx_rate_to_brl: 5.5,
         },
+        {
+          asset_id: 'pos3',
+          ticker: '',
+          name: '',
+          type: 'STOCK_US',
+          currency: 'USD',
+          quantity: undefined as any,
+          average_price: undefined as any,
+          total_cost: 0,
+          current_price: undefined as any,
+          current_value: 0,
+          daily_change: undefined as any,
+          daily_change_percent: undefined as any,
+          previous_close: null as any,
+          fx_rate_to_brl: undefined as any,
+        },
       ];
 
       const mockFI = [
@@ -219,17 +235,17 @@ describe('Portfolio Helpers', () => {
           asset: {
             id: 'fi_pre',
             portfolio_id: 'p1',
-            institution: 'Banco Pre',
+            institution: '',
             type: 'CDB',
             debt_type: 'PRE',
-            indexer: 'PRE',
+            indexer: '',
             rate: 12,
             maturity_date: '',
           },
           total_invested: 5000,
           gross_value: 5500,
-          net_value: 5400,
-          net_return_percent: 8.0,
+          net_value: undefined as any,
+          net_return_percent: undefined as any,
         },
       ];
 
@@ -237,17 +253,17 @@ describe('Portfolio Helpers', () => {
         {
           transaction_id: 'tx_nomat',
           asset_id: 't_nomat',
-          ticker: 'Tesouro No Mat',
+          ticker: '',
           treasury_type: 'PREFIXADO',
           maturity_date: '',
           has_coupons: false,
           start_date: '2024-01-01',
           quantity: 1,
           unit_price: 1000,
-          contracted_rate: 11.0,
+          contracted_rate: undefined as any,
           total_invested: 0,
           gross_value: 1100,
-          net_value: 1080,
+          net_value: undefined as any,
           is_matured: false,
           days_to_maturity: 500,
           taxes_calculated: 20,
@@ -258,8 +274,8 @@ describe('Portfolio Helpers', () => {
       ];
 
       const csv = exportDailyReportCSV([], fiWithoutMaturity, treasuryWithoutMaturity);
-      expect(csv).toContain('Banco Pre');
-      expect(csv).toContain('Tesouro No Mat');
+      expect(csv).toContain('CDB');
+      expect(csv).toContain('PREFIXADO');
 
       const csvDefault = exportDailyReportCSV([]);
       expect(csvDefault).toContain('--- RENDA VARIÁVEL ---');
@@ -383,6 +399,7 @@ describe('Portfolio Helpers', () => {
       expect(parsePastedCurrency('23.5')).toBe('23,50');
       expect(parsePastedCurrency('1234.56')).toBe('1.234,56');
       expect(parsePastedCurrency('1.234,56')).toBe('1.234,56');
+      expect(parsePastedCurrency('1,234.56')).toBe('1.234,56');
     });
 
     it('handles pasted integers by adding ,00', () => {
