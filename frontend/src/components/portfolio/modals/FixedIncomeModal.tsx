@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatCurrencyInput, parsePastedCurrency } from '../helpers';
 
 export interface FixedIncomeModalProps {
   showFIModal: boolean;
@@ -85,8 +86,9 @@ export default function FixedIncomeModal({
 
         <form onSubmit={handleAddFixedIncome} className="flex-col gap-md">
           <div className="form-group">
-            <label className="form-label">Instituição (Banco/Corretora)</label>
+            <label htmlFor="fi-institution" className="form-label">Instituição (Banco/Corretora)</label>
             <input
+              id="fi-institution"
               className="form-input"
               type="text"
               value={fiInstitution}
@@ -106,8 +108,9 @@ export default function FixedIncomeModal({
 
           <div className="flex-row gap-md">
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Tipo de Produto</label>
+              <label htmlFor="fi-product-type" className="form-label">Tipo de Produto</label>
               <select
+                id="fi-product-type"
                 className="form-input"
                 value={fiType}
                 onChange={(e) => setFiType(e.target.value)}
@@ -125,8 +128,9 @@ export default function FixedIncomeModal({
             </div>
 
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Rentabilidade</label>
+              <label htmlFor="fi-debt-type" className="form-label">Rentabilidade</label>
               <select
+                id="fi-debt-type"
                 className="form-input"
                 value={fiDebtType}
                 onChange={(e) => setFiDebtType(e.target.value)}
@@ -142,8 +146,9 @@ export default function FixedIncomeModal({
           <div className="flex-row gap-md">
             {(fiDebtType === 'POS' || fiDebtType === 'HIBRIDO') && (
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">Indexador</label>
+                <label htmlFor="fi-indexer" className="form-label">Indexador</label>
                 <select
+                  id="fi-indexer"
                   className="form-input"
                   value={fiIndexer}
                   onChange={(e) => setFiIndexer(e.target.value)}
@@ -161,10 +166,11 @@ export default function FixedIncomeModal({
             )}
 
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">
+              <label htmlFor="fi-rate" className="form-label">
                 {fiDebtType === 'POS' ? '% do Indexador' : 'Taxa ao Ano (%)'}
               </label>
               <input
+                id="fi-rate"
                 className="form-input"
                 type="number"
                 step="any"
@@ -179,20 +185,21 @@ export default function FixedIncomeModal({
 
           <div className="flex-row gap-md">
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Valor Aplicado (R$)</label>
+              <label htmlFor="fi-amount" className="form-label">Valor Aplicado (R$)</label>
               <input
+                id="fi-amount"
                 className="form-input"
                 type="text"
+                inputMode="numeric"
                 value={fiAmount}
-                onChange={(e) => {
-                  let val = e.target.value.replace(/\D/g, '');
-                  if (!val) {
-                    setFiAmount('');
-                    return;
+                onChange={(e) => setFiAmount(formatCurrencyInput(e.target.value))}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData('text');
+                  const formatted = parsePastedCurrency(text);
+                  if (formatted) {
+                    e.preventDefault();
+                    setFiAmount(formatted);
                   }
-                  const num = Number(val) / 100;
-                  const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                  setFiAmount(formatted);
                 }}
                 placeholder="Ex: 5.000,00"
                 required
@@ -203,8 +210,9 @@ export default function FixedIncomeModal({
 
           <div className="flex-row gap-md">
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Data de Aplicação</label>
+              <label htmlFor="fi-app-date" className="form-label">Data de Aplicação</label>
               <input
+                id="fi-app-date"
                 className="form-input"
                 type="date"
                 value={fiApplicationDate}
@@ -215,8 +223,9 @@ export default function FixedIncomeModal({
             </div>
 
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Data de Vencimento</label>
+              <label htmlFor="fi-mat-date" className="form-label">Data de Vencimento</label>
               <input
+                id="fi-mat-date"
                 className="form-input"
                 type="date"
                 value={fiMaturityDate}

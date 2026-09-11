@@ -1,6 +1,6 @@
 import React from 'react';
 import { SearchResult } from '../types';
-import { ASSET_TYPE_OPTIONS } from '../helpers';
+import { ASSET_TYPE_OPTIONS, formatCurrencyInput, parseCurrency, parsePastedCurrency } from '../helpers';
 
 export interface TransactionModalProps {
   showTxModal: boolean;
@@ -68,8 +68,8 @@ export default function TransactionModal({
   if (!showTxModal) return null;
 
   const parsedQty = parseFloat(txQuantity.toString()) || 0;
-  const parsedPrice = parseFloat(txUnitPrice.toString()) || 0;
-  const parsedFee = parseFloat(txFee.toString()) || 0;
+  const parsedPrice = parseCurrency(txUnitPrice);
+  const parsedFee = parseCurrency(txFee);
 
   const grossTotal = parsedQty * parsedPrice;
   const netTotal = txType === 'SELL' ? grossTotal - parsedFee : grossTotal + parsedFee;
@@ -212,8 +212,8 @@ export default function TransactionModal({
                 type="button"
                 onClick={() => {
                   setTxType('SPLIT');
-                  setTxUnitPrice(0);
-                  setTxFee(0);
+                  setTxUnitPrice('');
+                  setTxFee('');
                 }}
                 disabled={isAddingTx}
                 className="flex-row justify-center items-center font-bold text-sm"
@@ -233,8 +233,8 @@ export default function TransactionModal({
                 type="button"
                 onClick={() => {
                   setTxType('REVERSE_SPLIT');
-                  setTxUnitPrice(0);
-                  setTxFee(0);
+                  setTxUnitPrice('');
+                  setTxFee('');
                 }}
                 disabled={isAddingTx}
                 className="flex-row justify-center items-center font-bold text-sm"
@@ -278,10 +278,11 @@ export default function TransactionModal({
 
           <div className="flex-row flex-wrap gap-md">
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">
+              <label htmlFor="tx-quantity" className="form-label">
                 {txType === 'SPLIT' || txType === 'REVERSE_SPLIT' ? 'Fator / Multiplicador' : 'Quantidade'}
               </label>
               <input
+                id="tx-quantity"
                 className="form-input"
                 type="number"
                 step="any"
@@ -302,14 +303,23 @@ export default function TransactionModal({
 
             {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">Preço Unitário ({selectedAssetCurrency})</label>
+                <label htmlFor="tx-unit-price" className="form-label">Preço Unitário ({selectedAssetCurrency})</label>
                 <input
+                  id="tx-unit-price"
                   className="form-input"
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="numeric"
                   value={txUnitPrice}
-                  onChange={(e) => setTxUnitPrice(e.target.value)}
-                  placeholder="0.00"
+                  onChange={(e) => setTxUnitPrice(formatCurrencyInput(e.target.value))}
+                  onPaste={(e) => {
+                    const text = e.clipboardData.getData('text');
+                    const formatted = parsePastedCurrency(text);
+                    if (formatted) {
+                      e.preventDefault();
+                      setTxUnitPrice(formatted);
+                    }
+                  }}
+                  placeholder="0,00"
                   required
                   disabled={isAddingTx}
                 />
@@ -319,15 +329,23 @@ export default function TransactionModal({
 
           {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && txType !== 'BONUS' && (
             <div className="form-group">
-              <label className="form-label">Corretagem / Taxas ({selectedAssetCurrency})</label>
+              <label htmlFor="tx-fee" className="form-label">Corretagem / Taxas ({selectedAssetCurrency})</label>
               <input
+                id="tx-fee"
                 className="form-input"
-                type="number"
-                step="any"
-                min="0"
+                type="text"
+                inputMode="numeric"
                 value={txFee}
-                onChange={(e) => setTxFee(e.target.value)}
-                placeholder="0.00"
+                onChange={(e) => setTxFee(formatCurrencyInput(e.target.value))}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData('text');
+                  const formatted = parsePastedCurrency(text);
+                  if (formatted) {
+                    e.preventDefault();
+                    setTxFee(formatted);
+                  }
+                }}
+                placeholder="0,00"
                 disabled={isAddingTx}
               />
             </div>
@@ -335,10 +353,11 @@ export default function TransactionModal({
 
           {selectedAssetCurrency && kpiCurrency && selectedAssetCurrency !== kpiCurrency && (
             <div className="form-group">
-              <label className="form-label text-warning" style={{ color: '#ffc107' }}>
+              <label htmlFor="tx-exchange-rate" className="form-label text-warning" style={{ color: '#ffc107' }}>
                 Taxa Cambial {selectedAssetCurrency}{kpiCurrency}
               </label>
               <input
+                id="tx-exchange-rate"
                 className="form-input"
                 type="number"
                 step="any"
@@ -355,8 +374,9 @@ export default function TransactionModal({
           )}
 
           <div className="form-group">
-            <label className="form-label">Data de Execução</label>
+            <label htmlFor="tx-executed-at" className="form-label">Data de Execução</label>
             <input
+              id="tx-executed-at"
               className="form-input"
               type="date"
               value={txExecutedAt}
@@ -366,7 +386,7 @@ export default function TransactionModal({
             />
           </div>
 
-          {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && grossTotal > 0 && (
+          {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && grossTotal > 1e-6 && (
             <div
               className="card"
               style={{
@@ -380,7 +400,7 @@ export default function TransactionModal({
                 <span>Valor dos Ativos:</span>
                 <span>{currencySymbol} {grossTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              {parsedFee > 0 && (
+              {parsedFee > 1e-6 && (
                 <div className="flex-row justify-between text-xs text-secondary mt-xs">
                   <span>Taxas / Corretagem:</span>
                   <span>{currencySymbol} {parsedFee.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

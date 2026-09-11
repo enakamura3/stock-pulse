@@ -118,6 +118,95 @@ export const formatQuantity = (val: number) => {
   }).format(val);
 };
 
+/**
+ * Converte um valor numérico ou string monetária (ex: "2,35", "1.234,56", 2.35) em float numérico.
+ * Trata vírgulas e pontos decimais de forma resiliente.
+ */
+export function parseCurrency(val: string | number | undefined | null): number {
+  if (val === undefined || val === null || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const str = val.toString().trim();
+  if (!str) return 0;
+
+  // Remove caracteres não numéricos exceto vírgula, ponto e sinal de menos
+  const sanitized = str.replace(/[^\d,.-]/g, '');
+  if (!sanitized) return 0;
+
+  if (sanitized.includes(',') && sanitized.includes('.')) {
+    if (sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.')) {
+      // Formato brasileiro: 1.234,56
+      const cleaned = sanitized.replace(/\./g, '').replace(',', '.');
+      const parsed = parseFloat(cleaned);
+      return isNaN(parsed) ? 0 : parsed;
+    } else {
+      // Formato internacional: 1,234.56
+      const cleaned = sanitized.replace(/,/g, '');
+      const parsed = parseFloat(cleaned);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+  }
+
+  if (sanitized.includes(',')) {
+    const parsed = parseFloat(sanitized.replace(',', '.'));
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  const parsed = parseFloat(sanitized);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Aplica máscara de entrada monetária estilo ATM/caixa eletrônico (deslocamento da direita para a esquerda).
+ * Ex: Digitar "2" -> "0,02"; "23" -> "0,23"; "235" -> "2,35"; "2350" -> "23,50".
+ * Se receber um número (ex: ao carregar edição de transação), formata com 2 casas decimais.
+ */
+export function formatCurrencyInput(val: string | number | undefined | null): string {
+  if (val === undefined || val === null || val === '') return '';
+
+  if (typeof val === 'number') {
+    if (isNaN(val) || Math.abs(val) < 1e-6) return '';
+    return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  const digits = val.replace(/\D/g, '');
+  if (!digits || Number(digits) === 0) return '';
+
+  const num = Number(digits) / 100;
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Trata colagem (paste) de valores monetários, reconhecendo números inteiros ou decimais com ponto/vírgula.
+ * Ex: Colar "25" -> "25,00"; "2.35" -> "2,35"; "R$ 1.250,50" -> "1.250,50".
+ */
+export function parsePastedCurrency(pasted: string): string {
+  const trimmed = (pasted || '').trim();
+  if (!trimmed) return '';
+
+  const sanitized = trimmed.replace(/[^\d,.-]/g, '');
+  if (!sanitized) return '';
+
+  let num: number;
+  if (sanitized.includes(',') && sanitized.includes('.')) {
+    if (sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.')) {
+      num = parseFloat(sanitized.replace(/\./g, '').replace(',', '.'));
+    } else {
+      num = parseFloat(sanitized.replace(/,/g, ''));
+    }
+  } else if (sanitized.includes(',')) {
+    num = parseFloat(sanitized.replace(',', '.'));
+  } else if (sanitized.includes('.')) {
+    num = parseFloat(sanitized);
+  } else {
+    // Número inteiro: "25" -> 25.00
+    const digitsOnly = sanitized.replace(/\D/g, '');
+    num = digitsOnly ? parseFloat(digitsOnly) : 0;
+  }
+
+  if (isNaN(num) || Math.abs(num) < 1e-6) return '';
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export const DEFAULT_ANNUAL_CDI = 10.40;
 export const DEFAULT_ANNUAL_SELIC = 10.50;
 
