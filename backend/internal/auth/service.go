@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -73,10 +75,12 @@ var defaultParams = &argon2Params{
 	keyLength:   32,
 }
 
+var randReader io.Reader = rand.Reader
+
 // hashPassword gera um hash seguro usando Argon2id no formato padrão.
 func hashPassword(password string, params *argon2Params) (string, error) {
 	salt := make([]byte, params.saltLength)
-	if _, err := rand.Read(salt); err != nil {
+	if _, err := io.ReadFull(randReader, salt); err != nil {
 		return "", err
 	}
 
@@ -180,6 +184,13 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 
 // GenerateAccessToken gera um JWT Access Token assinado com a validade configurada.
 func (s *Service) GenerateAccessToken(user *User) (string, error) {
+	if user == nil {
+		return "", errors.New("usuário não fornecido")
+	}
+	if len(s.jwtSecret) == 0 {
+		return "", errors.New("jwtSecret não configurado")
+	}
+
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
@@ -191,10 +202,11 @@ func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	return token.SignedString(s.jwtSecret)
 }
 
-// GenerateRefreshToken cria um token seguro e armazena no Redis com o TTL configurado.
+// GenerateRefreshToken cria um token seguro e armazena no Redis com o TTL configurado,
+// registrando-o também no conjunto de tokens ativos do usuário para controle de sessão.
 func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
 	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
+	if _, err := io.ReadFull(randReader, tokenBytes); err != nil {
 		return "", err
 	}
 	refreshToken := base64.RawURLEncoding.EncodeToString(tokenBytes)
@@ -203,6 +215,14 @@ func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (stri
 	key := fmt.Sprintf("refresh_token:%s", refreshToken)
 	err := s.rdb.Set(ctx, key, userID, s.refreshTokenTTL).Err()
 	if err != nil {
+		return "", err
+	}
+
+	activeTokensKey := fmt.Sprintf("user_active_tokens:%s", userID)
+	if err := s.rdb.SAdd(ctx, activeTokensKey, refreshToken).Err(); err != nil {
+		return "", err
+	}
+	if err := s.rdb.Expire(ctx, activeTokensKey, s.refreshTokenTTL).Err(); err != nil {
 		return "", err
 	}
 
@@ -222,9 +242,67 @@ func (s *Service) ValidateRefreshToken(ctx context.Context, token string) (strin
 	return userID, nil
 }
 
-// RevokeRefreshToken invalida a sessão apagando o refresh token do Redis.
+// RotateRefreshToken consome um refresh token existente e gera um novo par de tokens (Refresh Token Rotation).
+// Se um token já consumido for apresentado (detectado via used_refresh_token:*), revoga todas as sessões ativas do usuário para mitigar replay attacks.
+func (s *Service) RotateRefreshToken(ctx context.Context, oldToken string) (string, string, error) {
+	if strings.TrimSpace(oldToken) == "" {
+		return "", "", errors.New("token inválido")
+	}
+
+	usedKey := fmt.Sprintf("used_refresh_token:%s", oldToken)
+	userID, err := s.rdb.Get(ctx, usedKey).Result()
+	if err == nil && userID != "" {
+		// Replay attack detectado! Token previamente consumido foi reutilizado.
+		// Ação defensiva: revogar todas as sessões ativas do usuário.
+		slog.Warn("Tentativa de reutilização de refresh token detectada (Replay Attack)", "user_id", userID)
+		activeTokensKey := fmt.Sprintf("user_active_tokens:%s", userID)
+		tokens, errMembers := s.rdb.SMembers(ctx, activeTokensKey).Result()
+		if errMembers == nil {
+			for _, t := range tokens {
+				_ = s.rdb.Del(ctx, fmt.Sprintf("refresh_token:%s", t)).Err()
+			}
+		}
+		_ = s.rdb.Del(ctx, activeTokensKey).Err()
+		return "", "", errors.New("tentativa de reutilização de token detectada")
+	} else if err != nil && !errors.Is(err, redis.Nil) {
+		return "", "", err
+	}
+
+	tokenKey := fmt.Sprintf("refresh_token:%s", oldToken)
+	userID, err = s.rdb.Get(ctx, tokenKey).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", "", errors.New("sessão expirada ou inválida")
+		}
+		return "", "", err
+	}
+
+	// Remove o token antigo dos ativos
+	_ = s.rdb.Del(ctx, tokenKey).Err()
+	_ = s.rdb.SRem(ctx, fmt.Sprintf("user_active_tokens:%s", userID), oldToken).Err()
+
+	// Marca o token antigo como consumido para detecção de reuso com o mesmo TTL
+	if err := s.rdb.Set(ctx, usedKey, userID, s.refreshTokenTTL).Err(); err != nil {
+		return "", "", err
+	}
+
+	// Emite o novo refresh token
+	newRefreshToken, err := s.GenerateRefreshToken(ctx, userID)
+	if err != nil {
+		return "", "", fmt.Errorf("falha ao gerar novo refresh token: %w", err)
+	}
+
+	return userID, newRefreshToken, nil
+}
+
+// RevokeRefreshToken invalida a sessão apagando o refresh token do Redis e desvinculando-o das sessões ativas.
 func (s *Service) RevokeRefreshToken(ctx context.Context, token string) error {
 	key := fmt.Sprintf("refresh_token:%s", token)
+	userID, err := s.rdb.Get(ctx, key).Result()
+	if err == nil && userID != "" {
+		_ = s.rdb.SRem(ctx, fmt.Sprintf("user_active_tokens:%s", userID), token).Err()
+	}
+	_ = s.rdb.Del(ctx, fmt.Sprintf("used_refresh_token:%s", token)).Err()
 	return s.rdb.Del(ctx, key).Err()
 }
 

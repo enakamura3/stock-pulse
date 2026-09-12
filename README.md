@@ -270,19 +270,22 @@ A autenticação do stock-pulse é baseada em sessões web híbridas e seguras s
 - **Hashing de Senha:** Implementado com o algoritmo **Argon2id** nativo, protegendo a base de dados contra ataques de dicionário ou rainbow tables.
 - **Estrutura de Tokens:**
   - `AccessToken`: JWT assinado via HMAC-SHA256, contendo dados do usuário e expiração configurável (padrão de **15 minutos**, ajustável via `JWT_ACCESS_TOKEN_TTL`). Transmitido via cookies seguros (`HttpOnly`, `Secure`, `SameSite=Lax`).
-  - `RefreshToken`: String opaca aleatória de 32 bytes gerada de forma segura e armazenada no Redis sob a chave `refresh_token:<token>` com expiração configurável (padrão de **12 horas**, ajustável via `JWT_REFRESH_TOKEN_TTL`).
-- **Validação de Refresh Token Sem Rotação**: Na chamada de renovação no endpoint `/refresh`, o backend valida a sessão recuperando o `userID` do Redis via comando `GET` com a chave `refresh_token:<token>`. O token antigo **nunca** é removido do Redis e **nenhum** novo refresh token é gerado. Apenas um novo `access_token` JWT é gerado e injetado nos cookies.
+  - `RefreshToken`: String opaca aleatória de 32 bytes gerada de forma segura e armazenada no Redis sob a chave `refresh_token:<token>` com expiração configurável (padrão de **12 horas**, ajustável via `JWT_REFRESH_TOKEN_TTL`). As sessões ativas do usuário são rastreadas em `user_active_tokens:<userID>`.
+- **Refresh Token Rotation (RTR) e Detecção de Replay Attack**:
+  - A cada renovação no endpoint `POST /api/v1/auth/refresh`, o refresh token antigo é invalidado e consumido, gerando um novo refresh token e um novo access token (`RotateRefreshToken`). Ambos os cookies são atualizados no cliente.
+  - O token consumido é mantido em `used_refresh_token:<token>` pelo tempo de vida do TTL.
+  - Caso um token já consumido seja reapresentado (tentativa de *Replay Attack*), o sistema detecta o comprometimento, revoga imediatamente **todas as sessões ativas do usuário** (`user_active_tokens:<userID>`), limpa os cookies e rejeita com `401 Unauthorized`.
 
 #### Endpoints de API:
 - `POST /api/v1/auth/register` - Criação de conta de usuário.
 - `POST /api/v1/auth/login` - Autenticação e geração de cookies de sessão.
 - `POST /api/v1/auth/logout` - Revogação de tokens e limpeza de cookies.
-- `POST /api/v1/auth/refresh` - Renovação silenciosa do Access Token.
+- `POST /api/v1/auth/refresh` - Renovação de sessão com rotação de tokens (RTR).
 - `GET /api/v1/auth/me` - Retorna informações do usuário atual (requer autenticação).
 
 #### Componentes de Código (Go):
 - **Handlers:** `auth.Handler.Register`, `auth.Handler.Login`, `auth.Handler.Logout`, `auth.Handler.Refresh`, `auth.Handler.Me`
-- **Services:** `auth.Service.Register`, `auth.Service.Login`, `auth.Service.ValidateRefreshToken`, `auth.Service.GenerateAccessToken`
+- **Services:** `auth.Service.Register`, `auth.Service.Login`, `auth.Service.RotateRefreshToken`, `auth.Service.RevokeRefreshToken`, `auth.Service.ValidateRefreshToken`, `auth.Service.GenerateAccessToken`
 - **Repositories:** `auth.Repository.CreateUser`, `auth.Repository.GetUserByEmail`, `auth.Repository.GetUserByID`
 
 ```mermaid
@@ -293,7 +296,7 @@ sequenceDiagram
     participant Service as auth.Service
     participant Repo as auth.Repository
     participant DB as PostgreSQL ("user")
-    participant Redis as Redis (refresh_token:*)
+    participant Redis as Redis (refresh_token:*, used_refresh_token:*, user_active_tokens:*)
 
     %% Cadastro
     Note over Cliente, DB: Fluxo de Registro (POST /api/v1/auth/register)
@@ -316,23 +319,32 @@ sequenceDiagram
     DB-->>Repo: Registro do Usuário
     Repo-->>Service: Dados com Senha Hasteada
     Note over Service: Validação da senha com Argon2id
-    Service->>Service: GenerateAccessToken (JWT, TTL 2h)
+    Service->>Service: GenerateAccessToken (JWT, TTL 15m)
     Note over Service: Cria RefreshToken opaco (32 bytes)
-    Service->>Redis: SET refresh_token:<token> = userID (TTL 7d)
+    Service->>Redis: SET refresh_token:<token> = userID (TTL 12h) + SADD user_active_tokens:<userID>
     Service-->>Handler: Tokens (Access e Refresh)
-    Note over Handler: Injeta nos cookies HttpOnly
+    Note over Handler: Injeta nos cookies HttpOnly (access_token, refresh_token)
     Handler-->>Cliente: Status 200 OK
 
-    %% Refresh (Sem Rotação de Refresh Token)
-    Note over Cliente, Redis: Fluxo de Refresh (POST /api/v1/auth/refresh)
+    %% Refresh com RTR
+    Note over Cliente, Redis: Fluxo de Refresh com RTR (POST /api/v1/auth/refresh)
     Cliente->>Handler: Envia cookie com Refresh Token
-    Handler->>Service: ValidateRefreshToken(ctx, token)
-    Service->>Redis: GET refresh_token:<token>
-    Redis-->>Service: userID (Se existente, sessão é válida)
-    Service->>Service: GenerateAccessToken (Novo JWT)
-    Service-->>Handler: Novo Access Token
-    Note over Handler: Atualiza cookie HttpOnly access_token
-    Handler-->>Cliente: Status 200 OK
+    Handler->>Service: RotateRefreshToken(ctx, oldToken)
+    alt Token já consumido em used_refresh_token (Replay Attack)
+        Service->>Redis: SMembers + DEL todas as chaves em user_active_tokens:<userID>
+        Service-->>Handler: Erro de Replay Attack (401 Unauthorized)
+        Handler->>Cliente: Limpa cookies + Status 401
+    else Token ativo válido
+        Service->>Redis: DEL refresh_token:<oldToken> + SREM user_active_tokens
+        Service->>Redis: SET used_refresh_token:<oldToken> = userID (TTL 12h)
+        Service->>Service: GenerateRefreshToken (Novo token)
+        Service->>Redis: SET refresh_token:<newToken> + SADD user_active_tokens
+        Service-->>Handler: userID, newRefreshToken
+        Handler->>Service: GetUserByID + GenerateAccessToken(user)
+        Service-->>Handler: newAccessToken
+        Note over Handler: Injeta novos cookies HttpOnly (access_token e refresh_token)
+        Handler-->>Cliente: Status 200 OK
+    end
 ```
 
 ---

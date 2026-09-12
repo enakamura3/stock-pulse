@@ -22,6 +22,7 @@ type AuthService interface {
 	Login(ctx context.Context, email, password string) (*User, string, string, error)
 	RevokeRefreshToken(ctx context.Context, token string) error
 	ValidateRefreshToken(ctx context.Context, token string) (string, error)
+	RotateRefreshToken(ctx context.Context, oldToken string) (string, string, error)
 	GetUserByID(ctx context.Context, id string) (*User, error)
 	GenerateAccessToken(user *User) (string, error)
 	UpdateProfile(ctx context.Context, id, name, email string) (*User, error)
@@ -118,7 +119,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Logout efetuado com sucesso"})
 }
 
-// Refresh renova o access_token se o refresh_token for válido.
+// Refresh renova o access_token e rotaciona o refresh_token (RTR).
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil || cookie == nil {
@@ -126,14 +127,16 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := h.service.ValidateRefreshToken(r.Context(), cookie.Value)
+	userID, newRefreshToken, err := h.service.RotateRefreshToken(r.Context(), cookie.Value)
 	if err != nil {
+		h.clearTokenCookies(w)
 		httputils.RespondWithError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	user, err := h.service.GetUserByID(r.Context(), userID)
 	if err != nil {
+		h.clearTokenCookies(w)
 		httputils.RespondWithError(w, http.StatusUnauthorized, "Usuário não encontrado.")
 		return
 	}
@@ -144,18 +147,8 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Atualiza o cookie do access token
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    newAccessToken,
-		Path:     "/",
-		Expires:  time.Now().Add(h.accessTokenTTL),
-		MaxAge:   int(h.accessTokenTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   h.cookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
-
+	// Injeta ambos os cookies atualizados (Access Token renovado + Novo Refresh Token rotacionado)
+	h.setTokenCookies(w, newAccessToken, newRefreshToken)
 	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Sessão renovada com sucesso"})
 }
 

@@ -47,6 +47,11 @@ func (m *MockAuthService) ValidateRefreshToken(ctx context.Context, token string
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockAuthService) RotateRefreshToken(ctx context.Context, oldToken string) (string, string, error) {
+	args := m.Called(ctx, oldToken)
+	return args.String(0), args.String(1), args.Error(2)
+}
+
 func (m *MockAuthService) GetUserByID(ctx context.Context, id string) (*User, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) != nil {
@@ -301,7 +306,7 @@ func TestHandler_Refresh(t *testing.T) {
 			name:   "Invalid Token",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "invalid"},
 			mockSetup: func(m *MockAuthService) {
-				m.On("ValidateRefreshToken", mock.Anything, "invalid").Return("", errors.New("invalid"))
+				m.On("RotateRefreshToken", mock.Anything, "invalid").Return("", "", errors.New("invalid"))
 			},
 			expectedCode: http.StatusUnauthorized,
 		},
@@ -309,7 +314,7 @@ func TestHandler_Refresh(t *testing.T) {
 			name:   "User Not Found",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "valid"},
 			mockSetup: func(m *MockAuthService) {
-				m.On("ValidateRefreshToken", mock.Anything, "valid").Return("1", nil)
+				m.On("RotateRefreshToken", mock.Anything, "valid").Return("1", "new_refresh", nil)
 				m.On("GetUserByID", mock.Anything, "1").Return(nil, errors.New("not found"))
 			},
 			expectedCode: http.StatusUnauthorized,
@@ -318,7 +323,7 @@ func TestHandler_Refresh(t *testing.T) {
 			name:   "Failed to generate token",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "valid"},
 			mockSetup: func(m *MockAuthService) {
-				m.On("ValidateRefreshToken", mock.Anything, "valid").Return("1", nil)
+				m.On("RotateRefreshToken", mock.Anything, "valid").Return("1", "new_refresh", nil)
 				m.On("GetUserByID", mock.Anything, "1").Return(&User{ID: "1"}, nil)
 				m.On("GenerateAccessToken", mock.Anything).Return("", errors.New("error generating token"))
 			},
@@ -328,7 +333,7 @@ func TestHandler_Refresh(t *testing.T) {
 			name:   "Success",
 			cookie: &http.Cookie{Name: "refresh_token", Value: "valid"},
 			mockSetup: func(m *MockAuthService) {
-				m.On("ValidateRefreshToken", mock.Anything, "valid").Return("1", nil)
+				m.On("RotateRefreshToken", mock.Anything, "valid").Return("1", "new_refresh", nil)
 				m.On("GetUserByID", mock.Anything, "1").Return(&User{ID: "1"}, nil)
 				m.On("GenerateAccessToken", mock.Anything).Return("new_access", nil)
 			},
@@ -353,8 +358,27 @@ func TestHandler_Refresh(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, rec.Code)
 			if tt.expectedCode == http.StatusOK {
 				cookies := rec.Result().Cookies()
-				assert.Len(t, cookies, 1) // SetCookie was called for access_token
-				assert.Equal(t, "new_access", cookies[0].Value)
+				assert.Len(t, cookies, 2) // SetCookie chamado para access_token e refresh_token
+				var foundAccess, foundRefresh bool
+				for _, c := range cookies {
+					if c.Name == "access_token" {
+						assert.Equal(t, "new_access", c.Value)
+						foundAccess = true
+					}
+					if c.Name == "refresh_token" {
+						assert.Equal(t, "new_refresh", c.Value)
+						foundRefresh = true
+					}
+				}
+				assert.True(t, foundAccess)
+				assert.True(t, foundRefresh)
+			}
+			if tt.expectedCode == http.StatusUnauthorized && tt.cookie != nil {
+				cookies := rec.Result().Cookies()
+				assert.Len(t, cookies, 2)
+				for _, c := range cookies {
+					assert.True(t, c.MaxAge < 0)
+				}
 			}
 			m.AssertExpectations(t)
 		})
