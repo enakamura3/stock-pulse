@@ -27,6 +27,8 @@ func TestLoad_Success(t *testing.T) {
 	assert.Equal(t, "http://localhost:3000", Envs.FrontendURL)
 	assert.Equal(t, 10*time.Minute, Envs.RedisTTLQuotes)
 	assert.Equal(t, 24*time.Hour, Envs.RedisTTLFundamentals)
+	assert.Equal(t, 15*time.Minute, Envs.JWTAccessTokenTTL)
+	assert.Equal(t, 12*time.Hour, Envs.JWTRefreshTokenTTL)
 }
 
 func TestLoad_MissingDBURL(t *testing.T) {

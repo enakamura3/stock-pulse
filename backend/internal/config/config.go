@@ -19,6 +19,8 @@ type Environment struct {
 	AlertCheckInterval    string
 	BrapiToken            string
 	Env                   string
+	JWTAccessTokenTTL     time.Duration
+	JWTRefreshTokenTTL    time.Duration
 	RedisTTLQuotes        time.Duration
 	RedisTTLFundamentals  time.Duration
 	RedisTTLExchangeRates time.Duration
@@ -42,6 +44,8 @@ func Load() error {
 		BrapiToken:         os.Getenv("BRAPI_TOKEN"),
 		Env:                os.Getenv("ENV"),
 
+		JWTAccessTokenTTL:     parseDuration(os.Getenv("JWT_ACCESS_TOKEN_TTL"), 15*time.Minute),
+		JWTRefreshTokenTTL:    parseDuration(os.Getenv("JWT_REFRESH_TOKEN_TTL"), 12*time.Hour),
 		RedisTTLQuotes:        parseDuration(os.Getenv("REDIS_TTL_QUOTES"), 5*time.Minute),
 		RedisTTLFundamentals:  parseDuration(os.Getenv("REDIS_TTL_FUNDAMENTALS"), 24*time.Hour),
 		RedisTTLExchangeRates: parseDuration(os.Getenv("REDIS_TTL_EXCHANGE_RATES"), 1*time.Hour),

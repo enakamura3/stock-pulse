@@ -269,8 +269,8 @@ A camada de cache e sessão gerencia as seguintes chaves mapeadas no Redis 7:
 A autenticação do stock-pulse é baseada em sessões web híbridas e seguras sem armazenar estado no backend da aplicação, aderente às melhores práticas do OWASP.
 - **Hashing de Senha:** Implementado com o algoritmo **Argon2id** nativo, protegendo a base de dados contra ataques de dicionário ou rainbow tables.
 - **Estrutura de Tokens:**
-  - `AccessToken`: JWT assinado via HMAC-SHA256, contendo dados do usuário e expiração curta de **15 minutos**. Transmitido via cookies seguros (`HttpOnly`, `Secure`, `SameSite=Lax`).
-  - `RefreshToken`: String opaca aleatória de 32 bytes gerada de forma segura e armazenada no Redis sob a chave `refresh_token:<token>` com expiração de **12 horas**.
+  - `AccessToken`: JWT assinado via HMAC-SHA256, contendo dados do usuário e expiração configurável (padrão de **15 minutos**, ajustável via `JWT_ACCESS_TOKEN_TTL`). Transmitido via cookies seguros (`HttpOnly`, `Secure`, `SameSite=Lax`).
+  - `RefreshToken`: String opaca aleatória de 32 bytes gerada de forma segura e armazenada no Redis sob a chave `refresh_token:<token>` com expiração configurável (padrão de **12 horas**, ajustável via `JWT_REFRESH_TOKEN_TTL`).
 - **Validação de Refresh Token Sem Rotação**: Na chamada de renovação no endpoint `/refresh`, o backend valida a sessão recuperando o `userID` do Redis via comando `GET` com a chave `refresh_token:<token>`. O token antigo **nunca** é removido do Redis e **nenhum** novo refresh token é gerado. Apenas um novo `access_token` JWT é gerado e injetado nos cookies.
 
 #### Endpoints de API:

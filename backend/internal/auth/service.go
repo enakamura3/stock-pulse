@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/argon2"
 )
@@ -26,19 +27,32 @@ type UserRepository interface {
 	DeleteUser(ctx context.Context, id string) error
 }
 
-// Service lida com regras de negócio de autenticação, hashing e controle de sessão.
+// Service implementa a lógica de negócio de autenticação.
 type Service struct {
-	repo      UserRepository
-	rdb       *redis.Client
-	jwtSecret []byte
+	repo            UserRepository
+	rdb             *redis.Client
+	jwtSecret       []byte
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
 }
 
 // NewService cria uma nova instância de Service.
 func NewService(repo UserRepository, rdb *redis.Client, jwtSecret string) *Service {
+	accessTTL := config.Envs.JWTAccessTokenTTL
+	if accessTTL <= 0 {
+		accessTTL = 15 * time.Minute
+	}
+	refreshTTL := config.Envs.JWTRefreshTokenTTL
+	if refreshTTL <= 0 {
+		refreshTTL = 12 * time.Hour
+	}
+
 	return &Service{
-		repo:      repo,
-		rdb:       rdb,
-		jwtSecret: []byte(jwtSecret),
+		repo:            repo,
+		rdb:             rdb,
+		jwtSecret:       []byte(jwtSecret),
+		accessTokenTTL:  accessTTL,
+		refreshTokenTTL: refreshTTL,
 	}
 }
 
@@ -164,12 +178,12 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 	return user, accessToken, refreshToken, nil
 }
 
-// GenerateAccessToken gera um JWT Access Token assinado com validade de 15 minutos.
+// GenerateAccessToken gera um JWT Access Token assinado com a validade configurada.
 func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
-		"exp":     time.Now().Add(15 * time.Minute).Unix(),
+		"exp":     time.Now().Add(s.accessTokenTTL).Unix(),
 		"iat":     time.Now().Unix(),
 	}
 
@@ -177,7 +191,7 @@ func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	return token.SignedString(s.jwtSecret)
 }
 
-// GenerateRefreshToken cria um token seguro e armazena no Redis com TTL de 12 horas.
+// GenerateRefreshToken cria um token seguro e armazena no Redis com o TTL configurado.
 func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -187,7 +201,7 @@ func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (stri
 
 	// Chave com prefixo para fácil identificação
 	key := fmt.Sprintf("refresh_token:%s", refreshToken)
-	err := s.rdb.Set(ctx, key, userID, 12*time.Hour).Err()
+	err := s.rdb.Set(ctx, key, userID, s.refreshTokenTTL).Err()
 	if err != nil {
 		return "", err
 	}

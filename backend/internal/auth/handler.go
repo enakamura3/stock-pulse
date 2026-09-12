@@ -31,17 +31,31 @@ type AuthService interface {
 
 // Handler expõe os métodos HTTP da API de Autenticação.
 type Handler struct {
-	service      AuthService
-	cookieSecure bool
+	service         AuthService
+	cookieSecure    bool
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
 }
 
 // NewHandler cria uma nova instância de Handler.
 func NewHandler(service AuthService) *Handler {
 	// Em modo de desenvolvimento local, cookieSecure pode ser desativado para permitir testes sem HTTPS
 	cookieSecure := config.Envs.Env != "development"
+
+	accessTTL := config.Envs.JWTAccessTokenTTL
+	if accessTTL <= 0 {
+		accessTTL = 15 * time.Minute
+	}
+	refreshTTL := config.Envs.JWTRefreshTokenTTL
+	if refreshTTL <= 0 {
+		refreshTTL = 12 * time.Hour
+	}
+
 	return &Handler{
-		service:      service,
-		cookieSecure: cookieSecure,
+		service:         service,
+		cookieSecure:    cookieSecure,
+		accessTokenTTL:  accessTTL,
+		refreshTokenTTL: refreshTTL,
 	}
 }
 
@@ -135,8 +149,8 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		Name:     "access_token",
 		Value:    newAccessToken,
 		Path:     "/",
-		Expires:  time.Now().Add(15 * time.Minute),
-		MaxAge:   900,
+		Expires:  time.Now().Add(h.accessTokenTTL),
+		MaxAge:   int(h.accessTokenTTL.Seconds()),
 		HttpOnly: true,
 		Secure:   h.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
@@ -164,25 +178,23 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 // setTokenCookies injeta os cookies access_token e refresh_token.
 func (h *Handler) setTokenCookies(w http.ResponseWriter, accessToken, refreshToken string) {
-	// Access Token: 15 minutos
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    accessToken,
 		Path:     "/",
-		Expires:  time.Now().Add(15 * time.Minute),
-		MaxAge:   900,
+		Expires:  time.Now().Add(h.accessTokenTTL),
+		MaxAge:   int(h.accessTokenTTL.Seconds()),
 		HttpOnly: true,
 		Secure:   h.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	// Refresh Token: 12 horas
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Path:     "/",
-		Expires:  time.Now().Add(12 * time.Hour),
-		MaxAge:   12 * 3600,
+		Expires:  time.Now().Add(h.refreshTokenTTL),
+		MaxAge:   int(h.refreshTokenTTL.Seconds()),
 		HttpOnly: true,
 		Secure:   h.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
