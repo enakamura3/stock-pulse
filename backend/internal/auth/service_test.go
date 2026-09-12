@@ -130,6 +130,8 @@ func TestService_Login(t *testing.T) {
 		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
 
 		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 12*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSAdd("^user_active_tokens:1$", ".*").SetVal(1)
+		rdbMock.ExpectExpire("user_active_tokens:1", 12*time.Hour).SetVal(true)
 
 		resUser, access, refresh, err := s.Login(context.Background(), "test@test.com", "password")
 		assert.NoError(t, err)
@@ -153,6 +155,27 @@ func TestService_Login_RefreshTokenError(t *testing.T) {
 	assert.Contains(t, err.Error(), "falha ao gerar refresh token")
 }
 
+func TestService_GenerateRefreshToken_Errors(t *testing.T) {
+	t.Run("SAdd error", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "user-1", 12*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSAdd("^user_active_tokens:user-1$", ".*").SetErr(errors.New("sadd err"))
+
+		_, err := s.GenerateRefreshToken(context.Background(), "user-1")
+		assert.EqualError(t, err, "sadd err")
+	})
+
+	t.Run("Expire error", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "user-1", 12*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSAdd("^user_active_tokens:user-1$", ".*").SetVal(1)
+		rdbMock.ExpectExpire("user_active_tokens:user-1", 12*time.Hour).SetErr(errors.New("expire err"))
+
+		_, err := s.GenerateRefreshToken(context.Background(), "user-1")
+		assert.EqualError(t, err, "expire err")
+	})
+}
+
 func TestService_ValidateRefreshToken_Expired(t *testing.T) {
 	s, _, rdbMock := setupService()
 	rdbMock.ExpectGet("refresh_token:expired").SetErr(redis.Nil)
@@ -169,12 +192,131 @@ func TestService_ValidateRefreshToken_Error(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestService_RevokeRefreshToken(t *testing.T) {
-	s, _, rdbMock := setupService()
-	rdbMock.ExpectDel("refresh_token:token").SetVal(1)
+func TestService_RotateRefreshToken(t *testing.T) {
+	t.Run("Empty token", func(t *testing.T) {
+		s, _, _ := setupService()
+		_, _, err := s.RotateRefreshToken(context.Background(), "   ")
+		assert.EqualError(t, err, "token inválido")
+	})
 
-	err := s.RevokeRefreshToken(context.Background(), "token")
-	assert.NoError(t, err)
+	t.Run("Replay attack detected - multiple active tokens revoked", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:replayed_token").SetVal("user-123")
+		rdbMock.ExpectSMembers("user_active_tokens:user-123").SetVal([]string{"active1", "active2"})
+		rdbMock.ExpectDel("refresh_token:active1").SetVal(1)
+		rdbMock.ExpectDel("refresh_token:active2").SetVal(1)
+		rdbMock.ExpectDel("user_active_tokens:user-123").SetVal(1)
+
+		userID, newRef, err := s.RotateRefreshToken(context.Background(), "replayed_token")
+		assert.Empty(t, userID)
+		assert.Empty(t, newRef)
+		assert.EqualError(t, err, "tentativa de reutilização de token detectada")
+	})
+
+	t.Run("Replay attack detected - SMembers error still revokes user_active_tokens", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:replayed_token").SetVal("user-123")
+		rdbMock.ExpectSMembers("user_active_tokens:user-123").SetErr(errors.New("smembers err"))
+		rdbMock.ExpectDel("user_active_tokens:user-123").SetVal(1)
+
+		userID, newRef, err := s.RotateRefreshToken(context.Background(), "replayed_token")
+		assert.Empty(t, userID)
+		assert.Empty(t, newRef)
+		assert.EqualError(t, err, "tentativa de reutilização de token detectada")
+	})
+
+	t.Run("Redis error on checking used token", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:err_token").SetErr(errors.New("redis err"))
+
+		_, _, err := s.RotateRefreshToken(context.Background(), "err_token")
+		assert.EqualError(t, err, "redis err")
+	})
+
+	t.Run("Expired or non-existent token", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:non_existent").SetErr(redis.Nil)
+		rdbMock.ExpectGet("refresh_token:non_existent").SetErr(redis.Nil)
+
+		_, _, err := s.RotateRefreshToken(context.Background(), "non_existent")
+		assert.EqualError(t, err, "sessão expirada ou inválida")
+	})
+
+	t.Run("Redis error on checking refresh token", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:token").SetErr(redis.Nil)
+		rdbMock.ExpectGet("refresh_token:token").SetErr(errors.New("redis get err"))
+
+		_, _, err := s.RotateRefreshToken(context.Background(), "token")
+		assert.EqualError(t, err, "redis get err")
+	})
+
+	t.Run("Error setting used_refresh_token", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:valid_token").SetErr(redis.Nil)
+		rdbMock.ExpectGet("refresh_token:valid_token").SetVal("user-123")
+		rdbMock.ExpectDel("refresh_token:valid_token").SetVal(1)
+		rdbMock.ExpectSRem("user_active_tokens:user-123", "valid_token").SetVal(1)
+		rdbMock.ExpectSet("used_refresh_token:valid_token", "user-123", 12*time.Hour).SetErr(errors.New("redis set err"))
+
+		_, _, err := s.RotateRefreshToken(context.Background(), "valid_token")
+		assert.EqualError(t, err, "redis set err")
+	})
+
+	t.Run("Error generating new refresh token", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:valid_token").SetErr(redis.Nil)
+		rdbMock.ExpectGet("refresh_token:valid_token").SetVal("user-123")
+		rdbMock.ExpectDel("refresh_token:valid_token").SetVal(1)
+		rdbMock.ExpectSRem("user_active_tokens:user-123", "valid_token").SetVal(1)
+		rdbMock.ExpectSet("used_refresh_token:valid_token", "user-123", 12*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "user-123", 12*time.Hour).SetErr(errors.New("generate err"))
+
+		_, _, err := s.RotateRefreshToken(context.Background(), "valid_token")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "falha ao gerar novo refresh token")
+	})
+
+	t.Run("Success rotation", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("used_refresh_token:old_token").SetErr(redis.Nil)
+		rdbMock.ExpectGet("refresh_token:old_token").SetVal("user-123")
+		rdbMock.ExpectDel("refresh_token:old_token").SetVal(1)
+		rdbMock.ExpectSRem("user_active_tokens:user-123", "old_token").SetVal(1)
+		rdbMock.ExpectSet("used_refresh_token:old_token", "user-123", 12*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "user-123", 12*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSAdd("^user_active_tokens:user-123$", ".*").SetVal(1)
+		rdbMock.ExpectExpire("user_active_tokens:user-123", 12*time.Hour).SetVal(true)
+
+		userID, newRefreshToken, err := s.RotateRefreshToken(context.Background(), "old_token")
+		assert.NoError(t, err)
+		assert.Equal(t, "user-123", userID)
+		assert.NotEmpty(t, newRefreshToken)
+		assert.NotEqual(t, "old_token", newRefreshToken)
+	})
+}
+
+func TestService_RevokeRefreshToken(t *testing.T) {
+	t.Run("Success with user in token", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("refresh_token:token").SetVal("user-1")
+		rdbMock.ExpectSRem("user_active_tokens:user-1", "token").SetVal(1)
+		rdbMock.ExpectDel("used_refresh_token:token").SetVal(1)
+		rdbMock.ExpectDel("refresh_token:token").SetVal(1)
+
+		err := s.RevokeRefreshToken(context.Background(), "token")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Token not found in redis", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("refresh_token:token").SetErr(redis.Nil)
+		rdbMock.ExpectDel("used_refresh_token:token").SetVal(0)
+		rdbMock.ExpectDel("refresh_token:token").SetVal(0)
+
+		err := s.RevokeRefreshToken(context.Background(), "token")
+		assert.NoError(t, err)
+	})
 }
 
 func TestService_GetUserByID(t *testing.T) {
