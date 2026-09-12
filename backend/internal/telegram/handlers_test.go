@@ -40,7 +40,12 @@ func (m *MockTelebotContext) Set(key string, val interface{}) {
 		m.store = make(map[string]interface{})
 	}
 	m.store[key] = val
-	m.Called(key, val)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Set" {
+			m.Called(key, val)
+			return
+		}
+	}
 }
 
 func (m *MockTelebotContext) Send(what interface{}, opts ...interface{}) error {
@@ -95,17 +100,27 @@ func (m *MockTelebotContext) Edit(what interface{}, opts ...interface{}) error {
 }
 
 func (m *MockTelebotContext) Callback() *telebot.Callback {
-	args := m.Called()
-	if args.Get(0) != nil {
-		return args.Get(0).(*telebot.Callback)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Callback" {
+			args := m.Called()
+			if args.Get(0) != nil {
+				return args.Get(0).(*telebot.Callback)
+			}
+			return nil
+		}
 	}
 	return nil
 }
 
 func (m *MockTelebotContext) Sender() *telebot.User {
-	args := m.Called()
-	if args.Get(0) != nil {
-		return args.Get(0).(*telebot.User)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Sender" {
+			args := m.Called()
+			if args.Get(0) != nil {
+				return args.Get(0).(*telebot.User)
+			}
+			return nil
+		}
 	}
 	return nil
 }
@@ -155,6 +170,10 @@ func (m *MockPortfolioService) GetPortfolioTransactions(ctx context.Context, por
 	}
 	return nil, args.Error(1)
 }
+func (m *MockPortfolioService) DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error {
+	args := m.Called(ctx, txID, portfolioID, userID)
+	return args.Error(0)
+}
 
 type MockMarketSvc struct {
 	mock.Mock
@@ -164,6 +183,14 @@ func (m *MockMarketSvc) GetQuote(ctx context.Context, ticker string) (*market.Qu
 	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
 		return args.Get(0).(*market.Quote), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockMarketSvc) GetFundamentals(ctx context.Context, symbol string) (*market.Fundamentals, error) {
+	args := m.Called(ctx, symbol)
+	if args.Get(0) != nil {
+		return args.Get(0).(*market.Fundamentals), args.Error(1)
 	}
 	return nil, args.Error(1)
 }

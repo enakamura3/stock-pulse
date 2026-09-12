@@ -15,6 +15,7 @@ type PortfolioService interface {
 	GetPortfolios(ctx context.Context, userID string) ([]portfolio.Portfolio, error)
 	GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*portfolio.Portfolio, []portfolio.Position, error)
 	AddTransaction(ctx context.Context, userID string, tx *portfolio.Transaction) (*portfolio.Transaction, error)
+	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]portfolio.CalculatedDividend, error)
 	GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]portfolio.Transaction, error)
 }
@@ -22,6 +23,7 @@ type PortfolioService interface {
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
 	GetBenchmarks(ctx context.Context) (*market.MarketBenchmarks, error)
+	GetFundamentals(ctx context.Context, symbol string) (*market.Fundamentals, error)
 }
 
 type FixedIncomeService interface {
@@ -62,11 +64,15 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("/start", h.HandleStart)
 	bot.Handle("/menu", h.HandleMenu)
 	bot.Handle("/cotacao", h.HandleQuote)
+	bot.Handle("/agenda", h.HandleAgenda)
+	bot.Handle("/analise", h.HandleAnalysis)
+	bot.Handle("/desfazer", h.HandleUndoLastOperation)
 
 	// Callback dos Inline Keyboards estáticos
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
 	bot.Handle("\fbtn_ativos", h.HandleAssetList)
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
+	bot.Handle("\fbtn_agenda", h.HandleAgenda)
 	bot.Handle("\fbtn_history", h.HandleHistory)
 	bot.Handle("\fbtn_renda_fixa", h.HandleFixedIncome)
 	bot.Handle("\fbtn_divs_year", h.HandleDividendsByYear)
@@ -77,6 +83,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_alert_cond_above", h.HandleAlertConditionAbove)
 	bot.Handle("\fbtn_alert_cond_below", h.HandleAlertConditionBelow)
 	bot.Handle("\fbtn_cotacao", h.HandleQuoteStart)
+	bot.Handle("\fbtn_analise", h.HandleAnalysisStart)
 	bot.Handle("\fbtn_change_portfolio", h.HandleChangePortfolio)
 	bot.Handle("\fbtn_menu", h.HandleMenuCallback)
 	bot.Handle("\fbtn_cancel_op", h.HandleCancelOperation)
