@@ -13,6 +13,14 @@ import (
 
 func (h *Handlers) HandleAlerts(c telebot.Context) error {
 	defer c.Respond()
+	page := 0
+	if rawData := c.Data(); rawData != "" {
+		fmt.Sscanf(rawData, "%d", &page)
+	}
+	return h.renderAlerts(c, page)
+}
+
+func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 	if h.alertSvc == nil {
 		return c.Edit("⚠️ Módulo de alertas não está ativo.")
 	}
@@ -29,12 +37,32 @@ func (h *Handlers) HandleAlerts(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := "🔔 *Meus Alertas de Preço*\n\n"
+	msg := "🔔 *Meus Alertas de Preço*\n"
 
 	if len(alerts) == 0 {
-		msg += "Você não possui alertas cadastrados.\n\nUse o botão abaixo para criar o seu primeiro alerta!"
+		msg += "\nVocê não possui alertas cadastrados.\n\nUse o botão abaixo para criar o seu primeiro alerta!"
 	} else {
-		for _, a := range alerts {
+		pageSize := 5
+		totalPages := (len(alerts) + pageSize - 1) / pageSize
+		if page < 0 {
+			page = 0
+		}
+		if page >= totalPages {
+			page = totalPages - 1
+		}
+		start := page * pageSize
+		end := start + pageSize
+		if end > len(alerts) {
+			end = len(alerts)
+		}
+
+		if totalPages > 1 {
+			msg += p.Sprintf("_Página %d de %d_\n\n", page+1, totalPages)
+		} else {
+			msg += "\n"
+		}
+
+		for _, a := range alerts[start:end] {
 			condStr := "acima de"
 			if a.Condition == "BELOW" {
 				condStr = "abaixo de"
@@ -62,32 +90,50 @@ func (h *Handlers) HandleAlerts(c telebot.Context) error {
 				emoji, a.Ticker, condStr, getCurrencySymbol(curr), a.TargetPrice, statusLabel)
 		}
 		msg += p.Sprintf("\n_Total: %d alerta(s)_", len(alerts))
+
+		menu := &telebot.ReplyMarkup{}
+		var rows []telebot.Row
+
+		for i := start; i < end; i++ {
+			a := alerts[i]
+			toggleLabel := "⏸️ Pausar " + a.Ticker
+			if a.Status == "DISABLED" || a.Status == "TRIGGERED" {
+				toggleLabel = "▶️ Ativar " + a.Ticker
+			}
+			btnToggle := menu.Data(toggleLabel, fmt.Sprintf("btn_alert_toggle_%s:%d", a.ID, page))
+			btnDel := menu.Data("🗑️ "+a.Ticker, fmt.Sprintf("btn_alert_del_%s:%d", a.ID, page))
+			rows = append(rows, menu.Row(btnToggle, btnDel))
+		}
+
+		var navBtns []telebot.Btn
+		if page > 0 {
+			navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_alerts", fmt.Sprintf("%d", page-1)))
+		}
+		if end < len(alerts) {
+			navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_alerts", fmt.Sprintf("%d", page+1)))
+		}
+		if len(navBtns) > 0 {
+			rows = append(rows, menu.Row(navBtns...))
+		}
+
+		btnCreate := menu.Data("➕ Criar Alerta", "btn_alert_create")
+		btnRefresh := menu.Data("🔄 Atualizar", "btn_alerts", fmt.Sprintf("%d", page))
+		btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
+		rows = append(rows, menu.Row(btnCreate, btnRefresh), menu.Row(btnBack))
+		menu.Inline(rows...)
+
+		err = c.Edit(msg, telebot.ModeMarkdown, menu)
+		if err != nil && strings.Contains(err.Error(), "message is not modified") {
+			return nil
+		}
+		return err
 	}
 
 	menu := &telebot.ReplyMarkup{}
-	var rows []telebot.Row
-
-	// Botões de ação por alerta (máximo 5 para não sobrecarregar o inline keyboard)
-	limit := 5
-	if len(alerts) < limit {
-		limit = len(alerts)
-	}
-	for i := 0; i < limit; i++ {
-		a := alerts[i]
-		toggleLabel := "⏸️ Pausar " + a.Ticker
-		if a.Status == "DISABLED" || a.Status == "TRIGGERED" {
-			toggleLabel = "▶️ Ativar " + a.Ticker
-		}
-		btnToggle := menu.Data(toggleLabel, "btn_alert_toggle_"+a.ID)
-		btnDel := menu.Data("🗑️ "+a.Ticker, "btn_alert_del_"+a.ID)
-		rows = append(rows, menu.Row(btnToggle, btnDel))
-	}
-
 	btnCreate := menu.Data("➕ Criar Alerta", "btn_alert_create")
 	btnRefresh := menu.Data("🔄 Atualizar", "btn_alerts")
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
-	rows = append(rows, menu.Row(btnCreate, btnRefresh), menu.Row(btnBack))
-	menu.Inline(rows...)
+	menu.Inline(menu.Row(btnCreate, btnRefresh), menu.Row(btnBack))
 
 	err = c.Edit(msg, telebot.ModeMarkdown, menu)
 	if err != nil && strings.Contains(err.Error(), "message is not modified") {
@@ -145,12 +191,19 @@ func (h *Handlers) handleAlertCondition(c telebot.Context, condition string) err
 	return c.Edit(fmt.Sprintf("🔔 *Alerta para %s* (%s)\n\nQual o preço alvo do alerta? (ex: 35.50)", state.Ticker, condLabel), telebot.ModeMarkdown, menu)
 }
 
-func (h *Handlers) handleAlertToggle(c telebot.Context, alertID string) error {
+func (h *Handlers) handleAlertToggle(c telebot.Context, payload string) error {
 	defer c.Respond()
 
 	userIDStr, err := h.getUserID(c)
 	if err != nil {
 		return err
+	}
+
+	alertID := payload
+	page := 0
+	if parts := strings.SplitN(payload, ":", 2); len(parts) == 2 {
+		alertID = parts[0]
+		fmt.Sscanf(parts[1], "%d", &page)
 	}
 
 	_, err = h.alertSvc.ToggleAlert(context.Background(), alertID, userIDStr)
@@ -158,10 +211,10 @@ func (h *Handlers) handleAlertToggle(c telebot.Context, alertID string) error {
 		slog.Error("Failed to toggle alert status", "error", err, "alert_id", alertID)
 	}
 
-	return h.HandleAlerts(c)
+	return h.renderAlerts(c, page)
 }
 
-func (h *Handlers) handleAlertDelete(c telebot.Context, alertID string) error {
+func (h *Handlers) handleAlertDelete(c telebot.Context, payload string) error {
 	defer c.Respond()
 
 	userIDStr, err := h.getUserID(c)
@@ -169,10 +222,17 @@ func (h *Handlers) handleAlertDelete(c telebot.Context, alertID string) error {
 		return err
 	}
 
+	alertID := payload
+	page := 0
+	if parts := strings.SplitN(payload, ":", 2); len(parts) == 2 {
+		alertID = parts[0]
+		fmt.Sscanf(parts[1], "%d", &page)
+	}
+
 	err = h.alertSvc.DeleteAlert(context.Background(), alertID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to delete alert", "error", err, "alert_id", alertID)
 	}
 
-	return h.HandleAlerts(c)
+	return h.renderAlerts(c, page)
 }

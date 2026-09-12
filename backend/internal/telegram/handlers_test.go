@@ -67,8 +67,13 @@ func (m *MockTelebotContext) Respond(resp ...*telebot.CallbackResponse) error {
 }
 
 func (m *MockTelebotContext) Data() string {
-	args := m.Called()
-	return args.String(0)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Data" {
+			args := m.Called()
+			return args.String(0)
+		}
+	}
+	return ""
 }
 
 func (m *MockTelebotContext) Text() string {

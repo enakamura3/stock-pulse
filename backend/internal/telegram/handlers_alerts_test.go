@@ -92,10 +92,75 @@ func TestHandlers_Alerts(t *testing.T) {
 		assert.Contains(t, sentMsg, "PETR4")
 	})
 
+	t.Run("HandleAlerts - pagination page 1", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Data").Return("1").Once()
+
+		alertsList := []*alert.Alert{
+			{ID: "a1", Ticker: "PETR4", TargetPrice: 35.50, Condition: "ABOVE", Status: "ACTIVE", Currency: "BRL"},
+			{ID: "a2", Ticker: "VALE3", TargetPrice: 60.00, Condition: "BELOW", Status: "TRIGGERED", Currency: ""},
+			{ID: "a3", Ticker: "AAPL", TargetPrice: 200.00, Condition: "ABOVE", Status: "DISABLED", Currency: "USD"},
+			{ID: "a4", Ticker: "BTC-USD", TargetPrice: 90000.00, Condition: "BELOW", Status: "UNKNOWN_STATUS", Currency: "USD"},
+			{ID: "a5", Ticker: "WEGE3", TargetPrice: 45.00, Condition: "ABOVE", Status: "ACTIVE", Currency: "BRL"},
+			{ID: "a6", Ticker: "ITUB4", TargetPrice: 30.00, Condition: "BELOW", Status: "ACTIVE", Currency: "BRL"},
+		}
+		alertSvc.On("GetAlerts", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(alertsList, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Página 2 de 2") &&
+				strings.Contains(msg, "ITUB4")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleAlerts(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "ITUB4")
+	})
+
+	t.Run("HandleAlerts - page out of bounds negative and high", func(t *testing.T) {
+		// page < 0
+		mCtxNeg := new(MockTelebotContext)
+		mCtxNeg.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxNeg.On("Data").Return("-1").Once()
+		alertSvc.On("GetAlerts", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]*alert.Alert{
+			{ID: "a1", Ticker: "PETR4", TargetPrice: 35.50, Condition: "ABOVE", Status: "ACTIVE"},
+		}, nil).Once()
+		mCtxNeg.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleAlerts(mCtxNeg)
+		assert.NoError(t, err)
+
+		// page >= totalPages
+		mCtxHigh := new(MockTelebotContext)
+		mCtxHigh.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxHigh.On("Data").Return("99").Once()
+		alertSvc.On("GetAlerts", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]*alert.Alert{
+			{ID: "a1", Ticker: "PETR4", TargetPrice: 35.50, Condition: "ABOVE", Status: "ACTIVE"},
+		}, nil).Once()
+		mCtxHigh.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err = h.HandleAlerts(mCtxHigh)
+		assert.NoError(t, err)
+	})
+
 	t.Run("HandleAlerts - message not modified", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 		alertSvc.On("GetAlerts", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]*alert.Alert{}, nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("telegram: message is not modified")).Once()
+
+		err := h.HandleAlerts(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleAlerts - message not modified with alerts", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		alertSvc.On("GetAlerts", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]*alert.Alert{
+			{ID: "a1", Ticker: "PETR4", TargetPrice: 35.50, Condition: "ABOVE", Status: "ACTIVE"},
+		}, nil).Once()
 		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("telegram: message is not modified")).Once()
 
 		err := h.HandleAlerts(mCtx)
@@ -283,6 +348,50 @@ func TestHandlers_Alerts(t *testing.T) {
 
 		err = h.HandleDynamicCallback(mCtx3)
 		assert.NoError(t, err)
+	})
+
+	t.Run("HandleDynamicCallback - alert toggle and del with page payload and errors", func(t *testing.T) {
+		// btn_alert_toggle_ with page payload and toggle error
+		mCtx1 := new(MockTelebotContext)
+		mCtx1.On("Callback").Return(&telebot.Callback{Data: "\fbtn_alert_toggle_a123:1"}).Once()
+		mCtx1.On("Respond", mock.Anything).Return(nil).Twice()
+		alertSvc.On("ToggleAlert", mock.Anything, "a123", "00000000-0000-0000-0000-000000000000").Return("", errors.New("toggle err")).Once()
+		alertSvc.On("GetAlerts", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]*alert.Alert{}, nil).Once()
+		mCtx1.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleDynamicCallback(mCtx1)
+		assert.NoError(t, err)
+
+		// btn_alert_del_ with page payload and delete error
+		mCtx2 := new(MockTelebotContext)
+		mCtx2.On("Callback").Return(&telebot.Callback{Data: "\fbtn_alert_del_a123:1"}).Once()
+		mCtx2.On("Respond", mock.Anything).Return(nil).Twice()
+		alertSvc.On("DeleteAlert", mock.Anything, "a123", "00000000-0000-0000-0000-000000000000").Return(errors.New("delete err")).Once()
+		alertSvc.On("GetAlerts", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]*alert.Alert{}, nil).Once()
+		mCtx2.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err = h.HandleDynamicCallback(mCtx2)
+		assert.NoError(t, err)
+
+		// toggle unauthenticated
+		mCtxUnauth1 := new(MockTelebotContext)
+		mCtxUnauth1.store = map[string]interface{}{"user_id": nil}
+		mCtxUnauth1.On("Callback").Return(&telebot.Callback{Data: "\fbtn_alert_toggle_a123:0"}).Twice()
+		mCtxUnauth1.On("Respond", mock.Anything).Return(nil)
+		mCtxUnauth1.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err = h.HandleDynamicCallback(mCtxUnauth1)
+		assert.Error(t, err)
+
+		// delete unauthenticated
+		mCtxUnauth2 := new(MockTelebotContext)
+		mCtxUnauth2.store = map[string]interface{}{"user_id": nil}
+		mCtxUnauth2.On("Callback").Return(&telebot.Callback{Data: "\fbtn_alert_del_a123:0"}).Twice()
+		mCtxUnauth2.On("Respond", mock.Anything).Return(nil)
+		mCtxUnauth2.On("Edit", mock.Anything, mock.Anything).Return(nil)
+
+		err = h.HandleDynamicCallback(mCtxUnauth2)
+		assert.Error(t, err)
 	})
 
 	t.Run("HandleText - ALERT_EXPECT_TICKER", func(t *testing.T) {

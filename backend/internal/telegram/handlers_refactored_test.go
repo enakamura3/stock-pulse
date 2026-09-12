@@ -615,11 +615,10 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Text").Return("150.50")
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10}, nil).Once()
-		pSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.MatchedBy(func(tx *portfolio.Transaction) bool {
-			return tx.Ticker == "AAPL" && tx.UnitPrice == 150.50 && tx.TotalCost == 1505.0 && tx.Type == "BUY"
-		})).Return(&portfolio.Transaction{}, nil).Once()
-		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
-		mCtx.On("Send", mock.Anything, mock.Anything).Return(nil)
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_DATE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 150.50}).Return(nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Data da Operação")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
 
 		err := h.HandleText(mCtx)
 		assert.NoError(t, err)
@@ -886,14 +885,22 @@ func TestHandlers_TextErrors(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("HandleText - EXPECT_PRICE db error", func(t *testing.T) {
+	t.Run("HandleText - EXPECT_FEE db error", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
-		mCtx.On("Text").Return("150.50")
+		mCtx.On("Text").Return("5.00")
 
-		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10}, nil).Once()
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "AAPL",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   150.50,
+			ExecutedAt:  "2026-09-12",
+		}, nil).Once()
 		pSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.Anything).Return((*portfolio.Transaction)(nil), errors.New("db error")).Once()
-		mCtx.On("Send", "❌ Ocorreu um erro ao salvar a transação. Tente novamente mais tarde.", mock.Anything).Return(nil)
+		mCtx.On("Send", "❌ Ocorreu um erro ao salvar a transação. Tente novamente mais tarde.", mock.Anything).Return(nil).Once()
 
 		err := h.HandleText(mCtx)
 		assert.NoError(t, err)
@@ -1381,14 +1388,16 @@ func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
 	t.Run("HandleText SELL success", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
-		mCtx.On("Text").Return("50,00")
+		mCtx.On("Text").Return("0")
 
 		state := &ConversationState{
-			Step:        "EXPECT_PRICE",
+			Step:        "EXPECT_FEE",
 			PortfolioID: "p1",
 			Ticker:      "PETR4",
 			Type:        "SELL",
 			Quantity:    10,
+			UnitPrice:   50,
+			ExecutedAt:  "2026-09-12",
 		}
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(state, nil).Once()
 		portSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.Anything).Return(&portfolio.Transaction{}, nil).Once()
@@ -1984,16 +1993,23 @@ func TestHandlers_DeepBranchCoverage(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("HandleText EXPECT_PRICE getUserID error", func(t *testing.T) {
+	t.Run("HandleText EXPECT_FEE getUserID error", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
-		mCtx.On("Text").Return("150.50")
+		mCtx.On("Text").Return("0")
 		mCtx.On("Callback").Return((*telebot.Callback)(nil))
 		mCtx.On("Set", "user_id", nil).Return()
 		mCtx.Set("user_id", nil)
 		mCtx.On("Send", "⚠️ Sessão não encontrada ou expirada. Por favor, envie /start para reconectar.", mock.Anything).Return(nil).Once()
 
-		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10}, nil).Once()
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "AAPL",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   150.50,
+		}, nil).Once()
 
 		err := h.HandleText(mCtx)
 		assert.Error(t, err)
@@ -2022,6 +2038,268 @@ func TestHandlers_DeepBranchCoverage(t *testing.T) {
 		}), mock.Anything, mock.Anything).Return(nil).Once()
 
 		err := h.HandleAssetList(mCtx)
+		assert.NoError(t, err)
+	})
+}
+
+func TestHandlers_Operations_DateAndFee(t *testing.T) {
+	h, svc, portSvc, _, _, _ := setupHandlersTest()
+
+	t.Run("HandleDateToday - invalid state", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_QTY"}, nil).Once()
+		mCtx.On("Edit", "⚠️ Nenhuma operação em andamento.", mock.Anything).Return(nil).Once()
+
+		err := h.HandleDateToday(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleDateToday - success", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_DATE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+		}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), mock.MatchedBy(func(cs ConversationState) bool {
+			return cs.Step == "EXPECT_FEE" && cs.ExecutedAt != ""
+		})).Return(nil).Once()
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Taxas / Corretagem")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleDateToday(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleFeeZero - invalid state", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_DATE"}, nil).Once()
+		mCtx.On("Edit", "⚠️ Nenhuma operação em andamento.", mock.Anything).Return(nil).Once()
+
+		err := h.HandleFeeZero(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleFeeZero - success", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+			ExecutedAt:  "2026-09-12",
+		}, nil).Once()
+		portSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.MatchedBy(func(tx *portfolio.Transaction) bool {
+			return tx.Ticker == "PETR4" && tx.UnitPrice == 35.50 && tx.TotalCost == 355.0 && tx.Fee == 0 && tx.ExchangeRate == 0
+		})).Return(&portfolio.Transaction{}, nil).Once()
+		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Operação Lançada com Sucesso") &&
+				strings.Contains(msg, "PETR4")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleFeeZero(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleFeeZero - db error", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+			ExecutedAt:  "2026-09-12",
+		}, nil).Once()
+		portSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.Anything).Return((*portfolio.Transaction)(nil), errors.New("db error")).Once()
+		mCtx.On("Edit", "❌ Ocorreu um erro ao salvar a transação. Tente novamente mais tarde.", mock.Anything).Return(nil).Once()
+
+		err := h.HandleFeeZero(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleText - EXPECT_DATE invalid format", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Text").Return("32/13/2026")
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_DATE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+		}, nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Formato de data inválido")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleText(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleText - EXPECT_DATE text hoje", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Text").Return("hoje")
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_DATE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+		}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), mock.MatchedBy(func(cs ConversationState) bool {
+			return cs.Step == "EXPECT_FEE" && cs.ExecutedAt != ""
+		})).Return(nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Taxas / Corretagem")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleText(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleText - EXPECT_DATE text DD/MM/AAAA", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Text").Return("15/03/2024")
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_DATE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+		}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+			ExecutedAt:  "2024-03-15",
+		}).Return(nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Taxas / Corretagem")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleText(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleText - EXPECT_DATE text DD-MM-AAAA", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Text").Return("15-03-2024")
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_DATE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+		}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+			ExecutedAt:  "2024-03-15",
+		}).Return(nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Taxas / Corretagem")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleText(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleText - EXPECT_FEE invalid format and negative", func(t *testing.T) {
+		// invalid text
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Text").Return("abc")
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+		}, nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Valor de taxa inválido")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleText(mCtx)
+		assert.NoError(t, err)
+
+		// negative number
+		mCtxNeg := new(MockTelebotContext)
+		mCtxNeg.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtxNeg.On("Text").Return("-10")
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+		}, nil).Once()
+		mCtxNeg.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Valor de taxa inválido")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err = h.HandleText(mCtxNeg)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleText - EXPECT_FEE success with fee and invalid ExecutedAt fallback", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Text").Return("4,50")
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{
+			Step:        "EXPECT_FEE",
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "BUY",
+			Quantity:    10,
+			UnitPrice:   35.50,
+			ExecutedAt:  "invalid-date-format",
+		}, nil).Once()
+		portSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.MatchedBy(func(tx *portfolio.Transaction) bool {
+			return tx.Ticker == "PETR4" && tx.UnitPrice == 35.50 && tx.TotalCost == 359.50 && tx.Fee == 4.50 && tx.ExchangeRate == 0
+		})).Return(&portfolio.Transaction{}, nil).Once()
+		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Operação Lançada com Sucesso") &&
+				strings.Contains(msg, "PETR4")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleText(mCtx)
 		assert.NoError(t, err)
 	})
 }
