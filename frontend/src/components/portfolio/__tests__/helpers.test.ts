@@ -14,6 +14,8 @@ import {
   formatCurrencyInput,
   parseCurrency,
   parsePastedCurrency,
+  formatExchangeRateInput,
+  parsePastedExchangeRate,
 } from '../helpers';
 
 describe('Portfolio Helpers', () => {
@@ -101,6 +103,12 @@ describe('Portfolio Helpers', () => {
     it('handles default indexer and negative effective rates', () => {
       const defRate = calculateDailyFixedIncomeRate('OTHER', 10.0);
       expect(defRate).toBeGreaterThan(0);
+
+      const emptyIndexer = calculateDailyFixedIncomeRate('', 10.0);
+      expect(emptyIndexer).toBeGreaterThan(0);
+
+      const selicDefaultRate = calculateDailyFixedIncomeRate('SELIC', 100.0, 0);
+      expect(selicDefaultRate).toBeCloseTo(0.0397, 2);
 
       const negRate = calculateDailyFixedIncomeRate('PRE', -150.0);
       expect(negRate).toBe(0);
@@ -315,6 +323,8 @@ describe('Portfolio Helpers', () => {
     it('infers standard Brazilian equities correctly', () => {
       expect(determineAssetTypeLocal('PETR4.SA', 'Petrobras PN', 'BRL')).toBe('STOCK_BR');
       expect(determineAssetTypeLocal('VALE3.SA', 'Vale ON', 'BRL')).toBe('STOCK_BR');
+      expect(determineAssetTypeLocal(undefined as any, '', '')).toBe('STOCK_US');
+      expect(determineAssetTypeLocal('PETR4.SA', '', undefined as any)).toBe('STOCK_BR');
     });
 
     it('contains all 8 market asset type options', () => {
@@ -385,10 +395,17 @@ describe('Portfolio Helpers', () => {
 
     it('returns 0 for empty, null, undefined or zero inputs', () => {
       expect(parseCurrency('')).toBe(0);
+      expect(parseCurrency('   ')).toBe(0);
       expect(parseCurrency(null)).toBe(0);
       expect(parseCurrency(undefined)).toBe(0);
       expect(parseCurrency(0)).toBe(0);
+      expect(parseCurrency(NaN)).toBe(0);
       expect(parseCurrency('invalid')).toBe(0);
+      expect(parseCurrency('... ,,,')).toBe(0);
+      expect(parseCurrency(',,, ...')).toBe(0);
+      expect(parseCurrency(',')).toBe(0);
+      expect(parseCurrency('.')).toBe(0);
+      expect(parseCurrency('-')).toBe(0);
     });
   });
 
@@ -417,6 +434,68 @@ describe('Portfolio Helpers', () => {
       expect(parsePastedCurrency('')).toBe('');
       expect(parsePastedCurrency('abc')).toBe('');
       expect(parsePastedCurrency('0')).toBe('');
+      expect(parsePastedCurrency('-')).toBe('');
+    });
+  });
+
+  describe('formatExchangeRateInput (ATM style mask, 4 decimal places)', () => {
+    it('shifts decimal from right to left as digits are typed (4 places)', () => {
+      expect(formatExchangeRateInput('5')).toBe('0,0005');
+      expect(formatExchangeRateInput('52')).toBe('0,0052');
+      expect(formatExchangeRateInput('525')).toBe('0,0525');
+      expect(formatExchangeRateInput('5250')).toBe('0,5250');
+      expect(formatExchangeRateInput('52500')).toBe('5,2500');
+      expect(formatExchangeRateInput('525000')).toBe('52,5000');
+    });
+
+    it('handles backspacing correctly', () => {
+      // 5,2500 -> backspace -> 0,5250 -> backspace -> 0,0525
+      expect(formatExchangeRateInput('5,250')).toBe('0,5250');
+      expect(formatExchangeRateInput('0,525')).toBe('0,0525');
+      expect(formatExchangeRateInput('0,000')).toBe('');
+    });
+
+    it('returns empty string for zero, empty or non-digit input', () => {
+      expect(formatExchangeRateInput('')).toBe('');
+      expect(formatExchangeRateInput('0')).toBe('');
+      expect(formatExchangeRateInput('0,0000')).toBe('');
+      expect(formatExchangeRateInput('abc')).toBe('');
+      expect(formatExchangeRateInput(undefined)).toBe('');
+      expect(formatExchangeRateInput(null)).toBe('');
+    });
+
+    it('formats existing numbers when loaded into edit mode', () => {
+      expect(formatExchangeRateInput(5.25)).toBe('5,2500');
+      expect(formatExchangeRateInput(5.2534)).toBe('5,2534');
+      expect(formatExchangeRateInput(1.0)).toBe('1,0000');
+      expect(formatExchangeRateInput(0)).toBe('');
+    });
+  });
+
+  describe('parsePastedExchangeRate', () => {
+    it('handles pasted numbers with comma or dot decimals (4 places)', () => {
+      expect(parsePastedExchangeRate('5.25')).toBe('5,2500');
+      expect(parsePastedExchangeRate('5,25')).toBe('5,2500');
+      expect(parsePastedExchangeRate('5,2500')).toBe('5,2500');
+      expect(parsePastedExchangeRate('5.2500')).toBe('5,2500');
+    });
+
+    it('handles pasted numbers with both comma and dot (BR and US format)', () => {
+      expect(parsePastedExchangeRate('1.234,5678')).toBe('1.234,5678');
+      expect(parsePastedExchangeRate('1,234.5678')).toBe('1.234,5678');
+      expect(parsePastedExchangeRate('US$ 5,2500')).toBe('5,2500');
+    });
+
+    it('handles pasted integers by adding ,0000', () => {
+      expect(parsePastedExchangeRate('5')).toBe('5,0000');
+      expect(parsePastedExchangeRate('10')).toBe('10,0000');
+    });
+
+    it('returns empty string for invalid pastes', () => {
+      expect(parsePastedExchangeRate('')).toBe('');
+      expect(parsePastedExchangeRate('abc')).toBe('');
+      expect(parsePastedExchangeRate('0')).toBe('');
+      expect(parsePastedExchangeRate('-')).toBe('');
     });
   });
 });

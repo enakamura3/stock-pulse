@@ -207,6 +207,57 @@ export function parsePastedCurrency(pasted: string): string {
   return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/**
+ * Aplica máscara ATM para taxa de câmbio (4 casas decimais, ex: 5,2500).
+ * Ex: Digitar "5" -> "0,0005"; "52" -> "0,0052"; "52500" -> "5,2500".
+ * Se receber um número (ao carregar edição), formata com 4 casas decimais.
+ */
+export function formatExchangeRateInput(val: string | number | undefined | null): string {
+  if (val === undefined || val === null || val === '') return '';
+
+  if (typeof val === 'number') {
+    if (isNaN(val) || Math.abs(val) < 1e-6) return '';
+    return val.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  }
+
+  const digits = val.replace(/\D/g, '');
+  if (!digits || Number(digits) === 0) return '';
+
+  const num = Number(digits) / 10000;
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+}
+
+/**
+ * Trata colagem de taxa de câmbio, preservando 4 casas decimais.
+ * Ex: Colar "5.25" -> "5,2500"; "5,2500" -> "5,2500"; "5" -> "5,0000".
+ */
+export function parsePastedExchangeRate(pasted: string): string {
+  const trimmed = (pasted || '').trim();
+  if (!trimmed) return '';
+
+  const sanitized = trimmed.replace(/[^\d,.-]/g, '');
+  if (!sanitized) return '';
+
+  let num: number;
+  if (sanitized.includes(',') && sanitized.includes('.')) {
+    if (sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.')) {
+      num = parseFloat(sanitized.replace(/\./g, '').replace(',', '.'));
+    } else {
+      num = parseFloat(sanitized.replace(/,/g, ''));
+    }
+  } else if (sanitized.includes(',')) {
+    num = parseFloat(sanitized.replace(',', '.'));
+  } else if (sanitized.includes('.')) {
+    num = parseFloat(sanitized);
+  } else {
+    const digitsOnly = sanitized.replace(/\D/g, '');
+    num = digitsOnly ? parseFloat(digitsOnly) : 0;
+  }
+
+  if (isNaN(num) || Math.abs(num) < 1e-6) return '';
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+}
+
 export const DEFAULT_ANNUAL_CDI = 10.40;
 export const DEFAULT_ANNUAL_SELIC = 10.50;
 

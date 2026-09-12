@@ -1,6 +1,6 @@
 import React from 'react';
 import { SearchResult } from '../types';
-import { ASSET_TYPE_OPTIONS, formatCurrencyInput, parseCurrency, parsePastedCurrency } from '../helpers';
+import { ASSET_TYPE_OPTIONS, formatCurrencyInput, parseCurrency, parsePastedCurrency, formatExchangeRateInput, parsePastedExchangeRate } from '../helpers';
 
 export interface TransactionModalProps {
   showTxModal: boolean;
@@ -359,11 +359,19 @@ export default function TransactionModal({
               <input
                 id="tx-exchange-rate"
                 className="form-input"
-                type="number"
-                step="any"
+                type="text"
+                inputMode="numeric"
                 value={txExchangeRate}
-                onChange={(e) => setTxExchangeRate(e.target.value)}
-                placeholder="Ex: 5.2500"
+                onChange={(e) => setTxExchangeRate(formatExchangeRateInput(e.target.value))}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData('text');
+                  const formatted = parsePastedExchangeRate(text);
+                  if (formatted) {
+                    e.preventDefault();
+                    setTxExchangeRate(formatted);
+                  }
+                }}
+                placeholder="Ex: 5,2500"
                 disabled={isAddingTx}
                 style={{ borderColor: 'rgba(255, 193, 7, 0.4)' }}
               />
