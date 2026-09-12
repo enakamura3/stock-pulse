@@ -164,12 +164,12 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 	return user, accessToken, refreshToken, nil
 }
 
-// GenerateAccessToken gera um JWT Access Token assinado com validade de 2 horas.
+// GenerateAccessToken gera um JWT Access Token assinado com validade de 15 minutos.
 func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
-		"exp":     time.Now().Add(2 * time.Hour).Unix(),
+		"exp":     time.Now().Add(15 * time.Minute).Unix(),
 		"iat":     time.Now().Unix(),
 	}
 
@@ -177,7 +177,7 @@ func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	return token.SignedString(s.jwtSecret)
 }
 
-// GenerateRefreshToken cria um token seguro e armazena no Redis com TTL de 7 dias.
+// GenerateRefreshToken cria um token seguro e armazena no Redis com TTL de 12 horas.
 func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -187,7 +187,7 @@ func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (stri
 
 	// Chave com prefixo para fácil identificação
 	key := fmt.Sprintf("refresh_token:%s", refreshToken)
-	err := s.rdb.Set(ctx, key, userID, 7*24*time.Hour).Err()
+	err := s.rdb.Set(ctx, key, userID, 12*time.Hour).Err()
 	if err != nil {
 		return "", err
 	}
