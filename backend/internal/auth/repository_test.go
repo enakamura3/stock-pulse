@@ -198,3 +198,55 @@ func TestRepository_DeleteUser(t *testing.T) {
 		t.Errorf("expectations failed: %v", err)
 	}
 }
+
+func TestRepository_GetUserByIDWithHash_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT id, name, email, password_hash, created_at, updated_at FROM "user"`).
+		WithArgs("1").
+		WillReturnError(errors.New("db error"))
+
+	_, err := repo.GetUserByIDWithHash(context.Background(), "1")
+	assert.EqualError(t, err, "db error")
+}
+
+func TestRepository_UpdateUser_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`UPDATE "user" SET name = \$2, email = \$3, updated_at = NOW\(\)`).
+		WithArgs("1", "NewName", "new@test.com").
+		WillReturnError(errors.New("db error"))
+
+	_, err := repo.UpdateUser(context.Background(), "1", "NewName", "new@test.com")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "erro ao atualizar usuário: db error")
+}
+
+func TestRepository_UpdatePassword_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`UPDATE "user" SET password_hash = \$2, updated_at = NOW\(\)`).
+		WithArgs("1", "new_hash").
+		WillReturnError(errors.New("db error"))
+
+	err := repo.UpdatePassword(context.Background(), "1", "new_hash")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "erro ao atualizar senha: db error")
+}
+
+func TestRepository_DeleteUser_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`DELETE FROM "user"`).
+		WithArgs("1").
+		WillReturnError(errors.New("db error"))
+
+	err := repo.DeleteUser(context.Background(), "1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "erro ao excluir usuário: db error")
+}
+

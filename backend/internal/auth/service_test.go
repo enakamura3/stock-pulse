@@ -155,6 +155,19 @@ func TestService_Login_RefreshTokenError(t *testing.T) {
 	assert.Contains(t, err.Error(), "falha ao gerar refresh token")
 }
 
+func TestService_Login_AccessTokenError(t *testing.T) {
+	repo := new(MockUserRepository)
+	db, _ := redismock.NewClientMock()
+	s := NewService(repo, db, "") // Secret vazio faz GenerateAccessToken falhar
+	hash, _ := hashPassword("password", defaultParams)
+	user := &User{ID: "1", Email: "test@test.com", PasswordHash: hash}
+	repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
+
+	_, _, _, err := s.Login(context.Background(), "test@test.com", "password")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "falha ao gerar access token")
+}
+
 func TestService_GenerateRefreshToken_Errors(t *testing.T) {
 	t.Run("SAdd error", func(t *testing.T) {
 		s, _, rdbMock := setupService()
@@ -176,20 +189,31 @@ func TestService_GenerateRefreshToken_Errors(t *testing.T) {
 	})
 }
 
-func TestService_ValidateRefreshToken_Expired(t *testing.T) {
-	s, _, rdbMock := setupService()
-	rdbMock.ExpectGet("refresh_token:expired").SetErr(redis.Nil)
+func TestService_ValidateRefreshToken(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("refresh_token:valid").SetVal("user-123")
 
-	_, err := s.ValidateRefreshToken(context.Background(), "expired")
-	assert.EqualError(t, err, "sessão expirada ou inválida")
-}
+		userID, err := s.ValidateRefreshToken(context.Background(), "valid")
+		assert.NoError(t, err)
+		assert.Equal(t, "user-123", userID)
+	})
 
-func TestService_ValidateRefreshToken_Error(t *testing.T) {
-	s, _, rdbMock := setupService()
-	rdbMock.ExpectGet("refresh_token:invalid").SetErr(errors.New("redis err"))
+	t.Run("Expired", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("refresh_token:expired").SetErr(redis.Nil)
 
-	_, err := s.ValidateRefreshToken(context.Background(), "invalid")
-	assert.Error(t, err)
+		_, err := s.ValidateRefreshToken(context.Background(), "expired")
+		assert.EqualError(t, err, "sessão expirada ou inválida")
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectGet("refresh_token:invalid").SetErr(errors.New("redis err"))
+
+		_, err := s.ValidateRefreshToken(context.Background(), "invalid")
+		assert.Error(t, err)
+	})
 }
 
 func TestService_RotateRefreshToken(t *testing.T) {
@@ -328,31 +352,44 @@ func TestService_GetUserByID(t *testing.T) {
 	assert.Equal(t, "1", user.ID)
 }
 
-func TestService_GenerateAccessToken_Expiration(t *testing.T) {
+func TestService_GenerateAccessToken(t *testing.T) {
 	s, _, _ := setupService()
 	user := &User{ID: "user-123", Email: "user@test.com"}
 
-	tokenStr, err := s.GenerateAccessToken(user)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, tokenStr)
-
-	// Valida os claims do token gerado
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		return s.jwtSecret, nil
+	t.Run("Nil user", func(t *testing.T) {
+		_, err := s.GenerateAccessToken(nil)
+		assert.EqualError(t, err, "usuário não fornecido")
 	})
-	assert.NoError(t, err)
-	assert.True(t, token.Valid)
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	assert.True(t, ok)
-	assert.Equal(t, "user-123", claims["user_id"])
-	assert.Equal(t, "user@test.com", claims["email"])
+	t.Run("Empty secret", func(t *testing.T) {
+		sNoSecret := NewService(nil, nil, "")
+		_, err := sNoSecret.GenerateAccessToken(user)
+		assert.EqualError(t, err, "jwtSecret não configurado")
+	})
 
-	expFloat, ok := claims["exp"].(float64)
-	assert.True(t, ok)
-	expectedExp := time.Now().Add(15 * time.Minute).Unix()
-	// Tolera diferença de até 5 segundos devido ao tempo de execução do teste
-	assert.InDelta(t, expectedExp, int64(expFloat), 5)
+	t.Run("Success and Expiration", func(t *testing.T) {
+		tokenStr, err := s.GenerateAccessToken(user)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, tokenStr)
+
+		// Valida os claims do token gerado
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+			return s.jwtSecret, nil
+		})
+		assert.NoError(t, err)
+		assert.True(t, token.Valid)
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		assert.True(t, ok)
+		assert.Equal(t, "user-123", claims["user_id"])
+		assert.Equal(t, "user@test.com", claims["email"])
+
+		expFloat, ok := claims["exp"].(float64)
+		assert.True(t, ok)
+		expectedExp := time.Now().Add(15 * time.Minute).Unix()
+		// Tolera diferença de até 5 segundos devido ao tempo de execução do teste
+		assert.InDelta(t, expectedExp, int64(expFloat), 5)
+	})
 }
 
 func TestService_NewService_CustomTTL(t *testing.T) {
@@ -386,8 +423,20 @@ func TestComparePasswordAndHash(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, match)
 
-	// Invalid format
+	// Invalid format (less than 6 parts)
 	_, err = comparePasswordAndHash("test1234", "invalid")
+	assert.Error(t, err)
+
+	// Invalid params part
+	_, err = comparePasswordAndHash("test1234", "$argon2id$v=19$badparams$c2FsdA$aGFzaA")
+	assert.Error(t, err)
+
+	// Invalid base64 salt
+	_, err = comparePasswordAndHash("test1234", "$argon2id$v=19$m=65536,t=1,p=4$bad#salt$aGFzaA")
+	assert.Error(t, err)
+
+	// Invalid base64 hash
+	_, err = comparePasswordAndHash("test1234", "$argon2id$v=19$m=65536,t=1,p=4$c2FsdA$bad#hash")
 	assert.Error(t, err)
 }
 
@@ -456,4 +505,51 @@ func TestService_DeleteUser(t *testing.T) {
 
 	err := s.DeleteUser(context.Background(), "1")
 	assert.NoError(t, err)
+}
+
+type failingReader struct{}
+
+func (f *failingReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("entropy source failed")
+}
+
+func TestRandReader_Failures(t *testing.T) {
+	origReader := randReader
+	defer func() { randReader = origReader }()
+
+	t.Run("hashPassword fails", func(t *testing.T) {
+		randReader = &failingReader{}
+		_, err := hashPassword("password", defaultParams)
+		assert.EqualError(t, err, "entropy source failed")
+	})
+
+	t.Run("Register fails on hashPassword", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(nil, errors.New("not found"))
+
+		randReader = &failingReader{}
+		_, err := s.Register(context.Background(), "Test", "test@test.com", "password")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "falha ao criptografar senha")
+	})
+
+	t.Run("UpdatePassword fails on hashPassword", func(t *testing.T) {
+		randReader = origReader
+		hash, _ := hashPassword("oldpass", defaultParams)
+
+		s, repo, _ := setupService()
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+
+		randReader = &failingReader{}
+		err := s.UpdatePassword(context.Background(), "1", "oldpass", "newpass123")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "falha ao criptografar nova senha")
+	})
+
+	t.Run("GenerateRefreshToken fails on rand.Read", func(t *testing.T) {
+		s, _, _ := setupService()
+		randReader = &failingReader{}
+		_, err := s.GenerateRefreshToken(context.Background(), "user-1")
+		assert.EqualError(t, err, "entropy source failed")
+	})
 }

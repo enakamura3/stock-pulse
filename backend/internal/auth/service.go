@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -74,10 +75,12 @@ var defaultParams = &argon2Params{
 	keyLength:   32,
 }
 
+var randReader io.Reader = rand.Reader
+
 // hashPassword gera um hash seguro usando Argon2id no formato padrão.
 func hashPassword(password string, params *argon2Params) (string, error) {
 	salt := make([]byte, params.saltLength)
-	if _, err := rand.Read(salt); err != nil {
+	if _, err := io.ReadFull(randReader, salt); err != nil {
 		return "", err
 	}
 
@@ -181,6 +184,13 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 
 // GenerateAccessToken gera um JWT Access Token assinado com a validade configurada.
 func (s *Service) GenerateAccessToken(user *User) (string, error) {
+	if user == nil {
+		return "", errors.New("usuário não fornecido")
+	}
+	if len(s.jwtSecret) == 0 {
+		return "", errors.New("jwtSecret não configurado")
+	}
+
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
@@ -196,7 +206,7 @@ func (s *Service) GenerateAccessToken(user *User) (string, error) {
 // registrando-o também no conjunto de tokens ativos do usuário para controle de sessão.
 func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
 	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
+	if _, err := io.ReadFull(randReader, tokenBytes); err != nil {
 		return "", err
 	}
 	refreshToken := base64.RawURLEncoding.EncodeToString(tokenBytes)
