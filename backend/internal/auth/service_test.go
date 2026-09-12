@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/go-redis/redismock/v9"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -127,7 +129,7 @@ func TestService_Login(t *testing.T) {
 		user := &User{ID: "1", Email: "test@test.com", PasswordHash: hash}
 		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
 
-		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 12*time.Hour).SetVal("OK")
 
 		resUser, access, refresh, err := s.Login(context.Background(), "test@test.com", "password")
 		assert.NoError(t, err)
@@ -144,7 +146,7 @@ func TestService_Login_RefreshTokenError(t *testing.T) {
 	hash, _ := hashPassword("password", defaultParams)
 	user := &User{ID: "1", Email: "test@test.com", PasswordHash: hash}
 	repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(user, nil)
-	rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 7*24*time.Hour).SetErr(errors.New("redis err"))
+	rdbMock.Regexp().ExpectSet("^refresh_token:.*", "1", 12*time.Hour).SetErr(errors.New("redis err"))
 
 	_, _, _, err := s.Login(context.Background(), "test@test.com", "password")
 	assert.Error(t, err)
@@ -182,6 +184,52 @@ func TestService_GetUserByID(t *testing.T) {
 	user, err := s.GetUserByID(context.Background(), "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "1", user.ID)
+}
+
+func TestService_GenerateAccessToken_Expiration(t *testing.T) {
+	s, _, _ := setupService()
+	user := &User{ID: "user-123", Email: "user@test.com"}
+
+	tokenStr, err := s.GenerateAccessToken(user)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tokenStr)
+
+	// Valida os claims do token gerado
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		return s.jwtSecret, nil
+	})
+	assert.NoError(t, err)
+	assert.True(t, token.Valid)
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	assert.True(t, ok)
+	assert.Equal(t, "user-123", claims["user_id"])
+	assert.Equal(t, "user@test.com", claims["email"])
+
+	expFloat, ok := claims["exp"].(float64)
+	assert.True(t, ok)
+	expectedExp := time.Now().Add(15 * time.Minute).Unix()
+	// Tolera diferença de até 5 segundos devido ao tempo de execução do teste
+	assert.InDelta(t, expectedExp, int64(expFloat), 5)
+}
+
+func TestService_NewService_CustomTTL(t *testing.T) {
+	origAccess := config.Envs.JWTAccessTokenTTL
+	origRefresh := config.Envs.JWTRefreshTokenTTL
+	defer func() {
+		config.Envs.JWTAccessTokenTTL = origAccess
+		config.Envs.JWTRefreshTokenTTL = origRefresh
+	}()
+
+	config.Envs.JWTAccessTokenTTL = 30 * time.Minute
+	config.Envs.JWTRefreshTokenTTL = 24 * time.Hour
+
+	repoMock := new(MockUserRepository)
+	db, _ := redismock.NewClientMock()
+	service := NewService(repoMock, db, "secret")
+
+	assert.Equal(t, 30*time.Minute, service.accessTokenTTL)
+	assert.Equal(t, 24*time.Hour, service.refreshTokenTTL)
 }
 
 func TestComparePasswordAndHash(t *testing.T) {

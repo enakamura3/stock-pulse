@@ -9,7 +9,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -526,4 +528,22 @@ func TestHandler_DeleteUser(t *testing.T) {
 		assert.Equal(t, "refresh_token", cookies[1].Name)
 		m.AssertExpectations(t)
 	})
+}
+
+func TestHandler_NewHandler_CustomTTL(t *testing.T) {
+	origAccess := config.Envs.JWTAccessTokenTTL
+	origRefresh := config.Envs.JWTRefreshTokenTTL
+	defer func() {
+		config.Envs.JWTAccessTokenTTL = origAccess
+		config.Envs.JWTRefreshTokenTTL = origRefresh
+	}()
+
+	config.Envs.JWTAccessTokenTTL = 30 * time.Minute
+	config.Envs.JWTRefreshTokenTTL = 24 * time.Hour
+
+	m := new(MockAuthService)
+	h := NewHandler(m)
+
+	assert.Equal(t, 30*time.Minute, h.accessTokenTTL)
+	assert.Equal(t, 24*time.Hour, h.refreshTokenTTL)
 }

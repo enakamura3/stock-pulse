@@ -237,7 +237,7 @@ A plataforma gerencia a persistência relacional de forma rígida através de **
 A camada de cache e sessão gerencia as seguintes chaves mapeadas no Redis 7:
 
 - **`refresh_token:<token>`**
-  - **Tipo:** String | **TTL:** 7 dias (604800 segundos)
+  - **Tipo:** String | **TTL:** 12 horas (43200 segundos)
   - **Propósito:** Armazena o ID do usuário correspondente ao Refresh Token opaco. Usado para validação de sessão na rota `/refresh` sem rotação (GET-only).
 - **`quote:<symbol>`**
   - **Tipo:** String | **TTL:** 60 segundos
@@ -269,8 +269,8 @@ A camada de cache e sessão gerencia as seguintes chaves mapeadas no Redis 7:
 A autenticação do stock-pulse é baseada em sessões web híbridas e seguras sem armazenar estado no backend da aplicação, aderente às melhores práticas do OWASP.
 - **Hashing de Senha:** Implementado com o algoritmo **Argon2id** nativo, protegendo a base de dados contra ataques de dicionário ou rainbow tables.
 - **Estrutura de Tokens:**
-  - `AccessToken`: JWT assinado via HMAC-SHA256, contendo dados do usuário e expiração curta de **2 horas**. Transmitido via cookies seguros (`HttpOnly`, `Secure`, `SameSite=Lax`).
-  - `RefreshToken`: String opaca aleatória de 32 bytes gerada de forma segura e armazenada no Redis sob a chave `refresh_token:<token>` com expiração de **7 dias**.
+  - `AccessToken`: JWT assinado via HMAC-SHA256, contendo dados do usuário e expiração configurável (padrão de **15 minutos**, ajustável via `JWT_ACCESS_TOKEN_TTL`). Transmitido via cookies seguros (`HttpOnly`, `Secure`, `SameSite=Lax`).
+  - `RefreshToken`: String opaca aleatória de 32 bytes gerada de forma segura e armazenada no Redis sob a chave `refresh_token:<token>` com expiração configurável (padrão de **12 horas**, ajustável via `JWT_REFRESH_TOKEN_TTL`).
 - **Validação de Refresh Token Sem Rotação**: Na chamada de renovação no endpoint `/refresh`, o backend valida a sessão recuperando o `userID` do Redis via comando `GET` com a chave `refresh_token:<token>`. O token antigo **nunca** é removido do Redis e **nenhum** novo refresh token é gerado. Apenas um novo `access_token` JWT é gerado e injetado nos cookies.
 
 #### Endpoints de API:

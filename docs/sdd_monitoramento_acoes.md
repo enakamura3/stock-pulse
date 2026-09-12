@@ -528,7 +528,7 @@ sequenceDiagram
     G->>G: Verifica senha com Argon2id
     alt Senha válida
         G->>G: Gera JWT (Access Token, 15min)
-        G->>G: Gera Refresh Token (7 dias)
+        G->>G: Gera Refresh Token (12 horas)
         G-->>U: Set-Cookie (HttpOnly, Secure, SameSite=Lax)
     else Senha inválida
         G-->>U: 401 Unauthorized
@@ -540,7 +540,7 @@ sequenceDiagram
 | Camada            | Mecanismo                                                                                      |
 |-------------------|------------------------------------------------------------------------------------------------|
 | **Transporte**    | HTTPS/TLS 1.3 obrigatório, gerenciado pelo Caddy (certificado automático via Let's Encrypt).   |
-| **Autenticação**  | JWT em Cookie HttpOnly + Secure + SameSite=Lax. Access Token (15min) + Refresh Token (7 dias). |
+| **Autenticação**  | JWT em Cookie HttpOnly + Secure + SameSite=Lax. Access Token (15min) + Refresh Token (12 horas). |
 | **Senhas**        | Hash com Argon2id (resistente a GPU attacks).                                                  |
 | **Anti-XSS**      | React escapa conteúdo por padrão + Content Security Policy (CSP) restritiva no Next.js.       |
 | **Anti-CSRF**     | Cookie SameSite=Lax impede envio cross-origin. CSRF token adicional em formulários críticos.   |
