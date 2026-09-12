@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-redis/redismock/v9"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -210,6 +211,25 @@ func TestService_GenerateAccessToken_Expiration(t *testing.T) {
 	expectedExp := time.Now().Add(15 * time.Minute).Unix()
 	// Tolera diferença de até 5 segundos devido ao tempo de execução do teste
 	assert.InDelta(t, expectedExp, int64(expFloat), 5)
+}
+
+func TestService_NewService_CustomTTL(t *testing.T) {
+	origAccess := config.Envs.JWTAccessTokenTTL
+	origRefresh := config.Envs.JWTRefreshTokenTTL
+	defer func() {
+		config.Envs.JWTAccessTokenTTL = origAccess
+		config.Envs.JWTRefreshTokenTTL = origRefresh
+	}()
+
+	config.Envs.JWTAccessTokenTTL = 30 * time.Minute
+	config.Envs.JWTRefreshTokenTTL = 24 * time.Hour
+
+	repoMock := new(MockUserRepository)
+	db, _ := redismock.NewClientMock()
+	service := NewService(repoMock, db, "secret")
+
+	assert.Equal(t, 30*time.Minute, service.accessTokenTTL)
+	assert.Equal(t, 24*time.Hour, service.refreshTokenTTL)
 }
 
 func TestComparePasswordAndHash(t *testing.T) {
