@@ -17,6 +17,9 @@ type ConversationState struct {
 	Ticker      string  `json:"ticker,omitempty"`
 	Type        string  `json:"type,omitempty"`
 	Quantity    float64 `json:"quantity,omitempty"`
+	UnitPrice   float64 `json:"unit_price,omitempty"`
+	ExecutedAt  string  `json:"executed_at,omitempty"`
+	Fee         float64 `json:"fee,omitempty"`
 	PortfolioID string  `json:"portfolio_id,omitempty"`
 }
 
