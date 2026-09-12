@@ -625,6 +625,124 @@ func TestHandlers_Operations(t *testing.T) {
 	})
 }
 
+func TestHandlers_Agenda(t *testing.T) {
+	h, svc, pSvc, _, _, _ := setupHandlersTest()
+
+	t.Run("HandleAgenda - error fetching dividends callback", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{}).Twice()
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(([]portfolio.Portfolio)(nil), errors.New("err")).Once()
+		mCtx.On("Edit", "❌ Ocorreu um erro ao buscar os proventos da sua carteira.", mock.Anything).Return(nil).Once()
+
+		err := h.HandleAgenda(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleAgenda - error fetching dividends command send", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(([]portfolio.Portfolio)(nil), errors.New("err")).Once()
+		mCtx.On("Send", "❌ Ocorreu um erro ao buscar os proventos da sua carteira.", mock.Anything).Return(nil).Once()
+
+		err := h.HandleAgenda(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleAgenda - empty upcoming", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{}).Twice()
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		now := time.Now()
+		divs := []portfolio.CalculatedDividend{
+			{Ticker: "OLD", PaymentDate: now.AddDate(0, 0, -5)},
+			{Ticker: "FUTURE", PaymentDate: now.AddDate(0, 0, 45)},
+			{Ticker: "ZERO", PaymentDate: time.Time{}},
+		}
+		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
+
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Nenhum provento com pagamento previsto para os próximos 30 dias")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleAgenda(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleAgenda - success with items, sorting, message is not modified and send fallback", func(t *testing.T) {
+		now := time.Now()
+		day2 := now.AddDate(0, 0, 2)
+		day5 := now.AddDate(0, 0, 5)
+
+		divs := []portfolio.CalculatedDividend{
+			{Ticker: "PETR4", AssetType: "AÇÕES", Type: "DIVIDENDO", Currency: "BRL", PaymentDate: day2, Quantity: 100.5, PerShareAmount: 0.50, NetAmount: 50.25},
+			{Ticker: "BBAS3", AssetType: "AÇÕES", Type: "JCP", Currency: "BRL", PaymentDate: day2, Quantity: 0, PerShareAmount: 0, NetAmount: 30.0},
+			{Ticker: "HGLG11.SA", AssetType: "FII", Type: "RENDIMENTO", Currency: "", PaymentDate: day5, Quantity: 10.0, PerShareAmount: 1.10, NetAmount: 11.0},
+			{Ticker: "AAPL", AssetType: "STOCK", Type: "DIV", Currency: "USD", PaymentDate: day5, Quantity: 5.0, PerShareAmount: 0.25, NetAmount: 1.25},
+		}
+
+		// Callback with "message is not modified"
+		mCtx1 := new(MockTelebotContext)
+		mCtx1.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx1.On("Callback").Return(&telebot.Callback{}).Twice()
+		mCtx1.On("Respond", mock.Anything).Return(nil).Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
+
+		mCtx1.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Agenda de Proventos — Próximos 30 Dias") &&
+				strings.Contains(msg, "PETR4") &&
+				strings.Contains(msg, "BBAS3") &&
+				strings.Contains(msg, "HGLG11") &&
+				strings.Contains(msg, "AAPL") &&
+				strings.Contains(msg, "Total Previsto a Receber")
+		}), mock.Anything, mock.Anything).Return(errors.New("message is not modified")).Once()
+
+		err := h.HandleAgenda(mCtx1)
+		assert.NoError(t, err)
+
+		// Callback with other error
+		mCtx2 := new(MockTelebotContext)
+		mCtx2.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx2.On("Callback").Return(&telebot.Callback{}).Twice()
+		mCtx2.On("Respond", mock.Anything).Return(nil).Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
+		mCtx2.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("fatal edit err")).Once()
+
+		err = h.HandleAgenda(mCtx2)
+		assert.Error(t, err)
+
+		// Send command
+		mCtx3 := new(MockTelebotContext)
+		mCtx3.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx3.On("Callback").Return((*telebot.Callback)(nil))
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(divs, nil).Once()
+		mCtx3.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Agenda de Proventos")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err = h.HandleAgenda(mCtx3)
+		assert.NoError(t, err)
+	})
+}
+
 func TestGetCurrencySymbolAndAbbreviate(t *testing.T) {
 	assert.Equal(t, "US$", getCurrencySymbol("USD"))
 	assert.Equal(t, "€", getCurrencySymbol("EUR"))
@@ -2300,6 +2418,178 @@ func TestHandlers_Operations_DateAndFee(t *testing.T) {
 		}), mock.Anything, mock.Anything).Return(nil).Once()
 
 		err := h.HandleText(mCtx)
+		assert.NoError(t, err)
+	})
+}
+
+func TestHandlers_UndoAndOperations(t *testing.T) {
+	h, svc, pSvc, mSvc, _, _ := setupHandlersTest()
+
+	t.Run("HandleDynamicCallback - btn_tx_del_, btn_analise_, btn_quote_", func(t *testing.T) {
+		// btn_tx_del_
+		mCtxDel := new(MockTelebotContext)
+		mCtxDel.On("Callback").Return(&telebot.Callback{Data: "btn_tx_del_tx-999"}).Once()
+		mCtxDel.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxDel.On("Chat").Return(&telebot.Chat{ID: 123})
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("DeleteTransaction", mock.Anything, "tx-999", "p1", "00000000-0000-0000-0000-000000000000").Return(nil).Once()
+		mCtxDel.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Operação desfeita com sucesso")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleDynamicCallback(mCtxDel)
+		assert.NoError(t, err)
+
+		// btn_analise_
+		mCtxAna := new(MockTelebotContext)
+		mCtxAna.On("Callback").Return(&telebot.Callback{Data: "btn_analise_VALE3"})
+		mSvc.On("GetFundamentals", mock.Anything, "VALE3").Return(&market.Fundamentals{Symbol: "VALE3"}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Price: 60.0}, nil).Once()
+		mCtxAna.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Análise Fundamentalista: VALE3")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err = h.HandleDynamicCallback(mCtxAna)
+		assert.NoError(t, err)
+
+		// btn_quote_
+		mCtxQuote := new(MockTelebotContext)
+		mCtxQuote.On("Callback").Return(&telebot.Callback{Data: "btn_quote_VALE3"})
+		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Symbol: "VALE3", Price: 60.0}, nil).Once()
+		mCtxQuote.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "VALE3")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err = h.HandleDynamicCallback(mCtxQuote)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleUndoLastOperation - branches", func(t *testing.T) {
+		// getUserID error
+		mCtxErrUser := new(MockTelebotContext)
+		mCtxErrUser.Set("user_id", "")
+		mCtxErrUser.On("Send", "⚠️ Sessão inválida. Por favor, envie /start para reconectar.", mock.Anything).Return(nil).Once()
+		err := h.HandleUndoLastOperation(mCtxErrUser)
+		assert.Error(t, err)
+
+		// GetPortfolios error
+		mCtxErrPort := new(MockTelebotContext)
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(([]portfolio.Portfolio)(nil), errors.New("err")).Once()
+		mCtxErrPort.On("Send", "⚠️ Nenhuma carteira encontrada. Crie uma carteira primeiro na plataforma web.", mock.Anything).Return(nil).Once()
+		err = h.HandleUndoLastOperation(mCtxErrPort)
+		assert.NoError(t, err)
+
+		// GetPortfolios empty
+		mCtxEmptyPort := new(MockTelebotContext)
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{}, nil).Once()
+		mCtxEmptyPort.On("Send", "⚠️ Nenhuma carteira encontrada. Crie uma carteira primeiro na plataforma web.", mock.Anything).Return(nil).Once()
+		err = h.HandleUndoLastOperation(mCtxEmptyPort)
+		assert.NoError(t, err)
+
+		// GetPortfolioTransactions error
+		mCtxErrTx := new(MockTelebotContext)
+		mCtxErrTx.On("Chat").Return(&telebot.Chat{ID: 123})
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "P1"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(([]portfolio.Transaction)(nil), errors.New("err")).Once()
+		mCtxErrTx.On("Send", "ℹ️ Nenhuma operação recente encontrada para desfazer nesta carteira.", mock.Anything).Return(nil).Once()
+		err = h.HandleUndoLastOperation(mCtxErrTx)
+		assert.NoError(t, err)
+
+		// GetPortfolioTransactions empty
+		mCtxEmptyTx := new(MockTelebotContext)
+		mCtxEmptyTx.On("Chat").Return(&telebot.Chat{ID: 123})
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "P1"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return([]portfolio.Transaction{}, nil).Once()
+		mCtxEmptyTx.On("Send", "ℹ️ Nenhuma operação recente encontrada para desfazer nesta carteira.", mock.Anything).Return(nil).Once()
+		err = h.HandleUndoLastOperation(mCtxEmptyTx)
+		assert.NoError(t, err)
+
+		// Success with BUY tx
+		mCtxBuy := new(MockTelebotContext)
+		mCtxBuy.On("Chat").Return(&telebot.Chat{ID: 123})
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return([]portfolio.Transaction{
+			{ID: "tx-1", Ticker: "PETR4", Type: "BUY", Quantity: 100, UnitPrice: 35.0, TotalCost: 3505.0, Fee: 5.0, ExecutedAt: time.Now()},
+		}, nil).Once()
+		mCtxBuy.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Confirmar cancelamento da última operação") &&
+				strings.Contains(msg, "PETR4") &&
+				strings.Contains(msg, "COMPRA")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+		err = h.HandleUndoLastOperation(mCtxBuy)
+		assert.NoError(t, err)
+
+		// Success with SELL tx
+		mCtxSell := new(MockTelebotContext)
+		mCtxSell.On("Chat").Return(&telebot.Chat{ID: 123})
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return([]portfolio.Transaction{
+			{ID: "tx-2", Ticker: "VALE3", Type: "SELL", Quantity: 50, UnitPrice: 60.0, TotalCost: 2995.0, Fee: 5.0, ExecutedAt: time.Now()},
+		}, nil).Once()
+		mCtxSell.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Confirmar cancelamento da última operação") &&
+				strings.Contains(msg, "VALE3") &&
+				strings.Contains(msg, "VENDA")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+		err = h.HandleUndoLastOperation(mCtxSell)
+		assert.NoError(t, err)
+	})
+
+	t.Run("handleDeleteTransaction - branches", func(t *testing.T) {
+		// getUserID error
+		mCtxErrUser := new(MockTelebotContext)
+		mCtxErrUser.Set("user_id", "")
+		mCtxErrUser.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxErrUser.On("Send", "⚠️ Sessão inválida. Por favor, envie /start para reconectar.", mock.Anything).Return(nil).Once()
+		err := h.handleDeleteTransaction(mCtxErrUser, "tx-1")
+		assert.Error(t, err)
+
+		// GetPortfolios error
+		mCtxErrPort := new(MockTelebotContext)
+		mCtxErrPort.On("Respond", mock.Anything).Return(nil).Once()
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(([]portfolio.Portfolio)(nil), errors.New("err")).Once()
+		mCtxErrPort.On("Edit", "⚠️ Carteira não encontrada.", mock.Anything).Return(nil).Once()
+		err = h.handleDeleteTransaction(mCtxErrPort, "tx-1")
+		assert.NoError(t, err)
+
+		// DeleteTransaction error
+		mCtxErrDel := new(MockTelebotContext)
+		mCtxErrDel.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxErrDel.On("Chat").Return(&telebot.Chat{ID: 123})
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("DeleteTransaction", mock.Anything, "tx-fail", "p1", "00000000-0000-0000-0000-000000000000").Return(errors.New("db err")).Once()
+		mCtxErrDel.On("Edit", "❌ Erro ao excluir a operação. Ela pode já ter sido removida.", mock.Anything).Return(nil).Once()
+		err = h.handleDeleteTransaction(mCtxErrDel, "tx-fail")
+		assert.NoError(t, err)
+	})
+
+	t.Run("finalizeTransaction - with savedTx ID and callback edit", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		state := &ConversationState{
+			PortfolioID: "p1",
+			Ticker:      "BBAS3",
+			Type:        "BUY",
+			Quantity:    20,
+			UnitPrice:   28.0,
+			ExecutedAt:  "2024-03-15",
+		}
+		pSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.Anything).Return(&portfolio.Transaction{
+			ID: "tx-undo-saved",
+		}, nil).Once()
+		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Operação Lançada com Sucesso") &&
+				strings.Contains(msg, "BBAS3")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.finalizeTransaction(mCtx, state, 2.50, true)
 		assert.NoError(t, err)
 	})
 }

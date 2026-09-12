@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -94,7 +95,7 @@ func cleanTickerForDisplay(ticker string) string {
 }
 
 func formatQuantity(q float64) string {
-	if q == float64(int64(q)) {
+	if math.Abs(q-float64(int64(q))) < 1e-6 {
 		return fmt.Sprintf("%.0f", q)
 	}
 	return fmt.Sprintf("%.2f", q)
@@ -317,12 +318,13 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 
 	menu := &telebot.ReplyMarkup{}
 	btnRefresh := menu.Data("🔄 Atualizar", "btn_proventos")
+	btnAgenda := menu.Data("📋 Agenda (30 dias)", "btn_agenda")
 	btnAno := menu.Data("📅 Agrupar por Ano", "btn_divs_year")
 	btnMes := menu.Data("📆 Agrupar por Mês", "btn_divs_month")
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 
 	if len(divs) > 0 {
-		menu.Inline(menu.Row(btnRefresh), menu.Row(btnAno, btnMes), menu.Row(btnBack))
+		menu.Inline(menu.Row(btnRefresh, btnAgenda), menu.Row(btnAno, btnMes), menu.Row(btnBack))
 	} else {
 		menu.Inline(menu.Row(btnRefresh), menu.Row(btnBack))
 	}
@@ -332,6 +334,103 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 		return nil
 	}
 	return err
+}
+
+func (h *Handlers) HandleAgenda(c telebot.Context) error {
+	if c.Callback() != nil {
+		defer c.Respond()
+	}
+
+	divs, portfolioName, err := h.fetchDividends(c)
+	if err != nil {
+		slog.Error("Failed to fetch dividends for agenda", "error", err)
+		msgErr := "❌ Ocorreu um erro ao buscar os proventos da sua carteira."
+		if c.Callback() != nil {
+			return c.Edit(msgErr)
+		}
+		return c.Send(msgErr)
+	}
+
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	limitDate := today.AddDate(0, 0, 30).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+
+	var upcoming []portfolio.CalculatedDividend
+	totals := make(map[string]float64)
+
+	for _, d := range divs {
+		if d.PaymentDate.IsZero() {
+			continue
+		}
+		if !d.PaymentDate.Before(today) && !d.PaymentDate.After(limitDate) {
+			upcoming = append(upcoming, d)
+			curr := d.Currency
+			if curr == "" {
+				curr = "BRL"
+			}
+			totals[curr] += d.NetAmount
+		}
+	}
+
+	sort.Slice(upcoming, func(i, j int) bool {
+		if upcoming[i].PaymentDate.Equal(upcoming[j].PaymentDate) {
+			return upcoming[i].Ticker < upcoming[j].Ticker
+		}
+		return upcoming[i].PaymentDate.Before(upcoming[j].PaymentDate)
+	})
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("📋 *Agenda de Proventos — Próximos 30 Dias*\n🏢 Carteira: *%s*\n\n", portfolioName)
+
+	if len(upcoming) == 0 {
+		msg += "Nenhum provento com pagamento previsto para os próximos 30 dias na sua carteira."
+	} else {
+		var currList []string
+		for curr := range totals {
+			currList = append(currList, curr)
+		}
+		sortCurrencies(currList)
+
+		msg += "💰 *Total Previsto a Receber:*\n"
+		for _, curr := range currList {
+			msg += p.Sprintf("• %s: *%s %.2f*\n", curr, getCurrencySymbol(curr), totals[curr])
+		}
+		msg += "\n"
+
+		for _, d := range upcoming {
+			curr := d.Currency
+			if curr == "" {
+				curr = "BRL"
+			}
+			emoji := getAssetTypeEmoji(d.AssetType, d.Ticker)
+			tickerClean := cleanTickerForDisplay(d.Ticker)
+			tipoAbbr := abbreviateDividendType(d.Type)
+
+			msg += p.Sprintf("📅 *%s* — %s `%s` (%s)\n", d.PaymentDate.Format("02/01/2006"), emoji, tickerClean, tipoAbbr)
+			if d.Quantity > 0 && d.PerShareAmount > 0 {
+				msg += p.Sprintf("   ↳ *%s %.2f* _(%s un x %s %s)_\n",
+					getCurrencySymbol(curr), d.NetAmount, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+			} else {
+				msg += p.Sprintf("   ↳ *%s %.2f*\n", getCurrencySymbol(curr), d.NetAmount)
+			}
+		}
+		msg += p.Sprintf("\n_Total de eventos no período: %d_", len(upcoming))
+	}
+
+	menu := &telebot.ReplyMarkup{}
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_agenda")
+	btnVoltarProventos := menu.Data("💸 Ver Proventos", "btn_proventos")
+	btnMenu := menu.Data("🏠 Menu", "btn_menu")
+	menu.Inline(menu.Row(btnRefresh, btnVoltarProventos), menu.Row(btnMenu))
+
+	if c.Callback() != nil {
+		err = c.Edit(msg, telebot.ModeMarkdown, menu)
+		if err != nil && strings.Contains(err.Error(), "message is not modified") {
+			return nil
+		}
+		return err
+	}
+	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {

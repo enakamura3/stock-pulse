@@ -83,6 +83,21 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 		return h.handleSelectedQty(c, qtyStr)
 	}
 
+	if strings.HasPrefix(data, "btn_tx_del_") {
+		txID := strings.TrimPrefix(data, "btn_tx_del_")
+		return h.handleDeleteTransaction(c, txID)
+	}
+
+	if strings.HasPrefix(data, "btn_analise_") {
+		ticker := strings.TrimPrefix(data, "btn_analise_")
+		return h.renderAnalysis(c, ticker)
+	}
+
+	if strings.HasPrefix(data, "btn_quote_") {
+		ticker := strings.TrimPrefix(data, "btn_quote_")
+		return h.renderQuote(c, ticker)
+	}
+
 	if strings.HasPrefix(data, "btn_alert_toggle_") {
 		alertID := strings.TrimPrefix(data, "btn_alert_toggle_")
 		return h.handleAlertToggle(c, alertID)
@@ -273,7 +288,7 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 		ExecutedAt:   executedAt,
 	}
 
-	_, err = h.portfolioSvc.AddTransaction(context.Background(), userIDStr, tx)
+	savedTx, err := h.portfolioSvc.AddTransaction(context.Background(), userIDStr, tx)
 	if err != nil {
 		slog.Error("Erro ao lançar transação via telegram", "error", err)
 		errMsg := "❌ Ocorreu um erro ao salvar a transação. Tente novamente mais tarde."
@@ -295,14 +310,84 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 		state.Ticker, tipoStr, state.Quantity, state.UnitPrice, fee, executedAt.Format("02/01/2006"), totalCost)
 
 	successMenu := &telebot.ReplyMarkup{}
+	var rows []telebot.Row
+	if savedTx != nil && savedTx.ID != "" {
+		btnUndo := successMenu.Data("🗑️ Desfazer Operação", "btn_tx_del_"+savedTx.ID)
+		rows = append(rows, successMenu.Row(btnUndo))
+	}
 	btnNewOp := successMenu.Data("➕ Nova Operação", "btn_operacao")
 	btnMenu := successMenu.Data("🏠 Voltar ao Menu", "btn_menu")
-	successMenu.Inline(successMenu.Row(btnNewOp, btnMenu))
+	rows = append(rows, successMenu.Row(btnNewOp, btnMenu))
+	successMenu.Inline(rows...)
 
 	if isCallback {
 		return c.Edit(successMsg, telebot.ModeMarkdown, successMenu)
 	}
 	return c.Send(successMsg, telebot.ModeMarkdown, successMenu)
+}
+
+func (h *Handlers) HandleUndoLastOperation(c telebot.Context) error {
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Send("⚠️ Nenhuma carteira encontrada. Crie uma carteira primeiro na plataforma web.")
+	}
+
+	portID, portName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+
+	txs, err := h.portfolioSvc.GetPortfolioTransactions(context.Background(), portID, userIDStr)
+	if err != nil || len(txs) == 0 {
+		return c.Send("ℹ️ Nenhuma operação recente encontrada para desfazer nesta carteira.")
+	}
+
+	lastTx := txs[0]
+	tipoStr := "COMPRA"
+	if lastTx.Type == "SELL" {
+		tipoStr = "VENDA"
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("⚠️ *Confirmar cancelamento da última operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço: R$ %.2f\n• Taxas: R$ %.2f\n• Data: %s\n• Total: R$ %.2f\n\nDeseja realmente excluir esta operação?",
+		portName, lastTx.Ticker, tipoStr, lastTx.Quantity, lastTx.UnitPrice, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), lastTx.TotalCost)
+
+	menu := &telebot.ReplyMarkup{}
+	btnConfirm := menu.Data("🗑️ Sim, Desfazer", "btn_tx_del_"+lastTx.ID)
+	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
+	menu.Inline(menu.Row(btnConfirm, btnCancel))
+
+	return c.Send(msg, telebot.ModeMarkdown, menu)
+}
+
+func (h *Handlers) handleDeleteTransaction(c telebot.Context, txID string) error {
+	defer c.Respond()
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Edit("⚠️ Carteira não encontrada.")
+	}
+
+	portID, _ := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+
+	err = h.portfolioSvc.DeleteTransaction(context.Background(), txID, portID, userIDStr)
+	if err != nil {
+		slog.Error("Erro ao excluir transação via telegram", "txID", txID, "error", err)
+		return c.Edit("❌ Erro ao excluir a operação. Ela pode já ter sido removida.")
+	}
+
+	menu := &telebot.ReplyMarkup{}
+	btnNewOp := menu.Data("➕ Nova Operação", "btn_operacao")
+	btnMenu := menu.Data("🏠 Voltar ao Menu", "btn_menu")
+	menu.Inline(menu.Row(btnNewOp, btnMenu))
+
+	return c.Edit("🗑️ *Operação desfeita com sucesso!*\nA transação foi removida da sua carteira.", telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleText(c telebot.Context) error {
@@ -474,11 +559,18 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		msg := formatQuoteMessage(ticker, quote)
 
 		replyMenu := &telebot.ReplyMarkup{}
+		btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+ticker)
+		btnAnalise := replyMenu.Data("🔍 Análise Fundamentalista", "btn_analise_"+ticker)
 		btnNew := replyMenu.Data("🔍 Consultar Outro", "btn_cotacao")
 		btnMenuBtn := replyMenu.Data("🏠 Menu", "btn_menu")
-		replyMenu.Inline(replyMenu.Row(btnNew, btnMenuBtn))
+		replyMenu.Inline(replyMenu.Row(btnRefresh, btnAnalise), replyMenu.Row(btnNew, btnMenuBtn))
 
 		return c.Send(msg, telebot.ModeMarkdown, replyMenu)
+
+	case "ANALYSIS_EXPECT_TICKER":
+		ticker := strings.ToUpper(text)
+		_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+		return h.renderAnalysis(c, ticker)
 	}
 
 	return nil
