@@ -7,19 +7,16 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/config"
+	"github.com/onigiri/stock-pulse/backend/internal/middleware"
 )
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Valida a origem do request verificando FRONTEND_URL
+	// Valida a origem do request verificando FRONTEND_URL e regras de desenvolvimento
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		frontendURL := config.Envs.FrontendURL
-		if frontendURL == "" {
-			frontendURL = "http://localhost:3000"
-		}
-		return origin == frontendURL
+		return middleware.IsOriginAllowed(origin, config.Envs.FrontendURL, config.Envs.Env, r.Host)
 	},
 }
 

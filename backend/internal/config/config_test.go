@@ -60,17 +60,35 @@ func TestLoad_ShortJWTSecret(t *testing.T) {
 	assert.ErrorContains(t, err, "pelo menos 32 caracteres")
 }
 
-func TestLoad_MissingFrontendURL(t *testing.T) {
+func TestLoad_MissingFrontendURL_Production(t *testing.T) {
 	os.Setenv("DB_URL", "postgres://localhost")
 	os.Setenv("JWT_SECRET", "supersecret_key_12345678901234567890")
+	os.Setenv("ENV", "production")
 	os.Unsetenv("FRONTEND_URL")
 	defer func() {
 		os.Unsetenv("DB_URL")
 		os.Unsetenv("JWT_SECRET")
+		os.Unsetenv("ENV")
 	}()
 
 	err := Load()
 	assert.ErrorContains(t, err, "FRONTEND_URL")
+}
+
+func TestLoad_MissingFrontendURL_DevDefault(t *testing.T) {
+	os.Setenv("DB_URL", "postgres://localhost")
+	os.Setenv("JWT_SECRET", "supersecret_key_12345678901234567890")
+	os.Setenv("ENV", "development")
+	os.Unsetenv("FRONTEND_URL")
+	defer func() {
+		os.Unsetenv("DB_URL")
+		os.Unsetenv("JWT_SECRET")
+		os.Unsetenv("ENV")
+	}()
+
+	err := Load()
+	assert.NoError(t, err)
+	assert.Equal(t, "http://localhost:3000", Envs.FrontendURL)
 }
 
 func TestParseDuration(t *testing.T) {

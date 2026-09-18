@@ -209,3 +209,44 @@ func TestCORS_FallbackURL(t *testing.T) {
 
 	assert.Equal(t, "http://localhost:3000", rr.Header().Get("Access-Control-Allow-Origin"))
 }
+
+func TestCORS_CommaSeparatedURLs(t *testing.T) {
+	config.Envs.FrontendURL = "http://localhost:3000,http://192.168.1.100:3000"
+	defer func() { config.Envs.FrontendURL = "" }()
+
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "http://192.168.1.100:3000")
+
+	rr := httptest.NewRecorder()
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	middleware := CORS()
+	middleware(nextHandler).ServeHTTP(rr, req)
+
+	assert.Equal(t, "http://192.168.1.100:3000", rr.Header().Get("Access-Control-Allow-Origin"))
+}
+
+func TestCORS_RemoteIP_SameHost_Dev(t *testing.T) {
+	config.Envs.FrontendURL = ""
+	config.Envs.Env = "development"
+	defer func() {
+		config.Envs.FrontendURL = ""
+		config.Envs.Env = ""
+	}()
+
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "192.168.1.100:8080"
+	req.Header.Set("Origin", "http://192.168.1.100:3000")
+
+	rr := httptest.NewRecorder()
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	middleware := CORS()
+	middleware(nextHandler).ServeHTTP(rr, req)
+
+	assert.Equal(t, "http://192.168.1.100:3000", rr.Header().Get("Access-Control-Allow-Origin"))
+}
