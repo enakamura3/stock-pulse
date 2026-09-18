@@ -10,7 +10,7 @@ import (
 
 func TestLoad_Success(t *testing.T) {
 	os.Setenv("DB_URL", "postgres://user:pass@localhost:5432/db")
-	os.Setenv("JWT_SECRET", "supersecret")
+	os.Setenv("JWT_SECRET", "supersecret_key_12345678901234567890")
 	os.Setenv("FRONTEND_URL", "http://localhost:3000")
 	os.Setenv("REDIS_TTL_QUOTES", "10m")
 	defer func() {
@@ -23,7 +23,7 @@ func TestLoad_Success(t *testing.T) {
 	err := Load()
 	assert.NoError(t, err)
 	assert.Equal(t, "postgres://user:pass@localhost:5432/db", Envs.DBURL)
-	assert.Equal(t, "supersecret", Envs.JWTSecret)
+	assert.Equal(t, "supersecret_key_12345678901234567890", Envs.JWTSecret)
 	assert.Equal(t, "http://localhost:3000", Envs.FrontendURL)
 	assert.Equal(t, 10*time.Minute, Envs.RedisTTLQuotes)
 	assert.Equal(t, 24*time.Hour, Envs.RedisTTLFundamentals)
@@ -46,9 +46,23 @@ func TestLoad_MissingJWTSecret(t *testing.T) {
 	assert.ErrorContains(t, err, "JWT_SECRET")
 }
 
+func TestLoad_ShortJWTSecret(t *testing.T) {
+	os.Setenv("DB_URL", "postgres://localhost")
+	os.Setenv("JWT_SECRET", "short_secret_under_32_chars")
+	os.Setenv("FRONTEND_URL", "http://localhost:3000")
+	defer func() {
+		os.Unsetenv("DB_URL")
+		os.Unsetenv("JWT_SECRET")
+		os.Unsetenv("FRONTEND_URL")
+	}()
+
+	err := Load()
+	assert.ErrorContains(t, err, "pelo menos 32 caracteres")
+}
+
 func TestLoad_MissingFrontendURL(t *testing.T) {
 	os.Setenv("DB_URL", "postgres://localhost")
-	os.Setenv("JWT_SECRET", "secret")
+	os.Setenv("JWT_SECRET", "supersecret_key_12345678901234567890")
 	os.Unsetenv("FRONTEND_URL")
 	defer func() {
 		os.Unsetenv("DB_URL")
