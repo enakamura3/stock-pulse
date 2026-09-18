@@ -58,6 +58,9 @@ func Load() error {
 	if Envs.JWTSecret == "" {
 		return fmt.Errorf("variável de ambiente obrigatória não configurada: JWT_SECRET")
 	}
+	if len(Envs.JWTSecret) < 32 {
+		return fmt.Errorf("a variável JWT_SECRET deve ter pelo menos 32 caracteres (atualmente tem %d)", len(Envs.JWTSecret))
+	}
 	if Envs.FrontendURL == "" {
 		return fmt.Errorf("variável de ambiente obrigatória não configurada: FRONTEND_URL")
 	}

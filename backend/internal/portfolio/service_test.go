@@ -1053,11 +1053,12 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 		}
 		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
 
+		baseDate := time.Date(now.Year(), now.Month(), 5, 0, 0, 0, 0, time.UTC).AddDate(0, -1, 0)
 		repo.On("GetAssetEvents", mock.Anything, "fii1").Return([]AssetEvent{
 			// Event 1 with PaymentDate: time.Time{} (zero date)
-			{AssetID: "fii1", CumDate: now.AddDate(0, -1, 10), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
+			{AssetID: "fii1", CumDate: baseDate, PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
 			// Event 2 in same month (should be deduped / skipped)
-			{AssetID: "fii1", CumDate: now.AddDate(0, -1, 15), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
+			{AssetID: "fii1", CumDate: baseDate.AddDate(0, 0, 5), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
 		}, nil)
 
 		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")

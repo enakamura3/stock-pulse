@@ -15,7 +15,11 @@ export async function middleware(request: NextRequest) {
 
   if (token) {
     try {
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'stock-pulse-dev-secret-key-super-secure');
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET environment variable is not defined');
+      }
+      const secret = new TextEncoder().encode(jwtSecret);
       await jwtVerify(token, secret);
       isValid = true;
     } catch (err) {

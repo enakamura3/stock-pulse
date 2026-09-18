@@ -19,7 +19,14 @@ vi.mock('jose', () => ({
 }));
 
 describe('Middleware', () => {
+  const originalJwtSecret = process.env.JWT_SECRET;
+
+  beforeEach(() => {
+    process.env.JWT_SECRET = 'test-jwt-secret-key-123456789012';
+  });
+
   afterEach(() => {
+    process.env.JWT_SECRET = originalJwtSecret;
     vi.clearAllMocks();
   });
 
@@ -57,5 +64,13 @@ describe('Middleware', () => {
     const req = createRequest('/about', undefined);
     await middleware(req);
     expect(NextResponse.next).toHaveBeenCalled();
+  });
+
+  it('redirects to login when JWT_SECRET is not configured', async () => {
+    delete process.env.JWT_SECRET;
+    const req = createRequest('/dashboard', 'token123');
+    const res = await middleware(req);
+    expect(NextResponse.redirect).toHaveBeenCalled();
+    expect((res as any).url).toContain('/login');
   });
 });

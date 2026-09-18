@@ -302,8 +302,11 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:    ":" + port,
-		Handler: r,
+		Addr:         ":" + port,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// Graceful Shutdown (RNF09)
