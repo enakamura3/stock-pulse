@@ -3,7 +3,10 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
@@ -56,18 +59,55 @@ func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
 	}
 }
 
+// IsOriginAllowed verifica se a origem da requisição é permitida segundo as regras de negócio e ambiente.
+func IsOriginAllowed(origin, configuredURL, env, reqHost string) bool {
+	if origin == "" {
+		return false
+	}
+	// 1. Suporta correspondência exata ou URLs separadas por vírgula em FRONTEND_URL
+	if configuredURL != "" {
+		for _, u := range strings.Split(configuredURL, ",") {
+			if strings.TrimSpace(u) == origin {
+				return true
+			}
+		}
+	}
+	// 2. Em produção, apenas URLs explicitamente cadastradas são permitidas
+	if env == "production" {
+		return false
+	}
+	// 3. Em desenvolvimento, se FRONTEND_URL não estiver configurado, permite localhost:3000 por padrão
+	if configuredURL == "" && origin == "http://localhost:3000" {
+		return true
+	}
+	// 4. Em desenvolvimento, se a origem tiver o mesmo hostname do servidor acessado (ex: IP de rede local como 192.168.x.x)
+	originHost := extractHost(origin)
+	reqHostname := reqHost
+	if h, _, err := net.SplitHostPort(reqHost); err == nil {
+		reqHostname = h
+	}
+	if originHost != "" && reqHostname != "" && reqHostname != "localhost" && reqHostname != "127.0.0.1" && originHost == reqHostname {
+		return true
+	}
+	return false
+}
+
+func extractHost(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
 // CORS configura as permissões de compartilhamento de recursos entre origens de forma extremamente segura.
 func CORS() func(http.Handler) http.Handler {
-	frontendURL := config.Envs.FrontendURL
-	if frontendURL == "" {
-		frontendURL = "http://localhost:3000" // Fallback seguro de desenvolvimento
-	}
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			// Apenas autoriza a origem se coincidir com o Frontend cadastrado
-			if origin == frontendURL {
+			allowed := IsOriginAllowed(origin, config.Envs.FrontendURL, config.Envs.Env, r.Host)
+
+			if allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 			}
 
@@ -77,7 +117,11 @@ func CORS() func(http.Handler) http.Handler {
 
 			// Responde imediatamente a requisições de preflight do browser (OPTIONS)
 			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
+				if allowed {
+					w.WriteHeader(http.StatusNoContent)
+				} else {
+					w.WriteHeader(http.StatusForbidden)
+				}
 				return
 			}
 

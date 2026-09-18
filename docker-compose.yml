@@ -73,6 +73,7 @@ services:
       - ANBIMA_WORKER_INTERVAL=${ANBIMA_WORKER_INTERVAL:-6h}
       - LOG_LEVEL=warn
       - JWT_SECRET=${JWT_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-}
       - MOCK_EXTERNAL_APIS=${MOCK_EXTERNAL_APIS:-false}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     volumes:
@@ -106,7 +107,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
       - JWT_SECRET=${JWT_SECRET}
     depends_on:
       - backend
