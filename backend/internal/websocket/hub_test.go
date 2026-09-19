@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -264,6 +265,84 @@ func TestHub_MaxMessageSizeLimit(t *testing.T) {
 	_ = ws.SetReadDeadline(time.Now().Add(1 * time.Second))
 	_, _, readErr := ws.ReadMessage()
 	assert.Error(t, readErr, "servidor deve fechar conexão se a mensagem exceder MaxMessageSize")
+}
+
+func TestHub_DirectRegisterLimitExceeded(t *testing.T) {
+	ms := new(MockMarketService)
+	hub := NewHub(ms)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go hub.Start(ctx)
+	defer cancel()
+
+	// Simula 5 conexões já ativas para o usuário
+	hub.mu.Lock()
+	hub.userConns["busy_user"] = MaxConnectionsPerUser
+	hub.mu.Unlock()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		assert.NoError(t, err)
+		client := NewClient(hub, conn, "busy_user")
+		hub.register <- client
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	header := http.Header{}
+	header.Add("Origin", "http://localhost:3000")
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+	assert.NoError(t, err)
+	defer ws.Close()
+
+	// Como atingiu o limite no hub.register, o servidor deve enviar ClosePolicyViolation e fechar a conexão
+	_ = ws.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_, _, readErr := ws.ReadMessage()
+	assert.Error(t, readErr)
+}
+
+func TestHub_BroadcastQuotes_EdgeCases(t *testing.T) {
+	ms := new(MockMarketService)
+	// Retorna erro para BAD_TICKER
+	ms.On("GetQuote", mock.Anything, "BAD_TICKER").Return(nil, errors.New("provider timeout"))
+
+	hub := NewHub(ms)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go hub.Start(ctx)
+	defer cancel()
+
+	// 1. Sem clientes inscritos: broadcastQuotes retorna sem erro
+	hub.broadcastQuotes(ctx)
+
+	// 2. Com cliente inscrito em BAD_TICKER
+	handler := NewHandler(hub)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(context.WithValue(r.Context(), auth.UserIDKey, "user_err_test"))
+		handler.ServeWS(w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	header := http.Header{}
+	header.Add("Origin", "http://localhost:3000")
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+	assert.NoError(t, err)
+	defer ws.Close()
+
+	subMsg := WSMessage{
+		Action:  "subscribe",
+		Symbols: []string{"BAD_TICKER"},
+	}
+	err = ws.WriteJSON(subMsg)
+	assert.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Força broadcast com ticker que dá erro
+	hub.broadcastQuotes(ctx)
 }
 
 func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {

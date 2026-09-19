@@ -116,3 +116,33 @@ func TestIsMaxBytesError(t *testing.T) {
 	assert.True(t, IsMaxBytesError(fmt.Errorf("wrapped error: %w", &http.MaxBytesError{Limit: 100})))
 	assert.True(t, IsMaxBytesError(errors.New("http: request body too large")))
 }
+
+func TestRequestSizeLimit_DefaultLimits(t *testing.T) {
+	// Passando 0 ou negativo para acionar os fallbacks para DefaultMaxJSONBytes e DefaultMaxMultipartBytes
+	mw := RequestSizeLimit(0, -1)
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ping", strings.NewReader("ok"))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestRequestSizeLimit_NilBody(t *testing.T) {
+	mw := RequestSizeLimit(1024, 2048)
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Nil(t, r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/nobody", nil)
+	req.Body = nil
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
