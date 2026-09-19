@@ -738,6 +738,19 @@ func TestHandler_AdditionalErrorBranches(t *testing.T) {
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusPartialContent, w.Code)
 
+	// 16b. bulkImportTransactions: payload too large (413)
+	buf.Reset()
+	writer = multipart.NewWriter(&buf)
+	partFile, _ = writer.CreateFormFile("file", "test.csv")
+	partFile.Write([]byte("header\nval"))
+	writer.Close()
+	req = authReq(httptest.NewRequest("POST", "/portfolios/p1/fixed-income/bulk", &buf), "u1")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w = httptest.NewRecorder()
+	req.Body = http.MaxBytesReader(w, req.Body, 10)
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+
 	// 17. getTreasuryPositions error (500)
 	svc.On("GetTreasuryPositions", mock.Anything, "p1").Return(nil, errors.New("err")).Once()
 	req = authReq(httptest.NewRequest("GET", "/portfolios/p1/treasury/positions", nil), "u1")
@@ -870,6 +883,19 @@ func TestHandler_BulkImportTreasuryTransactions(t *testing.T) {
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusPartialContent, w.Code)
+
+	// 6. Payload Too Large (413)
+	buf.Reset()
+	writer = multipart.NewWriter(&buf)
+	part, _ = writer.CreateFormFile("file", "treasury.csv")
+	part.Write([]byte("date;ticker;type;quantity;price\n"))
+	writer.Close()
+	req = authReq(httptest.NewRequest("POST", "/portfolios/p1/treasury/bulk", &buf), "u1")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w = httptest.NewRecorder()
+	req.Body = http.MaxBytesReader(w, req.Body, 10)
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
 func TestHandler_ExportTreasuryTransactions(t *testing.T) {

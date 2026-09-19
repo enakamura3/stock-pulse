@@ -41,6 +41,12 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.Hub.CanConnect(userID) {
+		slog.WarnContext(r.Context(), "limite de conexões WebSocket atingido para usuário", slog.String("user_id", userID))
+		http.Error(w, "Limite de conexões simultâneas excedido", http.StatusTooManyRequests)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.WarnContext(r.Context(), "falha ao realizar upgrade da conexão WebSocket", slog.Any("error", err))
