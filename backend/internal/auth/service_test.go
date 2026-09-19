@@ -3,15 +3,18 @@ package auth
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redismock/v9"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // MockUserRepository é um mock para a interface UserRepository
@@ -216,6 +219,14 @@ func TestService_ValidateRefreshToken(t *testing.T) {
 	})
 }
 
+func setupMiniRedisService(t *testing.T) (*Service, *miniredis.Miniredis) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	repoMock := new(MockUserRepository)
+	s := NewService(repoMock, rdb, "secret")
+	return s, mr
+}
+
 func TestService_RotateRefreshToken(t *testing.T) {
 	t.Run("Empty token", func(t *testing.T) {
 		s, _, _ := setupService()
@@ -223,100 +234,165 @@ func TestService_RotateRefreshToken(t *testing.T) {
 		assert.EqualError(t, err, "token inválido")
 	})
 
-	t.Run("Replay attack detected - multiple active tokens revoked", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:replayed_token").SetVal("user-123")
-		rdbMock.ExpectSMembers("user_active_tokens:user-123").SetVal([]string{"active1", "active2"})
-		rdbMock.ExpectDel("refresh_token:active1").SetVal(1)
-		rdbMock.ExpectDel("refresh_token:active2").SetVal(1)
-		rdbMock.ExpectDel("user_active_tokens:user-123").SetVal(1)
-
-		userID, newRef, err := s.RotateRefreshToken(context.Background(), "replayed_token")
-		assert.Empty(t, userID)
-		assert.Empty(t, newRef)
-		assert.EqualError(t, err, "tentativa de reutilização de token detectada")
+	t.Run("Nil Redis client", func(t *testing.T) {
+		repoMock := new(MockUserRepository)
+		s := NewService(repoMock, nil, "secret")
+		_, _, err := s.RotateRefreshToken(context.Background(), "valid_token")
+		assert.EqualError(t, err, "cliente redis não inicializado")
 	})
 
-	t.Run("Replay attack detected - SMembers error still revokes user_active_tokens", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:replayed_token").SetVal("user-123")
-		rdbMock.ExpectSMembers("user_active_tokens:user-123").SetErr(errors.New("smembers err"))
-		rdbMock.ExpectDel("user_active_tokens:user-123").SetVal(1)
-
-		userID, newRef, err := s.RotateRefreshToken(context.Background(), "replayed_token")
-		assert.Empty(t, userID)
-		assert.Empty(t, newRef)
-		assert.EqualError(t, err, "tentativa de reutilização de token detectada")
-	})
-
-	t.Run("Redis error on checking used token", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:err_token").SetErr(errors.New("redis err"))
-
-		_, _, err := s.RotateRefreshToken(context.Background(), "err_token")
-		assert.EqualError(t, err, "redis err")
-	})
-
-	t.Run("Expired or non-existent token", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:non_existent").SetErr(redis.Nil)
-		rdbMock.ExpectGet("refresh_token:non_existent").SetErr(redis.Nil)
-
-		_, _, err := s.RotateRefreshToken(context.Background(), "non_existent")
+	t.Run("Non-existent or expired token", func(t *testing.T) {
+		s, _ := setupMiniRedisService(t)
+		_, _, err := s.RotateRefreshToken(context.Background(), "non_existent_token")
 		assert.EqualError(t, err, "sessão expirada ou inválida")
 	})
 
-	t.Run("Redis error on checking refresh token", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:token").SetErr(redis.Nil)
-		rdbMock.ExpectGet("refresh_token:token").SetErr(errors.New("redis get err"))
+	t.Run("Success atomic rotation", func(t *testing.T) {
+		s, mr := setupMiniRedisService(t)
+		ctx := context.Background()
+
+		oldToken, err := s.GenerateRefreshToken(ctx, "user-1")
+		require.NoError(t, err)
+
+		userID, newToken, err := s.RotateRefreshToken(ctx, oldToken)
+		assert.NoError(t, err)
+		assert.Equal(t, "user-1", userID)
+		assert.NotEmpty(t, newToken)
+		assert.NotEqual(t, oldToken, newToken)
+
+		// Token antigo não é mais ativo
+		assert.False(t, mr.Exists("refresh_token:"+oldToken))
+		// Novo token é ativo
+		assert.True(t, mr.Exists("refresh_token:"+newToken))
+		// rotated_token foi registrado
+		assert.True(t, mr.Exists("rotated_token:"+oldToken))
+		// active tokens contém apenas o novo token
+		activeTokens, _ := s.rdb.SMembers(ctx, "user_active_tokens:user-1").Result()
+		assert.Equal(t, []string{newToken}, activeTokens)
+	})
+
+	t.Run("Grace Period allows retry with old token", func(t *testing.T) {
+		s, _ := setupMiniRedisService(t)
+		ctx := context.Background()
+
+		oldToken, err := s.GenerateRefreshToken(ctx, "user-1")
+		require.NoError(t, err)
+
+		// 1ª rotação
+		userID1, newToken1, err := s.RotateRefreshToken(ctx, oldToken)
+		require.NoError(t, err)
+
+		// 2ª rotação com o mesmo oldToken (dentro do grace period de 30s)
+		userID2, newToken2, err := s.RotateRefreshToken(ctx, oldToken)
+		assert.NoError(t, err)
+		assert.Equal(t, userID1, userID2)
+		assert.Equal(t, newToken1, newToken2)
+
+		// Sessão permanece válida
+		validUser, err := s.ValidateRefreshToken(ctx, newToken1)
+		assert.NoError(t, err)
+		assert.Equal(t, "user-1", validUser)
+	})
+
+	t.Run("Concurrent requests within grace window", func(t *testing.T) {
+		s, _ := setupMiniRedisService(t)
+		ctx := context.Background()
+
+		oldToken, err := s.GenerateRefreshToken(ctx, "user-concurrent")
+		require.NoError(t, err)
+
+		concurrency := 20
+		results := make([]string, concurrency)
+		errorsList := make([]error, concurrency)
+		var wg sync.WaitGroup
+
+		for i := 0; i < concurrency; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				_, newToken, rErr := s.RotateRefreshToken(ctx, oldToken)
+				results[idx] = newToken
+				errorsList[idx] = rErr
+			}(i)
+		}
+		wg.Wait()
+
+		for i := 0; i < concurrency; i++ {
+			assert.NoError(t, errorsList[i], "request %d failed", i)
+			assert.NotEmpty(t, results[i])
+			assert.Equal(t, results[0], results[i], "todas as requisições concorrentes devem receber o mesmo token")
+		}
+
+		// Apenas 1 token ativo no Redis
+		activeTokens, err := s.rdb.SMembers(ctx, "user_active_tokens:user-concurrent").Result()
+		assert.NoError(t, err)
+		assert.Len(t, activeTokens, 1)
+	})
+
+	t.Run("Replay attack detected after grace period expires", func(t *testing.T) {
+		s, mr := setupMiniRedisService(t)
+		s.SetGracePeriod(100 * time.Millisecond) // Grace period de 100ms para teste rápido
+		ctx := context.Background()
+
+		oldToken, err := s.GenerateRefreshToken(ctx, "user-replay")
+		require.NoError(t, err)
+
+		// Rotação inicial
+		_, newToken, err := s.RotateRefreshToken(ctx, oldToken)
+		require.NoError(t, err)
+
+		// Aguarda término do grace period (150ms > 100ms)
+		time.Sleep(150 * time.Millisecond)
+
+		// Atacante tenta reutilizar oldToken após o grace period
+		userID, replayedToken, err := s.RotateRefreshToken(ctx, oldToken)
+		assert.Empty(t, userID)
+		assert.Empty(t, replayedToken)
+		assert.EqualError(t, err, "tentativa de reutilização de token detectada")
+
+		// Todas as sessões do usuário devem ter sido revogadas
+		assert.False(t, mr.Exists("refresh_token:"+newToken))
+		assert.False(t, mr.Exists("user_active_tokens:user-replay"))
+	})
+
+	t.Run("Legacy used_refresh_token triggers replay revocation", func(t *testing.T) {
+		s, mr := setupMiniRedisService(t)
+		ctx := context.Background()
+
+		// Cria uma sessão ativa para o usuário
+		activeToken, err := s.GenerateRefreshToken(ctx, "user-legacy")
+		require.NoError(t, err)
+
+		// Simula chave legada no Redis
+		mr.Set("used_refresh_token:legacy_token", "user-legacy")
+
+		// Replay com token legado
+		_, _, err = s.RotateRefreshToken(ctx, "legacy_token")
+		assert.EqualError(t, err, "tentativa de reutilização de token detectada")
+
+		// Sessão ativa foi revogada
+		assert.False(t, mr.Exists("refresh_token:"+activeToken))
+		assert.False(t, mr.Exists("user_active_tokens:user-legacy"))
+	})
+
+	t.Run("Redis script execution error", func(t *testing.T) {
+		mr := miniredis.RunT(t)
+		rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+		s := NewService(new(MockUserRepository), rdb, "secret")
+		mr.Close() // Fecha o servidor Redis para forçar falha no comando
 
 		_, _, err := s.RotateRefreshToken(context.Background(), "token")
-		assert.EqualError(t, err, "redis get err")
-	})
-
-	t.Run("Error setting used_refresh_token", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:valid_token").SetErr(redis.Nil)
-		rdbMock.ExpectGet("refresh_token:valid_token").SetVal("user-123")
-		rdbMock.ExpectDel("refresh_token:valid_token").SetVal(1)
-		rdbMock.ExpectSRem("user_active_tokens:user-123", "valid_token").SetVal(1)
-		rdbMock.ExpectSet("used_refresh_token:valid_token", "user-123", 12*time.Hour).SetErr(errors.New("redis set err"))
-
-		_, _, err := s.RotateRefreshToken(context.Background(), "valid_token")
-		assert.EqualError(t, err, "redis set err")
-	})
-
-	t.Run("Error generating new refresh token", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:valid_token").SetErr(redis.Nil)
-		rdbMock.ExpectGet("refresh_token:valid_token").SetVal("user-123")
-		rdbMock.ExpectDel("refresh_token:valid_token").SetVal(1)
-		rdbMock.ExpectSRem("user_active_tokens:user-123", "valid_token").SetVal(1)
-		rdbMock.ExpectSet("used_refresh_token:valid_token", "user-123", 12*time.Hour).SetVal("OK")
-		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "user-123", 12*time.Hour).SetErr(errors.New("generate err"))
-
-		_, _, err := s.RotateRefreshToken(context.Background(), "valid_token")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "falha ao gerar novo refresh token")
 	})
 
-	t.Run("Success rotation", func(t *testing.T) {
-		s, _, rdbMock := setupService()
-		rdbMock.ExpectGet("used_refresh_token:old_token").SetErr(redis.Nil)
-		rdbMock.ExpectGet("refresh_token:old_token").SetVal("user-123")
-		rdbMock.ExpectDel("refresh_token:old_token").SetVal(1)
-		rdbMock.ExpectSRem("user_active_tokens:user-123", "old_token").SetVal(1)
-		rdbMock.ExpectSet("used_refresh_token:old_token", "user-123", 12*time.Hour).SetVal("OK")
-		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "user-123", 12*time.Hour).SetVal("OK")
-		rdbMock.Regexp().ExpectSAdd("^user_active_tokens:user-123$", ".*").SetVal(1)
-		rdbMock.ExpectExpire("user_active_tokens:user-123", 12*time.Hour).SetVal(true)
+	t.Run("Script returns malformed or unexpected slice", func(t *testing.T) {
+		_, _, err := parseRotateResult([]interface{}{"SHORT"})
+		assert.EqualError(t, err, "resposta inesperada do script de rotação de token")
+	})
 
-		userID, newRefreshToken, err := s.RotateRefreshToken(context.Background(), "old_token")
-		assert.NoError(t, err)
-		assert.Equal(t, "user-123", userID)
-		assert.NotEmpty(t, newRefreshToken)
-		assert.NotEqual(t, "old_token", newRefreshToken)
+	t.Run("Script returns unknown status", func(t *testing.T) {
+		_, _, err := parseRotateResult([]interface{}{"UNKNOWN_STATUS", "u1", "t1"})
+		assert.EqualError(t, err, "status desconhecido na rotação de token")
 	})
 }
 
@@ -326,6 +402,7 @@ func TestService_RevokeRefreshToken(t *testing.T) {
 		rdbMock.ExpectGet("refresh_token:token").SetVal("user-1")
 		rdbMock.ExpectSRem("user_active_tokens:user-1", "token").SetVal(1)
 		rdbMock.ExpectDel("used_refresh_token:token").SetVal(1)
+		rdbMock.ExpectDel("rotated_token:token").SetVal(1)
 		rdbMock.ExpectDel("refresh_token:token").SetVal(1)
 
 		err := s.RevokeRefreshToken(context.Background(), "token")
@@ -336,6 +413,7 @@ func TestService_RevokeRefreshToken(t *testing.T) {
 		s, _, rdbMock := setupService()
 		rdbMock.ExpectGet("refresh_token:token").SetErr(redis.Nil)
 		rdbMock.ExpectDel("used_refresh_token:token").SetVal(0)
+		rdbMock.ExpectDel("rotated_token:token").SetVal(0)
 		rdbMock.ExpectDel("refresh_token:token").SetVal(0)
 
 		err := s.RevokeRefreshToken(context.Background(), "token")

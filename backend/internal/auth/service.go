@@ -31,12 +31,95 @@ type UserRepository interface {
 
 // Service implementa a lógica de negócio de autenticação.
 type Service struct {
-	repo            UserRepository
-	rdb             *redis.Client
-	jwtSecret       []byte
-	accessTokenTTL  time.Duration
-	refreshTokenTTL time.Duration
+	repo                    UserRepository
+	rdb                     *redis.Client
+	jwtSecret               []byte
+	accessTokenTTL          time.Duration
+	refreshTokenTTL         time.Duration
+	refreshTokenGracePeriod time.Duration
 }
+
+// rotateRefreshTokenScript executa a rotação atômica de refresh token com suporte a Grace Period.
+// Resolve race conditions de concorrência em abas paralelas e mitiga Replay Attacks reais.
+var rotateRefreshTokenScript = redis.NewScript(`
+-- KEYS[1] = "refresh_token:" .. oldToken
+-- KEYS[2] = "rotated_token:" .. oldToken
+-- KEYS[3] = "refresh_token:" .. newToken
+
+-- ARGV[1] = candidateToken
+-- ARGV[2] = ttlSeconds (ex: 43200)
+-- ARGV[3] = gracePeriodMillis (ex: 30000)
+-- ARGV[4] = nowUnixMilli (timestamp atual em milissegundos)
+-- ARGV[5] = "used_refresh_token:" .. oldToken
+-- ARGV[6] = oldToken
+
+-- 1. Verifica se oldToken já foi rotacionado anteriormente (está em rotated_token)
+local rotatedData = redis.call('HMGET', KEYS[2], 'user_id', 'new_token', 'rotated_at')
+local rotatedUserID = rotatedData[1]
+local existingNewToken = rotatedData[2]
+local rotatedAtStr = rotatedData[3]
+
+if rotatedUserID and rotatedUserID ~= false and existingNewToken and existingNewToken ~= false and rotatedAtStr and rotatedAtStr ~= false then
+    local rotatedAt = tonumber(rotatedAtStr)
+    local now = tonumber(ARGV[4])
+    local gracePeriod = tonumber(ARGV[3])
+    local elapsed = now - rotatedAt
+
+    if elapsed >= 0 and elapsed <= gracePeriod then
+        -- DENTRO DO GRACE PERIOD:
+        -- Retorna idempotentemente o mesmo newToken já emitido
+        return {"GRACE_PERIOD", rotatedUserID, existingNewToken}
+    else
+        -- FORA DO GRACE PERIOD: REPLAY ATTACK!
+        -- Revoga todas as sessões ativas do usuário
+        local userActiveKey = "user_active_tokens:" .. rotatedUserID
+        local activeTokens = redis.call('SMEMBERS', userActiveKey)
+        if activeTokens and #activeTokens > 0 then
+            for _, t in ipairs(activeTokens) do
+                redis.call('DEL', "refresh_token:" .. t)
+            end
+        end
+        redis.call('DEL', userActiveKey)
+        return {"REPLAY_ATTACK", rotatedUserID, ""}
+    end
+end
+
+-- 1b. Checagem de compatibilidade com chave legada used_refresh_token
+local legacyUserID = redis.call('GET', ARGV[5])
+if legacyUserID and legacyUserID ~= false then
+    local userActiveKey = "user_active_tokens:" .. legacyUserID
+    local activeTokens = redis.call('SMEMBERS', userActiveKey)
+    if activeTokens and #activeTokens > 0 then
+        for _, t in ipairs(activeTokens) do
+            redis.call('DEL', "refresh_token:" .. t)
+        end
+    end
+    redis.call('DEL', userActiveKey)
+    return {"REPLAY_ATTACK", legacyUserID, ""}
+end
+
+-- 2. Verifica se oldToken é um token ativo válido
+local userID = redis.call('GET', KEYS[1])
+if not userID or userID == false then
+    return {"NOT_FOUND", "", ""}
+end
+
+-- 3. Token válido! Executa a rotação atômica:
+local userActiveKey = "user_active_tokens:" .. userID
+redis.call('DEL', KEYS[1])
+redis.call('SREM', userActiveKey, ARGV[6])
+
+-- Registra o novo refresh token
+redis.call('SET', KEYS[3], userID, 'EX', ARGV[2])
+redis.call('SADD', userActiveKey, ARGV[1])
+redis.call('EXPIRE', userActiveKey, ARGV[2])
+
+-- Registra metadados de rotação para tolerância a concorrência (Grace Period)
+redis.call('HSET', KEYS[2], 'user_id', userID, 'new_token', ARGV[1], 'rotated_at', ARGV[4])
+redis.call('EXPIRE', KEYS[2], ARGV[2])
+
+return {"ROTATED", userID, ARGV[1]}
+`)
 
 // NewService cria uma nova instância de Service.
 func NewService(repo UserRepository, rdb *redis.Client, jwtSecret string) *Service {
@@ -48,14 +131,24 @@ func NewService(repo UserRepository, rdb *redis.Client, jwtSecret string) *Servi
 	if refreshTTL <= 0 {
 		refreshTTL = 12 * time.Hour
 	}
+	gracePeriod := config.Envs.JWTRefreshGracePeriod
+	if gracePeriod <= 0 {
+		gracePeriod = 30 * time.Second
+	}
 
 	return &Service{
-		repo:            repo,
-		rdb:             rdb,
-		jwtSecret:       []byte(jwtSecret),
-		accessTokenTTL:  accessTTL,
-		refreshTokenTTL: refreshTTL,
+		repo:                    repo,
+		rdb:                     rdb,
+		jwtSecret:               []byte(jwtSecret),
+		accessTokenTTL:          accessTTL,
+		refreshTokenTTL:         refreshTTL,
+		refreshTokenGracePeriod: gracePeriod,
 	}
+}
+
+// SetGracePeriod permite customizar a janela de tolerância de rotação (útil para testes).
+func (s *Service) SetGracePeriod(d time.Duration) {
+	s.refreshTokenGracePeriod = d
 }
 
 type argon2Params struct {
@@ -202,18 +295,25 @@ func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	return token.SignedString(s.jwtSecret)
 }
 
-// GenerateRefreshToken cria um token seguro e armazena no Redis com o TTL configurado,
-// registrando-o também no conjunto de tokens ativos do usuário para controle de sessão.
-func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
+func (s *Service) generateRandomToken() (string, error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := io.ReadFull(randReader, tokenBytes); err != nil {
 		return "", err
 	}
-	refreshToken := base64.RawURLEncoding.EncodeToString(tokenBytes)
+	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
+}
+
+// GenerateRefreshToken cria um token seguro e armazena no Redis com o TTL configurado,
+// registrando-o também no conjunto de tokens ativos do usuário para controle de sessão.
+func (s *Service) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
+	refreshToken, err := s.generateRandomToken()
+	if err != nil {
+		return "", err
+	}
 
 	// Chave com prefixo para fácil identificação
 	key := fmt.Sprintf("refresh_token:%s", refreshToken)
-	err := s.rdb.Set(ctx, key, userID, s.refreshTokenTTL).Err()
+	err = s.rdb.Set(ctx, key, userID, s.refreshTokenTTL).Err()
 	if err != nil {
 		return "", err
 	}
@@ -243,66 +343,82 @@ func (s *Service) ValidateRefreshToken(ctx context.Context, token string) (strin
 }
 
 // RotateRefreshToken consome um refresh token existente e gera um novo par de tokens (Refresh Token Rotation).
-// Se um token já consumido for apresentado (detectado via used_refresh_token:*), revoga todas as sessões ativas do usuário para mitigar replay attacks.
+// A operação é executada atomicamente no Redis com suporte a Grace Period (tolerância a concorrência de abas).
+// Se o token for reutilizado fora da janela de tolerância, revoga todas as sessões ativas do usuário para mitigar replay attacks.
 func (s *Service) RotateRefreshToken(ctx context.Context, oldToken string) (string, string, error) {
-	if strings.TrimSpace(oldToken) == "" {
+	oldToken = strings.TrimSpace(oldToken)
+	if oldToken == "" {
 		return "", "", errors.New("token inválido")
 	}
 
-	usedKey := fmt.Sprintf("used_refresh_token:%s", oldToken)
-	userID, err := s.rdb.Get(ctx, usedKey).Result()
-	if err == nil && userID != "" {
-		// Replay attack detectado! Token previamente consumido foi reutilizado.
-		// Ação defensiva: revogar todas as sessões ativas do usuário.
-		slog.Warn("Tentativa de reutilização de refresh token detectada (Replay Attack)", "user_id", userID)
-		activeTokensKey := fmt.Sprintf("user_active_tokens:%s", userID)
-		tokens, errMembers := s.rdb.SMembers(ctx, activeTokensKey).Result()
-		if errMembers == nil {
-			for _, t := range tokens {
-				_ = s.rdb.Del(ctx, fmt.Sprintf("refresh_token:%s", t)).Err()
-			}
-		}
-		_ = s.rdb.Del(ctx, activeTokensKey).Err()
-		return "", "", errors.New("tentativa de reutilização de token detectada")
-	} else if err != nil && !errors.Is(err, redis.Nil) {
-		return "", "", err
+	if s.rdb == nil {
+		return "", "", errors.New("cliente redis não inicializado")
 	}
 
-	tokenKey := fmt.Sprintf("refresh_token:%s", oldToken)
-	userID, err = s.rdb.Get(ctx, tokenKey).Result()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return "", "", errors.New("sessão expirada ou inválida")
-		}
-		return "", "", err
-	}
-
-	// Remove o token antigo dos ativos
-	_ = s.rdb.Del(ctx, tokenKey).Err()
-	_ = s.rdb.SRem(ctx, fmt.Sprintf("user_active_tokens:%s", userID), oldToken).Err()
-
-	// Marca o token antigo como consumido para detecção de reuso com o mesmo TTL
-	if err := s.rdb.Set(ctx, usedKey, userID, s.refreshTokenTTL).Err(); err != nil {
-		return "", "", err
-	}
-
-	// Emite o novo refresh token
-	newRefreshToken, err := s.GenerateRefreshToken(ctx, userID)
+	candidateToken, err := s.generateRandomToken()
 	if err != nil {
 		return "", "", fmt.Errorf("falha ao gerar novo refresh token: %w", err)
 	}
 
-	return userID, newRefreshToken, nil
+	keys := []string{
+		fmt.Sprintf("refresh_token:%s", oldToken),
+		fmt.Sprintf("rotated_token:%s", oldToken),
+		fmt.Sprintf("refresh_token:%s", candidateToken),
+	}
+	args := []interface{}{
+		candidateToken,
+		int64(s.refreshTokenTTL.Seconds()),
+		int64(s.refreshTokenGracePeriod.Milliseconds()),
+		time.Now().UnixMilli(),
+		fmt.Sprintf("used_refresh_token:%s", oldToken),
+		oldToken,
+	}
+
+	rawResult, err := rotateRefreshTokenScript.Run(ctx, s.rdb, keys, args...).Slice()
+	if err != nil {
+		return "", "", err
+	}
+
+	return parseRotateResult(rawResult)
+}
+
+func parseRotateResult(rawResult []interface{}) (string, string, error) {
+	if len(rawResult) < 3 {
+		return "", "", errors.New("resposta inesperada do script de rotação de token")
+	}
+
+	status, _ := rawResult[0].(string)
+	userID, _ := rawResult[1].(string)
+	newToken, _ := rawResult[2].(string)
+
+	switch status {
+	case "ROTATED":
+		return userID, newToken, nil
+	case "GRACE_PERIOD":
+		slog.Info("Refresh token reutilizado dentro da janela de tolerância (Grace Period)", "user_id", userID)
+		return userID, newToken, nil
+	case "REPLAY_ATTACK":
+		slog.Warn("Tentativa de reutilização de refresh token detectada (Replay Attack)", "user_id", userID)
+		return "", "", errors.New("tentativa de reutilização de token detectada")
+	case "NOT_FOUND":
+		return "", "", errors.New("sessão expirada ou inválida")
+	default:
+		return "", "", errors.New("status desconhecido na rotação de token")
+	}
 }
 
 // RevokeRefreshToken invalida a sessão apagando o refresh token do Redis e desvinculando-o das sessões ativas.
 func (s *Service) RevokeRefreshToken(ctx context.Context, token string) error {
 	key := fmt.Sprintf("refresh_token:%s", token)
+	rotatedKey := fmt.Sprintf("rotated_token:%s", token)
+	usedKey := fmt.Sprintf("used_refresh_token:%s", token)
+
 	userID, err := s.rdb.Get(ctx, key).Result()
 	if err == nil && userID != "" {
 		_ = s.rdb.SRem(ctx, fmt.Sprintf("user_active_tokens:%s", userID), token).Err()
 	}
-	_ = s.rdb.Del(ctx, fmt.Sprintf("used_refresh_token:%s", token)).Err()
+	_ = s.rdb.Del(ctx, usedKey).Err()
+	_ = s.rdb.Del(ctx, rotatedKey).Err()
 	return s.rdb.Del(ctx, key).Err()
 }
 
