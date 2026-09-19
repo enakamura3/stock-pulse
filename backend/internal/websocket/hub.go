@@ -44,6 +44,16 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
 	}
 }
 
+// Limites de segurança e DoS para conexões WebSocket
+const (
+	// MaxConnectionsPerUser define o limite máximo de conexões WebSocket simultâneas ativas por usuário.
+	MaxConnectionsPerUser = 5
+	// MaxSubscriptionsPerClient define o limite máximo de tickers monitorados por conexão WebSocket.
+	MaxSubscriptionsPerClient = 50
+	// MaxMessageSize define o tamanho máximo de payload recebido do cliente (4 KB).
+	MaxMessageSize = 4096
+)
+
 // ReadPump escuta mensagens de entrada enviadas pelo cliente.
 func (c *Client) ReadPump() {
 	defer func() {
@@ -51,7 +61,7 @@ func (c *Client) ReadPump() {
 		c.Conn.Close()
 	}()
 
-	c.Conn.SetReadLimit(512) // Limite de tamanho de mensagem por segurança
+	c.Conn.SetReadLimit(MaxMessageSize) // Limite de tamanho de mensagem por segurança (4 KB)
 	// Configura limites de timeout de leitura
 	_ = c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
@@ -79,10 +89,28 @@ func (c *Client) ReadPump() {
 		case "subscribe":
 			// Sobrescreve as assinaturas anteriores para manter a conexão em sincronia exata com a UI atual
 			c.subscribed = make(map[string]bool)
+			count := 0
+			limitExceeded := false
 			for _, sym := range wsMsg.Symbols {
 				if sym != "" {
+					if count >= MaxSubscriptionsPerClient {
+						limitExceeded = true
+						break
+					}
 					c.subscribed[sym] = true
+					count++
 					slog.Info("Cliente assinou ticker via WebSocket", "user_id", c.UserID, "ticker", sym)
+				}
+			}
+			if limitExceeded {
+				slog.Warn("Cliente tentou exceder limite de assinaturas WebSocket", "user_id", c.UserID, "limit", MaxSubscriptionsPerClient)
+				errPayload, _ := json.Marshal(map[string]interface{}{
+					"type":  "error",
+					"error": "Limite máximo de 50 tickers por conexão atingido.",
+				})
+				select {
+				case c.Send <- errPayload:
+				default:
 				}
 			}
 		case "unsubscribe":
@@ -149,6 +177,7 @@ func (c *Client) IsSubscribed(symbol string) bool {
 // Hub coordena as conexões ativas e a orquestração do broadcast de cotações em tempo real.
 type Hub struct {
 	clients    map[*Client]bool
+	userConns  map[string]int
 	register   chan *Client
 	unregister chan *Client
 	marketSvc  MarketProvider
@@ -159,10 +188,25 @@ type Hub struct {
 func NewHub(marketSvc MarketProvider) *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
+		userConns:  make(map[string]int),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		marketSvc:  marketSvc,
 	}
+}
+
+// CanConnect verifica se o usuário ainda pode abrir novas conexões WebSocket.
+func (h *Hub) CanConnect(userID string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.userConns[userID] < MaxConnectionsPerUser
+}
+
+// ActiveConnectionsCount retorna o total de conexões ativas para um usuário.
+func (h *Hub) ActiveConnectionsCount(userID string) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.userConns[userID]
 }
 
 // Start gerencia o ciclo de vida de conexões e o loop periódico de broadcast de cotações (5 segundos).
@@ -174,16 +218,30 @@ func (h *Hub) Start(ctx context.Context) {
 		select {
 		case client := <-h.register:
 			h.mu.Lock()
+			if h.userConns[client.UserID] >= MaxConnectionsPerUser {
+				h.mu.Unlock()
+				slog.Warn("Limite de conexões WebSocket atingido para usuário", "user_id", client.UserID, "limit", MaxConnectionsPerUser)
+				closeMsg := websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "limite de conexões excedido")
+				_ = client.Conn.WriteMessage(websocket.CloseMessage, closeMsg)
+				client.Conn.Close()
+				continue
+			}
 			h.clients[client] = true
+			h.userConns[client.UserID]++
 			h.mu.Unlock()
-			slog.Info("Novo cliente WebSocket conectado", "clients_count", len(h.clients))
+			slog.Info("Novo cliente WebSocket conectado", "clients_count", len(h.clients), "user_id", client.UserID)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
+				if h.userConns[client.UserID] > 1 {
+					h.userConns[client.UserID]--
+				} else {
+					delete(h.userConns, client.UserID)
+				}
 				close(client.Send)
-				slog.Info("Cliente WebSocket desconectado", "clients_count", len(h.clients))
+				slog.Info("Cliente WebSocket desconectado", "clients_count", len(h.clients), "user_id", client.UserID)
 			}
 			h.mu.Unlock()
 

@@ -144,6 +144,17 @@ func TestHandler_CreatePortfolio(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 
+	t.Run("Payload Too Large", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"name": "My Long Long Portfolio Name", "base_currency": "USD"}`
+		rec := httptest.NewRecorder()
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios", bytes.NewBufferString(body)), "u1", nil)
+		req.Body = http.MaxBytesReader(rec, req.Body, 10)
+		h.CreatePortfolio(rec, req)
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.Contains(t, rec.Body.String(), "limite máximo")
+	})
+
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("CreatePortfolio", mock.Anything, "u1", "My Port", "USD").Return(&Portfolio{ID: "p1"}, nil)
@@ -226,6 +237,17 @@ func TestHandler_AddTransaction(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.AddTransaction(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Payload Too Large", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		req.Body = http.MaxBytesReader(rec, req.Body, 10)
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.Contains(t, rec.Body.String(), "limite máximo")
 	})
 
 	t.Run("Service Error", func(t *testing.T) {
@@ -508,6 +530,17 @@ func TestHandler_UpdateTransaction(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 
+	t.Run("Payload Too Large", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		req.Body = http.MaxBytesReader(rec, req.Body, 10)
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.Contains(t, rec.Body.String(), "limite máximo")
+	})
+
 	t.Run("Invalid Type", func(t *testing.T) {
 		h, _ := setupHandlerTest()
 		body := `{"ticker": "AAPL", "type": "INVALID", "quantity": 10, "unit_price": 150}`
@@ -623,6 +656,23 @@ func TestHandler_BulkImportTransactions(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.BulkImportTransactions(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Payload Too Large", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+		part, _ := writer.CreateFormFile("file", "test.csv")
+		_, _ = part.Write([]byte("ticker,type\nAAPL,BUY"))
+		_ = writer.Close()
+
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/bulk", body), "u1", map[string]string{"id": "p1"})
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		rec := httptest.NewRecorder()
+		req.Body = http.MaxBytesReader(rec, req.Body, 10)
+		h.BulkImportTransactions(rec, req)
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Arquivo excede o limite máximo permitido")
 	})
 
 	t.Run("Success", func(t *testing.T) {

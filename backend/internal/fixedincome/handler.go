@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
+	"github.com/onigiri/stock-pulse/backend/internal/middleware"
 )
 
 type Handler struct {
@@ -257,8 +258,12 @@ func (h *Handler) bulkImportTransactions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
+	err := r.ParseMultipartForm(15 << 20) // 15 MB limit
 	if err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Arquivo excede o limite máximo permitido de 15MB")
+			return
+		}
 		httputils.RespondWithError(w, http.StatusBadRequest, "Erro ao ler o formulário")
 		return
 	}
@@ -436,8 +441,12 @@ func (h *Handler) bulkImportTreasuryTransactions(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
+	err := r.ParseMultipartForm(15 << 20) // 15 MB limit
 	if err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Arquivo excede o limite máximo permitido de 15MB")
+			return
+		}
 		httputils.RespondWithError(w, http.StatusBadRequest, "Erro ao ler o formulário")
 		return
 	}

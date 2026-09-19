@@ -12,6 +12,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
+	"github.com/onigiri/stock-pulse/backend/internal/middleware"
 )
 
 // PortfolioService define as operações que o Handler espera.
@@ -99,6 +100,10 @@ func (h *Handler) CreatePortfolio(w http.ResponseWriter, r *http.Request) {
 
 	var payload portfolioPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Corpo da requisição excede o limite máximo permitido (1MB)")
+			return
+		}
 		httputils.RespondWithError(w, http.StatusBadRequest, "Payload inválido")
 		return
 	}
@@ -223,6 +228,10 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 
 	var payload transactionPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Corpo da requisição excede o limite máximo permitido (1MB)")
+			return
+		}
 		httputils.RespondWithError(w, http.StatusBadRequest, "Payload inválido")
 		return
 	}
@@ -368,6 +377,10 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 
 	var payload transactionPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Corpo da requisição excede o limite máximo permitido (1MB)")
+			return
+		}
 		httputils.RespondWithError(w, http.StatusBadRequest, "Payload inválido")
 		return
 	}
@@ -460,7 +473,11 @@ func (h *Handler) BulkImportTransactions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	if err := r.ParseMultipartForm(15 << 20); err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Arquivo excede o limite máximo permitido de 15MB")
+			return
+		}
 		httputils.RespondWithError(w, http.StatusBadRequest, "Falha ao processar arquivo")
 		return
 	}
