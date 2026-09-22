@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -36,20 +37,20 @@ func NewStockAnalysisClient() *StockAnalysisClient {
 //   - ETF_US    → stockanalysis.com/etf/{symbol}/dividend/
 //   - STOCK_US  → stockanalysis.com/stocks/{symbol}/dividend/
 func (c *StockAnalysisClient) FetchDividends(ctx context.Context, ticker string, assetType string) ([]StockAnalysisRawDividend, error) {
-	var url string
+	var urlStr string
 	if strings.HasSuffix(strings.ToUpper(ticker), ".SA") {
 		symbol := strings.ToLower(strings.TrimSuffix(ticker, ".SA"))
-		url = fmt.Sprintf("https://stockanalysis.com/quote/bvmf/%s/dividend/", symbol)
+		urlStr = fmt.Sprintf("https://stockanalysis.com/quote/bvmf/%s/dividend/", url.PathEscape(symbol))
 	} else {
 		symbol := strings.ToLower(ticker)
 		basePath := "stocks"
 		if strings.HasPrefix(strings.ToUpper(assetType), "ETF") {
 			basePath = "etf"
 		}
-		url = fmt.Sprintf("https://stockanalysis.com/%s/%s/dividend/", basePath, symbol)
+		urlStr = fmt.Sprintf("https://stockanalysis.com/%s/%s/dividend/", basePath, url.PathEscape(symbol))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, err
 	}

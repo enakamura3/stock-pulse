@@ -61,4 +61,18 @@ func TestFundamentusDividendSource_GetDividends(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, res)
 	})
+
+	t.Run("Escapes Special Characters in Symbol", func(t *testing.T) {
+		var capturedURL string
+		c := NewFundamentusClient()
+		c.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			capturedURL = req.URL.String()
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`<table id="resultado"><tbody></tbody></table>`)),
+			}
+		})
+		_, _, _ = c.FetchDividends(context.Background(), "TEST&INJECT=1")
+		assert.Contains(t, capturedURL, "papel=TEST%26INJECT%3D1")
+	})
 }

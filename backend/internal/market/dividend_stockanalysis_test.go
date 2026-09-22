@@ -112,4 +112,21 @@ func TestStockAnalysisDividendSource_GetDividends(t *testing.T) {
 		// 11 Feb was Record Date, which is exactly the Cum Date. No -24h is applied because Record Date was available.
 		assert.Equal(t, time.Date(2026, 2, 11, 0, 0, 0, 0, time.UTC), events[0].Date)
 	})
+
+	t.Run("Escapes Special Characters in Symbol", func(t *testing.T) {
+		var capturedURL string
+		c := NewStockAnalysisClient()
+		c.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			capturedURL = req.URL.String()
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`<table><tbody></tbody></table>`)),
+			}
+		})
+		_, _ = c.FetchDividends(context.Background(), "BRK/B", "STOCK_US")
+		assert.Contains(t, capturedURL, "/stocks/brk%2Fb/dividend/")
+
+		_, _ = c.FetchDividends(context.Background(), "PETR/4.SA", "STOCK_BR")
+		assert.Contains(t, capturedURL, "/quote/bvmf/petr%2F4/dividend/")
+	})
 }
