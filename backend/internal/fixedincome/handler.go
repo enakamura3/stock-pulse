@@ -3,6 +3,7 @@ package fixedincome
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -82,7 +83,8 @@ func (h *Handler) getMonthlyYields(w http.ResponseWriter, r *http.Request) {
 
 	yields, err := h.service.CalculateMonthlyYields(r.Context(), portfolioID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao calcular rendimentos mensais de renda fixa", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao calcular rendimentos mensais de renda fixa")
 		return
 	}
 
@@ -101,7 +103,8 @@ func (h *Handler) getPositions(w http.ResponseWriter, r *http.Request) {
 
 	positions, err := h.service.GetPortfolioPositions(r.Context(), portfolioID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao buscar posições de renda fixa", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar posições de renda fixa")
 		return
 	}
 
@@ -125,7 +128,8 @@ func (h *Handler) getPerformance(w http.ResponseWriter, r *http.Request) {
 
 	performance, err := h.service.GetPortfolioPerformance(r.Context(), portfolioID, period)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao buscar performance de renda fixa", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar performance de renda fixa")
 		return
 	}
 
@@ -147,7 +151,8 @@ func (h *Handler) createAsset(w http.ResponseWriter, r *http.Request) {
 
 	created, err := h.service.CreateAsset(r.Context(), &asset)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao criar ativo de renda fixa", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao criar ativo de renda fixa")
 		return
 	}
 
@@ -166,7 +171,8 @@ func (h *Handler) deleteAsset(w http.ResponseWriter, r *http.Request) {
 
 	err = h.repo.DeleteAsset(r.Context(), assetID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao excluir ativo de renda fixa", "portfolio_id", portfolioID, "asset_id", assetID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao excluir ativo de renda fixa")
 		return
 	}
 
@@ -192,7 +198,8 @@ func (h *Handler) createTransaction(w http.ResponseWriter, r *http.Request) {
 
 	created, err := h.service.CreateTransaction(r.Context(), &tx)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao criar transação de renda fixa", "portfolio_id", portfolioID, "asset_id", assetID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao criar transação de renda fixa")
 		return
 	}
 
@@ -224,9 +231,10 @@ func (h *Handler) updateTransaction(w http.ResponseWriter, r *http.Request) {
 	err := h.service.UpdateTransaction(r.Context(), portfolioID, txID, &tx, payload.MaturityDate)
 	if err != nil {
 		if strings.Contains(err.Error(), "unauthorized") {
-			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
+			httputils.RespondWithError(w, http.StatusForbidden, "Acesso não autorizado à transação")
 		} else {
-			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+			slog.Error("falha ao atualizar transação de renda fixa", "portfolio_id", portfolioID, "tx_id", txID, "error", err)
+			httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao atualizar transação de renda fixa")
 		}
 		return
 	}
@@ -241,9 +249,10 @@ func (h *Handler) deleteTransaction(w http.ResponseWriter, r *http.Request) {
 	err := h.service.DeleteTransaction(r.Context(), portfolioID, txID)
 	if err != nil {
 		if strings.Contains(err.Error(), "unauthorized") {
-			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
+			httputils.RespondWithError(w, http.StatusForbidden, "Acesso não autorizado à transação")
 		} else {
-			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+			slog.Error("falha ao excluir transação de renda fixa", "portfolio_id", portfolioID, "tx_id", txID, "error", err)
+			httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao excluir transação de renda fixa")
 		}
 		return
 	}
@@ -277,7 +286,8 @@ func (h *Handler) bulkImportTransactions(w http.ResponseWriter, r *http.Request)
 
 	res, err := h.service.BulkAddTransactions(r.Context(), portfolioID, file)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao importar transações de renda fixa", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao importar transações de renda fixa")
 		return
 	}
 
@@ -297,7 +307,8 @@ func (h *Handler) getTreasuryPositions(w http.ResponseWriter, r *http.Request) {
 
 	positions, err := h.service.GetTreasuryPositions(r.Context(), portfolioID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao buscar posições do Tesouro Direto", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar posições do Tesouro Direto")
 		return
 	}
 
@@ -316,7 +327,8 @@ func (h *Handler) getTreasuryTransactions(w http.ResponseWriter, r *http.Request
 
 	transactions, err := h.service.GetTreasuryTransactions(r.Context(), portfolioID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao buscar transações do Tesouro Direto", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar transações do Tesouro Direto")
 		return
 	}
 
@@ -341,7 +353,8 @@ func (h *Handler) createTreasuryTransaction(w http.ResponseWriter, r *http.Reque
 
 	res, err := h.service.CreateTreasuryTransaction(r.Context(), portfolioID, &req)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao criar transação do Tesouro Direto", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao criar transação do Tesouro Direto")
 		return
 	}
 
@@ -357,7 +370,8 @@ func (h *Handler) getTreasuryPerformance(w http.ResponseWriter, r *http.Request)
 
 	performance, err := h.service.GetTreasuryPerformance(r.Context(), portfolioID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao buscar performance do Tesouro Direto", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao buscar performance do Tesouro Direto")
 		return
 	}
 
@@ -384,9 +398,10 @@ func (h *Handler) updateTreasuryTransaction(w http.ResponseWriter, r *http.Reque
 	err := h.service.UpdateTreasuryTransaction(r.Context(), portfolioID, txID, &req)
 	if err != nil {
 		if strings.Contains(err.Error(), "unauthorized") {
-			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
+			httputils.RespondWithError(w, http.StatusForbidden, "Acesso não autorizado à transação")
 		} else {
-			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+			slog.Error("falha ao atualizar transação do Tesouro Direto", "portfolio_id", portfolioID, "tx_id", txID, "error", err)
+			httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao atualizar transação do Tesouro Direto")
 		}
 		return
 	}
@@ -405,9 +420,10 @@ func (h *Handler) deleteTreasuryTransaction(w http.ResponseWriter, r *http.Reque
 	err := h.service.DeleteTreasuryTransaction(r.Context(), portfolioID, txID)
 	if err != nil {
 		if strings.Contains(err.Error(), "unauthorized") {
-			httputils.RespondWithError(w, http.StatusForbidden, err.Error())
+			httputils.RespondWithError(w, http.StatusForbidden, "Acesso não autorizado à transação")
 		} else {
-			httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+			slog.Error("falha ao excluir transação do Tesouro Direto", "portfolio_id", portfolioID, "tx_id", txID, "error", err)
+			httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao excluir transação do Tesouro Direto")
 		}
 		return
 	}
@@ -424,7 +440,8 @@ func (h *Handler) getTreasuryMonthlyYields(w http.ResponseWriter, r *http.Reques
 
 	yields, err := h.service.GetTreasuryMonthlyYields(r.Context(), portfolioID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao calcular rendimentos mensais do Tesouro Direto", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao calcular rendimentos mensais do Tesouro Direto")
 		return
 	}
 
@@ -460,7 +477,8 @@ func (h *Handler) bulkImportTreasuryTransactions(w http.ResponseWriter, r *http.
 
 	res, err := h.service.BulkAddTreasuryTransactions(r.Context(), portfolioID, file)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao importar transações do Tesouro Direto", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao importar transações do Tesouro Direto")
 		return
 	}
 
@@ -480,7 +498,8 @@ func (h *Handler) exportTreasuryTransactions(w http.ResponseWriter, r *http.Requ
 
 	csvBytes, err := h.service.ExportTreasuryTransactions(r.Context(), portfolioID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao exportar transações do Tesouro Direto", "portfolio_id", portfolioID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao exportar transações do Tesouro Direto")
 		return
 	}
 
