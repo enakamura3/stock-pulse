@@ -50,6 +50,21 @@ export default function SettingsPage() {
   const [workersError, setWorkersError] = useState<string | null>(null);
   const [triggeringWorker, setTriggeringWorker] = useState<string | null>(null);
   const [workerSuccess, setWorkerSuccess] = useState<string | null>(null);
+  const [adminKey, setAdminKey] = useState<string>('');
+
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_ADMIN_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('admin_api_key') || '' : '');
+    setAdminKey(key);
+  }, []);
+
+  const getAdminHeaders = (keyToUse?: string) => {
+    const key = keyToUse !== undefined ? keyToUse : (adminKey || process.env.NEXT_PUBLIC_ADMIN_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('admin_api_key') || '' : ''));
+    const headers: Record<string, string> = {};
+    if (key.trim()) {
+      headers['X-Admin-Key'] = key.trim();
+    }
+    return headers;
+  };
 
   // Inicialização dos campos do perfil
   useEffect(() => {
@@ -78,11 +93,12 @@ export default function SettingsPage() {
     }
   };
 
-  const loadWorkers = async () => {
+  const loadWorkers = async (keyToUse?: string) => {
     setIsLoadingWorkers(true);
     setWorkersError(null);
     try {
-      const res = await apiFetch(`/workers`);
+      const headers = getAdminHeaders(keyToUse);
+      const res = await apiFetch(`/workers`, { headers });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -92,7 +108,8 @@ export default function SettingsPage() {
           setWorkersError('Formato de resposta de workers inválido.');
         }
       } else {
-        setWorkersError('Não foi possível carregar a lista de workers.');
+        const data = await res.json().catch(() => ({}));
+        setWorkersError(data.error || data.message || 'Não foi possível carregar a lista de workers.');
       }
     } catch (err) {
       console.error(err);
@@ -107,15 +124,17 @@ export default function SettingsPage() {
     setWorkerSuccess(null);
     setWorkersError(null);
     try {
+      const headers = getAdminHeaders();
       const res = await apiFetch(`/workers/${name}/trigger`, {
         method: 'POST',
+        headers,
       });
       if (res.ok) {
         setWorkerSuccess(`Worker "${name}" disparado com sucesso!`);
-        setTimeout(loadWorkers, 1500);
+        setTimeout(() => loadWorkers(), 1500);
       } else {
         const data = await res.json().catch(() => ({}));
-        setWorkersError(data.message || `Não foi possível disparar o worker "${name}".`);
+        setWorkersError(data.error || data.message || `Não foi possível disparar o worker "${name}".`);
       }
     } catch (err) {
       console.error(err);
@@ -477,7 +496,7 @@ export default function SettingsPage() {
             <h2 className="card-title">⚙️ Controle de Workers</h2>
             <button 
               className="btn-secondary" 
-              onClick={loadWorkers} 
+              onClick={() => loadWorkers()} 
               disabled={isLoadingWorkers} 
               style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
             >
@@ -485,6 +504,37 @@ export default function SettingsPage() {
             </button>
           </div>
           
+          {/* Chave de Administração para Workers */}
+          <div style={{ marginBottom: '1.25rem', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label htmlFor="adminKeyInput" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              Chave de Administração (X-Admin-Key):
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flex: '1 1 250px' }}>
+              <input
+                id="adminKeyInput"
+                type="password"
+                placeholder="Insira a ADMIN_API_KEY para autenticar"
+                value={adminKey}
+                onChange={(e) => {
+                  setAdminKey(e.target.value);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('admin_api_key', e.target.value);
+                  }
+                }}
+                className="input-field"
+                style={{ fontSize: '0.85rem', padding: '0.4rem 0.6rem', flex: 1 }}
+              />
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => loadWorkers(adminKey)}
+                style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+              >
+                Conectar
+              </button>
+            </div>
+          </div>
+
           {workersError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{workersError}</div>}
           {workerSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.9rem', padding: '0.5rem 0', fontWeight: 600, marginBottom: '1rem' }}>{workerSuccess}</div>}
 

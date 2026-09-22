@@ -288,11 +288,12 @@ func main() {
 				r.With(customMiddleware.RateLimitTelegramLink(rdb)).Post("/link", telegramHttpHandler.GenerateLinkToken)
 				r.Delete("/link", telegramHttpHandler.UnlinkTelegram)
 			})
+		})
 
-			// Workers / System Management
-			r.Route("/workers", func(r chi.Router) {
-				workerHandler.RegisterRoutes(r)
-			})
+		// Workers / System Management (Protegido por ADMIN_API_KEY)
+		r.Route("/workers", func(r chi.Router) {
+			r.Use(customMiddleware.RequireAdminKey(config.Envs.AdminAPIKey))
+			workerHandler.RegisterRoutes(r)
 		})
 	})
 
