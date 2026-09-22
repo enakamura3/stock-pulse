@@ -305,16 +305,19 @@ func TestService_RotateRefreshToken(t *testing.T) {
 		results := make([]string, concurrency)
 		errorsList := make([]error, concurrency)
 		var wg sync.WaitGroup
+		start := make(chan struct{})
 
 		for i := 0; i < concurrency; i++ {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
+				<-start
 				_, newToken, rErr := s.RotateRefreshToken(ctx, oldToken)
 				results[idx] = newToken
 				errorsList[idx] = rErr
 			}(i)
 		}
+		close(start)
 		wg.Wait()
 
 		for i := 0; i < concurrency; i++ {

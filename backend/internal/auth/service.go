@@ -63,9 +63,12 @@ if rotatedUserID and rotatedUserID ~= false and existingNewToken and existingNew
     local rotatedAt = tonumber(rotatedAtStr)
     local now = tonumber(ARGV[4])
     local gracePeriod = tonumber(ARGV[3])
-    local elapsed = now - rotatedAt
+    local diff = now - rotatedAt
+    if diff < 0 then
+        diff = -diff
+    end
 
-    if elapsed >= 0 and elapsed <= gracePeriod then
+    if diff <= gracePeriod then
         -- DENTRO DO GRACE PERIOD:
         -- Retorna idempotentemente o mesmo newToken já emitido
         return {"GRACE_PERIOD", rotatedUserID, existingNewToken}
