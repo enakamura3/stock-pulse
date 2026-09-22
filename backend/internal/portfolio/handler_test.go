@@ -319,6 +319,19 @@ func TestHandler_AddTransaction(t *testing.T) {
 		h.AddTransaction(rec, req)
 		assert.Equal(t, http.StatusCreated, rec.Code)
 	})
+
+	t.Run("Success Split/Bonus Zeroes Fee", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("AddTransaction", mock.Anything, "u1", mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Fee == 0
+		})).Return(&Transaction{ID: "tx-split"}, nil)
+
+		body := `{"ticker": "AAPL", "type": "SPLIT", "quantity": 10, "unit_price": 0, "fee": 15}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusCreated, rec.Code)
+	})
 }
 
 func TestHandler_GetTransactions(t *testing.T) {
@@ -595,6 +608,28 @@ func TestHandler_UpdateTransaction(t *testing.T) {
 			return tx.AssetType == "STOCK_BR"
 		})).Return(nil)
 		body := `{"ticker": "PETR4.SA", "type": "BUY", "asset_type": "STOCK_BR", "quantity": 10, "unit_price": 38}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Negative Fee", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "fee": -5}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Taxa/Corretagem não pode ser negativa")
+	})
+
+	t.Run("Success Split/Bonus Zeroes Fee", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("UpdateTransaction", mock.Anything, "u1", "p1", "tx1", mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Fee == 0
+		})).Return(nil)
+		body := `{"ticker": "AAPL", "type": "SPLIT", "quantity": 10, "unit_price": 0, "fee": 20}`
 		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
 		rec := httptest.NewRecorder()
 		h.UpdateTransaction(rec, req)
