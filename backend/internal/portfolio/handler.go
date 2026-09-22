@@ -3,6 +3,7 @@ package portfolio
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"strings"
@@ -434,7 +435,8 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.UpdateTransaction(ctxOrDefault(r), userID, portfolioID, txID, tx); err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao atualizar transação", "user_id", userID, "portfolio_id", portfolioID, "tx_id", txID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao atualizar transação")
 		return
 	}
 
@@ -517,7 +519,8 @@ func (h *Handler) GetDividends(w http.ResponseWriter, r *http.Request) {
 
 	divs, err := h.service.GetPortfolioDividends(r.Context(), portfolioID, userID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao recuperar dividendos da carteira", "portfolio_id", portfolioID, "user_id", userID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao recuperar dividendos")
 		return
 	}
 

@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -85,7 +85,8 @@ func (h *HTTPHandler) UnlinkTelegram(w http.ResponseWriter, r *http.Request) {
 
 	err = h.svc.UnlinkAccount(r.Context(), userID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to unlink telegram account: %v", err), http.StatusInternalServerError)
+		slog.Error("falha ao desvincular conta do Telegram", "user_id", userID, "error", err)
+		http.Error(w, "failed to unlink telegram account", http.StatusInternalServerError)
 		return
 	}
 

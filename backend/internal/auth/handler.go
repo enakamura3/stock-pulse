@@ -288,7 +288,8 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	err = h.service.DeleteUser(r.Context(), userID)
 	if err != nil {
-		httputils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("falha ao excluir conta de usuário", "user_id", userID, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao excluir conta de usuário")
 		return
 	}
 
