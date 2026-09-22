@@ -170,6 +170,13 @@ func TestCORS(t *testing.T) {
 			expectedOrigin: "http://example.com",
 			expectedStatus: http.StatusNoContent,
 		},
+		{
+			name:           "OPTIONS preflight disallowed",
+			method:         http.MethodOptions,
+			origin:         "http://hacker.com",
+			expectedOrigin: "",
+			expectedStatus: http.StatusForbidden,
+		},
 	}
 
 	for _, tc := range tests {
@@ -250,3 +257,18 @@ func TestCORS_RemoteIP_SameHost_Dev(t *testing.T) {
 
 	assert.Equal(t, "http://192.168.1.100:3000", rr.Header().Get("Access-Control-Allow-Origin"))
 }
+
+func TestIsOriginAllowed_EdgeCases(t *testing.T) {
+	// 1. Empty origin
+	assert.False(t, IsOriginAllowed("", "http://example.com", "development", "localhost:8080"))
+
+	// 2. Production with origin not in configured list
+	assert.False(t, IsOriginAllowed("http://hacker.com", "http://example.com", "production", "example.com"))
+
+	// 3. Invalid URL syntax in origin returns empty host
+	assert.Empty(t, extractHost("://invalid-url"))
+
+	// 4. Dev mode with IP without port in reqHost
+	assert.True(t, IsOriginAllowed("http://192.168.1.100:3000", "", "development", "192.168.1.100"))
+}
+
