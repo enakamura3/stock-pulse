@@ -13,11 +13,13 @@ func TestLoad_Success(t *testing.T) {
 	os.Setenv("JWT_SECRET", "supersecret_key_12345678901234567890")
 	os.Setenv("FRONTEND_URL", "http://localhost:3000")
 	os.Setenv("REDIS_TTL_QUOTES", "10m")
+	os.Setenv("ADMIN_API_KEY", "admin-secret-key-12345")
 	defer func() {
 		os.Unsetenv("DB_URL")
 		os.Unsetenv("JWT_SECRET")
 		os.Unsetenv("FRONTEND_URL")
 		os.Unsetenv("REDIS_TTL_QUOTES")
+		os.Unsetenv("ADMIN_API_KEY")
 	}()
 
 	err := Load()
@@ -25,6 +27,7 @@ func TestLoad_Success(t *testing.T) {
 	assert.Equal(t, "postgres://user:pass@localhost:5432/db", Envs.DBURL)
 	assert.Equal(t, "supersecret_key_12345678901234567890", Envs.JWTSecret)
 	assert.Equal(t, "http://localhost:3000", Envs.FrontendURL)
+	assert.Equal(t, "admin-secret-key-12345", Envs.AdminAPIKey)
 	assert.Equal(t, 10*time.Minute, Envs.RedisTTLQuotes)
 	assert.Equal(t, 24*time.Hour, Envs.RedisTTLFundamentals)
 	assert.Equal(t, 15*time.Minute, Envs.JWTAccessTokenTTL)

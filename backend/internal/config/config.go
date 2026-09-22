@@ -18,6 +18,7 @@ type Environment struct {
 	LogLevel              string
 	AlertCheckInterval    string
 	BrapiToken            string
+	AdminAPIKey           string
 	Env                   string
 	JWTAccessTokenTTL     time.Duration
 	JWTRefreshTokenTTL    time.Duration
@@ -43,6 +44,7 @@ func Load() error {
 		LogLevel:           os.Getenv("LOG_LEVEL"),
 		AlertCheckInterval: os.Getenv("ALERT_CHECK_INTERVAL"),
 		BrapiToken:         os.Getenv("BRAPI_TOKEN"),
+		AdminAPIKey:        os.Getenv("ADMIN_API_KEY"),
 		Env:                os.Getenv("ENV"),
 
 		JWTAccessTokenTTL:     parseDuration(os.Getenv("JWT_ACCESS_TOKEN_TTL"), 15*time.Minute),
