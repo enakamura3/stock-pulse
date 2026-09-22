@@ -21,6 +21,7 @@ type Environment struct {
 	Env                   string
 	JWTAccessTokenTTL     time.Duration
 	JWTRefreshTokenTTL    time.Duration
+	JWTRefreshGracePeriod time.Duration
 	RedisTTLQuotes        time.Duration
 	RedisTTLFundamentals  time.Duration
 	RedisTTLExchangeRates time.Duration
@@ -46,6 +47,7 @@ func Load() error {
 
 		JWTAccessTokenTTL:     parseDuration(os.Getenv("JWT_ACCESS_TOKEN_TTL"), 15*time.Minute),
 		JWTRefreshTokenTTL:    parseDuration(os.Getenv("JWT_REFRESH_TOKEN_TTL"), 12*time.Hour),
+		JWTRefreshGracePeriod: parseDuration(os.Getenv("JWT_REFRESH_GRACE_PERIOD"), 30*time.Second),
 		RedisTTLQuotes:        parseDuration(os.Getenv("REDIS_TTL_QUOTES"), 5*time.Minute),
 		RedisTTLFundamentals:  parseDuration(os.Getenv("REDIS_TTL_FUNDAMENTALS"), 24*time.Hour),
 		RedisTTLExchangeRates: parseDuration(os.Getenv("REDIS_TTL_EXCHANGE_RATES"), 1*time.Hour),
