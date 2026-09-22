@@ -630,4 +630,12 @@ func TestRandReader_Failures(t *testing.T) {
 		_, err := s.GenerateRefreshToken(context.Background(), "user-1")
 		assert.EqualError(t, err, "entropy source failed")
 	})
+
+	t.Run("RotateRefreshToken fails on rand.Read", func(t *testing.T) {
+		s, _, _ := setupService()
+		randReader = &failingReader{}
+		_, _, err := s.RotateRefreshToken(context.Background(), "valid-token")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "falha ao gerar novo refresh token")
+	})
 }
