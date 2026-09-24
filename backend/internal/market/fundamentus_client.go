@@ -1,11 +1,10 @@
 package market
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -39,13 +38,13 @@ func (c *FundamentusClient) FetchDividends(ctx context.Context, ticker string) (
 	symbol := strings.TrimSuffix(ticker, ".SA")
 
 	// Tenta como Ação primeiro
-	raw, err := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/proventos.php?papel=%s&tipo=2", symbol), "acao")
+	raw, err := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/proventos.php?papel=%s&tipo=2", url.QueryEscape(symbol)), "acao")
 	if err == nil && len(raw) > 0 {
 		return raw, "acao", nil
 	}
 
 	// Se retornou vazio (ou deu erro na raspagem), tenta como FII
-	rawFii, errFii := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/fii_proventos.php?papel=%s&tipo=2", symbol), "fii")
+	rawFii, errFii := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/fii_proventos.php?papel=%s&tipo=2", url.QueryEscape(symbol)), "fii")
 	if errFii == nil && len(rawFii) > 0 {
 		return rawFii, "fii", nil
 	}
@@ -73,12 +72,7 @@ func (c *FundamentusClient) fetchAndScrape(ctx context.Context, url string, layo
 	}
 
 	decoder := charmap.ISO8859_1.NewDecoder()
-	body, err := io.ReadAll(decoder.Reader(resp.Body))
-	if err != nil {
-		return nil, err
-	}
-
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	doc, err := goquery.NewDocumentFromReader(decoder.Reader(resp.Body))
 	if err != nil {
 		return nil, err
 	}

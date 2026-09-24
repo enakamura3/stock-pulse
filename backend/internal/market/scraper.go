@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -61,7 +62,7 @@ func (s *Scraper) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 }
 
 func (s *Scraper) ScrapeFundamentus(ctx context.Context, symbol string) (*Fundamentals, error) {
-	url := fmt.Sprintf("%s/detalhes.php?papel=%s", s.fundamentusBaseURL, symbol)
+	url := fmt.Sprintf("%s/detalhes.php?papel=%s", s.fundamentusBaseURL, url.QueryEscape(symbol))
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
@@ -101,7 +102,7 @@ func (s *Scraper) ScrapeFundamentus(ctx context.Context, symbol string) (*Fundam
 }
 
 func (s *Scraper) ScrapeFinviz(ctx context.Context, symbol string) (*Fundamentals, error) {
-	url := fmt.Sprintf("%s/quote.ashx?t=%s", s.finvizBaseURL, symbol)
+	url := fmt.Sprintf("%s/quote.ashx?t=%s", s.finvizBaseURL, url.QueryEscape(symbol))
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
