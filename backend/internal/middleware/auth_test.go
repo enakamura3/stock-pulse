@@ -136,46 +136,64 @@ func TestCORS(t *testing.T) {
 	defer func() { config.Envs.FrontendURL = "" }()
 
 	tests := []struct {
-		name           string
-		method         string
-		origin         string
-		expectedOrigin string
-		expectedStatus int
+		name                string
+		method              string
+		origin              string
+		expectedOrigin      string
+		expectedCredentials string
+		expectedHeaders     string
+		expectedMethods     string
+		expectedStatus      int
 	}{
 		{
-			name:           "Allowed frontend URL",
-			method:         http.MethodGet,
-			origin:         "http://example.com",
-			expectedOrigin: "http://example.com",
-			expectedStatus: http.StatusOK,
+			name:                "Allowed frontend URL",
+			method:              http.MethodGet,
+			origin:              "http://example.com",
+			expectedOrigin:      "http://example.com",
+			expectedCredentials: "true",
+			expectedHeaders:     "Content-Type, Authorization, X-Requested-With, X-Idempotency-Key, X-Admin-Key",
+			expectedMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+			expectedStatus:      http.StatusOK,
 		},
 		{
-			name:           "Disallowed localhost port",
-			method:         http.MethodGet,
-			origin:         "http://localhost:8080",
-			expectedOrigin: "",
-			expectedStatus: http.StatusOK,
+			name:                "Disallowed localhost port",
+			method:              http.MethodGet,
+			origin:              "http://localhost:8080",
+			expectedOrigin:      "",
+			expectedCredentials: "",
+			expectedHeaders:     "",
+			expectedMethods:     "",
+			expectedStatus:      http.StatusOK,
 		},
 		{
-			name:           "Disallowed origin",
-			method:         http.MethodGet,
-			origin:         "http://hacker.com",
-			expectedOrigin: "",
-			expectedStatus: http.StatusOK,
+			name:                "Disallowed origin",
+			method:              http.MethodGet,
+			origin:              "http://hacker.com",
+			expectedOrigin:      "",
+			expectedCredentials: "",
+			expectedHeaders:     "",
+			expectedMethods:     "",
+			expectedStatus:      http.StatusOK,
 		},
 		{
-			name:           "OPTIONS preflight",
-			method:         http.MethodOptions,
-			origin:         "http://example.com",
-			expectedOrigin: "http://example.com",
-			expectedStatus: http.StatusNoContent,
+			name:                "OPTIONS preflight",
+			method:              http.MethodOptions,
+			origin:              "http://example.com",
+			expectedOrigin:      "http://example.com",
+			expectedCredentials: "true",
+			expectedHeaders:     "Content-Type, Authorization, X-Requested-With, X-Idempotency-Key, X-Admin-Key",
+			expectedMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+			expectedStatus:      http.StatusNoContent,
 		},
 		{
-			name:           "OPTIONS preflight disallowed",
-			method:         http.MethodOptions,
-			origin:         "http://hacker.com",
-			expectedOrigin: "",
-			expectedStatus: http.StatusForbidden,
+			name:                "OPTIONS preflight disallowed",
+			method:              http.MethodOptions,
+			origin:              "http://hacker.com",
+			expectedOrigin:      "",
+			expectedCredentials: "",
+			expectedHeaders:     "",
+			expectedMethods:     "",
+			expectedStatus:      http.StatusForbidden,
 		},
 	}
 
@@ -196,7 +214,9 @@ func TestCORS(t *testing.T) {
 
 			assert.Equal(t, tc.expectedStatus, rr.Code)
 			assert.Equal(t, tc.expectedOrigin, rr.Header().Get("Access-Control-Allow-Origin"))
-			assert.Equal(t, "true", rr.Header().Get("Access-Control-Allow-Credentials"))
+			assert.Equal(t, tc.expectedCredentials, rr.Header().Get("Access-Control-Allow-Credentials"))
+			assert.Equal(t, tc.expectedHeaders, rr.Header().Get("Access-Control-Allow-Headers"))
+			assert.Equal(t, tc.expectedMethods, rr.Header().Get("Access-Control-Allow-Methods"))
 		})
 	}
 }

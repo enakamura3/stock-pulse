@@ -2,29 +2,69 @@
 
 # Domínio do Frontend (Produção)
 stock-pulse.com, www.stock-pulse.com {
-    # Habilita compressão de conteúdo
-    encode zstd gzip
+	# Habilita compressão de conteúdo
+	encode zstd gzip
 
-    # Proxy reverso direcionando para o container Next.js
-    reverse_proxy frontend:3000
+	# Headers de Segurança (LOW-3)
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Proxy reverso direcionando para o container Next.js
+	reverse_proxy frontend:3000
 }
 
 # Domínio do Backend (Produção - API & WebSockets)
 api.stock-pulse.com {
-    # Habilita compressão de conteúdo
-    encode zstd gzip
+	# Habilita compressão de conteúdo
+	encode zstd gzip
 
-    # Proxy reverso direcionando para o container Go
-    reverse_proxy backend:8080
+	# Bloqueia acesso externo ao endpoint de métricas do Prometheus (LOW-4)
+	@metrics path /metrics /metrics/*
+	respond @metrics "Not Found" 404
+
+	# Headers de Segurança (LOW-3)
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Proxy reverso direcionando para o container Go
+	reverse_proxy backend:8080
 }
 
 # Bloco de Desenvolvimento / Teste Local (Acesso HTTP)
 http://stock-pulse.localhost, http://localhost {
-    encode zstd gzip
-    reverse_proxy frontend:3000
+	encode zstd gzip
+
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy frontend:3000
 }
 
 http://api.stock-pulse.localhost {
-    encode zstd gzip
-    reverse_proxy backend:8080
+	encode zstd gzip
+
+	# Bloqueia acesso externo ao endpoint de métricas do Prometheus (LOW-4)
+	@metrics path /metrics /metrics/*
+	respond @metrics "Not Found" 404
+
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy backend:8080
 }
