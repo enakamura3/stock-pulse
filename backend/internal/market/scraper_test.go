@@ -2,6 +2,8 @@ package market
 
 import (
 	"context"
+	"errors"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -176,5 +178,40 @@ func TestGetFundamentals(t *testing.T) {
 	fNeg := s.calculateFormulas(&Fundamentals{EPS: -1, BookValue: 10})
 	if math.Abs(fNeg.GrahamValue-0) > 1e-6 {
 		t.Errorf("expected GrahamValue 0 for negative EPS, got %f", fNeg.GrahamValue)
+	}
+}
+
+func TestScraper_Errors(t *testing.T) {
+	s := NewScraper()
+
+	// 1. Network Do Error for Fundamentus
+	s.client.Transport = &errorTransport{err: errors.New("network error")}
+	_, err := s.ScrapeFundamentus(context.Background(), "PETR4")
+	if err == nil {
+		t.Errorf("expected network error, got nil")
+	}
+
+	// 2. Network Do Error for Finviz
+	_, err = s.ScrapeFinviz(context.Background(), "AAPL")
+	if err == nil {
+		t.Errorf("expected network error, got nil")
+	}
+
+	// 3. Body Read Error for Fundamentus
+	s.client.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(&errReader{err: errors.New("read error")}),
+		}
+	})
+	_, err = s.ScrapeFundamentus(context.Background(), "PETR4")
+	if err == nil {
+		t.Errorf("expected read error, got nil")
+	}
+
+	// 4. Body Read Error for Finviz
+	_, err = s.ScrapeFinviz(context.Background(), "AAPL")
+	if err == nil {
+		t.Errorf("expected read error, got nil")
 	}
 }

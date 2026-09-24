@@ -1,10 +1,8 @@
 package market
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -68,12 +66,7 @@ func (c *StockAnalysisClient) FetchDividends(ctx context.Context, ticker string,
 		return nil, fmt.Errorf("stockanalysis retornou status %d para o ativo %s", resp.StatusCode, ticker)
 	}
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(bodyBytes))
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, err
 	}

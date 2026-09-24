@@ -1,10 +1,8 @@
 package market
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -74,12 +72,7 @@ func (c *FundamentusClient) fetchAndScrape(ctx context.Context, url string, layo
 	}
 
 	decoder := charmap.ISO8859_1.NewDecoder()
-	body, err := io.ReadAll(decoder.Reader(resp.Body))
-	if err != nil {
-		return nil, err
-	}
-
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	doc, err := goquery.NewDocumentFromReader(decoder.Reader(resp.Body))
 	if err != nil {
 		return nil, err
 	}

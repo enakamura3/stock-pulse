@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -10,6 +11,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+type errReader struct {
+	err error
+}
+
+func (e *errReader) Read(p []byte) (n int, err error) {
+	return 0, e.err
+}
 
 func TestFundamentusDividendSource_GetDividends(t *testing.T) {
 	client := NewFundamentusClient()
@@ -74,5 +83,67 @@ func TestFundamentusDividendSource_GetDividends(t *testing.T) {
 		})
 		_, _, _ = c.FetchDividends(context.Background(), "TEST&INJECT=1")
 		assert.Contains(t, capturedURL, "papel=TEST%26INJECT%3D1")
+	})
+
+	t.Run("FII Layout Success", func(t *testing.T) {
+		c := NewFundamentusClient()
+		c.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			if strings.Contains(req.URL.String(), "fii_proventos.php") {
+				fiiHTML := `
+				<table id="resultado">
+					<tbody>
+						<tr>
+							<td>15/01/2026</td>
+							<td>RENDIMENTO</td>
+							<td>25/01/2026</td>
+							<td>1,10</td>
+						</tr>
+					</tbody>
+				</table>`
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(fiiHTML)),
+				}
+			}
+			// Ação returns empty table
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`<table id="resultado"><tbody></tbody></table>`)),
+			}
+		})
+
+		raw, layout, err := c.FetchDividends(context.Background(), "HGLG11.SA")
+		assert.NoError(t, err)
+		assert.Equal(t, "fii", layout)
+		assert.Len(t, raw, 1)
+		assert.Equal(t, "RENDIMENTO", raw[0].Type)
+		assert.Equal(t, "1,10", raw[0].Amount)
+		assert.Equal(t, "15/01/2026", raw[0].Date)
+		assert.Equal(t, "25/01/2026", raw[0].PaymentDate)
+	})
+
+	t.Run("NewRequest Error with nil context", func(t *testing.T) {
+		c := NewFundamentusClient()
+		_, _, err := c.FetchDividends(nil, "PETR4")
+		assert.Error(t, err)
+	})
+
+	t.Run("Network Do Error", func(t *testing.T) {
+		c := NewFundamentusClient()
+		c.httpClient.Transport = &errorTransport{err: errors.New("network failure")}
+		_, _, err := c.FetchDividends(context.Background(), "PETR4")
+		assert.Error(t, err)
+	})
+
+	t.Run("Body Read Error", func(t *testing.T) {
+		c := NewFundamentusClient()
+		c.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(&errReader{err: errors.New("read error")}),
+			}
+		})
+		_, _, err := c.FetchDividends(context.Background(), "PETR4")
+		assert.Error(t, err)
 	})
 }

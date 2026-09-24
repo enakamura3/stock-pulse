@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -128,5 +129,50 @@ func TestStockAnalysisDividendSource_GetDividends(t *testing.T) {
 
 		_, _ = c.FetchDividends(context.Background(), "PETR/4.SA", "STOCK_BR")
 		assert.Contains(t, capturedURL, "/quote/bvmf/petr%2F4/dividend/")
+	})
+
+	t.Run("ETF Support and Short Rows", func(t *testing.T) {
+		var capturedURL string
+		c := NewStockAnalysisClient()
+		c.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			capturedURL = req.URL.String()
+			html := `<table><tbody>
+				<tr><td>Header only</td></tr>
+				<tr><td>Feb 12, 2026</td><td>$1.50</td><td>Feb 11, 2026</td><td>Mar 15, 2026</td></tr>
+			</tbody></table>`
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(html)),
+			}
+		})
+		divs, err := c.FetchDividends(context.Background(), "SPY", "ETF_US")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.Contains(t, capturedURL, "/etf/spy/dividend/")
+	})
+
+	t.Run("NewRequest Error with nil context", func(t *testing.T) {
+		c := NewStockAnalysisClient()
+		_, err := c.FetchDividends(nil, "AAPL", "STOCK_US")
+		assert.Error(t, err)
+	})
+
+	t.Run("Network Do Error", func(t *testing.T) {
+		c := NewStockAnalysisClient()
+		c.httpClient.Transport = &errorTransport{err: errors.New("network failure")}
+		_, err := c.FetchDividends(context.Background(), "AAPL", "STOCK_US")
+		assert.Error(t, err)
+	})
+
+	t.Run("Body Read Error", func(t *testing.T) {
+		c := NewStockAnalysisClient()
+		c.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(&errReader{err: errors.New("read error")}),
+			}
+		})
+		_, err := c.FetchDividends(context.Background(), "AAPL", "STOCK_US")
+		assert.Error(t, err)
 	})
 }

@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -9,6 +10,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+type errorTransport struct {
+	err error
+}
+
+func (t *errorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, t.err
+}
 
 func TestYahooDividendSource_GetDividends(t *testing.T) {
 	client := NewYahooClient()
@@ -80,5 +89,30 @@ func TestYahooDividendSource_GetDividends(t *testing.T) {
 		})
 		_, _ = c.FetchDividends(context.Background(), "BRK/B")
 		assert.Contains(t, capturedURL, "/chart/BRK%2FB?")
+	})
+
+	t.Run("NewRequest Error with nil context", func(t *testing.T) {
+		c := NewYahooClient()
+		_, err := c.FetchDividends(nil, "AAPL")
+		assert.Error(t, err)
+	})
+
+	t.Run("Network Do Error", func(t *testing.T) {
+		c := NewYahooClient()
+		c.httpClient.Transport = &errorTransport{err: errors.New("network failure")}
+		_, err := c.FetchDividends(context.Background(), "AAPL")
+		assert.Error(t, err)
+	})
+
+	t.Run("JSON Decode Error", func(t *testing.T) {
+		c := NewYahooClient()
+		c.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader("invalid-json")),
+			}
+		})
+		_, err := c.FetchDividends(context.Background(), "AAPL")
+		assert.Error(t, err)
 	})
 }
