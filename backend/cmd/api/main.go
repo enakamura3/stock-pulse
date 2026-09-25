@@ -194,6 +194,7 @@ func main() {
 
 	// Configuração das Rotas (Chi)
 	r := chi.NewRouter()
+	r.Use(customMiddleware.SecurityHeaders())                                                                              // Headers defensivos de segurança (MIME sniffing, clickjacking, referrer)
 	r.Use(customMiddleware.CORS())                                                                                         // CORS seguro com credenciais
 	r.Use(customMiddleware.Metrics())                                                                                      // Coleta de métricas Prometheus (Fase 4)
 	r.Use(customMiddleware.RequestSizeLimit(customMiddleware.DefaultMaxJSONBytes, customMiddleware.DefaultMaxMultipartBytes)) // Proteção DoS: 1MB JSON, 15MB Multipart
