@@ -3,10 +3,8 @@ package telegram
 import (
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
 	"gopkg.in/telebot.v3"
 )
 
@@ -93,31 +91,5 @@ func (r *BotRunner) SendAlertMessage(chatID int64, userName, ticker, assetName s
 }
 
 func rateLimitMiddleware() telebot.MiddlewareFunc {
-	var mu sync.Mutex
-	limiters := make(map[int64]*rate.Limiter)
-
-	return func(next telebot.HandlerFunc) telebot.HandlerFunc {
-		return func(c telebot.Context) error {
-			sender := c.Sender()
-			if sender == nil {
-				return next(c)
-			}
-
-			mu.Lock()
-			l, exists := limiters[sender.ID]
-			if !exists {
-				// Permite 1 mensagem por segundo com burst de até 3 mensagens simultâneas
-				l = rate.NewLimiter(rate.Every(time.Second), 3)
-				limiters[sender.ID] = l
-			}
-			mu.Unlock()
-
-			if !l.Allow() {
-				slog.Warn("Rate limit exceeded for user", "userID", sender.ID, "username", sender.Username)
-				return c.Send("⚠️ Você está enviando mensagens muito rápido. Por favor, aguarde um momento antes de enviar a próxima.")
-			}
-
-			return next(c)
-		}
-	}
+	return RateLimitMiddleware()
 }
