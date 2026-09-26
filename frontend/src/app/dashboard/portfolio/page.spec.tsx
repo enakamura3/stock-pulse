@@ -567,5 +567,36 @@ describe('PortfolioPage Contextual Filters', () => {
     render(<PortfolioPage />);
     expect(screen.getByText('Investidor')).toBeInTheDocument();
   });
+
+  it('renders equity KPI summary cards reflecting filtered positions on ativos tab', () => {
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'ativos',
+      activeCategoryFilter: 'FIIs',
+      positions: [
+        { ticker: 'PETR4', type: 'STOCK_BR', total_cost: 1000, current_value: 1200 },
+        { ticker: 'HGLG11', type: 'FII', total_cost: 2000, current_value: 2300 },
+      ],
+      dividends: [
+        { ticker: 'PETR4', net_amount: 50 },
+        { ticker: 'HGLG11', net_amount: 120 },
+      ],
+    });
+
+    render(<PortfolioPage />);
+    const kpiCards = screen.getByTestId('equity-kpi-cards');
+    expect(within(kpiCards).getByText(/Total Investido/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Patrimônio Atual/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Lucro \/ Prejuízo/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Proventos Recebidos/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Ativos em Carteira/i)).toBeInTheDocument();
+
+    // FIIs has 1 asset (HGLG11) with total_cost 2000, current_value 2300, profit 300 (+15.00%)
+    expect(within(kpiCards).getByText('1')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('FIIs')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('R$ 2.000,00')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('R$ 2.300,00')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('R$ 120,00')).toBeInTheDocument();
+  });
 });
 

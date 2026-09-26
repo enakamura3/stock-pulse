@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FixedIncomeTab from '../FixedIncomeTab';
 import * as api from '@/lib/api';
@@ -104,6 +104,14 @@ describe('FixedIncomeTab Component', () => {
 
     expect(screen.getByText('100.00% CDI')).toBeInTheDocument();
     expect(screen.getByText('11.50% a.a.')).toBeInTheDocument();
+
+    const kpiCards = screen.getByTestId('fixed-income-kpi-cards');
+    expect(within(kpiCards).getByText(/Total Aplicado/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Valor Bruto/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Valor Líquido/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Impostos \(IOF \+ IR\)/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText(/Títulos Ativos/i)).toBeInTheDocument();
+    expect(within(kpiCards).getByText('2')).toBeInTheDocument();
   });
 
   it('allows sorting positions by institution, rate, and dates', async () => {
@@ -503,6 +511,10 @@ describe('FixedIncomeTab Component', () => {
       expect(screen.queryByText('XP Investimentos')).not.toBeInTheDocument();
     });
 
+    const kpiCardsCDB = screen.getByTestId('fixed-income-kpi-cards');
+    expect(within(kpiCardsCDB).getByText('1')).toBeInTheDocument();
+    expect(within(kpiCardsCDB).getByText('CDB')).toBeInTheDocument();
+
     // When categoryFilter is LCI
     rerender(
       <FixedIncomeTab portfolioId="p1" onLaunchOperation={vi.fn()} categoryFilter="LCI" />
@@ -513,6 +525,10 @@ describe('FixedIncomeTab Component', () => {
       expect(screen.getByText('XP Investimentos')).toBeInTheDocument();
     });
 
+    const kpiCardsLCI = screen.getByTestId('fixed-income-kpi-cards');
+    expect(within(kpiCardsLCI).getByText('Isento ou sem retenção')).toBeInTheDocument();
+    expect(within(kpiCardsLCI).getByText('LCI')).toBeInTheDocument();
+
     // When categoryFilter has no matches
     rerender(
       <FixedIncomeTab portfolioId="p1" onLaunchOperation={vi.fn()} categoryFilter="CRI" />
@@ -521,6 +537,9 @@ describe('FixedIncomeTab Component', () => {
     await waitFor(() => {
       expect(screen.getByText(/Nenhuma aplicação de Renda Fixa encontrada para a categoria "CRI"/i)).toBeInTheDocument();
     });
+
+    const kpiCardsCRI = screen.getByTestId('fixed-income-kpi-cards');
+    expect(within(kpiCardsCRI).getByText('0')).toBeInTheDocument();
 
     // When categoryFilter is "Todas"
     rerender(
@@ -531,5 +550,9 @@ describe('FixedIncomeTab Component', () => {
       expect(screen.getByText('Banco Inter')).toBeInTheDocument();
       expect(screen.getByText('XP Investimentos')).toBeInTheDocument();
     });
+
+    const kpiCardsTodas = screen.getByTestId('fixed-income-kpi-cards');
+    expect(within(kpiCardsTodas).getByText('2')).toBeInTheDocument();
+    expect(within(kpiCardsTodas).getByText('Todas as categorias')).toBeInTheDocument();
   });
 });
