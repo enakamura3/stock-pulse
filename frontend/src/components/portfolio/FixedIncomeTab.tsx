@@ -67,6 +67,49 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
     return sortedPositions.filter(pos => pos.asset?.type === categoryFilter);
   }, [sortedPositions, categoryFilter]);
 
+  // Métricas agregadas das posições filtradas
+  const totalInvested = useMemo(() => filteredPositions.reduce((acc, p) => acc + (p.total_invested || 0), 0), [filteredPositions]);
+  const totalGross = useMemo(() => filteredPositions.reduce((acc, p) => acc + (p.gross_value || 0), 0), [filteredPositions]);
+  const totalNet = useMemo(() => filteredPositions.reduce((acc, p) => acc + (p.net_value || 0), 0), [filteredPositions]);
+  const totalProfitLoss = totalNet - totalInvested;
+  const returnPct = totalInvested > 1e-6 ? (totalProfitLoss / totalInvested) * 100 : 0;
+
+  const totalTaxes = useMemo(() => {
+    return filteredPositions.reduce((acc, p) => {
+      if (typeof p.taxes_calculated === 'number') {
+        return acc + p.taxes_calculated;
+      }
+      const diff = (p.gross_value || 0) - (p.net_value || 0);
+      return acc + (diff > 1e-6 ? diff : 0);
+    }, 0);
+  }, [filteredPositions]);
+
+  const kpis = [
+    { label: 'Total Aplicado', value: formatMoney(totalInvested, 'BRL'), icon: '💰' },
+    { label: 'Valor Bruto', value: formatMoney(totalGross, 'BRL'), icon: '📊' },
+    {
+      label: 'Valor Líquido',
+      value: formatMoney(totalNet, 'BRL'),
+      icon: '💵',
+      sub: `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}% (${formatMoney(totalProfitLoss, 'BRL')})`,
+      subColor: returnPct >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
+    },
+    {
+      label: 'Impostos (IOF + IR)',
+      value: formatMoney(totalTaxes, 'BRL'),
+      icon: '🏛️',
+      sub: totalTaxes > 1e-6 ? 'IR e IOF provisionados' : 'Isento ou sem retenção',
+      subColor: totalTaxes > 1e-6 ? 'var(--color-danger)' : 'var(--text-secondary)',
+    },
+    {
+      label: 'Títulos Ativos',
+      value: `${filteredPositions.length}`,
+      icon: '🏷️',
+      sub: categoryFilter && categoryFilter !== 'Todas' ? categoryFilter : 'Todas as categorias',
+      subColor: 'var(--text-secondary)',
+    },
+  ];
+
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
     return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
@@ -206,8 +249,27 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
   }
 
   return (
-    <div className="flex-col gap-md" style={{ width: '100%' }}>
-      
+    <div className="flex-col gap-xl" style={{ width: '100%' }}>
+      {/* ── KPI Cards ── */}
+      <div className="flex-row gap-md flex-wrap" data-testid="fixed-income-kpi-cards">
+        {kpis.map((card, idx) => (
+          <div
+            key={idx}
+            className="card"
+            style={{ flex: '1 1 180px', minWidth: 160, padding: '1.25rem 1.5rem' }}
+          >
+            <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>{card.icon}</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.value}</div>
+            {card.sub && (
+              <div style={{ fontSize: '0.75rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600 }}>
+                {card.sub}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
       <div className="card flex-col mb-lg" style={{ padding: '1.75rem 2rem', border: '1px solid var(--panel-border)' }}>
         <div className="flex-row justify-between items-center mb-md flex-wrap gap-md">
           <div>

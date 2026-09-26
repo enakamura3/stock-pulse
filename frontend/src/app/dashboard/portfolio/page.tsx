@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { PortfolioProvider, usePortfolio } from '@/context/PortfolioContext';
-import { getAssetCategory, getDividendAssetCategory } from '@/components/portfolio/helpers';
+import { getAssetCategory, getDividendAssetCategory, formatMoney } from '@/components/portfolio/helpers';
 import { apiFetch } from '@/lib/api';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
@@ -165,7 +165,7 @@ function PortfolioContent() {
   const sumDivs12m = divs12m.reduce((acc, div) => acc + ((div as any).total_value || div.net_amount || 0), 0);
   const avgDividends12m = sumDivs12m / 12;
 
-  const getCategoryLabel = (cat: string) => {
+  const getCategoryLabel = React.useCallback((cat: string) => {
     if (cat === 'Todas') return 'Todas';
     if (activeTab === 'tesouro') {
       const map: Record<string, string> = {
@@ -180,7 +180,48 @@ function PortfolioContent() {
       if (cat.toUpperCase() === 'DEBENTURE') return 'Debêntures';
     }
     return cat;
-  };
+  }, [activeTab]);
+
+  const filteredEqCost = React.useMemo(() => filteredPositions.reduce((acc, pos) => acc + (pos.total_cost || 0), 0), [filteredPositions]);
+  const filteredEqValue = React.useMemo(() => filteredPositions.reduce((acc, pos) => acc + (pos.current_value || 0), 0), [filteredPositions]);
+  const filteredEqProfitLoss = filteredEqValue - filteredEqCost;
+  const filteredEqReturnPercent = filteredEqCost > 1e-6 ? (filteredEqProfitLoss / filteredEqCost) * 100 : 0.0;
+
+  const filteredEqDividends = React.useMemo(() => {
+    const activeTickers = new Set(filteredPositions.map(p => p.ticker).filter(Boolean));
+    const activeAssetIds = new Set(filteredPositions.map(p => p.asset_id).filter(Boolean));
+    return dividends.filter(d => (d.ticker && activeTickers.has(d.ticker)) || (d.asset_id && activeAssetIds.has(d.asset_id)));
+  }, [filteredPositions, dividends]);
+
+  const filteredEqDividendsTotal = React.useMemo(() => {
+    return filteredEqDividends.reduce((acc, d) => acc + ((d as any).total_value || d.net_amount || 0), 0);
+  }, [filteredEqDividends]);
+
+  const equityKpis = React.useMemo(() => [
+    { label: 'Total Investido', value: formatMoney(filteredEqCost, kpiCurrency), icon: '💰' },
+    { label: 'Patrimônio Atual', value: formatMoney(filteredEqValue, kpiCurrency), icon: '📊' },
+    {
+      label: 'Lucro / Prejuízo',
+      value: formatMoney(filteredEqProfitLoss, kpiCurrency),
+      icon: '💵',
+      sub: `${filteredEqReturnPercent >= 0 ? '+' : ''}${filteredEqReturnPercent.toFixed(2)}% (${filteredEqProfitLoss >= 0 ? '+' : ''}${formatMoney(filteredEqProfitLoss, kpiCurrency)})`,
+      subColor: filteredEqProfitLoss >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
+    },
+    {
+      label: 'Proventos Recebidos',
+      value: formatMoney(filteredEqDividendsTotal, kpiCurrency),
+      icon: '🪙',
+      sub: 'Total acumulado',
+      subColor: 'var(--accent-color)',
+    },
+    {
+      label: 'Ativos em Carteira',
+      value: `${filteredPositions.length}`,
+      icon: '🏷️',
+      sub: activeCategoryFilter && activeCategoryFilter !== 'Todas' ? getCategoryLabel(activeCategoryFilter) : 'Todas as categorias',
+      subColor: 'var(--text-secondary)',
+    },
+  ], [filteredEqCost, filteredEqValue, filteredEqProfitLoss, filteredEqReturnPercent, filteredEqDividendsTotal, filteredPositions.length, activeCategoryFilter, kpiCurrency, getCategoryLabel]);
 
   if (authLoading || isLoadingPortfolios) {
     return (
@@ -237,6 +278,26 @@ function PortfolioContent() {
 
           {activeTab === 'ativos' && (
             <div className="flex-col gap-xl w-full">
+              {/* ── KPI Cards ── */}
+              <div className="flex-row gap-md flex-wrap" data-testid="equity-kpi-cards">
+                {equityKpis.map((card, idx) => (
+                  <div
+                    key={idx}
+                    className="card"
+                    style={{ flex: '1 1 180px', minWidth: 160, padding: '1.25rem 1.5rem' }}
+                  >
+                    <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>{card.icon}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.value}</div>
+                    {card.sub && (
+                      <div style={{ fontSize: '0.75rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600 }}>
+                        {card.sub}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
               <div className="card flex-col" style={{ padding: '1.75rem 2rem', minHeight: '380px' }}>
                 <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
                   <div>
