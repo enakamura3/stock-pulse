@@ -95,6 +95,13 @@ export const getAssetCategory = (dbType: string) => {
   }
 };
 
+export const getDividendAssetCategory = (div: { asset_type?: string; is_accrued?: boolean }): string => {
+  let cat = getAssetCategory(div.asset_type || '');
+  if (div.asset_type === 'TESOURO') return 'Tesouro Direto';
+  if (cat === 'Desconhecido') return div.is_accrued ? 'Renda Fixa' : 'Outros';
+  return cat;
+};
+
 export const formatMoney = (val: number, currency: string) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

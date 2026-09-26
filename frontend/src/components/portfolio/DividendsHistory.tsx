@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CalculatedDividend } from './types';
-import { getAssetCategory, formatMoney } from './helpers';
+import { getAssetCategory, getDividendAssetCategory, formatMoney } from './helpers';
 import dynamic from 'next/dynamic';
 import AnnualSummary from './AnnualSummary';
 
@@ -108,16 +108,8 @@ export default function DividendsHistory({
           valB = b.ticker || '';
           break;
         case 'category': {
-          let catA = getAssetCategory(a.asset_type || '');
-          if (a.asset_type === 'TESOURO') catA = 'Tesouro Direto';
-          else if (catA === 'Desconhecido') catA = a.is_accrued ? 'Renda Fixa' : 'Outros';
-          
-          let catB = getAssetCategory(b.asset_type || '');
-          if (b.asset_type === 'TESOURO') catB = 'Tesouro Direto';
-          else if (catB === 'Desconhecido') catB = b.is_accrued ? 'Renda Fixa' : 'Outros';
-          
-          valA = catA;
-          valB = catB;
+          valA = getDividendAssetCategory(a);
+          valB = getDividendAssetCategory(b);
           break;
         }
         case 'type':
@@ -191,9 +183,7 @@ export default function DividendsHistory({
       const paid = isPaid(d);
       const amt = d.net_amount;
       
-      let groupStr = getAssetCategory(d.asset_type || '');
-      if (d.asset_type === 'TESOURO') groupStr = 'Tesouro Direto';
-      else if (groupStr === 'Desconhecido') groupStr = d.is_accrued ? 'Renda Fixa' : 'Outros';
+      const groupStr = getDividendAssetCategory(d);
 
       if (paid) s.totalPaid += amt; else s.totalPending += amt;
       
@@ -326,12 +316,7 @@ export default function DividendsHistory({
                         </td>
                         <td className="text-center font-bold" style={{ color: 'var(--text-primary)' }}>{div.ticker}</td>
                         <td className="text-center text-secondary">
-                          {(() => {
-                            let cat = getAssetCategory(div.asset_type || '');
-                            if (div.asset_type === 'TESOURO') cat = 'Tesouro Direto';
-                            else if (cat === 'Desconhecido') cat = div.is_accrued ? 'Renda Fixa' : 'Outros';
-                            return cat;
-                          })()}
+                          {getDividendAssetCategory(div)}
                         </td>
                         <td className="text-center">
                           <span className="badge badge-pill" style={{
@@ -349,8 +334,8 @@ export default function DividendsHistory({
                             {typeStr}
                           </span>
                         </td>
-                        <td className="text-center text-secondary num-col">{new Date(div.cum_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
-                        <td className="text-center text-secondary num-col">{(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/')}</td>
+                        <td className="text-center text-secondary num-col">{(!div.cum_date || div.cum_date.startsWith('0001')) ? '--' : (() => { try { return new Date(div.cum_date).toISOString().split('T')[0].replace(/-/g, '/'); } catch { return '--'; } })()}</td>
+                        <td className="text-center text-secondary num-col">{(!div.payment_date || div.payment_date.startsWith('0001')) ? '--' : (() => { try { return new Date(div.payment_date).toISOString().split('T')[0].replace(/-/g, '/'); } catch { return '--'; } })()}</td>
                         <td className="text-center font-semibold num-col">{div.is_accrued ? '--' : Number(div.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}</td>
                         <td className="text-right font-semibold num-col">{div.is_accrued ? '--' : formatMoney(div.per_share_amount, div.currency)}</td>
                         <td className="text-right num-col">
