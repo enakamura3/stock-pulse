@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
@@ -10,9 +10,10 @@ import { usePortfolioOptional } from '@/context/PortfolioContext';
 interface FixedIncomeTabProps {
   portfolioId: string;
   onLaunchOperation: () => void;
+  categoryFilter?: string;
 }
 
-export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: FixedIncomeTabProps) {
+export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categoryFilter = 'Todas' }: FixedIncomeTabProps) {
   const [positions, setPositions] = useState<FixedIncomePosition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [performanceData, setPerformanceData] = useState<PerformancePoint[]>([]);
@@ -58,6 +59,13 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
     }
     return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
   });
+
+  const filteredPositions = useMemo(() => {
+    if (!categoryFilter || categoryFilter === 'Todas') {
+      return sortedPositions;
+    }
+    return sortedPositions.filter(pos => pos.asset?.type === categoryFilter);
+  }, [sortedPositions, categoryFilter]);
 
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
@@ -247,7 +255,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
           </div>
         </div>
         <div className="table-container flex-col" style={{ flex: 1 }}>
-        {positions.length > 0 ? (
+        {filteredPositions.length > 0 ? (
           <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
@@ -263,7 +271,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
               </tr>
             </thead>
             <tbody>
-              {sortedPositions.map(pos => {
+              {filteredPositions.map(pos => {
                 const isMatured = pos.is_matured;
                 const isZeroDate = pos.asset.maturity_date && pos.asset.maturity_date.startsWith('0001');
                 const isNearMaturity = !isZeroDate && pos.days_to_maturity <= 30 && !isMatured;
@@ -332,7 +340,11 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation }: Fixed
         ) : (
           <div className="flex-col items-center justify-center text-secondary" style={{ height: '240px' }}>
             <span className="text-2xl mb-sm">🏛️</span>
-            <p className="text-sm">Nenhuma aplicação de Renda Fixa encontrada.</p>
+            <p className="text-sm">
+              {categoryFilter && categoryFilter !== 'Todas'
+                ? `Nenhuma aplicação de Renda Fixa encontrada para a categoria "${categoryFilter}".`
+                : 'Nenhuma aplicação de Renda Fixa encontrada.'}
+            </p>
           </div>
         )}
         </div>

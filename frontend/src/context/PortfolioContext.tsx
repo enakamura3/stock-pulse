@@ -364,15 +364,10 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!activePortfolioId) return;
     let targetTickers: string[] = [];
-    if (activeCategoryFilter === 'Renda Variável') {
-      targetTickers = positions.map(p => p.ticker);
-      if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
-    } else if (activeCategoryFilter !== 'Todas' && activeCategoryFilter !== 'Renda Fixa') {
+    if (activeCategoryFilter !== 'Todas') {
       const filtered = positions.filter(pos => getAssetCategory(pos.type) === activeCategoryFilter);
       targetTickers = filtered.map(p => p.ticker);
       if (targetTickers.length === 0) targetTickers = ['NONE_FOUND'];
-    } else if (activeCategoryFilter === 'Renda Fixa') {
-      targetTickers = ['NONE_FOUND'];
     }
 
     if (filterChartTicker !== 'Todos') {

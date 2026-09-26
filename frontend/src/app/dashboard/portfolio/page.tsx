@@ -87,47 +87,71 @@ function PortfolioContent() {
 
   if (!user) return null;
 
-  const filteredPositions = positions.filter(pos => activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Variável' || getAssetCategory(pos.type) === activeCategoryFilter);
-  const filteredTransactions = transactions.filter(tx => {
-    if (activeCategoryFilter === 'Todas') return true;
-    if (activeCategoryFilter === 'Renda Variável') return tx.module !== 'RF';
-    if (activeCategoryFilter === 'Renda Fixa') return tx.module === 'RF' && tx.asset_type !== 'TESOURO';
-    if (activeCategoryFilter === 'Tesouro Direto') return tx.module === 'RF' && tx.asset_type === 'TESOURO';
-    return getAssetCategory(tx.asset_type || '') === activeCategoryFilter;
-  });
-  const categoryFilteredDividends = dividends.filter(div => {
-    if (activeCategoryFilter === 'Todas') return true;
-    if (activeCategoryFilter === 'Renda Variável') return !div.is_accrued;
-    if (activeCategoryFilter === 'Renda Fixa') return div.is_accrued && div.asset_type !== 'TESOURO';
-    if (activeCategoryFilter === 'Tesouro Direto') return div.is_accrued && div.asset_type === 'TESOURO';
-    if (div.is_accrued || getAssetCategory(div.asset_type) !== activeCategoryFilter) return false;
-    return true;
-  });
+  // Dynamic categories per active tab without hardcoding
+  const dynamicCategories = React.useMemo(() => {
+    if (activeTab === 'ativos') {
+      const cats = Array.from(new Set(positions.map(p => getAssetCategory(p.type)).filter(c => c && c !== 'Desconhecido'))).sort();
+      return cats.length > 1 ? ['Todas', ...cats] : [];
+    }
+    if (activeTab === 'renda-fixa') {
+      const types = Array.from(new Set(fiPositions.map(p => p.asset?.type).filter(Boolean))).sort();
+      return types.length > 1 ? ['Todas', ...types] : [];
+    }
+    if (activeTab === 'tesouro') {
+      const types = Array.from(new Set(treasuryPositions.map(p => p.treasury_type).filter(Boolean))).sort();
+      return types.length > 1 ? ['Todas', ...types] : [];
+    }
+    return [];
+  }, [activeTab, positions, fiPositions, treasuryPositions]);
 
-  const filteredDividends = categoryFilteredDividends.filter(div => {
-    const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
-    if (!dateStr) return true;
-    const year = dateStr.substring(0, 4);
-    const month = dateStr.substring(5, 7);
-    return (filterDivYear === 'Todos' || year === filterDivYear) && (filterDivMonth === 'Todos' || month === filterDivMonth);
-  });
+  // Reset activeCategoryFilter to 'Todas' on tab change
+  React.useEffect(() => {
+    setActiveCategoryFilter('Todas');
+  }, [activeTab, setActiveCategoryFilter]);
 
-  const availableYears = Array.from(new Set(categoryFilteredDividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.cum_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  // Reset if activeCategoryFilter is no longer present in dynamicCategories
+  React.useEffect(() => {
+    if (activeCategoryFilter !== 'Todas' && dynamicCategories.length > 0 && !dynamicCategories.includes(activeCategoryFilter)) {
+      setActiveCategoryFilter('Todas');
+    }
+  }, [dynamicCategories, activeCategoryFilter, setActiveCategoryFilter]);
 
-  const includeFI = activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Renda Fixa';
-  const filteredFI = includeFI ? fiPositions : [];
+  const filteredPositions = React.useMemo(() => {
+    if (activeTab !== 'ativos' || activeCategoryFilter === 'Todas') {
+      return positions;
+    }
+    return positions.filter(pos => getAssetCategory(pos.type) === activeCategoryFilter);
+  }, [positions, activeTab, activeCategoryFilter]);
 
-  const includeTreasury = activeCategoryFilter === 'Todas' || activeCategoryFilter === 'Tesouro Direto';
-  const filteredTreasury = includeTreasury ? treasuryPositions : [];
+  const filteredTreasuryPositions = React.useMemo(() => {
+    if (activeTab !== 'tesouro' || activeCategoryFilter === 'Todas') {
+      return treasuryPositions;
+    }
+    return treasuryPositions.filter(p => p.treasury_type === activeCategoryFilter);
+  }, [treasuryPositions, activeTab, activeCategoryFilter]);
 
-  const eqCost = filteredPositions.reduce((acc, pos) => acc + pos.total_cost, 0);
-  const eqValue = filteredPositions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
+  const filteredDividends = React.useMemo(() => {
+    return dividends.filter(div => {
+      const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
+      if (!dateStr) return true;
+      const year = dateStr.substring(0, 4);
+      const month = dateStr.substring(5, 7);
+      return (filterDivYear === 'Todos' || year === filterDivYear) && (filterDivMonth === 'Todos' || month === filterDivMonth);
+    });
+  }, [dividends, filterDivYear, filterDivMonth]);
+
+  const availableYears = React.useMemo(() => {
+    return Array.from(new Set(dividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.cum_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  }, [dividends]);
+
+  const eqCost = positions.reduce((acc, pos) => acc + pos.total_cost, 0);
+  const eqValue = positions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
   
-  const fiCost = filteredFI.reduce((acc, pos) => acc + pos.total_invested, 0);
-  const fiValue = filteredFI.reduce((acc, pos) => acc + pos.net_value, 0);
+  const fiCost = fiPositions.reduce((acc, pos) => acc + pos.total_invested, 0);
+  const fiValue = fiPositions.reduce((acc, pos) => acc + pos.net_value, 0);
 
-  const tdCost = filteredTreasury.reduce((acc, pos) => acc + pos.total_invested, 0);
-  const tdValue = filteredTreasury.reduce((acc, pos) => acc + pos.net_value, 0);
+  const tdCost = treasuryPositions.reduce((acc, pos) => acc + pos.total_invested, 0);
+  const tdValue = treasuryPositions.reduce((acc, pos) => acc + pos.net_value, 0);
 
   const totalCost = eqCost + fiCost + tdCost;
   const currentValue = eqValue + fiValue + tdValue;
@@ -136,22 +160,29 @@ function PortfolioContent() {
   
   const twelveMonthsAgo = new Date();
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const divs12m = categoryFilteredDividends.filter(div => {
+  const divs12m = dividends.filter(div => {
     const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
     return dateStr && new Date(dateStr) >= twelveMonthsAgo;
   });
   const sumDivs12m = divs12m.reduce((acc, div) => acc + ((div as any).total_value || div.net_amount || 0), 0);
   const avgDividends12m = sumDivs12m / 12;
 
-  const availableCategories = Array.from(new Set(positions.map(pos => getAssetCategory(pos.type)))).sort();
-  const filterCategories = ['Todas'];
-  if (positions.length > 0) filterCategories.push('Renda Variável', ...availableCategories);
-  if (fiPositions.length > 0) {
-    filterCategories.push('Renda Fixa');
-  }
-  if (treasuryPositions.length > 0) {
-    filterCategories.push('Tesouro Direto');
-  }
+  const getCategoryLabel = (cat: string) => {
+    if (cat === 'Todas') return 'Todas';
+    if (activeTab === 'tesouro') {
+      const map: Record<string, string> = {
+        SELIC: 'Tesouro Selic',
+        PREFIXADO: 'Prefixado',
+        'IPCA+': 'IPCA+',
+        IPCA: 'IPCA+',
+      };
+      return map[cat] || cat;
+    }
+    if (activeTab === 'renda-fixa') {
+      if (cat.toUpperCase() === 'DEBENTURE') return 'Debêntures';
+    }
+    return cat;
+  };
 
   return (
     <div className="app-layout">
@@ -171,18 +202,6 @@ function PortfolioContent() {
           handleSetDefaultPortfolio={handleSetDefaultPortfolio}
         />
 
-        <div className="flex-row gap-sm mb-lg flex-wrap">
-          {filterCategories.map(cat => (
-            <button
-              key={cat} onClick={() => setActiveCategoryFilter(cat)}
-              className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
-              style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'var(--accent-bg)' : 'var(--panel-bg)', color: activeCategoryFilter === cat ? 'var(--accent-color)' : 'var(--text-secondary)' }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
         {isLoadingDetails ? (
           <div className="glass-panel flex-row items-center justify-center" style={{ minHeight: '300px' }}>
             <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 35, height: 35 }}></span>
@@ -190,6 +209,20 @@ function PortfolioContent() {
         ) : (
           <div className="flex-col gap-xl">
             <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} />
+
+            {dynamicCategories.length > 1 && (
+              <div className="flex-row gap-sm flex-wrap" data-testid="contextual-filter-pills" aria-label="Filtro de categorias">
+                {dynamicCategories.map(cat => (
+                  <button
+                    key={cat} onClick={() => setActiveCategoryFilter(cat)}
+                    className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
+                    style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'var(--accent-bg)' : 'var(--panel-bg)', color: activeCategoryFilter === cat ? 'var(--accent-color)' : 'var(--text-secondary)' }}
+                  >
+                    {getCategoryLabel(cat)}
+                  </button>
+                ))}
+              </div>
+            )}
 
           {activeTab === 'ativos' && (
             <div className="flex-col gap-xl w-full">
@@ -199,29 +232,25 @@ function PortfolioContent() {
                     <h3 className="card-title">📈 Evolução da Renda Variável</h3>
                     <p className="text-xs text-secondary mt-sm">Valores ponderados na moeda base ({kpiCurrency})</p>
                   </div>
-                  {activeCategoryFilter !== 'Renda Fixa' && (
-                    <>
-                    <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
-                      <select 
-                        value={filterChartTicker} 
-                        onChange={(e) => setFilterChartTicker(e.target.value)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.5rem', fontWeight: 600 }}
-                      >
-                        <option value="Todos" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>Todos os Tickers</option>
-                        {Array.from(new Set(filteredPositions.map(p => p.ticker))).sort().map(t => (
-                          <option key={t} value={t} style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
-                      {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-                        <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
-                          {p}
-                        </button>
+                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                    <select 
+                      value={filterChartTicker} 
+                      onChange={(e) => setFilterChartTicker(e.target.value)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: '0 0.5rem', fontWeight: 600 }}
+                    >
+                      <option value="Todos" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>Todos os Tickers</option>
+                      {Array.from(new Set(filteredPositions.map(p => p.ticker))).sort().map(t => (
+                        <option key={t} value={t} style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>{t}</option>
                       ))}
-                    </div>
-                    </>
-                  )}
+                    </select>
+                  </div>
+                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                    {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
+                      <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {isLoadingPerformance ? (
@@ -244,20 +273,20 @@ function PortfolioContent() {
 
           {activeTab === 'operacoes' && (
             <div className="flex-col gap-xl w-full">
-              <TransactionHistory transactions={filteredTransactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} kpiCurrency={kpiCurrency} />
+              <TransactionHistory transactions={transactions} filterTxTicker={filterTxTicker} setFilterTxTicker={setFilterTxTicker} handleEditTransaction={handleEditTransaction} handleDeleteTransaction={handleDeleteTransaction} onLaunchOperation={() => { setEditingTxId(null); setShowTxModal(true); }} kpiCurrency={kpiCurrency} />
             </div>
           )}
 
           {activeTab === 'proventos' && (
-            <DividendsHistory dividends={filteredDividends} allDividends={categoryFilteredDividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
+            <DividendsHistory dividends={filteredDividends} allDividends={dividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
           )}
 
           {activeTab === 'analise' && (
             <PortfolioAnalysis
-              positions={filteredPositions}
-              dividends={categoryFilteredDividends}
-              fiPositions={filteredFI}
-              treasuryPositions={filteredTreasury}
+              positions={positions}
+              dividends={dividends}
+              fiPositions={fiPositions}
+              treasuryPositions={treasuryPositions}
               performanceData={performanceData}
               kpiCurrency={kpiCurrency}
             />
@@ -265,9 +294,9 @@ function PortfolioContent() {
 
           {activeTab === 'diario' && (
             <DailyReport
-              positions={filteredPositions}
-              fiPositions={filteredFI}
-              treasuryPositions={filteredTreasury}
+              positions={positions}
+              fiPositions={fiPositions}
+              treasuryPositions={treasuryPositions}
               dividends={dividends}
               kpiCurrency={kpiCurrency}
               lastFetchedAt={lastFetchedAt}
@@ -289,13 +318,13 @@ function PortfolioContent() {
           )}
 
           {activeTab === 'renda-fixa' && (
-            <FixedIncomeTab portfolioId={activePortfolioId} onLaunchOperation={() => setShowFIModal(true)} />
+            <FixedIncomeTab portfolioId={activePortfolioId} onLaunchOperation={() => setShowFIModal(true)} categoryFilter={activeCategoryFilter} />
           )}
 
           {activeTab === 'tesouro' && (
             <TreasuryTab
               portfolioId={activePortfolioId}
-              positions={treasuryPositions}
+              positions={filteredTreasuryPositions}
               isLoadingPositions={isLoadingTreasury}
               onRefresh={async () => { await loadTreasuryPositions(activePortfolioId); }}
             />
