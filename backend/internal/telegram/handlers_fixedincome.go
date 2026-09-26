@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -13,6 +14,11 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	defer c.Respond()
 	if h.fiSvc == nil {
 		return c.Edit("⚠️ Módulo de Renda Fixa não está ativo.")
+	}
+
+	page := 0
+	if rawData := c.Data(); rawData != "" {
+		fmt.Sscanf(rawData, "%d", &page)
 	}
 
 	userIDStr, err := h.getUserID(c)
@@ -50,18 +56,8 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("🏛️ *Renda Fixa & Tesouro: %s*\n\n", portfolioName)
-	msg += p.Sprintf("💰 Valor Líquido: *R$ %.2f*\n", totalLiquido)
-	msg += p.Sprintf("📈 Valor Bruto: R$ %.2f\n", totalBruto)
+	var items []string
 
-	lucro := totalLiquido - totalCusto
-	lucroPct := 0.0
-	if totalCusto > 0 {
-		lucroPct = (lucro / totalCusto) * 100
-	}
-	msg += p.Sprintf("⚖️ Lucro Líquido: R$ %.2f (%.2f%%)\n\n", lucro, lucroPct)
-
-	msg += "*Minhas Posições:*\n"
 	for _, pos := range positions {
 		status := ""
 		if pos.IsMatured {
@@ -77,8 +73,9 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 			taxa = p.Sprintf("%.2f%% a.a.", pos.Asset.Rate)
 		}
 
-		msg += p.Sprintf("• `%s %s` - %s\n", pos.Asset.Institution, pos.Asset.Type, taxa)
-		msg += p.Sprintf("  Líquido: R$ %.2f (+%.2f%%)%s\n", pos.NetValue, pos.NetReturnPercent, status)
+		line := p.Sprintf("• `%s %s` - %s\n  Líquido: R$ %.2f (+%.2f%%)%s",
+			pos.Asset.Institution, pos.Asset.Type, taxa, pos.NetValue, pos.NetReturnPercent, status)
+		items = append(items, line)
 	}
 
 	for _, pos := range treasuryPositions {
@@ -94,14 +91,65 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 			netReturnPct = ((pos.NetValue - pos.TotalInvested) / pos.TotalInvested) * 100
 		}
 
-		msg += p.Sprintf("• `Tesouro %s` (%.4f un.)\n", pos.TreasuryType, pos.Quantity)
-		msg += p.Sprintf("  Líquido: R$ %.2f (%+.2f%%)%s\n", pos.NetValue, netReturnPct, status)
+		line := p.Sprintf("• `Tesouro %s` (%.4f un.)\n  Líquido: R$ %.2f (%+.2f%%)%s",
+			pos.TreasuryType, pos.Quantity, pos.NetValue, netReturnPct, status)
+		items = append(items, line)
+	}
+
+	pageSize := 5
+	totalPages := (len(items) + pageSize - 1) / pageSize
+	if page < 0 {
+		page = 0
+	}
+	if page >= totalPages {
+		page = totalPages - 1
+	}
+	start := page * pageSize
+	end := start + pageSize
+	if end > len(items) {
+		end = len(items)
+	}
+
+	msg := p.Sprintf("🏛️ *Renda Fixa & Tesouro: %s*\n\n", escapeMarkdown(portfolioName))
+	msg += p.Sprintf("💰 Valor Líquido: *R$ %.2f*\n", totalLiquido)
+	msg += p.Sprintf("📈 Valor Bruto: R$ %.2f\n", totalBruto)
+
+	lucro := totalLiquido - totalCusto
+	lucroPct := 0.0
+	if totalCusto > 0 {
+		lucroPct = (lucro / totalCusto) * 100
+	}
+	msg += p.Sprintf("⚖️ Lucro Líquido: R$ %.2f (%.2f%%)\n\n", lucro, lucroPct)
+
+	if totalPages > 1 {
+		msg += p.Sprintf("*Minhas Posições* (Página %d de %d):\n", page+1, totalPages)
+	} else {
+		msg += "*Minhas Posições:*\n"
+	}
+
+	for _, item := range items[start:end] {
+		msg += item + "\n"
 	}
 
 	menu := &telebot.ReplyMarkup{}
-	btnRefresh := menu.Data("🔄 Atualizar", "btn_renda_fixa")
+	var rows []telebot.Row
+
+	var navBtns []telebot.Btn
+	if page > 0 {
+		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_renda_fixa", fmt.Sprintf("%d", page-1)))
+	}
+	if end < len(items) {
+		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_renda_fixa", fmt.Sprintf("%d", page+1)))
+	}
+	if len(navBtns) > 0 {
+		rows = append(rows, menu.Row(navBtns...))
+	}
+
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_renda_fixa", fmt.Sprintf("%d", page))
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
-	menu.Inline(menu.Row(btnRefresh), menu.Row(btnBack))
+	rows = append(rows, menu.Row(btnRefresh), menu.Row(btnBack))
+
+	menu.Inline(rows...)
 
 	err = c.Edit(msg, telebot.ModeMarkdown, menu)
 	if err != nil && strings.Contains(err.Error(), "message is not modified") {
