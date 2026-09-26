@@ -217,4 +217,70 @@ func TestAlertWorker_process(t *testing.T) {
 		repo.AssertExpectations(t)
 		tg.AssertExpectations(t)
 	})
+
+	t.Run("Multiple Alerts Same Ticker - Groups and Calls GetQuote Once", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+		tg := new(MockTelegramService)
+
+		chatId := int64(123)
+		alerts := []*Alert{
+			{ID: "1", Ticker: "PETR4", TargetPrice: 30.0, Condition: "ABOVE", TelegramChatID: &chatId},
+			{ID: "2", Ticker: "PETR4", TargetPrice: 40.0, Condition: "BELOW", TelegramChatID: &chatId},
+			{ID: "3", Ticker: "PETR4", TargetPrice: 50.0, Condition: "ABOVE", TelegramChatID: &chatId},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		// Crucial assertion: GetQuote called EXACTLY ONCE for PETR4 despite 3 alerts
+		ms.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Price: 35.0}, nil).Once()
+		repo.On("MarkAlertTriggered", mock.Anything, "1").Return(nil).Once()
+		repo.On("MarkAlertTriggered", mock.Anything, "2").Return(nil).Once()
+		tg.On("SendAlertMessage", int64(123), mock.Anything, "PETR4", mock.Anything, 35.0, 30.0, "ABOVE", mock.Anything).Return(nil).Once()
+		tg.On("SendAlertMessage", int64(123), mock.Anything, "PETR4", mock.Anything, 35.0, 40.0, "BELOW", mock.Anything).Return(nil).Once()
+
+		w := NewAlertWorker(repo, ms, tg)
+		w.CheckActiveAlerts(context.Background())
+		time.Sleep(15 * time.Millisecond)
+
+		repo.AssertExpectations(t)
+		ms.AssertExpectations(t)
+		tg.AssertExpectations(t)
+	})
+
+	t.Run("Quote Nil", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+		tg := new(MockTelegramService)
+
+		alerts := []*Alert{
+			{ID: "1", Ticker: "PETR4", TargetPrice: 30.0, Condition: "ABOVE"},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		ms.On("GetQuote", mock.Anything, "PETR4").Return((*market.Quote)(nil), nil).Once()
+
+		w := NewAlertWorker(repo, ms, tg)
+		w.CheckActiveAlerts(context.Background())
+
+		repo.AssertExpectations(t)
+		ms.AssertExpectations(t)
+	})
+
+	t.Run("Telegram Service Nil", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+
+		chatId := int64(123)
+		alerts := []*Alert{
+			{ID: "1", Ticker: "PETR4", TargetPrice: 30.0, Condition: "ABOVE", TelegramChatID: &chatId},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		ms.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Price: 35.0}, nil).Once()
+		repo.On("MarkAlertTriggered", mock.Anything, "1").Return(nil).Once()
+
+		w := NewAlertWorker(repo, ms, nil)
+		w.CheckActiveAlerts(context.Background())
+		time.Sleep(10 * time.Millisecond)
+
+		repo.AssertExpectations(t)
+		ms.AssertExpectations(t)
+	})
 }

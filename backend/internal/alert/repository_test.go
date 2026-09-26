@@ -2,9 +2,11 @@ package alert
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,97 +44,274 @@ func TestRepository_CreateAlert(t *testing.T) {
 }
 
 func TestRepository_GetAlertsByUserID(t *testing.T) {
-	mock, repo := setupRepoTest(t)
-	defer mock.Close()
+	t.Run("success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
 
-	now := time.Now()
-	mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
-		WithArgs("u1").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at"}).
-			AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now))
+		now := time.Now()
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WithArgs("u1").
+			WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at"}).
+				AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now))
 
-	alerts, err := repo.GetAlertsByUserID(context.Background(), "u1")
-	assert.NoError(t, err)
-	assert.Len(t, alerts, 1)
+		alerts, err := repo.GetAlertsByUserID(context.Background(), "u1")
+		assert.NoError(t, err)
+		assert.Len(t, alerts, 1)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("query error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WithArgs("u1").
+			WillReturnError(errors.New("db error"))
+
+		alerts, err := repo.GetAlertsByUserID(context.Background(), "u1")
+		assert.Error(t, err)
+		assert.Nil(t, alerts)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("scan error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WithArgs("u1").
+			WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("1"))
+
+		alerts, err := repo.GetAlertsByUserID(context.Background(), "u1")
+		assert.Error(t, err)
+		assert.Nil(t, alerts)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRepository_GetAlertByID(t *testing.T) {
-	mock, repo := setupRepoTest(t)
-	defer mock.Close()
+	t.Run("success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
 
-	now := time.Now()
-	mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
-		WithArgs("1", "u1").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at"}).
-			AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now))
+		now := time.Now()
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WithArgs("1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at"}).
+				AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now))
 
-	alert, err := repo.GetAlertByID(context.Background(), "1", "u1")
-	assert.NoError(t, err)
-	assert.NotNil(t, alert)
-	assert.Equal(t, "1", alert.ID)
+		alert, err := repo.GetAlertByID(context.Background(), "1", "u1")
+		assert.NoError(t, err)
+		assert.NotNil(t, alert)
+		assert.Equal(t, "1", alert.ID)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WithArgs("1", "u1").
+			WillReturnError(pgx.ErrNoRows)
+
+		alert, err := repo.GetAlertByID(context.Background(), "1", "u1")
+		assert.NoError(t, err)
+		assert.Nil(t, alert)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("query error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WithArgs("1", "u1").
+			WillReturnError(errors.New("db error"))
+
+		alert, err := repo.GetAlertByID(context.Background(), "1", "u1")
+		assert.Error(t, err)
+		assert.Nil(t, alert)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRepository_DeleteAlert(t *testing.T) {
-	mock, repo := setupRepoTest(t)
-	defer mock.Close()
+	t.Run("success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
 
-	mock.ExpectExec("DELETE FROM alert").
-		WithArgs("1", "u1").
-		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+		mock.ExpectExec("DELETE FROM alert").
+			WithArgs("1", "u1").
+			WillReturnResult(pgxmock.NewResult("DELETE", 1))
 
-	err := repo.DeleteAlert(context.Background(), "1", "u1")
-	assert.NoError(t, err)
+		err := repo.DeleteAlert(context.Background(), "1", "u1")
+		assert.NoError(t, err)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("exec error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectExec("DELETE FROM alert").
+			WithArgs("1", "u1").
+			WillReturnError(errors.New("db error"))
+
+		err := repo.DeleteAlert(context.Background(), "1", "u1")
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectExec("DELETE FROM alert").
+			WithArgs("1", "u1").
+			WillReturnResult(pgxmock.NewResult("DELETE", 0))
+
+		err := repo.DeleteAlert(context.Background(), "1", "u1")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "alerta não encontrado")
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRepository_ToggleAlertStatus(t *testing.T) {
-	mock, repo := setupRepoTest(t)
-	defer mock.Close()
+	t.Run("success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
 
-	mock.ExpectQuery("UPDATE alert").
-		WithArgs("1", "u1").
-		WillReturnRows(pgxmock.NewRows([]string{"status"}).AddRow("DISABLED"))
+		mock.ExpectQuery("UPDATE alert").
+			WithArgs("1", "u1").
+			WillReturnRows(pgxmock.NewRows([]string{"status"}).AddRow("DISABLED"))
 
-	status, err := repo.ToggleAlertStatus(context.Background(), "1", "u1")
-	assert.NoError(t, err)
-	assert.Equal(t, "DISABLED", status)
+		status, err := repo.ToggleAlertStatus(context.Background(), "1", "u1")
+		assert.NoError(t, err)
+		assert.Equal(t, "DISABLED", status)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("UPDATE alert").
+			WithArgs("1", "u1").
+			WillReturnError(pgx.ErrNoRows)
+
+		status, err := repo.ToggleAlertStatus(context.Background(), "1", "u1")
+		assert.Error(t, err)
+		assert.Empty(t, status)
+		assert.Contains(t, err.Error(), "alerta não encontrado")
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("query error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("UPDATE alert").
+			WithArgs("1", "u1").
+			WillReturnError(errors.New("db error"))
+
+		status, err := repo.ToggleAlertStatus(context.Background(), "1", "u1")
+		assert.Error(t, err)
+		assert.Empty(t, status)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRepository_GetActiveAlerts(t *testing.T) {
-	mock, repo := setupRepoTest(t)
-	defer mock.Close()
+	t.Run("success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
 
-	now := time.Now()
-	mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at", "user_name", "telegram_chat_id"}).
-			AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now, "User", func() *int64 { v := int64(123); return &v }()))
+		now := time.Now()
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "asset_id", "ticker", "name", "currency", "target_price", "condition", "status", "triggered_at", "created_at", "user_name", "telegram_chat_id"}).
+				AddRow("1", "u1", "a1", "AAPL", "Apple", "USD", 150.0, "ABOVE", "ACTIVE", &now, now, "User", func() *int64 { v := int64(123); return &v }()))
 
-	alerts, err := repo.GetActiveAlerts(context.Background())
-	assert.NoError(t, err)
-	assert.Len(t, alerts, 1)
+		alerts, err := repo.GetActiveAlerts(context.Background())
+		assert.NoError(t, err)
+		assert.Len(t, alerts, 1)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("query error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WillReturnError(errors.New("db error"))
+
+		alerts, err := repo.GetActiveAlerts(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, alerts)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("scan error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery("SELECT a.id, a.user_id, a.asset_id").
+			WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("1"))
+
+		alerts, err := repo.GetActiveAlerts(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, alerts)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRepository_MarkAlertTriggered(t *testing.T) {
-	mock, repo := setupRepoTest(t)
-	defer mock.Close()
+	t.Run("success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
 
-	mock.ExpectExec("UPDATE alert").
-		WithArgs("1").
-		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+		mock.ExpectExec("UPDATE alert").
+			WithArgs("1").
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
-	err := repo.MarkAlertTriggered(context.Background(), "1")
-	assert.NoError(t, err)
+		err := repo.MarkAlertTriggered(context.Background(), "1")
+		assert.NoError(t, err)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("exec error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectExec("UPDATE alert").
+			WithArgs("1").
+			WillReturnError(errors.New("db error"))
+
+		err := repo.MarkAlertTriggered(context.Background(), "1")
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("rows affected zero", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectExec("UPDATE alert").
+			WithArgs("1").
+			WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+		err := repo.MarkAlertTriggered(context.Background(), "1")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "não pôde ser disparado")
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestRepository_GetAssetByTicker(t *testing.T) {

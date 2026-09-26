@@ -494,6 +494,106 @@ func TestHandlers_HistoryAndFixedIncome(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, sentMsg, "Tesouro SELIC")
 	})
+
+	t.Run("HandleFixedIncome - pagination page 0 and page 1", func(t *testing.T) {
+		mCtx0 := new(MockTelebotContext)
+		mCtx0.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx0.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx0.On("Data").Return("0").Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
+			{ID: "p1", Name: "Minha_Carteira*"},
+		}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		fiPositions := []fixedincome.Position{
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B1", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B2", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B3", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B4", Type: "CDB", DebtType: "PRE", Rate: 10}},
+		}
+		trPositions := []fixedincome.TreasuryPosition{
+			{TreasuryType: "SELIC", GrossValue: 100, NetValue: 100, TotalInvested: 90, Quantity: 1},
+			{TreasuryType: "IPCA", GrossValue: 100, NetValue: 100, TotalInvested: 90, Quantity: 1},
+		}
+
+		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return(trPositions, nil).Once()
+
+		var sentMsg0 string
+		mCtx0.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg0 = msg
+			return strings.Contains(msg, "Página 1 de 2")
+		}), mock.Anything).Return(nil).Once()
+
+		err := h.HandleFixedIncome(mCtx0)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg0, "Página 1 de 2")
+
+		// Page 1
+		mCtx1 := new(MockTelebotContext)
+		mCtx1.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx1.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx1.On("Data").Return("1").Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
+			{ID: "p1", Name: "Minha_Carteira*"},
+		}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return(trPositions, nil).Once()
+
+		var sentMsg1 string
+		mCtx1.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg1 = msg
+			return strings.Contains(msg, "Página 2 de 2")
+		}), mock.Anything).Return(nil).Once()
+
+		err = h.HandleFixedIncome(mCtx1)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg1, "Página 2 de 2")
+	})
+
+	t.Run("HandleFixedIncome - pagination bounds clamping", func(t *testing.T) {
+		fiPositions := []fixedincome.Position{
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B1", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B2", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B3", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B4", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B5", Type: "CDB", DebtType: "PRE", Rate: 10}},
+			{GrossValue: 100, NetValue: 100, TotalInvested: 90, Asset: fixedincome.Asset{Institution: "B6", Type: "CDB", DebtType: "PRE", Rate: 10}},
+		}
+
+		// Negative page clamped to 0
+		mCtxNeg := new(MockTelebotContext)
+		mCtxNeg.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtxNeg.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxNeg.On("Data").Return("-1").Once()
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
+		mCtxNeg.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Página 1 de 2")
+		}), mock.Anything).Return(nil).Once()
+		err := h.HandleFixedIncome(mCtxNeg)
+		assert.NoError(t, err)
+
+		// Overflow page clamped to totalPages - 1
+		mCtxOver := new(MockTelebotContext)
+		mCtxOver.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtxOver.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxOver.On("Data").Return("99").Once()
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		fiSvc.On("GetPortfolioPositions", mock.Anything, "p1").Return(fiPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
+		mCtxOver.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Página 2 de 2")
+		}), mock.Anything).Return(nil).Once()
+		err = h.HandleFixedIncome(mCtxOver)
+		assert.NoError(t, err)
+	})
 }
 
 func TestHandlers_Operations(t *testing.T) {
