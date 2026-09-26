@@ -98,7 +98,7 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
               {sortedPositions.map((pos) => {
                 const isPos = (pos.profit_loss || 0) >= 0;
                 return (
-                  <tr key={pos.asset_id}>
+                  <tr key={pos.asset_id || pos.ticker}>
                     <td title={pos.name} style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'help' }}>
                       <span className="font-bold text-accent">{pos.ticker}</span>
                     </td>

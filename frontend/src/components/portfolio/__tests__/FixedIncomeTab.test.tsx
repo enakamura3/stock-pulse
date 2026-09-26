@@ -18,6 +18,15 @@ vi.mock('@/lib/api', () => ({
   apiFetch: vi.fn(),
 }));
 
+vi.mock('@/components/ThemeProvider', () => ({
+  useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn(), setTheme: vi.fn() }),
+  ThemeProvider: ({ children }: any) => <>{children}</>,
+}));
+
+vi.mock('@/components/PortfolioChart', () => ({
+  default: () => <div data-testid="portfolio-chart">Chart</div>,
+}));
+
 describe('FixedIncomeTab Component', () => {
   const mockPositions = [
     {
@@ -481,5 +490,46 @@ describe('FixedIncomeTab Component', () => {
     const form = screen.getByRole('button', { name: /Confirmar Resgate/i }).closest('form')!;
     fireEvent.submit(form);
     expect(window.alert).toHaveBeenCalledWith('Informe um valor válido para o resgate.');
+  });
+
+  it('filters positions according to categoryFilter prop', async () => {
+    // When categoryFilter is CDB
+    const { rerender } = render(
+      <FixedIncomeTab portfolioId="p1" onLaunchOperation={vi.fn()} categoryFilter="CDB" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Banco Inter')).toBeInTheDocument();
+      expect(screen.queryByText('XP Investimentos')).not.toBeInTheDocument();
+    });
+
+    // When categoryFilter is LCI
+    rerender(
+      <FixedIncomeTab portfolioId="p1" onLaunchOperation={vi.fn()} categoryFilter="LCI" />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('Banco Inter')).not.toBeInTheDocument();
+      expect(screen.getByText('XP Investimentos')).toBeInTheDocument();
+    });
+
+    // When categoryFilter has no matches
+    rerender(
+      <FixedIncomeTab portfolioId="p1" onLaunchOperation={vi.fn()} categoryFilter="CRI" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Nenhuma aplicação de Renda Fixa encontrada para a categoria "CRI"/i)).toBeInTheDocument();
+    });
+
+    // When categoryFilter is "Todas"
+    rerender(
+      <FixedIncomeTab portfolioId="p1" onLaunchOperation={vi.fn()} categoryFilter="Todas" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Banco Inter')).toBeInTheDocument();
+      expect(screen.getByText('XP Investimentos')).toBeInTheDocument();
+    });
   });
 });

@@ -183,7 +183,7 @@ export default function DailyReportTable({
 
                 return (
                   <tr
-                    key={pos.asset_id}
+                    key={pos.asset_id || pos.ticker}
                     tabIndex={0}
                     aria-label={`Ver ${pos.ticker} no Monitoramento`}
                     onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
