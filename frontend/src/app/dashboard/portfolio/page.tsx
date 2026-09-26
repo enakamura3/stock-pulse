@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { PortfolioProvider, usePortfolio } from '@/context/PortfolioContext';
-import { getAssetCategory } from '@/components/portfolio/helpers';
+import { getAssetCategory, getDividendAssetCategory } from '@/components/portfolio/helpers';
 import { apiFetch } from '@/lib/api';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
@@ -88,8 +88,12 @@ function PortfolioContent() {
       const types = Array.from(new Set(treasuryPositions.map(p => p.treasury_type).filter(Boolean))).sort();
       return types.length > 1 ? ['Todas', ...types] : [];
     }
+    if (activeTab === 'proventos') {
+      const cats = Array.from(new Set(dividends.map(d => getDividendAssetCategory(d)).filter(c => c && c !== 'Outros' && c !== 'Desconhecido'))).sort();
+      return cats.length > 1 ? ['Todas', ...cats] : [];
+    }
     return [];
-  }, [activeTab, positions, fiPositions, treasuryPositions]);
+  }, [activeTab, positions, fiPositions, treasuryPositions, dividends]);
 
   // Reset activeCategoryFilter to 'Todas' on tab change
   React.useEffect(() => {
@@ -117,19 +121,26 @@ function PortfolioContent() {
     return treasuryPositions.filter(p => p.treasury_type === activeCategoryFilter);
   }, [treasuryPositions, activeTab, activeCategoryFilter]);
 
+  const categoryFilteredDividends = React.useMemo(() => {
+    if (activeTab !== 'proventos' || activeCategoryFilter === 'Todas') {
+      return dividends;
+    }
+    return dividends.filter(div => getDividendAssetCategory(div) === activeCategoryFilter);
+  }, [dividends, activeTab, activeCategoryFilter]);
+
   const filteredDividends = React.useMemo(() => {
-    return dividends.filter(div => {
+    return categoryFilteredDividends.filter(div => {
       const dateStr = (div.payment_date && !div.payment_date.startsWith('0001')) ? div.payment_date : div.cum_date;
       if (!dateStr) return true;
       const year = dateStr.substring(0, 4);
       const month = dateStr.substring(5, 7);
       return (filterDivYear === 'Todos' || year === filterDivYear) && (filterDivMonth === 'Todos' || month === filterDivMonth);
     });
-  }, [dividends, filterDivYear, filterDivMonth]);
+  }, [categoryFilteredDividends, filterDivYear, filterDivMonth]);
 
   const availableYears = React.useMemo(() => {
-    return Array.from(new Set(dividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.cum_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
-  }, [dividends]);
+    return Array.from(new Set(categoryFilteredDividends.map(d => ((d.payment_date && !d.payment_date.startsWith('0001') ? d.payment_date : d.cum_date) || '').substring(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  }, [categoryFilteredDividends]);
 
   const eqCost = positions.reduce((acc, pos) => acc + pos.total_cost, 0);
   const eqValue = positions.reduce((acc, pos) => acc + (pos.current_value || 0), 0);
@@ -278,7 +289,7 @@ function PortfolioContent() {
           )}
 
           {activeTab === 'proventos' && (
-            <DividendsHistory dividends={filteredDividends} allDividends={dividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
+            <DividendsHistory dividends={filteredDividends} allDividends={categoryFilteredDividends} filterDivYear={filterDivYear} setFilterDivYear={setFilterDivYear} filterDivMonth={filterDivMonth} setFilterDivMonth={setFilterDivMonth} availableYears={availableYears} isLoadingDividends={isLoadingDividends} />
           )}
 
           {activeTab === 'analise' && (

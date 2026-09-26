@@ -3,6 +3,7 @@ import {
   formatPercentage,
   formatMoney,
   getAssetCategory,
+  getDividendAssetCategory,
   formatQuantity,
   calculateDailyFixedIncomeRate,
   calculateEstimatedDailyGain,
@@ -72,6 +73,18 @@ describe('Portfolio Helpers', () => {
       expect(getAssetCategory('CDB')).toBe('Renda Fixa');
       expect(getAssetCategory('TESOURO')).toBe('Renda Fixa');
       expect(getAssetCategory('UNKNOWN')).toBe('Desconhecido');
+    });
+  });
+
+  describe('getDividendAssetCategory', () => {
+    it('correctly maps dividend asset categories and handles Tesouro, accrued, and fallback', () => {
+      expect(getDividendAssetCategory({ asset_type: 'STOCK_BR' })).toBe('Ações (B3)');
+      expect(getDividendAssetCategory({ asset_type: 'FII' })).toBe('FIIs');
+      expect(getDividendAssetCategory({ asset_type: 'TESOURO' })).toBe('Tesouro Direto');
+      expect(getDividendAssetCategory({ asset_type: 'CDB', is_accrued: true })).toBe('Renda Fixa');
+      expect(getDividendAssetCategory({ asset_type: 'UNKNOWN', is_accrued: true })).toBe('Renda Fixa');
+      expect(getDividendAssetCategory({ asset_type: 'UNKNOWN', is_accrued: false })).toBe('Outros');
+      expect(getDividendAssetCategory({ asset_type: '', is_accrued: false })).toBe('Outros');
     });
   });
 

@@ -165,8 +165,8 @@ describe('PortfolioPage Contextual Filters', () => {
     expect(mockSetActiveCategoryFilter).toHaveBeenCalledWith('FIIs');
   });
 
-  it('auto-hides filter pills on operacoes, proventos, analise, and diario tabs', () => {
-    const tabs = ['operacoes', 'proventos', 'analise', 'diario'] as const;
+  it('auto-hides filter pills on operacoes, analise, and diario tabs', () => {
+    const tabs = ['operacoes', 'analise', 'diario'] as const;
 
     for (const tab of tabs) {
       (usePortfolio as any).mockReturnValue({
@@ -185,6 +185,42 @@ describe('PortfolioPage Contextual Filters', () => {
       expect(screen.queryByTestId('contextual-filter-pills')).not.toBeInTheDocument();
       unmount();
     }
+  });
+
+  it('dynamically displays asset categories on proventos tab when multiple categories exist and filters by category', () => {
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'proventos',
+      activeCategoryFilter: 'FIIs',
+      dividends: [
+        { id: '1', ticker: 'PETR4', asset_type: 'STOCK_BR', cum_date: '2026-05-01', payment_date: '2026-05-10', gross_amount: 100, net_amount: 100 },
+        { id: '2', ticker: 'HGLG11', asset_type: 'FII', cum_date: '2026-06-01', payment_date: '2026-06-15', gross_amount: 50, net_amount: 50 },
+      ],
+    });
+
+    render(<PortfolioPage />);
+    const filterBar = screen.getByTestId('contextual-filter-pills');
+    expect(within(filterBar).getByRole('button', { name: 'Todas' })).toBeInTheDocument();
+    expect(within(filterBar).getByRole('button', { name: 'Ações (B3)' })).toBeInTheDocument();
+    expect(within(filterBar).getByRole('button', { name: 'FIIs' })).toBeInTheDocument();
+
+    const acoesBtn = within(filterBar).getByRole('button', { name: 'Ações (B3)' });
+    fireEvent.click(acoesBtn);
+    expect(mockSetActiveCategoryFilter).toHaveBeenCalledWith('Ações (B3)');
+  });
+
+  it('auto-hides proventos filter pills when user has only 1 dividend category', () => {
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'proventos',
+      dividends: [
+        { id: '1', ticker: 'PETR4', asset_type: 'STOCK_BR', cum_date: '2026-05-01', payment_date: '2026-05-10', gross_amount: 100, net_amount: 100 },
+        { id: '2', ticker: 'VALE3', asset_type: 'STOCK_BR', cum_date: '2026-06-01', payment_date: '2026-06-15', gross_amount: 200, net_amount: 200 },
+      ],
+    });
+
+    render(<PortfolioPage />);
+    expect(screen.queryByTestId('contextual-filter-pills')).not.toBeInTheDocument();
   });
 
   it('dynamically displays fixed income categories on renda-fixa tab when multiple types exist', () => {
