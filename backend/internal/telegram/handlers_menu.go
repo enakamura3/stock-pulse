@@ -63,6 +63,8 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 	btnAlertas := menu.Data("🔔 Meus Alertas", "btn_alerts")
 	btnCotacao := menu.Data("📈 Cotação Rápida", "btn_cotacao")
 
+	btnHelp := menu.Data("❓ Ajuda e Comandos", "btn_help")
+
 	rows := []telebot.Row{
 		menu.Row(btnResumo),
 		menu.Row(btnProventos),
@@ -77,16 +79,38 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 		btnTrocarCarteira := menu.Data("🔄 Trocar Carteira", "btn_change_portfolio")
 		rows = append(rows, menu.Row(btnTrocarCarteira))
 	}
+	rows = append(rows, menu.Row(btnHelp))
 
 	menu.Inline(rows...)
 
 	_, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
-	msgText := fmt.Sprintf("🏢 *Carteira Ativa:* %s\nEscolha uma opção:", portfolioName)
+	msgText := fmt.Sprintf("🏢 *Carteira Ativa:* %s\nEscolha uma opção:", escapeMarkdown(portfolioName))
 
 	if c.Callback() != nil {
 		return c.Edit(msgText, telebot.ModeMarkdown, menu)
 	}
 	return c.Send(msgText, telebot.ModeMarkdown, menu)
+}
+
+func (h *Handlers) HandleHelp(c telebot.Context) error {
+	msg := "🤖 *Comandos do Stock Pulse Bot*\n\n"
+	msg += "• /menu — Abre o menu principal interativo\n"
+	msg += "• /cotacao `<ticker>` — Consulta cotação rápida (ex: `/cotacao PETR4`)\n"
+	msg += "• /analise `<ticker>` — Análise fundamentalista completa (ex: `/analise WEGE3`)\n"
+	msg += "• /agenda — Exibe os proventos previstos para os próximos 30 dias\n"
+	msg += "• /desfazer — Desfaz a última transação lançada na carteira ativa\n"
+	msg += "• /help — Exibe esta mensagem de ajuda\n\n"
+	msg += "💡 *Dica:* Você também pode usar todos os recursos clicando nos botões interativos do /menu."
+
+	menu := &telebot.ReplyMarkup{}
+	btnMenu := menu.Data("🏠 Menu Principal", "btn_menu")
+	menu.Inline(menu.Row(btnMenu))
+
+	if c.Callback() != nil {
+		defer c.Respond()
+		return c.Edit(msg, telebot.ModeMarkdown, menu)
+	}
+	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) resolveActivePortfolio(ctx context.Context, chatID int64, portfolios []portfolio.Portfolio) (string, string) {

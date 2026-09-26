@@ -42,11 +42,35 @@ func TestBotRunner_SendAlertMessage(t *testing.T) {
 		assert.NoError(t, err)
 
 		runner := &BotRunner{bot: b}
-		errAbove := runner.SendAlertMessage(123, "User", "AAPL", "Apple", 155.0, 150.0, "ABOVE", "USD")
+		errAbove := runner.SendAlertMessage(123, "User_Name*", "AAPL_US", "Apple*Corp", 155.0, 150.0, "ABOVE", "USD")
 		assert.NoError(t, errAbove)
 
 		errBelow := runner.SendAlertMessage(123, "User", "PETR4", "Petrobras", 25.0, 30.0, "BELOW", "BRL")
 		assert.NoError(t, errBelow)
+
+		errMicro := runner.SendAlertMessage(123, "CryptoUser", "PEPE-USD", "Pepe Coin", 0.000034, 0.000030, "ABOVE", "USD")
+		assert.NoError(t, errMicro)
+	})
+
+	t.Run("Mock server SendAlertMessage blocked by user", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"ok": false, "error_code": 403, "description": "Forbidden: bot was blocked by the user"}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		errBlocked := runner.SendAlertMessage(123, "User", "AAPL", "Apple", 155.0, 150.0, "ABOVE", "USD")
+		assert.Error(t, errBlocked)
+		assert.True(t, isBlockedByUser(errBlocked))
 	})
 }
 

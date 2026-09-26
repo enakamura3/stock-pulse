@@ -87,7 +87,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📊 *Resumo: %s*\n\n", portfolioName)
+	msg := p.Sprintf("📊 *Resumo: %s*\n\n", escapeMarkdown(portfolioName))
 	msg += p.Sprintf("💰 Valor Total: *R$ %.2f*\n", totalValue)
 
 	var variacaoDiaria string
@@ -300,7 +300,7 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		btnBack := menu.Data("⬅️ Voltar ao Resumo", "btn_resumo")
 		btnMenu := menu.Data("🏠 Menu", "btn_menu")
 		menu.Inline(menu.Row(btnBack, btnMenu))
-		return c.Edit(fmt.Sprintf("📋 *Ativos: %s*\n\nNenhum ativo encontrado nesta carteira.", portfolioName), telebot.ModeMarkdown, menu)
+		return c.Edit(fmt.Sprintf("📋 *Ativos: %s*\n\nNenhum ativo encontrado nesta carteira.", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
 	}
 
 	posByValue := make([]portfolio.Position, len(positions))
@@ -325,7 +325,7 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📋 *Ativos: %s*\n_Página %d de %d_\n\n", portfolioName, page+1, totalPages)
+	msg := p.Sprintf("📋 *Ativos: %s*\n_Página %d de %d_\n\n", escapeMarkdown(portfolioName), page+1, totalPages)
 
 	for _, pos := range posByValue[start:end] {
 		var symbol string

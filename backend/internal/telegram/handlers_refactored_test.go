@@ -158,6 +158,29 @@ func TestHandlers_HandleMenuAndCallback(t *testing.T) {
 	})
 }
 
+func TestHandlers_HandleHelp(t *testing.T) {
+	h, _, _, _, _, _ := setupHandlersTest()
+
+	t.Run("HandleHelp via message", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Send", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleHelp(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleHelp via callback button", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleHelp(mCtx)
+		assert.NoError(t, err)
+	})
+}
+
 func TestHandlers_PortfolioSummaryAndSelection(t *testing.T) {
 	h, svc, pSvc, _, fiSvc, _ := setupHandlersTest()
 

@@ -61,7 +61,7 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 
 	menu.Inline(rows...)
 
-	return c.Edit(fmt.Sprintf("🏢 *Carteira Ativa:* %s\nPara qual ativo deseja lançar a operação?", portfolioName), telebot.ModeMarkdown, menu)
+	return c.Edit(fmt.Sprintf("🏢 *Carteira Ativa:* %s\nPara qual ativo deseja lançar a operação?", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {

@@ -67,8 +67,10 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("/agenda", h.HandleAgenda)
 	bot.Handle("/analise", h.HandleAnalysis)
 	bot.Handle("/desfazer", h.HandleUndoLastOperation)
+	bot.Handle("/help", h.HandleHelp)
 
 	// Callback dos Inline Keyboards estáticos
+	bot.Handle("\fbtn_help", h.HandleHelp)
 	bot.Handle("\fbtn_resumo", h.HandlePortfolioSummary)
 	bot.Handle("\fbtn_ativos", h.HandleAssetList)
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
