@@ -8,6 +8,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
+	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
 	"gopkg.in/telebot.v3"
 )
 
@@ -38,21 +39,34 @@ type AlertService interface {
 	ToggleAlert(ctx context.Context, id string, userID string) (string, error)
 }
 
+type WatchlistService interface {
+	GetWatchlists(ctx context.Context, userID string) ([]watchlist.Watchlist, error)
+	GetWatchlist(ctx context.Context, id, userID string) (*watchlist.Watchlist, error)
+	AddAssetToWatchlist(ctx context.Context, watchlistID, userID, ticker string) (*watchlist.Item, error)
+	RemoveAssetFromWatchlist(ctx context.Context, watchlistID, userID, ticker string) error
+}
+
 type Handlers struct {
 	svc          Service
 	portfolioSvc PortfolioService
 	marketSvc    MarketService
 	fiSvc        FixedIncomeService
 	alertSvc     AlertService
+	watchlistSvc WatchlistService
 }
 
-func NewHandlers(svc Service, pSvc PortfolioService, mSvc MarketService, fiSvc FixedIncomeService, alertSvc AlertService) *Handlers {
+func NewHandlers(svc Service, pSvc PortfolioService, mSvc MarketService, fiSvc FixedIncomeService, alertSvc AlertService, wSvc ...WatchlistService) *Handlers {
+	var watchlistSvc WatchlistService
+	if len(wSvc) > 0 {
+		watchlistSvc = wSvc[0]
+	}
 	return &Handlers{
 		svc:          svc,
 		portfolioSvc: pSvc,
 		marketSvc:    mSvc,
 		fiSvc:        fiSvc,
 		alertSvc:     alertSvc,
+		watchlistSvc: watchlistSvc,
 	}
 }
 
@@ -67,6 +81,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("/agenda", h.HandleAgenda)
 	bot.Handle("/analise", h.HandleAnalysis)
 	bot.Handle("/desfazer", h.HandleUndoLastOperation)
+	bot.Handle("/watchlist", h.HandleWatchlist)
 	bot.Handle("/help", h.HandleHelp)
 
 	// Callback dos Inline Keyboards estáticos
@@ -84,6 +99,8 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_alert_create", h.HandleAlertCreate)
 	bot.Handle("\fbtn_alert_cond_above", h.HandleAlertConditionAbove)
 	bot.Handle("\fbtn_alert_cond_below", h.HandleAlertConditionBelow)
+	bot.Handle("\fbtn_watchlist", h.HandleWatchlist)
+	bot.Handle("\fbtn_wl_add", h.HandleWatchlistAdd)
 	bot.Handle("\fbtn_cotacao", h.HandleQuoteStart)
 	bot.Handle("\fbtn_analise", h.HandleAnalysisStart)
 	bot.Handle("\fbtn_change_portfolio", h.HandleChangePortfolio)

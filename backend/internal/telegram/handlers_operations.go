@@ -192,6 +192,11 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 		return h.handleAlertCondition(c, strings.ToUpper(condition))
 	}
 
+	if strings.HasPrefix(data, "btn_wl_del_") {
+		payload := strings.TrimPrefix(data, "btn_wl_del_")
+		return h.handleWatchlistDelete(c, payload)
+	}
+
 	return nil
 }
 
@@ -678,6 +683,9 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		ticker := strings.ToUpper(text)
 		_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
 		return h.renderAnalysis(c, ticker)
+
+	case "WL_EXPECT_TICKER":
+		return h.handleWatchlistAddTicker(c, text)
 	}
 
 	return nil
