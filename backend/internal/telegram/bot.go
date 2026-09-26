@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -35,9 +34,14 @@ func NewBotRunnerWithSettings(pref telebot.Settings, handlers *Handlers) (*BotRu
 
 	handlers.Register(b)
 
-	// Adiciona o Menu dinâmico nativo do Telegram (Botão "Menu" ao lado da caixa de texto)
+	// Adiciona os comandos no Menu dinâmico nativo do Telegram (Botão "Menu" ao lado da caixa de texto)
 	_ = b.SetCommands([]telebot.Command{
 		{Text: "menu", Description: "Abrir o menu principal"},
+		{Text: "cotacao", Description: "Consultar cotação de ativo"},
+		{Text: "agenda", Description: "Agenda de proventos (30 dias)"},
+		{Text: "analise", Description: "Análise fundamentalista de ativo"},
+		{Text: "desfazer", Description: "Desfazer última operação lançada"},
+		{Text: "help", Description: "Exibir comandos e ajuda"},
 	})
 
 	return &BotRunner{
@@ -79,14 +83,21 @@ func (r *BotRunner) SendAlertMessage(chatID int64, userName, ticker, assetName s
 		condStr = "abaixo de"
 	}
 
+	escapedUserName := escapeMarkdown(userName)
+	escapedTicker := escapeMarkdown(ticker)
+	escapedAssetName := escapeMarkdown(assetName)
+
 	msg := "🚨 *ALERTA DE PREÇO DISPARADO* 🚨\n\n"
-	msg += "Olá, *" + userName + "*!\n"
-	msg += "Seu alerta para o ativo *" + ticker + "* (" + assetName + ") foi atingido.\n\n"
-	msg += "📊 *Preço Atual:* " + currency + " " + fmt.Sprintf("%.2f", currentVal) + "\n"
-	msg += "🎯 *Seu Alvo (" + condStr + "):* " + currency + " " + fmt.Sprintf("%.2f", targetVal) + "\n\n"
+	msg += "Olá, *" + escapedUserName + "*!\n"
+	msg += "Seu alerta para o ativo *" + escapedTicker + "* (" + escapedAssetName + ") foi atingido.\n\n"
+	msg += "📊 *Preço Atual:* " + currency + " " + formatFinancialPrice(nil, currentVal) + "\n"
+	msg += "🎯 *Seu Alvo (" + condStr + "):* " + currency + " " + formatFinancialPrice(nil, targetVal) + "\n\n"
 	msg += "Acesse o *Stock Pulse* para mais detalhes."
 
 	_, err := r.bot.Send(&telebot.Chat{ID: chatID}, msg, telebot.ModeMarkdown)
+	if err != nil && isBlockedByUser(err) {
+		slog.Warn("Usuário bloqueou o bot do Telegram ao receber alerta", "chatID", chatID, "error", err)
+	}
 	return err
 }
 

@@ -159,9 +159,15 @@ func main() {
 	if err != nil {
 		slog.Error("Failed to start telegram bot", "err", err)
 	}
-	telegramHttpHandler := telegram.NewHTTPHandler(telegramService, telegramBot.GetUsername())
+	botUsername := ""
+	var alertTgProvider alert.TelegramProvider
+	if telegramBot != nil {
+		botUsername = telegramBot.GetUsername()
+		alertTgProvider = telegramBot
+	}
+	telegramHttpHandler := telegram.NewHTTPHandler(telegramService, botUsername)
 
-	alertWorker := alert.NewAlertWorker(alertRepo, marketService, telegramBot)
+	alertWorker := alert.NewAlertWorker(alertRepo, marketService, alertTgProvider)
 
 	// Inicialização da Documentação API Swagger (Fase 4)
 	docsHandler := docs.NewHandler("docs/openapi.yaml")

@@ -153,9 +153,9 @@ func formatAnalysisMessage(ticker string, fund *market.Fundamentals, price float
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	curr := getCurrencySymbol(currency)
 
-	msg := p.Sprintf("🔍 *Análise Fundamentalista: %s*\n", ticker)
+	msg := p.Sprintf("🔍 *Análise Fundamentalista: %s*\n", escapeMarkdown(ticker))
 	if price > 1e-6 {
-		msg += p.Sprintf("💵 Preço Atual: *%s %.2f*\n\n", curr, price)
+		msg += p.Sprintf("💵 Preço Atual: *%s %s*\n\n", curr, formatFinancialPrice(p, price))
 	} else {
 		msg += "\n"
 	}
@@ -177,15 +177,15 @@ func formatAnalysisMessage(ticker string, fund *market.Fundamentals, price float
 
 	msg += p.Sprintf("• Dividend Yield: *%.2f%%*\n", fund.DividendYield)
 	if fund.EPS > 1e-6 || fund.EPS < -1e-6 {
-		msg += p.Sprintf("• LPA (Lucro/Ação): *%s %.2f*\n", curr, fund.EPS)
+		msg += p.Sprintf("• LPA (Lucro/Ação): *%s %s*\n", curr, formatFinancialPrice(p, fund.EPS))
 	}
 	if fund.BookValue > 1e-6 {
-		msg += p.Sprintf("• VPA (Patrimônio/Ação): *%s %.2f*\n", curr, fund.BookValue)
+		msg += p.Sprintf("• VPA (Patrimônio/Ação): *%s %s*\n", curr, formatFinancialPrice(p, fund.BookValue))
 	}
 
 	msg += "\n🎯 *Modelos de Valuation:*\n"
 	if fund.GrahamValue > 1e-6 {
-		grahamStr := p.Sprintf("• Preço Justo de Graham: *%s %.2f*", curr, fund.GrahamValue)
+		grahamStr := p.Sprintf("• Preço Justo de Graham: *%s %s*", curr, formatFinancialPrice(p, fund.GrahamValue))
 		if price > 1e-6 {
 			margin := ((fund.GrahamValue - price) / price) * 100
 			if margin > 1e-6 {
@@ -200,7 +200,7 @@ func formatAnalysisMessage(ticker string, fund *market.Fundamentals, price float
 	}
 
 	if fund.BazinValue > 1e-6 {
-		bazinStr := p.Sprintf("• Preço Teto Bazin (6%%): *%s %.2f*", curr, fund.BazinValue)
+		bazinStr := p.Sprintf("• Preço Teto Bazin (6%%): *%s %s*", curr, formatFinancialPrice(p, fund.BazinValue))
 		if price > 1e-6 {
 			margin := ((fund.BazinValue - price) / price) * 100
 			if margin > 1e-6 {
@@ -234,16 +234,16 @@ func formatQuoteMessage(ticker string, quote *market.Quote) string {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📈 *%s*\n_%s_\n\n", title, quote.Name)
-	msg += p.Sprintf("💵 *Preço:* %s %.2f\n", curr, quote.Price)
-	msg += p.Sprintf("%s *Variação:* %s%.2f (%s%.2f%%)\n",
-		changeEmoji, changeSign, quote.Change, changeSign, quote.ChangePercent)
+	msg := p.Sprintf("📈 *%s*\n_%s_\n\n", escapeMarkdown(title), escapeMarkdown(quote.Name))
+	msg += p.Sprintf("💵 *Preço:* %s %s\n", curr, formatFinancialPrice(p, quote.Price))
+	msg += p.Sprintf("%s *Variação:* %s%s (%s%.2f%%)\n",
+		changeEmoji, changeSign, formatFinancialPrice(p, quote.Change), changeSign, quote.ChangePercent)
 
 	if quote.High > 1e-6 || quote.Low > 1e-6 {
-		msg += p.Sprintf("📊 *Mín / Máx (Dia):* %s %.2f / %s %.2f\n", curr, quote.Low, curr, quote.High)
+		msg += p.Sprintf("📊 *Mín / Máx (Dia):* %s %s / %s %s\n", curr, formatFinancialPrice(p, quote.Low), curr, formatFinancialPrice(p, quote.High))
 	}
 	if quote.PreviousClose > 1e-6 {
-		msg += p.Sprintf("⏮️ *Fechamento Anterior:* %s %.2f\n", curr, quote.PreviousClose)
+		msg += p.Sprintf("⏮️ *Fechamento Anterior:* %s %s\n", curr, formatFinancialPrice(p, quote.PreviousClose))
 	}
 	if quote.Volume > 0 {
 		msg += p.Sprintf("📦 *Volume:* %d\n", quote.Volume)
