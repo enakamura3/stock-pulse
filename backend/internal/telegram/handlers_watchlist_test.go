@@ -247,6 +247,29 @@ func TestHandlers_Watchlist(t *testing.T) {
 
 		err = h.HandleWatchlist(mCtxNotMod)
 		assert.NoError(t, err)
+
+		// Single page (totalPages == 1)
+		mCtxSingle := new(MockTelebotContext)
+		mCtxSingle.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxSingle.On("Get", "user_id").Return("u1")
+		mCtxSingle.On("Callback").Return(&telebot.Callback{})
+		mCtxSingle.On("Data").Return("0").Once()
+
+		wlSingle := &watchlist.Watchlist{
+			ID:   "wl1",
+			Name: "Favoritos",
+			Items: []watchlist.Item{
+				{Ticker: "PETR4", Price: 35.5, ChangePercent: 1.5, Currency: "BRL"},
+			},
+		}
+		wSvc.On("GetWatchlists", mock.Anything, "u1").Return(lists, nil).Once()
+		wSvc.On("GetWatchlist", mock.Anything, "wl1", "u1").Return(wlSingle, nil).Once()
+		mCtxSingle.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "PETR4") && !strings.Contains(msg, "Página")
+		}), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err = h.HandleWatchlist(mCtxSingle)
+		assert.NoError(t, err)
 	})
 
 	t.Run("HandleWatchlistAdd", func(t *testing.T) {
