@@ -26,6 +26,7 @@ func RateLimitMiddleware() telebot.MiddlewareFunc {
 func NewRateLimitMiddleware(r rate.Limit, burst int, ttl time.Duration) telebot.MiddlewareFunc {
 	var mu sync.Mutex
 	limiters := make(map[int64]*userLimiter)
+	lastCleanup := time.Now()
 
 	return func(next telebot.HandlerFunc) telebot.HandlerFunc {
 		return func(c telebot.Context) error {
@@ -37,13 +38,14 @@ func NewRateLimitMiddleware(r rate.Limit, burst int, ttl time.Duration) telebot.
 			now := time.Now()
 
 			mu.Lock()
-			// Limpeza oportuna de limitadores inativos caso o mapa acumule mais de 100 usuários
-			if len(limiters) > 100 {
+			// Limpeza oportuna de limitadores inativos se o TTL expirou desde a última limpeza ou se acumulou mais de 100 usuários
+			if len(limiters) > 100 || now.Sub(lastCleanup) > ttl {
 				for id, ul := range limiters {
 					if now.Sub(ul.lastSeen) > ttl {
 						delete(limiters, id)
 					}
 				}
+				lastCleanup = now
 			}
 
 			ul, exists := limiters[sender.ID]

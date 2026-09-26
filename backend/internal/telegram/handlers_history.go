@@ -98,7 +98,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	btnSell := menu.Data(fmt.Sprintf("%s Vendas", map[bool]string{true: "▪️", false: "🔴"}[filter == "SELL"]), "btn_history", "0:SELL")
 
 	if len(filtered) == 0 {
-		msg := fmt.Sprintf("📜 *Histórico: %s*\n_%s %s — Nenhuma operação encontrada._", portfolioName, filterEmoji, filterLabel)
+		msg := fmt.Sprintf("📜 *Histórico: %s*\n_%s %s — Nenhuma operação encontrada._", escapeMarkdown(portfolioName), filterEmoji, filterLabel)
 		btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 		menu.Inline(menu.Row(btnAll, btnBuy, btnSell), menu.Row(btnBack))
 		err = c.Edit(msg, telebot.ModeMarkdown, menu)
@@ -109,7 +109,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📜 *Histórico: %s*\n_%s %s — Página %d de %d_\n\n", portfolioName, filterEmoji, filterLabel, page+1, totalPages)
+	msg := p.Sprintf("📜 *Histórico: %s*\n_%s %s — Página %d de %d_\n\n", escapeMarkdown(portfolioName), filterEmoji, filterLabel, page+1, totalPages)
 
 	for _, tx := range filtered[start:end] {
 		tipoStr := "🟢 Compra"
