@@ -1,0 +1,27 @@
+# Docker Compose - Perfil de Produção com Isolamento do Docker Socket (HIGH-3 / Tarefa 14)
+# Em produção, o Promtail não deve ter acesso direto ao socket do Docker.
+# O tecnativa/docker-socket-proxy intercepta o daemon e expõe apenas endpoints de leitura de logs.
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: stock-pulse-docker-proxy
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1 # Permite GET /containers/* para descoberta e leitura de logs
+      - LOG_LEVEL=info
+      # Bloqueia por padrão todas as chamadas destrutivas ou de criação/execução
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - stock-pulse-net
+
+  promtail:
+    environment:
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
+    depends_on:
+      - loki
+      - docker-socket-proxy

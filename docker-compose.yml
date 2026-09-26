@@ -144,8 +144,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./promtail-config.yml:/etc/promtail/config.yml
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: -config.file=/etc/promtail/config.yml
+      # Em dev: montado como somente leitura (:ro). Em produção: usar docker-compose.prod.yml com docker-socket-proxy (HIGH-3)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
     depends_on:
       - loki
     networks:
