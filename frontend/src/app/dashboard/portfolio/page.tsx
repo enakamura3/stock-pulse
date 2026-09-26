@@ -290,7 +290,7 @@ function PortfolioContent() {
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
                     <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.value}</div>
                     {card.sub && (
-                      <div style={{ fontSize: '0.75rem', color: card.subColor || 'var(--text-secondary)', marginTop: '0.25rem', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.75rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600 }}>
                         {card.sub}
                       </div>
                     )}

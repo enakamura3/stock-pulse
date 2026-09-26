@@ -44,6 +44,7 @@ describe('FixedIncomeTab Component', () => {
       total_invested: 1000,
       gross_value: 1100,
       net_value: 1080,
+      taxes_calculated: 20,
       net_return_percent: 8.0,
       is_matured: false,
       days_to_maturity: 500,
@@ -554,5 +555,44 @@ describe('FixedIncomeTab Component', () => {
     const kpiCardsTodas = screen.getByTestId('fixed-income-kpi-cards');
     expect(within(kpiCardsTodas).getByText('2')).toBeInTheDocument();
     expect(within(kpiCardsTodas).getByText('Todas as categorias')).toBeInTheDocument();
+  });
+
+  it('handles negative return positions correctly in KPI cards', async () => {
+    (api.apiFetch as any).mockImplementation((url: string) => {
+      if (url.includes('/fixed-income/positions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            {
+              asset: {
+                id: 'fi-neg',
+                portfolio_id: 'p1',
+                institution: 'Banco C6',
+                type: 'CDB',
+                debt_type: 'PRE',
+                indexer: 'PRE',
+                rate: 5,
+              },
+              start_date: '2024-01-01',
+              total_invested: 1000,
+              gross_value: 900,
+              net_value: 900,
+              taxes_calculated: 0,
+              net_return_percent: -10.0,
+            },
+          ]),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<FixedIncomeTab portfolioId="p1" onLaunchOperation={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Banco C6')).toBeInTheDocument();
+    });
+
+    const kpiCards = screen.getByTestId('fixed-income-kpi-cards');
+    expect(within(kpiCards).getByText(/-10.00%/i)).toBeInTheDocument();
   });
 });

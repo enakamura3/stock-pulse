@@ -390,13 +390,22 @@ describe('PortfolioPage Contextual Filters', () => {
       expect(mockLoadPerformance).toHaveBeenCalledWith('p1', 'ALL');
     });
 
-    // Realtime refresh with apiFetch error handled gracefully
-    (apiFetch as any).mockRejectedValueOnce(new Error('Network error'));
+    // Realtime refresh with successful apiFetch
+    (apiFetch as any).mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) });
     const realtimeBtn = screen.getByRole('button', { name: /Forçar atualização de cotações em tempo real ignorando cache/i });
     fireEvent.click(realtimeBtn);
 
     await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith('/market/quotes/invalidate', { method: 'POST' });
       expect(mockLoadPortfolioDetails).toHaveBeenCalledTimes(2);
+    });
+
+    // Realtime refresh with apiFetch error handled gracefully
+    (apiFetch as any).mockRejectedValueOnce(new Error('Network error'));
+    fireEvent.click(realtimeBtn);
+
+    await waitFor(() => {
+      expect(mockLoadPortfolioDetails).toHaveBeenCalledTimes(3);
     });
 
     // Empty state onGoToAssets
@@ -576,27 +585,44 @@ describe('PortfolioPage Contextual Filters', () => {
       positions: [
         { ticker: 'PETR4', type: 'STOCK_BR', total_cost: 1000, current_value: 1200 },
         { ticker: 'HGLG11', type: 'FII', total_cost: 2000, current_value: 2300 },
+        { asset_id: 'aid-fii', type: 'FII', total_cost: 500, current_value: 600 },
       ],
       dividends: [
         { ticker: 'PETR4', net_amount: 50 },
         { ticker: 'HGLG11', net_amount: 120 },
+        { asset_id: 'aid-fii', total_value: 40 },
       ],
     });
 
-    render(<PortfolioPage />);
-    const kpiCards = screen.getByTestId('equity-kpi-cards');
+    const { rerender } = render(<PortfolioPage />);
+    let kpiCards = screen.getByTestId('equity-kpi-cards');
     expect(within(kpiCards).getByText(/Total Investido/i)).toBeInTheDocument();
     expect(within(kpiCards).getByText(/Patrimônio Atual/i)).toBeInTheDocument();
     expect(within(kpiCards).getByText(/Lucro \/ Prejuízo/i)).toBeInTheDocument();
     expect(within(kpiCards).getByText(/Proventos Recebidos/i)).toBeInTheDocument();
     expect(within(kpiCards).getByText(/Ativos em Carteira/i)).toBeInTheDocument();
 
-    // FIIs has 1 asset (HGLG11) with total_cost 2000, current_value 2300, profit 300 (+15.00%)
-    expect(within(kpiCards).getByText('1')).toBeInTheDocument();
+    // FIIs has 2 assets (HGLG11 + aid-fii) with total_cost 2500, current_value 2900, profit 400 (+16.00%)
+    expect(within(kpiCards).getByText('2')).toBeInTheDocument();
     expect(within(kpiCards).getByText('FIIs')).toBeInTheDocument();
-    expect(within(kpiCards).getByText('R$ 2.000,00')).toBeInTheDocument();
-    expect(within(kpiCards).getByText('R$ 2.300,00')).toBeInTheDocument();
-    expect(within(kpiCards).getByText('R$ 120,00')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('R$ 2.500,00')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('R$ 2.900,00')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('R$ 160,00')).toBeInTheDocument();
+
+    // Test negative profit and "Todas" category filter
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'ativos',
+      activeCategoryFilter: 'Todas',
+      positions: [
+        { ticker: 'PETR4', type: 'STOCK_BR', total_cost: 1000, current_value: 800 },
+      ],
+      dividends: [],
+    });
+    rerender(<PortfolioPage />);
+    kpiCards = screen.getByTestId('equity-kpi-cards');
+    expect(within(kpiCards).getByText('Todas as categorias')).toBeInTheDocument();
+    expect(within(kpiCards).getByText('-20.00% (-R$ 200,00)')).toBeInTheDocument();
   });
 });
 
