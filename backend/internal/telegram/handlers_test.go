@@ -9,6 +9,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
+	"github.com/onigiri/stock-pulse/backend/internal/watchlist"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/telebot.v3"
@@ -25,6 +26,12 @@ func (m *MockTelebotContext) Get(key string) interface{} {
 	if m.store != nil {
 		if val, ok := m.store[key]; ok {
 			return val
+		}
+	}
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Get" && len(call.Arguments) > 0 && call.Arguments[0] == key {
+			args := m.Called(key)
+			return args.Get(0)
 		}
 	}
 	if key == "user_id" {
@@ -258,6 +265,39 @@ func (m *MockAlertSvc) ToggleAlert(ctx context.Context, id string, userID string
 	return args.String(0), args.Error(1)
 }
 
+type MockWatchlistSvc struct {
+	mock.Mock
+}
+
+func (m *MockWatchlistSvc) GetWatchlists(ctx context.Context, userID string) ([]watchlist.Watchlist, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]watchlist.Watchlist), args.Error(1)
+}
+
+func (m *MockWatchlistSvc) GetWatchlist(ctx context.Context, id, userID string) (*watchlist.Watchlist, error) {
+	args := m.Called(ctx, id, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*watchlist.Watchlist), args.Error(1)
+}
+
+func (m *MockWatchlistSvc) AddAssetToWatchlist(ctx context.Context, watchlistID, userID, ticker string) (*watchlist.Item, error) {
+	args := m.Called(ctx, watchlistID, userID, ticker)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*watchlist.Item), args.Error(1)
+}
+
+func (m *MockWatchlistSvc) RemoveAssetFromWatchlist(ctx context.Context, watchlistID, userID, ticker string) error {
+	args := m.Called(ctx, watchlistID, userID, ticker)
+	return args.Error(0)
+}
+
 func setupHandlersTest() (*Handlers, *MockService, *MockPortfolioService, *MockMarketSvc, *MockFixedIncomeSvc, *MockAlertSvc) {
 	svc := new(MockService)
 	pSvc := new(MockPortfolioService)
@@ -265,6 +305,16 @@ func setupHandlersTest() (*Handlers, *MockService, *MockPortfolioService, *MockM
 	fiSvc := new(MockFixedIncomeSvc)
 	alertSvc := new(MockAlertSvc)
 	return NewHandlers(svc, pSvc, mSvc, fiSvc, alertSvc), svc, pSvc, mSvc, fiSvc, alertSvc
+}
+
+func setupHandlersTestWithWatchlist() (*Handlers, *MockService, *MockPortfolioService, *MockMarketSvc, *MockFixedIncomeSvc, *MockAlertSvc, *MockWatchlistSvc) {
+	svc := new(MockService)
+	pSvc := new(MockPortfolioService)
+	mSvc := new(MockMarketSvc)
+	fiSvc := new(MockFixedIncomeSvc)
+	alertSvc := new(MockAlertSvc)
+	wSvc := new(MockWatchlistSvc)
+	return NewHandlers(svc, pSvc, mSvc, fiSvc, alertSvc, wSvc), svc, pSvc, mSvc, fiSvc, alertSvc, wSvc
 }
 
 func TestHandlers_Register(t *testing.T) {

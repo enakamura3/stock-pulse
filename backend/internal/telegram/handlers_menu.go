@@ -61,6 +61,7 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 	btnRendaFixa := menu.Data("🏛️ Renda Fixa", "btn_renda_fixa")
 	btnOperacao := menu.Data("💵 Lançar Operação", "btn_operacao")
 	btnAlertas := menu.Data("🔔 Meus Alertas", "btn_alerts")
+	btnFavoritos := menu.Data("⭐ Favoritos", "btn_watchlist")
 	btnCotacao := menu.Data("📈 Cotação Rápida", "btn_cotacao")
 
 	btnHelp := menu.Data("❓ Ajuda e Comandos", "btn_help")
@@ -72,6 +73,7 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 		menu.Row(btnRendaFixa),
 		menu.Row(btnOperacao),
 		menu.Row(btnAlertas),
+		menu.Row(btnFavoritos),
 		menu.Row(btnCotacao),
 	}
 
@@ -98,6 +100,7 @@ func (h *Handlers) HandleHelp(c telebot.Context) error {
 	msg += "• /cotacao `<ticker>` — Consulta cotação rápida (ex: `/cotacao PETR4`)\n"
 	msg += "• /analise `<ticker>` — Análise fundamentalista completa (ex: `/analise WEGE3`)\n"
 	msg += "• /agenda — Exibe os proventos previstos para os próximos 30 dias\n"
+	msg += "• /watchlist — Lista e gerencia seus ativos favoritos\n"
 	msg += "• /desfazer — Desfaz a última transação lançada na carteira ativa\n"
 	msg += "• /help — Exibe esta mensagem de ajuda\n\n"
 	msg += "💡 *Dica:* Você também pode usar todos os recursos clicando nos botões interativos do /menu."
