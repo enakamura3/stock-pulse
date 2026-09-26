@@ -94,7 +94,13 @@ func (r *BotRunner) SendAlertMessage(chatID int64, userName, ticker, assetName s
 	msg += "🎯 *Seu Alvo (" + condStr + "):* " + currency + " " + formatFinancialPrice(nil, targetVal) + "\n\n"
 	msg += "Acesse o *Stock Pulse* para mais detalhes."
 
-	_, err := r.bot.Send(&telebot.Chat{ID: chatID}, msg, telebot.ModeMarkdown)
+	menu := &telebot.ReplyMarkup{}
+	btnQuote := menu.Data("📈 Ver Cotação", "btn_quote_"+ticker)
+	btnNewOp := menu.Data("➕ Nova Operação", "btn_operacao")
+	btnAlerts := menu.Data("🔔 Meus Alertas", "btn_alerts")
+	menu.Inline(menu.Row(btnQuote, btnNewOp), menu.Row(btnAlerts))
+
+	_, err := r.bot.Send(&telebot.Chat{ID: chatID}, msg, telebot.ModeMarkdown, menu)
 	if err != nil && isBlockedByUser(err) {
 		slog.Warn("Usuário bloqueou o bot do Telegram ao receber alerta", "chatID", chatID, "error", err)
 	}

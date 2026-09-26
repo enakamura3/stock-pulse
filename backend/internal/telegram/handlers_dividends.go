@@ -202,7 +202,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	}
 
 	refMonthName := getMonthNamePT(currentMonth)
-	msg := p.Sprintf("💸 *Proventos: %s*\n", portfolioName)
+	msg := p.Sprintf("💸 *Proventos: %s*\n", escapeMarkdown(portfolioName))
 	msg += p.Sprintf("💰 *Total Acumulado:* %s\n", totalAccumulatedStr)
 	msg += p.Sprintf("📅 *Mês de Referência:* %s/%s\n\n", refMonthName, fmt.Sprintf("%d", currentYear))
 
@@ -380,7 +380,7 @@ func (h *Handlers) HandleAgenda(c telebot.Context) error {
 	})
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📋 *Agenda de Proventos — Próximos 30 Dias*\n🏢 Carteira: *%s*\n\n", portfolioName)
+	msg := p.Sprintf("📋 *Agenda de Proventos — Próximos 30 Dias*\n🏢 Carteira: *%s*\n\n", escapeMarkdown(portfolioName))
 
 	if len(upcoming) == 0 {
 		msg += "Nenhum provento com pagamento previsto para os próximos 30 dias na sua carteira."
@@ -504,7 +504,7 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 		grandTotalStr = strings.Join(grandStrings, " | ")
 	}
 
-	msg := p.Sprintf("📅 *Proventos por Ano: %s*\n", portfolioName)
+	msg := p.Sprintf("📅 *Proventos por Ano: %s*\n", escapeMarkdown(portfolioName))
 	msg += p.Sprintf("💰 *Acumulado Geral:* %s\n", grandTotalStr)
 	msg += "----------------------------------\n\n"
 
@@ -677,7 +677,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	pageKeys := keys[start:end]
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📆 *Proventos por Mês: %s*\n_Página %d_\n\n", portfolioName, page+1)
+	msg := p.Sprintf("📆 *Proventos por Mês: %s*\n_Página %d_\n\n", escapeMarkdown(portfolioName), page+1)
 
 	for _, k := range pageKeys {
 		display := ""

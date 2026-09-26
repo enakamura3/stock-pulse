@@ -443,6 +443,56 @@ func TestHandlers_HistoryAndFixedIncome(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("HandleHistory escapes markdown in portfolioName", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Data").Return("0").Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
+			{ID: "p1", Name: "Minha_Carteira*Top"},
+		}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		txs := []portfolio.Transaction{
+			{Ticker: "AAPL", Type: "BUY", Quantity: 10, UnitPrice: 150, TotalCost: 1500, ExecutedAt: time.Now()},
+		}
+		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(txs, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, `Minha\_Carteira\*Top`)
+		}), mock.Anything).Return(nil).Once()
+
+		err := h.HandleHistory(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, `Minha\_Carteira\*Top`)
+	})
+
+	t.Run("HandleDividends escapes markdown in portfolioName", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
+			{ID: "p1", Name: "Minha_Carteira*Top[1]"},
+		}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		pSvc.On("GetPortfolioDividends", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return([]portfolio.CalculatedDividend{}, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, `Minha\_Carteira\*Top\[1\]`)
+		}), mock.Anything).Return(nil).Once()
+
+		err := h.HandleDividends(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, `Minha\_Carteira\*Top\[1\]`)
+	})
+
 	t.Run("HandleFixedIncome - success", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})

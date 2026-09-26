@@ -111,4 +111,28 @@ func TestRateLimitMiddleware_Unit(t *testing.T) {
 		err := handler(mCtx102)
 		assert.NoError(t, err)
 	})
+
+	t.Run("cleanup expired limiters periodically even when size <= 100", func(t *testing.T) {
+		mw := NewRateLimitMiddleware(rate.Every(time.Second), 5, 2*time.Millisecond)
+
+		handler := mw(func(c telebot.Context) error {
+			return nil
+		})
+
+		// Populate 2 users
+		for i := int64(1); i <= 2; i++ {
+			mCtx := new(MockTelebotContext)
+			mCtx.On("Sender").Return(&telebot.User{ID: i, Username: "user"})
+			err := handler(mCtx)
+			assert.NoError(t, err)
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Request for user 3 triggers periodic cleanup because now.Sub(lastCleanup) > ttl
+		mCtx3 := new(MockTelebotContext)
+		mCtx3.On("Sender").Return(&telebot.User{ID: 3, Username: "user3"})
+		err := handler(mCtx3)
+		assert.NoError(t, err)
+	})
 }
