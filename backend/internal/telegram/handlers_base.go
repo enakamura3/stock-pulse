@@ -89,6 +89,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_change_portfolio", h.HandleChangePortfolio)
 	bot.Handle("\fbtn_menu", h.HandleMenuCallback)
 	bot.Handle("\fbtn_cancel_op", h.HandleCancelOperation)
+	bot.Handle("\fbtn_op_back", h.HandleOperationBack)
 
 	bot.Handle("\fbtn_new_asset", h.HandleNewAsset)
 	bot.Handle("\fbtn_buy", h.HandleSetTypeBuy)

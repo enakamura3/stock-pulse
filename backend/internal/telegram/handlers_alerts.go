@@ -185,10 +185,11 @@ func (h *Handlers) handleAlertCondition(c telebot.Context, condition string) err
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	menu.Inline(menu.Row(btnCancel))
+	menu.Inline(menu.Row(btnBack, btnCancel))
 
-	return c.Edit(fmt.Sprintf("🔔 *Alerta para %s* (%s)\n\nQual o preço alvo do alerta? (ex: 35.50)", state.Ticker, condLabel), telebot.ModeMarkdown, menu)
+	return c.Edit(fmt.Sprintf("🔔 *Alerta para %s* (%s)\n\nQual o preço alvo do alerta? (ex: 35.50)", escapeMarkdown(state.Ticker), condLabel), telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) handleAlertToggle(c telebot.Context, payload string) error {

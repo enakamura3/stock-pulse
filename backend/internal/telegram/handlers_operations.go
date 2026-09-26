@@ -19,6 +19,85 @@ func (h *Handlers) HandleCancelOperation(c telebot.Context) error {
 	return h.sendOrEditMenu(c)
 }
 
+func (h *Handlers) HandleOperationBack(c telebot.Context) error {
+	defer c.Respond()
+	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	if err != nil || state == nil {
+		return h.sendOrEditMenu(c)
+	}
+
+	switch state.Step {
+	case "EXPECT_TYPE":
+		return h.HandleLaunchOperation(c)
+
+	case "EXPECT_QTY":
+		return h.handleSelectedTicker(c, state.Ticker)
+
+	case "EXPECT_PRICE":
+		return h.handleSetType(c, state.Type)
+
+	case "EXPECT_DATE":
+		state.Step = "EXPECT_PRICE"
+		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+
+		menu := &telebot.ReplyMarkup{}
+		btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
+		btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
+		menu.Inline(menu.Row(btnBack, btnCancel))
+
+		text := fmt.Sprintf("Qual o preço unitário da transação de *%s*? (ex: 15.50)", escapeMarkdown(state.Ticker))
+		if c.Callback() != nil {
+			return c.Edit(text, telebot.ModeMarkdown, menu)
+		}
+		return c.Send(text, telebot.ModeMarkdown, menu)
+
+	case "EXPECT_FEE":
+		state.Step = "EXPECT_DATE"
+		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+
+		dateMenu := &telebot.ReplyMarkup{}
+		btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
+		btnBack := dateMenu.Data("⬅️ Voltar", "btn_op_back")
+		btnCancel := dateMenu.Data("❌ Cancelar", "btn_cancel_op")
+		dateMenu.Inline(
+			dateMenu.Row(btnToday),
+			dateMenu.Row(btnBack, btnCancel),
+		)
+
+		text := "📅 *Data da Operação*\n\nClique em *Hoje* ou digite a data no formato `DD/MM/AAAA` (ex: `15/03/2024`):"
+		if c.Callback() != nil {
+			return c.Edit(text, telebot.ModeMarkdown, dateMenu)
+		}
+		return c.Send(text, telebot.ModeMarkdown, dateMenu)
+
+	case "ALERT_EXPECT_COND":
+		return h.HandleAlertCreate(c)
+
+	case "ALERT_EXPECT_PRICE":
+		state.Step = "ALERT_EXPECT_COND"
+		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+
+		condMenu := &telebot.ReplyMarkup{}
+		btnAbove := condMenu.Data("🟢 Acima de (>=)", "btn_alert_cond_above")
+		btnBelow := condMenu.Data("🔴 Abaixo de (<=)", "btn_alert_cond_below")
+		btnBack := condMenu.Data("⬅️ Voltar", "btn_op_back")
+		btnCancelOp := condMenu.Data("❌ Cancelar", "btn_cancel_op")
+		condMenu.Inline(
+			condMenu.Row(btnAbove, btnBelow),
+			condMenu.Row(btnBack, btnCancelOp),
+		)
+
+		text := fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(state.Ticker))
+		if c.Callback() != nil {
+			return c.Edit(text, telebot.ModeMarkdown, condMenu)
+		}
+		return c.Send(text, telebot.ModeMarkdown, condMenu)
+
+	default:
+		return h.sendOrEditMenu(c)
+	}
+}
+
 func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	defer c.Respond()
 	userIDStr, err := h.getUserID(c)
@@ -130,14 +209,15 @@ func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error 
 	menu := &telebot.ReplyMarkup{}
 	btnBuy := menu.Data("🟢 Compra", "btn_buy")
 	btnSell := menu.Data("🔴 Venda", "btn_sell")
+	btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 
 	menu.Inline(
 		menu.Row(btnBuy, btnSell),
-		menu.Row(btnCancel),
+		menu.Row(btnBack, btnCancel),
 	)
 
-	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", ticker)
+	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(ticker))
 	if c.Callback() != nil {
 		return c.Edit(text, telebot.ModeMarkdown, menu)
 	}
@@ -152,8 +232,9 @@ func (h *Handlers) HandleNewAsset(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	menu.Inline(menu.Row(btnCancel))
+	menu.Inline(menu.Row(btnBack, btnCancel))
 
 	return c.Edit("Qual o código do ativo? (ex: AAPL, PETR4.SA)", menu)
 }
@@ -183,12 +264,13 @@ func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 	b10 := menu.Data("10", "btn_qty_10")
 	b50 := menu.Data("50", "btn_qty_50")
 	b100 := menu.Data("100", "btn_qty_100")
+	btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 
 	menu.Inline(
 		menu.Row(b1, b5, b10),
 		menu.Row(b50, b100),
-		menu.Row(btnCancel),
+		menu.Row(btnBack, btnCancel),
 	)
 
 	return c.Edit("Qual a quantidade negociada? (Escolha abaixo ou digite o valor no chat):", menu)
@@ -209,8 +291,9 @@ func (h *Handlers) handleSelectedQty(c telebot.Context, qtyStr string) error {
 	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
 
 	menu := &telebot.ReplyMarkup{}
+	btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	menu.Inline(menu.Row(btnCancel))
+	menu.Inline(menu.Row(btnBack, btnCancel))
 
 	return c.Edit("Qual o preço unitário da transação? (ex: 15.50)", menu)
 }
@@ -243,10 +326,11 @@ func (h *Handlers) HandleFeeZero(c telebot.Context) error {
 func (h *Handlers) askFee(c telebot.Context, isCallback bool) error {
 	feeMenu := &telebot.ReplyMarkup{}
 	btnNoFee := feeMenu.Data("0️⃣ Sem Taxas", "btn_op_fee_zero")
+	btnBack := feeMenu.Data("⬅️ Voltar", "btn_op_back")
 	btnCancel := feeMenu.Data("❌ Cancelar", "btn_cancel_op")
 	feeMenu.Inline(
 		feeMenu.Row(btnNoFee),
-		feeMenu.Row(btnCancel),
+		feeMenu.Row(btnBack, btnCancel),
 	)
 
 	text := "💵 *Taxas / Corretagem*\n\nInforme o valor total de taxas em R$ (ex: `4.50`) ou clique em *Sem Taxas*:"
@@ -422,13 +506,22 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		state.Step = "EXPECT_PRICE"
 		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
 
-		return c.Send("Qual o preço unitário da transação? (ex: 15.50)", menu)
+		priceMenu := &telebot.ReplyMarkup{}
+		btnBack := priceMenu.Data("⬅️ Voltar", "btn_op_back")
+		btnCancelOp := priceMenu.Data("❌ Cancelar", "btn_cancel_op")
+		priceMenu.Inline(priceMenu.Row(btnBack, btnCancelOp))
+
+		return c.Send("Qual o preço unitário da transação? (ex: 15.50)", priceMenu)
 
 	case "EXPECT_PRICE":
 		text = strings.ReplaceAll(text, ",", ".")
 		var price float64
 		if _, err := fmt.Sscanf(text, "%f", &price); err != nil || price <= 0 {
-			return c.Send("⚠️ Preço inválido. Por favor, envie apenas o número (ex: 15.50):", menu)
+			priceErrMenu := &telebot.ReplyMarkup{}
+			btnBack := priceErrMenu.Data("⬅️ Voltar", "btn_op_back")
+			btnCancelOp := priceErrMenu.Data("❌ Cancelar", "btn_cancel_op")
+			priceErrMenu.Inline(priceErrMenu.Row(btnBack, btnCancelOp))
+			return c.Send("⚠️ Preço inválido. Por favor, envie apenas o número (ex: 15.50):", priceErrMenu)
 		}
 
 		state.UnitPrice = price
@@ -437,10 +530,11 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 		dateMenu := &telebot.ReplyMarkup{}
 		btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
+		btnBack := dateMenu.Data("⬅️ Voltar", "btn_op_back")
 		btnCancelOp := dateMenu.Data("❌ Cancelar", "btn_cancel_op")
 		dateMenu.Inline(
 			dateMenu.Row(btnToday),
-			dateMenu.Row(btnCancelOp),
+			dateMenu.Row(btnBack, btnCancelOp),
 		)
 
 		return c.Send("📅 *Data da Operação*\n\nClique em *Hoje* ou digite a data no formato `DD/MM/AAAA` (ex: `15/03/2024`):", telebot.ModeMarkdown, dateMenu)
@@ -459,8 +553,12 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			if parseErr != nil {
 				dateMenu := &telebot.ReplyMarkup{}
 				btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
+				btnBack := dateMenu.Data("⬅️ Voltar", "btn_op_back")
 				btnCancelOp := dateMenu.Data("❌ Cancelar", "btn_cancel_op")
-				dateMenu.Inline(dateMenu.Row(btnToday), dateMenu.Row(btnCancelOp))
+				dateMenu.Inline(
+					dateMenu.Row(btnToday),
+					dateMenu.Row(btnBack, btnCancelOp),
+				)
 				return c.Send("⚠️ Formato de data inválido. Use `DD/MM/AAAA` (ex: `15/03/2024`) ou clique em *Hoje*:", telebot.ModeMarkdown, dateMenu)
 			}
 		}
@@ -477,8 +575,12 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		if _, err := fmt.Sscanf(textClean, "%f", &fee); err != nil || fee < 0 {
 			feeMenu := &telebot.ReplyMarkup{}
 			btnNoFee := feeMenu.Data("0️⃣ Sem Taxas", "btn_op_fee_zero")
+			btnBack := feeMenu.Data("⬅️ Voltar", "btn_op_back")
 			btnCancelOp := feeMenu.Data("❌ Cancelar", "btn_cancel_op")
-			feeMenu.Inline(feeMenu.Row(btnNoFee), feeMenu.Row(btnCancelOp))
+			feeMenu.Inline(
+				feeMenu.Row(btnNoFee),
+				feeMenu.Row(btnBack, btnCancelOp),
+			)
 			return c.Send("⚠️ Valor de taxa inválido. Envie um número positivo (ex: 4.50) ou clique em *Sem Taxas*:", telebot.ModeMarkdown, feeMenu)
 		}
 
@@ -499,19 +601,24 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		condMenu := &telebot.ReplyMarkup{}
 		btnAbove := condMenu.Data("🟢 Acima de (>=)", "btn_alert_cond_above")
 		btnBelow := condMenu.Data("🔴 Abaixo de (<=)", "btn_alert_cond_below")
+		btnBack := condMenu.Data("⬅️ Voltar", "btn_op_back")
 		btnCancelOp := condMenu.Data("❌ Cancelar", "btn_cancel_op")
 		condMenu.Inline(
 			condMenu.Row(btnAbove, btnBelow),
-			condMenu.Row(btnCancelOp),
+			condMenu.Row(btnBack, btnCancelOp),
 		)
 
-		return c.Send(fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", ticker), telebot.ModeMarkdown, condMenu)
+		return c.Send(fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(ticker)), telebot.ModeMarkdown, condMenu)
 
 	case "ALERT_EXPECT_PRICE":
 		text = strings.ReplaceAll(text, ",", ".")
 		var price float64
 		if _, err := fmt.Sscanf(text, "%f", &price); err != nil || price <= 0 {
-			return c.Send("⚠️ Preço inválido. Por favor, envie apenas o número positivo (ex: 35.50):", menu)
+			priceErrMenu := &telebot.ReplyMarkup{}
+			btnBack := priceErrMenu.Data("⬅️ Voltar", "btn_op_back")
+			btnCancelOp := priceErrMenu.Data("❌ Cancelar", "btn_cancel_op")
+			priceErrMenu.Inline(priceErrMenu.Row(btnBack, btnCancelOp))
+			return c.Send("⚠️ Preço inválido. Por favor, envie apenas o número positivo (ex: 35.50):", priceErrMenu)
 		}
 
 		userIDStr, err := h.getUserID(c)
