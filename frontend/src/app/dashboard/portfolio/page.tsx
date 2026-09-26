@@ -74,19 +74,6 @@ function PortfolioContent() {
     loadPerformance,
   } = portfolio;
 
-  if (authLoading || isLoadingPortfolios) {
-    return (
-      <main className="container">
-        <div className="glass-panel flex-col items-center justify-center" style={{ minHeight: '300px' }}>
-          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
-          <p className="text-secondary mt-lg">Carregando dados financeiros seguros...</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) return null;
-
   // Dynamic categories per active tab without hardcoding
   const dynamicCategories = React.useMemo(() => {
     if (activeTab === 'ativos') {
@@ -183,6 +170,19 @@ function PortfolioContent() {
     }
     return cat;
   };
+
+  if (authLoading || isLoadingPortfolios) {
+    return (
+      <main className="container">
+        <div className="glass-panel flex-col items-center justify-center" style={{ minHeight: '300px' }}>
+          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
+          <p className="text-secondary mt-lg">Carregando dados financeiros seguros...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="app-layout">
