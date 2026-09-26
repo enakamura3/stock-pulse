@@ -648,6 +648,185 @@ func TestHandlers_Operations(t *testing.T) {
 	})
 }
 
+func TestHandlers_HandleOperationBack(t *testing.T) {
+	h, svc, pSvc, _, _, _ := setupHandlersTest()
+
+	t.Run("HandleOperationBack - state is nil", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return((*ConversationState)(nil), nil).Once()
+		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - EXPECT_TYPE", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Twice()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_TYPE", PortfolioID: "p1"}, nil).Once()
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolio.Portfolio{}, []portfolio.Position{{Ticker: "AAPL"}}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), mock.Anything).Return(nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - EXPECT_QTY", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Twice()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_QTY", PortfolioID: "p1", Ticker: "PETR4"}, nil).Times(2)
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_TYPE", PortfolioID: "p1", Ticker: "PETR4"}).Return(nil).Once()
+		mCtx.On("Edit", mock.MatchedBy(func(s string) bool { return strings.Contains(s, "PETR4") }), mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - EXPECT_PRICE", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Twice()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "PETR4", Type: "BUY"}, nil).Times(2)
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_QTY", PortfolioID: "p1", Ticker: "PETR4", Type: "BUY"}).Return(nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - EXPECT_DATE callback", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_DATE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10}).Return(nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - EXPECT_DATE send", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_DATE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10}).Return(nil).Once()
+		mCtx.On("Send", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - EXPECT_FEE callback", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_FEE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10, UnitPrice: 60}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_DATE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10, UnitPrice: 60}).Return(nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - EXPECT_FEE send", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_FEE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10, UnitPrice: 60}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_DATE", PortfolioID: "p1", Ticker: "VALE3", Type: "BUY", Quantity: 10, UnitPrice: 60}).Return(nil).Once()
+		mCtx.On("Send", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - ALERT_EXPECT_COND", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Twice()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "ALERT_EXPECT_COND", Ticker: "WEGE3"}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "ALERT_EXPECT_TICKER"}).Return(nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - ALERT_EXPECT_PRICE callback", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "ALERT_EXPECT_PRICE", Ticker: "WEGE3", Type: "ABOVE"}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "ALERT_EXPECT_COND", Ticker: "WEGE3", Type: "ABOVE"}).Return(nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - ALERT_EXPECT_PRICE send", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "ALERT_EXPECT_PRICE", Ticker: "WEGE3", Type: "ABOVE"}, nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "ALERT_EXPECT_COND", Ticker: "WEGE3", Type: "ABOVE"}).Return(nil).Once()
+		mCtx.On("Send", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleOperationBack - default step fallback", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+
+		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "UNKNOWN_STEP"}, nil).Once()
+		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := h.HandleOperationBack(mCtx)
+		assert.NoError(t, err)
+	})
+}
+
 func TestHandlers_Agenda(t *testing.T) {
 	h, svc, pSvc, _, _, _ := setupHandlersTest()
 
