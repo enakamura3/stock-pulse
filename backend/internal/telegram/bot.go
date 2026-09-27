@@ -1,11 +1,13 @@
 package telegram
 
 import (
+	"context"
 	"log/slog"
 	"math"
 	"time"
 
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
@@ -75,6 +77,19 @@ func (r *BotRunner) Stop() {
 	}
 	slog.Info("Parando Bot do Telegram...")
 	r.bot.Stop()
+}
+
+// StartWithLeaderElection inicia o bot gerenciado por eleição de liderança no cluster Redis.
+func (r *BotRunner) StartWithLeaderElection(ctx context.Context, rdb *redis.Client, cfg ...LeaderElectorConfig) error {
+	if r == nil || r.bot == nil {
+		return nil
+	}
+	var c LeaderElectorConfig
+	if len(cfg) > 0 {
+		c = cfg[0]
+	}
+	elector := NewLeaderElector(r, rdb, c)
+	return elector.Run(ctx)
 }
 
 func (r *BotRunner) GetUsername() string {

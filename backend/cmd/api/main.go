@@ -200,7 +200,11 @@ func main() {
 
 	go wsHub.Start(workerCtx)
 	if telegramBot != nil {
-		go telegramBot.Start()
+		go func() {
+			if err := telegramBot.StartWithLeaderElection(workerCtx, rdb); err != nil && err != context.Canceled {
+				slog.Error("Erro no Leader Election do Bot do Telegram", "error", err)
+			}
+		}()
 	}
 
 	// Configuração das Rotas (Chi)
@@ -336,13 +340,17 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	fmt.Println("Sinal de desligamento recebido. Encerrando servidor com Graceful Shutdown...")
-	workerCancel() // Encerra o Daily Worker em background imediatamente
+	workerCancel() // Encerra workers em background e o leader election do Telegram bot imediatamente
+
+	if telegramBot != nil {
+		telegramBot.Stop()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Erro durante o Graceful Shutdown: %v", err)
+		log.Printf("Erro durante o Graceful Shutdown do servidor HTTP: %v", err)
 	}
 
 	fmt.Println("Servidor encerrado com segurança.")
