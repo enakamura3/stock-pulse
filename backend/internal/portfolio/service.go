@@ -49,6 +49,16 @@ type PortfolioRepository interface {
 	UpdateAssetEventValueByID(ctx context.Context, eventID string, newGross, newNet float64, newPayment time.Time) error
 	GetExchangeRateByDate(ctx context.Context, currencyPairTicker string, date time.Time) (float64, error)
 	GetOldestPriceDate(ctx context.Context, assetID string) (time.Time, error)
+	GetTelegramLinkedPortfolios(ctx context.Context) ([]LinkedPortfolio, error)
+}
+
+// LinkedPortfolio representa uma carteira de um usuário que vinculou sua conta ao Telegram.
+type LinkedPortfolio struct {
+	PortfolioID    string `json:"portfolio_id"`
+	PortfolioName  string `json:"portfolio_name"`
+	UserID         string `json:"user_id"`
+	UserName       string `json:"user_name"`
+	TelegramChatID int64  `json:"telegram_chat_id"`
 }
 
 // MarketService define as operações de mercado suportadas.

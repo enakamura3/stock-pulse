@@ -879,3 +879,58 @@ func TestRepository_AssetEvents_Branches(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestRepository_GetTelegramLinkedPortfolios(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	expectedQuery := `SELECT p\.id, p\.name, p\.user_id, u\.name, utl\.telegram_chat_id FROM portfolio p INNER JOIN "user" u ON p\.user_id = u\.id INNER JOIN user_telegram_link utl ON u\.id = utl\.user_id ORDER BY p\.user_id`
+
+	t.Run("Success", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "name", "user_id", "user_name", "telegram_chat_id"}).
+			AddRow("p1", "Carteira 1", "u1", "Eduardo", int64(123456)).
+			AddRow("p2", "Carteira 2", "u2", "Ana", int64(789012))
+
+		mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
+
+		list, err := repo.GetTelegramLinkedPortfolios(context.Background())
+		assert.NoError(t, err)
+		assert.Len(t, list, 2)
+		assert.Equal(t, "p1", list[0].PortfolioID)
+		assert.Equal(t, "Carteira 1", list[0].PortfolioName)
+		assert.Equal(t, "u1", list[0].UserID)
+		assert.Equal(t, "Eduardo", list[0].UserName)
+		assert.Equal(t, int64(123456), list[0].TelegramChatID)
+	})
+
+	t.Run("Query Error", func(t *testing.T) {
+		mock.ExpectQuery(expectedQuery).WillReturnError(errors.New("db query error"))
+
+		list, err := repo.GetTelegramLinkedPortfolios(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, list)
+	})
+
+	t.Run("Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "name", "user_id", "user_name", "telegram_chat_id"}).
+			AddRow("p1", "Carteira 1", "u1", "Eduardo", "not_an_int")
+
+		mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
+
+		list, err := repo.GetTelegramLinkedPortfolios(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, list)
+	})
+
+	t.Run("Rows Err", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "name", "user_id", "user_name", "telegram_chat_id"}).
+			AddRow("p1", "Carteira 1", "u1", "Eduardo", int64(123)).
+			RowError(0, errors.New("iteration error"))
+
+		mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
+
+		list, err := repo.GetTelegramLinkedPortfolios(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, list)
+	})
+}

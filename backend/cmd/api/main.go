@@ -164,6 +164,7 @@ func main() {
 	if telegramBot != nil {
 		botUsername = telegramBot.GetUsername()
 		alertTgProvider = telegramBot
+		dividendWorker.WithNotifier(portfolioService, telegramBot, portfolio.NewRedisDividendDeduplicator(rdb))
 	}
 	telegramHttpHandler := telegram.NewHTTPHandler(telegramService, botUsername)
 

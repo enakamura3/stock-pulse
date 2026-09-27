@@ -2,8 +2,12 @@ package telegram
 
 import (
 	"log/slog"
+	"math"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
 )
 
@@ -37,6 +41,12 @@ func NewBotRunnerWithSettings(pref telebot.Settings, handlers *Handlers) (*BotRu
 	// Adiciona os comandos no Menu dinâmico nativo do Telegram (Botão "Menu" ao lado da caixa de texto)
 	_ = b.SetCommands([]telebot.Command{
 		{Text: "menu", Description: "Abrir o menu principal"},
+		{Text: "resumo", Description: "Resumo da carteira ativa"},
+		{Text: "ativos", Description: "Listar ativos em carteira"},
+		{Text: "rendafixa", Description: "Consultar posições de renda fixa"},
+		{Text: "operacao", Description: "Lançar nova operação"},
+		{Text: "alertas", Description: "Gerenciar alertas de preço"},
+		{Text: "watchlist", Description: "Listar e gerenciar favoritos"},
 		{Text: "cotacao", Description: "Consultar cotação de ativo"},
 		{Text: "agenda", Description: "Agenda de proventos (30 dias)"},
 		{Text: "analise", Description: "Análise fundamentalista de ativo"},
@@ -103,6 +113,64 @@ func (r *BotRunner) SendAlertMessage(chatID int64, userName, ticker, assetName s
 	_, err := r.bot.Send(&telebot.Chat{ID: chatID}, msg, telebot.ModeMarkdown, menu)
 	if err != nil && isBlockedByUser(err) {
 		slog.Warn("Usuário bloqueou o bot do Telegram ao receber alerta", "chatID", chatID, "error", err)
+	}
+	return err
+}
+
+func (r *BotRunner) SendDividendPaymentAlert(chatID int64, userName, portfolioName string, items []portfolio.DividendNotificationItem) error {
+	if r == nil || r.bot == nil || len(items) == 0 {
+		return nil
+	}
+
+	p := message.NewPrinter(language.Portuguese)
+	escapedUserName := escapeMarkdown(userName)
+	escapedPortfolioName := escapeMarkdown(portfolioName)
+
+	msg := "💰 *PROVENTO PAGO: Caiu na conta!* 💰\n\n"
+	msg += "Olá, *" + escapedUserName + "*!\n"
+	msg += "Hoje é data de pagamento de proventos na sua carteira *" + escapedPortfolioName + "*:\n\n"
+
+	totalCredited := 0.0
+	currency := "BRL"
+	for _, it := range items {
+		if it.Currency != "" {
+			currency = it.Currency
+		}
+		totalCredited += it.NetAmount
+
+		escapedTicker := escapeMarkdown(it.Ticker)
+		escapedType := escapeMarkdown(it.Type)
+		perShareStr := formatFinancialPrice(p, it.PerShareAmount)
+		totalItemStr := formatFinancialPrice(p, it.NetAmount)
+		qtyStr := p.Sprintf("%.2f", it.Quantity)
+		if math.Abs(it.Quantity-math.Round(it.Quantity)) < 1e-6 {
+			qtyStr = p.Sprintf("%.0f", it.Quantity)
+		}
+
+		msg += "• *" + escapedTicker + "* (" + escapedType + ")\n"
+		msg += "  ▫ Valor por cota: " + currency + " " + perShareStr + "\n"
+		msg += "  ▫ Quantidade: " + qtyStr + " cotas\n"
+		msg += "  ▫ Total creditado: *" + currency + " " + totalItemStr + "*\n\n"
+	}
+
+	if len(items) > 1 {
+		msg += "💵 *Total Geral Creditado Hoje:* *" + currency + " " + formatFinancialPrice(p, totalCredited) + "*\n\n"
+	}
+	msg += "Acesse o *Stock Pulse* para conferir seu extrato atualizado."
+
+	menu := &telebot.ReplyMarkup{}
+	var buttons []telebot.Btn
+	if len(items) == 1 {
+		buttons = append(buttons, menu.Data("📈 Ver Cotação", "btn_quote_"+items[0].Ticker))
+	}
+	buttons = append(buttons, menu.Data("📅 Minha Agenda", "btn_agenda"))
+	buttons = append(buttons, menu.Data("💼 Menu Principal", "btn_menu"))
+
+	menu.Inline(menu.Row(buttons...))
+
+	_, err := r.bot.Send(&telebot.Chat{ID: chatID}, msg, telebot.ModeMarkdown, menu)
+	if err != nil && isBlockedByUser(err) {
+		slog.Warn("Usuário bloqueou o bot do Telegram ao receber proventos", "chatID", chatID, "error", err)
 	}
 	return err
 }

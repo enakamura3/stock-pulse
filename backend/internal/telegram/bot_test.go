@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/telebot.v3"
@@ -69,6 +70,125 @@ func TestBotRunner_SendAlertMessage(t *testing.T) {
 
 		runner := &BotRunner{bot: b}
 		errBlocked := runner.SendAlertMessage(123, "User", "AAPL", "Apple", 155.0, 150.0, "ABOVE", "USD")
+		assert.Error(t, errBlocked)
+		assert.True(t, isBlockedByUser(errBlocked))
+	})
+}
+
+func TestBotRunner_SendDividendPaymentAlert(t *testing.T) {
+	t.Run("Bot is nil", func(t *testing.T) {
+		var runner *BotRunner
+		err := runner.SendDividendPaymentAlert(123, "User", "Carteira", []portfolio.DividendNotificationItem{
+			{Ticker: "PETR4", NetAmount: 100},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("Bot object is nil", func(t *testing.T) {
+		runner := &BotRunner{bot: nil}
+		err := runner.SendDividendPaymentAlert(123, "User", "Carteira", []portfolio.DividendNotificationItem{
+			{Ticker: "PETR4", NetAmount: 100},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("Items is empty", func(t *testing.T) {
+		runner := &BotRunner{bot: new(telebot.Bot)}
+		err := runner.SendDividendPaymentAlert(123, "User", "Carteira", nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Mock server single item", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 1, "chat": {"id": 123}}}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		items := []portfolio.DividendNotificationItem{
+			{
+				Ticker:         "PETR4",
+				AssetName:      "Petrobras",
+				Type:           "DIVIDENDO",
+				Quantity:       100.0,
+				PerShareAmount: 1.50,
+				NetAmount:      150.0,
+				Currency:       "BRL",
+			},
+		}
+		err = runner.SendDividendPaymentAlert(123, "User_Name*", "Minha_Carteira*", items)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Mock server multiple items with fractional quantities and USD", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 2, "chat": {"id": 123}}}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		items := []portfolio.DividendNotificationItem{
+			{
+				Ticker:         "AAPL",
+				AssetName:      "Apple",
+				Type:           "DIVIDENDO",
+				Quantity:       10.5,
+				PerShareAmount: 0.25,
+				NetAmount:      2.625,
+				Currency:       "USD",
+			},
+			{
+				Ticker:         "VALE3",
+				AssetName:      "Vale",
+				Type:           "JCP",
+				Quantity:       200.0,
+				PerShareAmount: 2.10,
+				NetAmount:      420.0,
+				Currency:       "",
+			},
+		}
+		err = runner.SendDividendPaymentAlert(123, "User", "Carteira Global", items)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Mock server blocked by user", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"ok": false, "error_code": 403, "description": "Forbidden: bot was blocked by the user"}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		items := []portfolio.DividendNotificationItem{
+			{Ticker: "PETR4", NetAmount: 100},
+		}
+		errBlocked := runner.SendDividendPaymentAlert(123, "User", "Carteira", items)
 		assert.Error(t, errBlocked)
 		assert.True(t, isBlockedByUser(errBlocked))
 	})
