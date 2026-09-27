@@ -37,6 +37,9 @@ func (m *MockTelebotContext) Get(key string) interface{} {
 	if key == "user_id" {
 		return "00000000-0000-0000-0000-000000000000"
 	}
+	if key == "ctx" {
+		return nil
+	}
 	// Fallback to mock.Called for backward compatibility in tests if any
 	args := m.Called(key)
 	return args.Get(0)

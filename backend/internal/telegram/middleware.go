@@ -76,6 +76,25 @@ func NewRateLimitMiddleware(r rate.Limit, burst int, ttl time.Duration) telebot.
 	}
 }
 
+// DefaultHandlerTimeout define o timeout padrão de 15 segundos para operações no Telegram.
+const DefaultHandlerTimeout = 15 * time.Second
+
+// TimeoutMiddleware intercepta requisições do Telegram e injeta um context.Context com timeout.
+// Isso evita goroutine leaks e bloqueios perpétuos em caso de lentidão ou contenção no banco de dados.
+func TimeoutMiddleware(timeout time.Duration) telebot.MiddlewareFunc {
+	if timeout <= 0 {
+		timeout = DefaultHandlerTimeout
+	}
+	return func(next telebot.HandlerFunc) telebot.HandlerFunc {
+		return func(c telebot.Context) error {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			c.Set("ctx", ctx)
+			return next(c)
+		}
+	}
+}
+
 func (h *Handlers) AuthMiddleware(next telebot.HandlerFunc) telebot.HandlerFunc {
 	return func(c telebot.Context) error {
 		// Ignore /start as it is used for linking
@@ -83,7 +102,10 @@ func (h *Handlers) AuthMiddleware(next telebot.HandlerFunc) telebot.HandlerFunc 
 			return next(c)
 		}
 
-		userID, err := h.svc.GetUserIDByChatID(context.Background(), c.Chat().ID)
+		ctx, cancel := h.getContext(c)
+		defer cancel()
+
+		userID, err := h.svc.GetUserIDByChatID(ctx, c.Chat().ID)
 		if err != nil {
 			if c.Callback() != nil {
 				c.Respond()

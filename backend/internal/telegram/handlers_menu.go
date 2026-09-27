@@ -14,7 +14,9 @@ func (h *Handlers) HandleStart(c telebot.Context) error {
 	args := c.Args()
 	if len(args) > 0 {
 		token := args[0]
-		err := h.svc.LinkAccountWithToken(context.Background(), token, c.Chat().ID)
+		ctx, cancel := h.getContext(c)
+		defer cancel()
+		err := h.svc.LinkAccountWithToken(ctx, token, c.Chat().ID)
 		if err != nil {
 			if strings.Contains(err.Error(), "inválido ou expirado") {
 				return c.Send("❌ O link de vinculação é inválido ou expirou. Gere um novo no Stock Pulse.")
@@ -43,10 +45,13 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 		return err
 	}
 
-	// Se houver estado pendente, vamos limpar
-	_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	// Se houver estado pendente, vamos limpar
+	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		if c.Callback() != nil {
 			return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
@@ -85,7 +90,7 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 
 	menu.Inline(rows...)
 
-	_, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	_, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 	msgText := fmt.Sprintf("🏢 *Carteira Ativa:* %s\nEscolha uma opção:", escapeMarkdown(portfolioName))
 
 	if c.Callback() != nil {

@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -19,13 +18,16 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Nenhuma carteira encontrada.")
 	}
-	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
-	txs, err := h.portfolioSvc.GetPortfolioTransactions(context.Background(), portfolioID, userIDStr)
+	txs, err := h.portfolioSvc.GetPortfolioTransactions(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch transactions for telegram bot", "error", err, "user_id", userIDStr)
 		return c.Edit("❌ Ocorreu um erro ao buscar o histórico.")

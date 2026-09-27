@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -33,7 +32,10 @@ func (h *Handlers) renderWatchlist(c telebot.Context, page int) error {
 		return err
 	}
 
-	lists, err := h.watchlistSvc.GetWatchlists(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	lists, err := h.watchlistSvc.GetWatchlists(ctx, userIDStr)
 	if err != nil || len(lists) == 0 {
 		slog.Error("Falha ao buscar listas de favoritos", "error", err, "user_id", userIDStr)
 		if c.Callback() != nil {
@@ -43,7 +45,7 @@ func (h *Handlers) renderWatchlist(c telebot.Context, page int) error {
 	}
 
 	activeList := lists[0]
-	wl, err := h.watchlistSvc.GetWatchlist(context.Background(), activeList.ID, userIDStr)
+	wl, err := h.watchlistSvc.GetWatchlist(ctx, activeList.ID, userIDStr)
 	if err != nil {
 		slog.Error("Falha ao buscar itens da lista de favoritos", "error", err, "list_id", activeList.ID)
 		if c.Callback() != nil {
@@ -148,7 +150,10 @@ func (h *Handlers) HandleWatchlistAdd(c telebot.Context) error {
 		return c.Edit("⚠️ Módulo de Favoritos não está ativo.")
 	}
 
-	err := h.svc.SetConversationState(context.Background(), c.Chat().ID, ConversationState{
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	err := h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{
 		Step: "WL_EXPECT_TICKER",
 	})
 	if err != nil {
@@ -177,12 +182,15 @@ func (h *Handlers) handleWatchlistAddTicker(c telebot.Context, text string) erro
 		return err
 	}
 
-	lists, err := h.watchlistSvc.GetWatchlists(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	lists, err := h.watchlistSvc.GetWatchlists(ctx, userIDStr)
 	if err != nil || len(lists) == 0 {
 		return c.Send("❌ Erro ao buscar lista de favoritos.")
 	}
 
-	_, err = h.watchlistSvc.AddAssetToWatchlist(context.Background(), lists[0].ID, userIDStr, ticker)
+	_, err = h.watchlistSvc.AddAssetToWatchlist(ctx, lists[0].ID, userIDStr, ticker)
 	if err != nil {
 		menu := &telebot.ReplyMarkup{}
 		btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
@@ -190,7 +198,7 @@ func (h *Handlers) handleWatchlistAddTicker(c telebot.Context, text string) erro
 		return c.Send(fmt.Sprintf("⚠️ Não foi possível adicionar *%s*: %s\n\nVerifique se o código está correto ou tente novamente:", escapeMarkdown(ticker), err.Error()), telebot.ModeMarkdown, menu)
 	}
 
-	_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 
 	menu := &telebot.ReplyMarkup{}
 	btnWatchlist := menu.Data("⭐ Ver Favoritos", "btn_watchlist")
@@ -219,9 +227,12 @@ func (h *Handlers) handleWatchlistDelete(c telebot.Context, payload string) erro
 		fmt.Sscanf(parts[1], "%d", &page)
 	}
 
-	lists, err := h.watchlistSvc.GetWatchlists(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	lists, err := h.watchlistSvc.GetWatchlists(ctx, userIDStr)
 	if err == nil && len(lists) > 0 {
-		err = h.watchlistSvc.RemoveAssetFromWatchlist(context.Background(), lists[0].ID, userIDStr, ticker)
+		err = h.watchlistSvc.RemoveAssetFromWatchlist(ctx, lists[0].ID, userIDStr, ticker)
 		if err != nil {
 			slog.Error("Falha ao remover ativo dos favoritos", "error", err, "ticker", ticker)
 		}
