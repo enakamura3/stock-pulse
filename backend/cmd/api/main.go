@@ -190,6 +190,10 @@ func main() {
 	workerManager.Register(worker.NewWorker("FixedIncomeWorker", "Sincroniza taxas e séries históricas de índices de renda fixa (CDI, SELIC, IPCA, etc.)", getInterval("FI_WORKER_INTERVAL", 6*time.Hour), fiWorker.SyncRates))
 	workerManager.Register(worker.NewWorker("AnbimaHolidayWorker", "Sincroniza a tabela de feriados nacionais da ANBIMA para cálculos de dias úteis", getInterval("ANBIMA_WORKER_INTERVAL", 6*time.Hour), fiAnbimaWorker.SyncHolidays))
 	workerManager.Register(worker.NewWorker("AlertWorker", "Verifica os alertas de preços ativos e dispara notificações de push/Telegram", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
+	if telegramBot != nil {
+		dailyDigestWorker := telegram.NewDailyDigestWorker(telegramRepo, telegramService, portfolioService, fiService, telegramBot, rdb)
+		workerManager.Register(worker.NewWorker("DailyDigestWorker", "Envia resumo diário matinal de investimentos para usuários com Telegram", getInterval("DAILY_DIGEST_INTERVAL", 15*time.Minute), dailyDigestWorker.ProcessDailyDigests))
+	}
 
 	workerManager.StartAll(workerCtx)
 	workerHandler := worker.NewHandler(workerManager)

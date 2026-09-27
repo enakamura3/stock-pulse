@@ -194,6 +194,108 @@ func TestBotRunner_SendDividendPaymentAlert(t *testing.T) {
 	})
 }
 
+func TestBotRunner_SendDailyDigest(t *testing.T) {
+	t.Run("Bot is nil", func(t *testing.T) {
+		var runner *BotRunner
+		err := runner.SendDailyDigest(123, "User", "Carteira", "BRL", 1000, 10, 1.0, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Bot object is nil", func(t *testing.T) {
+		runner := &BotRunner{bot: nil}
+		err := runner.SendDailyDigest(123, "User", "Carteira", "BRL", 1000, 10, 1.0, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Mock server success positive change and return with dividends", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 10, "chat": {"id": 123}}}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		todayDivs := []portfolio.CalculatedDividend{
+			{Ticker: "PETR4", Type: "DIVIDENDO", Currency: "R$", NetAmount: 150.0},
+		}
+		upcomingDivs := []portfolio.CalculatedDividend{
+			{Ticker: "VALE3", Type: "JCP", Currency: "R$", NetAmount: 200.0, PaymentDate: time.Now().AddDate(0, 0, 3)},
+		}
+
+		err = runner.SendDailyDigest(123, "Test_User*", "Carteira_Acoes*", "R$", 50000.0, 350.50, 5.25, todayDivs, upcomingDivs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Mock server success negative change and return without dividends", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 11, "chat": {"id": 123}}}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		err = runner.SendDailyDigest(123, "User", "Carteira", "USD", 25000.0, -120.0, -2.15, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Mock server success neutral change and return", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 12, "chat": {"id": 123}}}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		err = runner.SendDailyDigest(123, "User", "Carteira", "BRL", 10000.0, 0.0, 0.0, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Mock server blocked by user", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"ok": false, "error_code": 403, "description": "Forbidden: bot was blocked by the user"}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		err = runner.SendDailyDigest(123, "User", "Carteira", "BRL", 10000.0, 10.0, 0.5, nil, nil)
+		assert.Error(t, err)
+		assert.True(t, isBlockedByUser(err))
+	})
+}
+
 func TestBotRunner_LifecycleAndUsername(t *testing.T) {
 	t.Run("NewBotRunner empty token", func(t *testing.T) {
 		runner, err := NewBotRunner("", nil)
