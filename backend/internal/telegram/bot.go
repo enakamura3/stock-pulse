@@ -175,6 +175,71 @@ func (r *BotRunner) SendDividendPaymentAlert(chatID int64, userName, portfolioNa
 	return err
 }
 
+func (r *BotRunner) SendDailyDigest(chatID int64, userName, portfolioName, currency string, totalValue, dailyChange, returnPercent float64, todayDividends, upcomingDividends []portfolio.CalculatedDividend) error {
+	if r == nil || r.bot == nil {
+		return nil
+	}
+
+	p := message.NewPrinter(language.Portuguese)
+	escapedUserName := escapeMarkdown(userName)
+	escapedPortfolioName := escapeMarkdown(portfolioName)
+
+	msg := "🌅 *BOM DIA! Seu Daily Digest* 🌅\n\n"
+	msg += "Olá, *" + escapedUserName + "*!\n"
+	msg += "Aqui está o resumo matinal da sua carteira *" + escapedPortfolioName + "*:\n\n"
+
+	msg += "💼 *Patrimônio:* " + currency + " " + formatFinancialPrice(p, totalValue) + "\n"
+
+	badge := "⚪ "
+	if dailyChange > 1e-6 {
+		badge = "🟢 +"
+	} else if dailyChange < -1e-6 {
+		badge = "🔴 -"
+	}
+	msg += "📊 *Variação Diária:* " + badge + currency + " " + formatFinancialPrice(p, math.Abs(dailyChange)) + "\n"
+
+	retBadge := "⚪ "
+	if returnPercent > 1e-6 {
+		retBadge = "🟢 +"
+	} else if returnPercent < -1e-6 {
+		retBadge = "🔴 "
+	}
+	msg += "📈 *Rentabilidade Total:* " + retBadge + p.Sprintf("%.2f%%", returnPercent) + "\n\n"
+
+	// Proventos que caem hoje
+	if len(todayDividends) > 0 {
+		msg += "💰 *Cai na conta hoje:*\n"
+		for _, d := range todayDividends {
+			msg += "  • *" + escapeMarkdown(d.Ticker) + "* (" + escapeMarkdown(d.Type) + "): " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
+		}
+		msg += "\n"
+	}
+
+	// Próximos proventos (7 dias)
+	if len(upcomingDividends) > 0 {
+		msg += "📅 *Próximos Proventos (7 dias):*\n"
+		for _, d := range upcomingDividends {
+			msg += "  • *" + escapeMarkdown(d.Ticker) + "*: " + d.PaymentDate.Format("02/01") + " — " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
+		}
+		msg += "\n"
+	}
+
+	msg += "Acompanhe seus investimentos em tempo real no *Stock Pulse*."
+
+	menu := &telebot.ReplyMarkup{}
+	btnResumo := menu.Data("💼 Ver Carteira", "btn_resumo")
+	btnAgenda := menu.Data("📅 Minha Agenda", "btn_agenda")
+	btnFavs := menu.Data("⭐ Meus Favoritos", "btn_watchlist")
+
+	menu.Inline(menu.Row(btnResumo, btnAgenda), menu.Row(btnFavs))
+
+	_, err := r.bot.Send(&telebot.Chat{ID: chatID}, msg, telebot.ModeMarkdown, menu)
+	if err != nil && isBlockedByUser(err) {
+		slog.Warn("Usuário bloqueou o bot do Telegram ao receber daily digest", "chatID", chatID, "error", err)
+	}
+	return err
+}
+
 func rateLimitMiddleware() telebot.MiddlewareFunc {
 	return RateLimitMiddleware()
 }

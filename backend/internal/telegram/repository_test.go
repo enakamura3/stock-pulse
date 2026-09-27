@@ -153,3 +153,49 @@ func TestRepository_UnlinkAccount(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
+
+func TestRepository_GetLinkedUsers(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	expectedQuery := `SELECT utl\.user_id, u\.name, utl\.telegram_chat_id FROM user_telegram_link utl INNER JOIN "user" u ON utl\.user_id = u\.id ORDER BY utl\.created_at ASC;`
+	uID1 := uuid.New()
+	uID2 := uuid.New()
+
+	t.Run("Success", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"user_id", "name", "telegram_chat_id"}).
+			AddRow(uID1, "User One", int64(12345)).
+			AddRow(uID2, "User Two", int64(67890))
+
+		mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
+
+		list, err := repo.GetLinkedUsers(context.Background())
+		assert.NoError(t, err)
+		assert.Len(t, list, 2)
+		assert.Equal(t, uID1, list[0].UserID)
+		assert.Equal(t, "User One", list[0].UserName)
+		assert.Equal(t, int64(12345), list[0].TelegramChatID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Query Error", func(t *testing.T) {
+		mock.ExpectQuery(expectedQuery).WillReturnError(errors.New("db error"))
+
+		list, err := repo.GetLinkedUsers(context.Background())
+		assert.ErrorContains(t, err, "failed to query linked users")
+		assert.Nil(t, list)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"user_id", "name", "telegram_chat_id"}).
+			AddRow("invalid-uuid", "User", "not-int")
+
+		mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
+
+		list, err := repo.GetLinkedUsers(context.Background())
+		assert.ErrorContains(t, err, "failed to scan linked user")
+		assert.Nil(t, list)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}

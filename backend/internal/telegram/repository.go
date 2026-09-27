@@ -10,10 +10,17 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/database"
 )
 
+type TelegramUserLink struct {
+	UserID         uuid.UUID `json:"user_id"`
+	UserName       string    `json:"user_name"`
+	TelegramChatID int64     `json:"telegram_chat_id"`
+}
+
 type Repository interface {
 	LinkAccount(ctx context.Context, userID uuid.UUID, telegramChatID int64) error
 	GetUserIDByChatID(ctx context.Context, telegramChatID int64) (uuid.UUID, error)
 	GetChatIDByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
+	GetLinkedUsers(ctx context.Context) ([]TelegramUserLink, error)
 	UnlinkAccount(ctx context.Context, userID uuid.UUID) error
 }
 
@@ -71,4 +78,28 @@ func (r *repository) UnlinkAccount(ctx context.Context, userID uuid.UUID) error 
 		return fmt.Errorf("failed to unlink account: %w", err)
 	}
 	return nil
+}
+
+func (r *repository) GetLinkedUsers(ctx context.Context) ([]TelegramUserLink, error) {
+	query := `
+		SELECT utl.user_id, u.name, utl.telegram_chat_id
+		FROM user_telegram_link utl
+		INNER JOIN "user" u ON utl.user_id = u.id
+		ORDER BY utl.created_at ASC;
+	`
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query linked users: %w", err)
+	}
+	defer rows.Close()
+
+	var list []TelegramUserLink
+	for rows.Next() {
+		var item TelegramUserLink
+		if err := rows.Scan(&item.UserID, &item.UserName, &item.TelegramChatID); err != nil {
+			return nil, fmt.Errorf("failed to scan linked user: %w", err)
+		}
+		list = append(list, item)
+	}
+	return list, nil
 }

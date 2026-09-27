@@ -117,15 +117,21 @@ func (h *Handlers) HandleHelp(c telebot.Context) error {
 }
 
 func (h *Handlers) resolveActivePortfolio(ctx context.Context, chatID int64, portfolios []portfolio.Portfolio) (string, string) {
+	return resolveActivePortfolio(ctx, h.svc, chatID, portfolios)
+}
+
+func resolveActivePortfolio(ctx context.Context, svc Service, chatID int64, portfolios []portfolio.Portfolio) (string, string) {
 	if len(portfolios) == 0 {
 		return "", ""
 	}
 
-	activeID, err := h.svc.GetActivePortfolio(ctx, chatID)
-	if err == nil && activeID != "" {
-		for _, p := range portfolios {
-			if p.ID == activeID {
-				return p.ID, p.Name
+	if svc != nil {
+		activeID, err := svc.GetActivePortfolio(ctx, chatID)
+		if err == nil && activeID != "" {
+			for _, p := range portfolios {
+				if p.ID == activeID {
+					return p.ID, p.Name
+				}
 			}
 		}
 	}
