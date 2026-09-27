@@ -541,3 +541,29 @@ func (r *Repository) GetOldestPriceDate(ctx context.Context, assetID string) (ti
 	}
 	return oldestDate, nil
 }
+
+// GetTelegramLinkedPortfolios retorna todas as carteiras pertencentes a usuários com Telegram vinculado.
+func (r *Repository) GetTelegramLinkedPortfolios(ctx context.Context) ([]LinkedPortfolio, error) {
+	query := `
+		SELECT p.id, p.name, p.user_id, u.name, utl.telegram_chat_id
+		FROM portfolio p
+		INNER JOIN "user" u ON p.user_id = u.id
+		INNER JOIN user_telegram_link utl ON u.id = utl.user_id
+		ORDER BY p.user_id
+	`
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []LinkedPortfolio
+	for rows.Next() {
+		var lp LinkedPortfolio
+		if err := rows.Scan(&lp.PortfolioID, &lp.PortfolioName, &lp.UserID, &lp.UserName, &lp.TelegramChatID); err != nil {
+			return nil, err
+		}
+		list = append(list, lp)
+	}
+	return list, nil
+}

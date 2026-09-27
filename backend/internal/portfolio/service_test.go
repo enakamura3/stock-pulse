@@ -717,6 +717,14 @@ func (m *MockPortfolioRepo) GetOldestPriceDate(ctx context.Context, assetID stri
 	return args.Get(0).(time.Time), args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetTelegramLinkedPortfolios(ctx context.Context) ([]LinkedPortfolio, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]LinkedPortfolio), args.Error(1)
+}
+
 func TestService_DetermineAssetType(t *testing.T) {
 	assert.Equal(t, "CRYPTO", determineAssetType("BTC-USD", "Bitcoin", "USD"))
 	assert.Equal(t, "ETF_US", determineAssetType("SPY", "SPDR S&P 500 ETF Trust", "USD"))
