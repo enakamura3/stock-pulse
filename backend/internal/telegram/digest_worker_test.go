@@ -84,6 +84,40 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
 	})
 
+	t.Run("fallback when location fails to load and nil locFunc", func(t *testing.T) {
+		repo := new(MockRepository)
+		pSvc := new(MockPortfolioService)
+		notifier := new(MockDigestNotifier)
+
+		// 1. locFunc returns error -> triggers fallback to FixedZone("BRT", -3h)
+		w := &DailyDigestWorker{
+			repo:         repo,
+			portfolioSvc: pSvc,
+			notifier:     notifier,
+			targetHour:   8,
+			targetMinute: 30,
+			nowFunc:      func() time.Time { return time.Date(2026, 9, 26, 7, 0, 0, 0, time.UTC) },
+			locFunc: func(name string) (*time.Location, error) {
+				return nil, errors.New("tzdata load failure")
+			},
+		}
+		w.ProcessDailyDigests(context.Background())
+		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
+
+		// 2. locFunc is nil -> defaults to time.LoadLocation
+		wNil := &DailyDigestWorker{
+			repo:         repo,
+			portfolioSvc: pSvc,
+			notifier:     notifier,
+			targetHour:   8,
+			targetMinute: 30,
+			nowFunc:      func() time.Time { return time.Date(2026, 9, 26, 7, 0, 0, 0, time.UTC) },
+			locFunc:      nil,
+		}
+		wNil.ProcessDailyDigests(context.Background())
+		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
+	})
+
 	t.Run("repo GetLinkedUsers returns error", func(t *testing.T) {
 		repo := new(MockRepository)
 		pSvc := new(MockPortfolioService)

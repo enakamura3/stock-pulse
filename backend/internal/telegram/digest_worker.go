@@ -26,6 +26,7 @@ type DailyDigestWorker struct {
 	targetHour   int
 	targetMinute int
 	nowFunc      func() time.Time
+	locFunc      func(name string) (*time.Location, error)
 }
 
 // NewDailyDigestWorker instancia o worker de resumo diário matinal.
@@ -40,6 +41,7 @@ func NewDailyDigestWorker(repo Repository, svc Service, pSvc PortfolioService, f
 		targetHour:   8,
 		targetMinute: 30,
 		nowFunc:      time.Now,
+		locFunc:      time.LoadLocation,
 	}
 }
 
@@ -49,7 +51,12 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 		return
 	}
 
-	loc, err := time.LoadLocation("America/Sao_Paulo")
+	locFunc := w.locFunc
+	if locFunc == nil {
+		locFunc = time.LoadLocation
+	}
+
+	loc, err := locFunc("America/Sao_Paulo")
 	if err != nil {
 		loc = time.FixedZone("BRT", -3*60*60)
 	}
