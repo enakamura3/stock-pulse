@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -134,5 +135,107 @@ func TestRateLimitMiddleware_Unit(t *testing.T) {
 		mCtx3.On("Sender").Return(&telebot.User{ID: 3, Username: "user3"})
 		err := handler(mCtx3)
 		assert.NoError(t, err)
+	})
+}
+
+func TestTimeoutMiddleware(t *testing.T) {
+	t.Run("default timeout when <= 0", func(t *testing.T) {
+		mw := TimeoutMiddleware(0)
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Set", "ctx", mock.Anything).Return()
+
+		executed := false
+		handler := mw(func(c telebot.Context) error {
+			executed = true
+			val := c.Get("ctx")
+			assert.NotNil(t, val)
+			ctx, ok := val.(context.Context)
+			assert.True(t, ok)
+			deadline, ok := ctx.Deadline()
+			assert.True(t, ok)
+			assert.True(t, time.Until(deadline) <= DefaultHandlerTimeout)
+			return nil
+		})
+
+		err := handler(mCtx)
+		assert.NoError(t, err)
+		assert.True(t, executed)
+	})
+
+	t.Run("custom timeout", func(t *testing.T) {
+		customTimeout := 5 * time.Second
+		mw := TimeoutMiddleware(customTimeout)
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Set", "ctx", mock.Anything).Return()
+
+		executed := false
+		handler := mw(func(c telebot.Context) error {
+			executed = true
+			val := c.Get("ctx")
+			assert.NotNil(t, val)
+			ctx, ok := val.(context.Context)
+			assert.True(t, ok)
+			deadline, ok := ctx.Deadline()
+			assert.True(t, ok)
+			assert.True(t, time.Until(deadline) <= customTimeout)
+			return nil
+		})
+
+		err := handler(mCtx)
+		assert.NoError(t, err)
+		assert.True(t, executed)
+	})
+}
+
+func TestHandlers_GetContext(t *testing.T) {
+	h := &Handlers{}
+
+	t.Run("c is nil returns default timeout context", func(t *testing.T) {
+		ctx, cancel := h.getContext(nil)
+		defer cancel()
+
+		assert.NotNil(t, ctx)
+		deadline, ok := ctx.Deadline()
+		assert.True(t, ok)
+		assert.True(t, time.Until(deadline) <= DefaultHandlerTimeout)
+	})
+
+	t.Run("c has no ctx in store returns default timeout context", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Get", "ctx").Return(nil)
+
+		ctx, cancel := h.getContext(mCtx)
+		defer cancel()
+
+		assert.NotNil(t, ctx)
+		deadline, ok := ctx.Deadline()
+		assert.True(t, ok)
+		assert.True(t, time.Until(deadline) <= DefaultHandlerTimeout)
+	})
+
+	t.Run("c has non-context value in store returns default timeout context", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Get", "ctx").Return("invalid")
+
+		ctx, cancel := h.getContext(mCtx)
+		defer cancel()
+
+		assert.NotNil(t, ctx)
+		deadline, ok := ctx.Deadline()
+		assert.True(t, ok)
+		assert.True(t, time.Until(deadline) <= DefaultHandlerTimeout)
+	})
+
+	t.Run("c has valid context in store returns it", func(t *testing.T) {
+		expectedCtx, expCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer expCancel()
+
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Get", "ctx").Return(expectedCtx)
+
+		ctx, cancel := h.getContext(mCtx)
+		defer cancel()
+
+		assert.Equal(t, expectedCtx, ctx)
 	})
 }

@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -30,7 +29,10 @@ func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 		return err
 	}
 
-	alerts, err := h.alertSvc.GetAlerts(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	alerts, err := h.alertSvc.GetAlerts(ctx, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch alerts for telegram bot", "error", err)
 		return c.Edit("❌ Ocorreu um erro ao buscar seus alertas.")
@@ -145,7 +147,10 @@ func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 func (h *Handlers) HandleAlertCreate(c telebot.Context) error {
 	defer c.Respond()
 
-	err := h.svc.SetConversationState(context.Background(), c.Chat().ID, ConversationState{
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	err := h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{
 		Step: "ALERT_EXPECT_TICKER",
 	})
 	if err != nil {
@@ -170,14 +175,17 @@ func (h *Handlers) HandleAlertConditionBelow(c telebot.Context) error {
 func (h *Handlers) handleAlertCondition(c telebot.Context, condition string) error {
 	defer c.Respond()
 
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil || state.Step != "ALERT_EXPECT_COND" {
 		return c.Edit("⚠️ Nenhuma criação de alerta em andamento.")
 	}
 
 	state.Type = condition
 	state.Step = "ALERT_EXPECT_PRICE"
-	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 	condLabel := "ACIMA DE"
 	if condition == "BELOW" {
@@ -207,7 +215,10 @@ func (h *Handlers) handleAlertToggle(c telebot.Context, payload string) error {
 		fmt.Sscanf(parts[1], "%d", &page)
 	}
 
-	_, err = h.alertSvc.ToggleAlert(context.Background(), alertID, userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	_, err = h.alertSvc.ToggleAlert(ctx, alertID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to toggle alert status", "error", err, "alert_id", alertID)
 	}
@@ -230,7 +241,10 @@ func (h *Handlers) handleAlertDelete(c telebot.Context, payload string) error {
 		fmt.Sscanf(parts[1], "%d", &page)
 	}
 
-	err = h.alertSvc.DeleteAlert(context.Background(), alertID, userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	err = h.alertSvc.DeleteAlert(ctx, alertID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to delete alert", "error", err, "alert_id", alertID)
 	}

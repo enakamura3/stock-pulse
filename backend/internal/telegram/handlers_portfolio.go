@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -21,13 +20,16 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
-	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
-	_, positions, err := h.portfolioSvc.GetPortfolioDetails(context.Background(), portfolioID, userIDStr)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
 		return c.Edit("❌ Ocorreu um erro ao buscar sua carteira.")
@@ -47,7 +49,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	var totalFIValue float64
 	var nearMaturity []fixedincome.Position
 	if h.fiSvc != nil {
-		fiPos, err := h.fiSvc.GetPortfolioPositions(context.Background(), portfolioID)
+		fiPos, err := h.fiSvc.GetPortfolioPositions(ctx, portfolioID)
 		if err == nil {
 			for _, pos := range fiPos {
 				totalFIValue += pos.NetValue
@@ -60,7 +62,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			}
 		}
 
-		trPos, err := h.fiSvc.GetTreasuryPositions(context.Background(), portfolioID)
+		trPos, err := h.fiSvc.GetTreasuryPositions(ctx, portfolioID)
 		if err == nil {
 			for _, pos := range trPos {
 				totalFIValue += pos.NetValue
@@ -210,7 +212,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	}
 
 	if h.marketSvc != nil {
-		if benchmarks, err := h.marketSvc.GetBenchmarks(context.Background()); err == nil && benchmarks != nil {
+		if benchmarks, err := h.marketSvc.GetBenchmarks(ctx); err == nil && benchmarks != nil {
 			var bmItems []struct {
 				name          string
 				changePercent float64
@@ -283,13 +285,16 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
-	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
-	_, positions, err := h.portfolioSvc.GetPortfolioDetails(context.Background(), portfolioID, userIDStr)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
 		return c.Edit("❌ Ocorreu um erro ao buscar sua carteira.")
@@ -400,7 +405,10 @@ func (h *Handlers) HandleChangePortfolio(c telebot.Context) error {
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
@@ -426,7 +434,10 @@ func (h *Handlers) handleSelectedPortfolio(c telebot.Context, portfolioID string
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil {
 		return c.Edit("❌ Erro ao buscar carteiras.")
 	}
@@ -443,7 +454,7 @@ func (h *Handlers) handleSelectedPortfolio(c telebot.Context, portfolioID string
 		return c.Edit("❌ Carteira inválida.")
 	}
 
-	err = h.svc.SetActivePortfolio(context.Background(), c.Chat().ID, portfolioID)
+	err = h.svc.SetActivePortfolio(ctx, c.Chat().ID, portfolioID)
 	if err != nil {
 		slog.Error("Failed to set active portfolio", "error", err)
 		return c.Edit("❌ Erro interno ao salvar carteira ativa.")

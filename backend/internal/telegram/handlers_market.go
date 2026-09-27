@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"log/slog"
 	"strings"
 
@@ -22,7 +21,10 @@ func (h *Handlers) HandleQuote(c telebot.Context) error {
 }
 
 func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
-	quote, err := h.marketSvc.GetQuote(context.Background(), ticker)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	quote, err := h.marketSvc.GetQuote(ctx, ticker)
 	if err != nil {
 		msgErr := "⚠️ Ativo não encontrado. Verifique o código e tente novamente."
 		if c.Callback() != nil {
@@ -53,7 +55,10 @@ func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
 func (h *Handlers) HandleQuoteStart(c telebot.Context) error {
 	defer c.Respond()
 
-	err := h.svc.SetConversationState(context.Background(), c.Chat().ID, ConversationState{
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	err := h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{
 		Step: "QUOTE_EXPECT_TICKER",
 	})
 	if err != nil {
@@ -88,7 +93,10 @@ func (h *Handlers) HandleAnalysisStart(c telebot.Context) error {
 		defer c.Respond()
 	}
 
-	err := h.svc.SetConversationState(context.Background(), c.Chat().ID, ConversationState{
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	err := h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{
 		Step: "ANALYSIS_EXPECT_TICKER",
 	})
 	if err != nil {
@@ -110,7 +118,10 @@ func (h *Handlers) HandleAnalysisStart(c telebot.Context) error {
 }
 
 func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
-	fund, err := h.marketSvc.GetFundamentals(context.Background(), ticker)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	fund, err := h.marketSvc.GetFundamentals(ctx, ticker)
 	if err != nil || fund == nil {
 		slog.Error("Failed to fetch fundamentals for telegram", "ticker", ticker, "error", err)
 		msgErr := "⚠️ Dados fundamentalistas não encontrados para `" + ticker + "`. Verifique o código e tente novamente."
@@ -120,7 +131,7 @@ func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
 		return c.Send(msgErr, telebot.ModeMarkdown)
 	}
 
-	quote, _ := h.marketSvc.GetQuote(context.Background(), ticker)
+	quote, _ := h.marketSvc.GetQuote(ctx, ticker)
 	currentPrice := 0.0
 	curr := "BRL"
 	if quote != nil {

@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -26,14 +25,17 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Nenhuma carteira encontrada.")
 	}
 
-	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
-	positions, err1 := h.fiSvc.GetPortfolioPositions(context.Background(), portfolioID)
-	treasuryPositions, err2 := h.fiSvc.GetTreasuryPositions(context.Background(), portfolioID)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	positions, err1 := h.fiSvc.GetPortfolioPositions(ctx, portfolioID)
+	treasuryPositions, err2 := h.fiSvc.GetTreasuryPositions(ctx, portfolioID)
 
 	if (err1 != nil && err2 != nil) || (err1 != nil && len(treasuryPositions) == 0) {
 		return c.Edit("❌ Erro ao buscar posições de Renda Fixa.")

@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -15,13 +14,17 @@ import (
 
 func (h *Handlers) HandleCancelOperation(c telebot.Context) error {
 	defer c.Respond()
-	_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 	return h.sendOrEditMenu(c)
 }
 
 func (h *Handlers) HandleOperationBack(c telebot.Context) error {
 	defer c.Respond()
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
 		return h.sendOrEditMenu(c)
 	}
@@ -38,7 +41,7 @@ func (h *Handlers) HandleOperationBack(c telebot.Context) error {
 
 	case "EXPECT_DATE":
 		state.Step = "EXPECT_PRICE"
-		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 		menu := &telebot.ReplyMarkup{}
 		btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
@@ -53,7 +56,7 @@ func (h *Handlers) HandleOperationBack(c telebot.Context) error {
 
 	case "EXPECT_FEE":
 		state.Step = "EXPECT_DATE"
-		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 		dateMenu := &telebot.ReplyMarkup{}
 		btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
@@ -75,7 +78,7 @@ func (h *Handlers) HandleOperationBack(c telebot.Context) error {
 
 	case "ALERT_EXPECT_PRICE":
 		state.Step = "ALERT_EXPECT_COND"
-		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 		condMenu := &telebot.ReplyMarkup{}
 		btnAbove := condMenu.Data("🟢 Acima de (>=)", "btn_alert_cond_above")
@@ -105,18 +108,21 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
-	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
-	_, positions, err := h.portfolioSvc.GetPortfolioDetails(context.Background(), portfolioID, userIDStr)
+	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		return c.Edit("❌ Ocorreu um erro ao buscar seus ativos.")
 	}
 
-	err = h.svc.SetConversationState(context.Background(), c.Chat().ID, ConversationState{
+	err = h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{
 		Step:        "EXPECT_TICKER",
 		PortfolioID: portfolioID,
 	})
@@ -202,14 +208,17 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 
 func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error {
 	defer c.Respond()
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
 		return c.Send("⚠️ Nenhuma operação em andamento. Envie /menu e clique em Lançar Operação.")
 	}
 
 	state.Ticker = ticker
 	state.Step = "EXPECT_TYPE"
-	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 	menu := &telebot.ReplyMarkup{}
 	btnBuy := menu.Data("🟢 Compra", "btn_buy")
@@ -231,7 +240,10 @@ func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error 
 
 func (h *Handlers) HandleNewAsset(c telebot.Context) error {
 	defer c.Respond()
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
 		return c.Edit("⚠️ Nenhuma operação em andamento.")
 	}
@@ -254,14 +266,17 @@ func (h *Handlers) HandleSetTypeSell(c telebot.Context) error {
 
 func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 	defer c.Respond()
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
 		return c.Edit("⚠️ Nenhuma operação em andamento.")
 	}
 
 	state.Type = opType
 	state.Step = "EXPECT_QTY"
-	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 	menu := &telebot.ReplyMarkup{}
 	b1 := menu.Data("1", "btn_qty_1")
@@ -283,7 +298,10 @@ func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 
 func (h *Handlers) handleSelectedQty(c telebot.Context, qtyStr string) error {
 	defer c.Respond()
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
 		return c.Edit("⚠️ Nenhuma operação em andamento.")
 	}
@@ -293,7 +311,7 @@ func (h *Handlers) handleSelectedQty(c telebot.Context, qtyStr string) error {
 
 	state.Quantity = qty
 	state.Step = "EXPECT_PRICE"
-	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 	menu := &telebot.ReplyMarkup{}
 	btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
@@ -305,21 +323,27 @@ func (h *Handlers) handleSelectedQty(c telebot.Context, qtyStr string) error {
 
 func (h *Handlers) HandleDateToday(c telebot.Context) error {
 	defer c.Respond()
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil || state.Step != "EXPECT_DATE" {
 		return c.Edit("⚠️ Nenhuma operação em andamento.")
 	}
 
 	state.ExecutedAt = time.Now().Format("2006-01-02")
 	state.Step = "EXPECT_FEE"
-	_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 	return h.askFee(c, true)
 }
 
 func (h *Handlers) HandleFeeZero(c telebot.Context) error {
 	defer c.Respond()
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil || state.Step != "EXPECT_FEE" {
 		return c.Edit("⚠️ Nenhuma operação em andamento.")
 	}
@@ -351,6 +375,9 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 		return err
 	}
 
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
 	executedAt := time.Now()
 	if state.ExecutedAt != "" {
 		if parsed, parseErr := time.Parse("2006-01-02", state.ExecutedAt); parseErr == nil {
@@ -377,7 +404,7 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 		ExecutedAt:   executedAt,
 	}
 
-	savedTx, err := h.portfolioSvc.AddTransaction(context.Background(), userIDStr, tx)
+	savedTx, err := h.portfolioSvc.AddTransaction(ctx, userIDStr, tx)
 	if err != nil {
 		slog.Error("Erro ao lançar transação via telegram", "error", err)
 		errMsg := "❌ Ocorreu um erro ao salvar a transação. Tente novamente mais tarde."
@@ -387,7 +414,7 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 		return c.Send(errMsg)
 	}
 
-	_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 
 	tipoStr := "COMPRA"
 	if state.Type == "SELL" {
@@ -421,14 +448,17 @@ func (h *Handlers) HandleUndoLastOperation(c telebot.Context) error {
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Send("⚠️ Nenhuma carteira encontrada. Crie uma carteira primeiro na plataforma web.")
 	}
 
-	portID, portName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	portID, portName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
-	txs, err := h.portfolioSvc.GetPortfolioTransactions(context.Background(), portID, userIDStr)
+	txs, err := h.portfolioSvc.GetPortfolioTransactions(ctx, portID, userIDStr)
 	if err != nil || len(txs) == 0 {
 		return c.Send("ℹ️ Nenhuma operação recente encontrada para desfazer nesta carteira.")
 	}
@@ -458,14 +488,17 @@ func (h *Handlers) handleDeleteTransaction(c telebot.Context, txID string) error
 		return err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Carteira não encontrada.")
 	}
 
-	portID, _ := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
+	portID, _ := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
-	err = h.portfolioSvc.DeleteTransaction(context.Background(), txID, portID, userIDStr)
+	err = h.portfolioSvc.DeleteTransaction(ctx, txID, portID, userIDStr)
 	if err != nil {
 		slog.Error("Erro ao excluir transação via telegram", "txID", txID, "error", err)
 		return c.Edit("❌ Erro ao excluir a operação. Ela pode já ter sido removida.")
@@ -480,7 +513,10 @@ func (h *Handlers) handleDeleteTransaction(c telebot.Context, txID string) error
 }
 
 func (h *Handlers) HandleText(c telebot.Context) error {
-	state, err := h.svc.GetConversationState(context.Background(), c.Chat().ID)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
 		return h.sendOrEditMenu(c)
 	}
@@ -493,7 +529,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 	switch state.Step {
 	case "EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
-		_, err := h.marketSvc.GetQuote(context.Background(), ticker)
+		_, err := h.marketSvc.GetQuote(ctx, ticker)
 		if err != nil {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
@@ -509,7 +545,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 		state.Quantity = qty
 		state.Step = "EXPECT_PRICE"
-		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 		priceMenu := &telebot.ReplyMarkup{}
 		btnBack := priceMenu.Data("⬅️ Voltar", "btn_op_back")
@@ -531,7 +567,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 		state.UnitPrice = price
 		state.Step = "EXPECT_DATE"
-		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 		dateMenu := &telebot.ReplyMarkup{}
 		btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
@@ -570,7 +606,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 		state.ExecutedAt = opDate.Format("2006-01-02")
 		state.Step = "EXPECT_FEE"
-		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 		return h.askFee(c, false)
 
@@ -594,14 +630,14 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	case "ALERT_EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
-		_, err := h.marketSvc.GetQuote(context.Background(), ticker)
+		_, err := h.marketSvc.GetQuote(ctx, ticker)
 		if err != nil {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
 
 		state.Ticker = ticker
 		state.Step = "ALERT_EXPECT_COND"
-		_ = h.svc.SetConversationState(context.Background(), c.Chat().ID, *state)
+		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
 		condMenu := &telebot.ReplyMarkup{}
 		btnAbove := condMenu.Data("🟢 Acima de (>=)", "btn_alert_cond_above")
@@ -631,13 +667,13 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			return err
 		}
 
-		createdAlert, err := h.alertSvc.CreateAlert(context.Background(), userIDStr, state.Ticker, price, state.Type)
+		createdAlert, err := h.alertSvc.CreateAlert(ctx, userIDStr, state.Ticker, price, state.Type)
 		if err != nil {
 			slog.Error("Erro ao criar alerta via telegram", "error", err)
 			return c.Send("❌ Ocorreu um erro ao salvar o alerta. Tente novamente mais tarde.", menu)
 		}
 
-		_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 
 		condStr := "acima de"
 		if createdAlert.Condition == "BELOW" {
@@ -661,12 +697,12 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	case "QUOTE_EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
-		quote, err := h.marketSvc.GetQuote(context.Background(), ticker)
+		quote, err := h.marketSvc.GetQuote(ctx, ticker)
 		if err != nil {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
 
-		_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 
 		msg := formatQuoteMessage(ticker, quote)
 
@@ -681,7 +717,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	case "ANALYSIS_EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
-		_ = h.svc.ClearConversationState(context.Background(), c.Chat().ID)
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 		return h.renderAnalysis(c, ticker)
 
 	case "WL_EXPECT_TICKER":

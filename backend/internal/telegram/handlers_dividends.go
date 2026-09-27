@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"math"
@@ -118,13 +117,16 @@ func (h *Handlers) fetchDividends(c telebot.Context) ([]portfolio.CalculatedDivi
 		return nil, "", err
 	}
 
-	portfolios, err := h.portfolioSvc.GetPortfolios(context.Background(), userIDStr)
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return nil, "", fmt.Errorf("nenhuma carteira")
 	}
 
-	portfolioID, portfolioName := h.resolveActivePortfolio(context.Background(), c.Chat().ID, portfolios)
-	divs, err := h.portfolioSvc.GetPortfolioDividends(context.Background(), portfolioID, userIDStr)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	divs, err := h.portfolioSvc.GetPortfolioDividends(ctx, portfolioID, userIDStr)
 	if err != nil {
 		return nil, "", fmt.Errorf("erro ao buscar")
 	}

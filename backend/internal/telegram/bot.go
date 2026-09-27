@@ -35,6 +35,7 @@ func NewBotRunnerWithSettings(pref telebot.Settings, handlers *Handlers) (*BotRu
 	}
 
 	b.Use(rateLimitMiddleware())
+	b.Use(TimeoutMiddleware(DefaultHandlerTimeout))
 
 	handlers.Register(b)
 

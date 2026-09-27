@@ -70,6 +70,18 @@ func NewHandlers(svc Service, pSvc PortfolioService, mSvc MarketService, fiSvc F
 	}
 }
 
+// getContext obtém o context.Context injetado pelo TimeoutMiddleware (ou instancia um novo com timeout padrão de 15s).
+func (h *Handlers) getContext(c telebot.Context) (context.Context, context.CancelFunc) {
+	if c != nil {
+		if val := c.Get("ctx"); val != nil {
+			if ctx, ok := val.(context.Context); ok {
+				return ctx, func() {}
+			}
+		}
+	}
+	return context.WithTimeout(context.Background(), DefaultHandlerTimeout)
+}
+
 func (h *Handlers) Register(bot *telebot.Bot) {
 	// Add auth middleware for all routes globally, wait, telebot allows group or Use.
 	// If we use bot.Use(), it applies to all. The middleware handles /start explicitly.
