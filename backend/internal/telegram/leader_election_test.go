@@ -50,6 +50,18 @@ func (m *mockBotController) Stop() {
 	}
 }
 
+func (m *mockBotController) GetStartCalled() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.startCalled
+}
+
+func (m *mockBotController) GetStopCalled() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.stopCalled
+}
+
 func TestNewLeaderElector(t *testing.T) {
 	t.Run("Default configuration values with real hostname", func(t *testing.T) {
 		bot := newMockBotController(false)
@@ -126,7 +138,7 @@ func TestLeaderElector_NilRedis(t *testing.T) {
 
 	err = elector.Run(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, bot.startCalled)
+	assert.Equal(t, 1, bot.GetStartCalled())
 }
 
 func TestLeaderElector_NilBot(t *testing.T) {
@@ -276,7 +288,7 @@ func TestLeaderElector_Run_SingleInstance_GracefulShutdown(t *testing.T) {
 		return elector.IsLeader()
 	}, 1*time.Second, 20*time.Millisecond)
 
-	assert.Equal(t, 1, bot.startCalled)
+	assert.Equal(t, 1, bot.GetStartCalled())
 	assert.True(t, mr.Exists("test:lock:lifecycle"))
 
 	// Let it run through at least one renewal
@@ -288,7 +300,7 @@ func TestLeaderElector_Run_SingleInstance_GracefulShutdown(t *testing.T) {
 	err := <-errCh
 	assert.True(t, errors.Is(err, context.Canceled))
 	assert.False(t, elector.IsLeader())
-	assert.Equal(t, 1, bot.stopCalled)
+	assert.Equal(t, 1, bot.GetStopCalled())
 	assert.False(t, mr.Exists("test:lock:lifecycle"))
 }
 
@@ -321,7 +333,7 @@ func TestLeaderElector_Run_StandbyAndFailover(t *testing.T) {
 	// Verify it starts in standby because old leader holds the lock
 	time.Sleep(100 * time.Millisecond)
 	assert.False(t, elector.IsLeader())
-	assert.Equal(t, 0, bot.startCalled)
+	assert.Equal(t, 0, bot.GetStartCalled())
 
 	// Old leader drops lock
 	mr.Del(lockKey)
@@ -331,7 +343,7 @@ func TestLeaderElector_Run_StandbyAndFailover(t *testing.T) {
 		return elector.IsLeader()
 	}, 1*time.Second, 20*time.Millisecond)
 
-	assert.Equal(t, 1, bot.startCalled)
+	assert.Equal(t, 1, bot.GetStartCalled())
 	val, err := mr.Get(lockKey)
 	assert.NoError(t, err)
 	assert.Equal(t, "leader-new", val)
@@ -376,7 +388,7 @@ func TestLeaderElector_Run_LostLeadership(t *testing.T) {
 		return !elector.IsLeader()
 	}, 1*time.Second, 20*time.Millisecond)
 
-	assert.Equal(t, 1, bot.stopCalled)
+	assert.Equal(t, 1, bot.GetStopCalled())
 
 	cancel()
 	<-errCh
