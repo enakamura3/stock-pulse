@@ -63,9 +63,6 @@ services:
       - DB_URL=${DB_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable}
       - REDIS_URL=redis:6379
       - PORT=8080
-      - SMTP_HOST=mailpit
-      - SMTP_PORT=1025
-      - SMTP_FROM=no-reply@stock-pulse.com
       - ALERT_CHECK_INTERVAL=1m
       - DIVIDEND_WORKER_INTERVAL=${DIVIDEND_WORKER_INTERVAL:-6h}
       - DAILY_WORKER_INTERVAL=${DAILY_WORKER_INTERVAL:-6h}
@@ -83,16 +80,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - stock-pulse-net
-
-  mailpit:
-    image: axllent/mailpit
-    container_name: stock-pulse-mailpit
-    restart: unless-stopped
-    ports:
-      - "8025:8025" # Web UI do Mailpit para ver e-mails no navegador
-      - "1025:1025" # Porta SMTP
     networks:
       - stock-pulse-net
 

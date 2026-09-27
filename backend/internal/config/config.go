@@ -12,9 +12,6 @@ type Environment struct {
 	JWTSecret             string
 	FrontendURL           string
 	TelegramBotToken      string
-	SMTPHost              string
-	SMTPPort              string
-	SMTPFrom              string
 	LogLevel              string
 	AlertCheckInterval    string
 	BrapiToken            string
@@ -38,9 +35,6 @@ func Load() error {
 		JWTSecret:          os.Getenv("JWT_SECRET"),
 		FrontendURL:        os.Getenv("FRONTEND_URL"),
 		TelegramBotToken:   os.Getenv("TELEGRAM_BOT_TOKEN"),
-		SMTPHost:           os.Getenv("SMTP_HOST"),
-		SMTPPort:           os.Getenv("SMTP_PORT"),
-		SMTPFrom:           os.Getenv("SMTP_FROM"),
 		LogLevel:           os.Getenv("LOG_LEVEL"),
 		AlertCheckInterval: os.Getenv("ALERT_CHECK_INTERVAL"),
 		BrapiToken:         os.Getenv("BRAPI_TOKEN"),
