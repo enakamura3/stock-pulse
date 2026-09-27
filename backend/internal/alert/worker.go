@@ -9,9 +9,14 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
-// TelegramProvider define as operações necessárias para envio de alertas.
+// TelegramProvider define as operações necessárias para envio de alertas via Telegram.
 type TelegramProvider interface {
 	SendAlertMessage(chatID int64, userName, ticker, assetName string, currentVal, targetVal float64, condition, currency string) error
+}
+
+// MailProvider define as operações necessárias para envio de alertas por e-mail.
+type MailProvider interface {
+	SendAlertEmail(to string, userName string, ticker string, assetName string, currentPrice float64, targetPrice float64, condition string, currency string) error
 }
 
 // AlertWorker gerencia o monitoramento periódico de alertas de preço ativos.
@@ -19,11 +24,12 @@ type AlertWorker struct {
 	repo          AlertRepository
 	marketService market.QuoteProvider
 	tgService     TelegramProvider
+	mailService   MailProvider
 	interval      time.Duration
 }
 
 // NewAlertWorker inicializa o Worker com intervalo customizável (Padrão: 1 minuto).
-func NewAlertWorker(repo AlertRepository, marketService market.QuoteProvider, tgService TelegramProvider) *AlertWorker {
+func NewAlertWorker(repo AlertRepository, marketService market.QuoteProvider, tgService TelegramProvider, mailService ...MailProvider) *AlertWorker {
 	intervalStr := config.Envs.AlertCheckInterval
 	interval := 1 * time.Minute // Valor padrão aprovado (Opção 1A)
 
@@ -33,12 +39,24 @@ func NewAlertWorker(repo AlertRepository, marketService market.QuoteProvider, tg
 		}
 	}
 
+	var ms MailProvider
+	if len(mailService) > 0 {
+		ms = mailService[0]
+	}
+
 	return &AlertWorker{
 		repo:          repo,
 		marketService: marketService,
 		tgService:     tgService,
+		mailService:   ms,
 		interval:      interval,
 	}
+}
+
+// WithMailService permite configurar ou alterar o serviço de e-mail do worker.
+func (w *AlertWorker) WithMailService(ms MailProvider) *AlertWorker {
+	w.mailService = ms
+	return w
 }
 
 func (w *AlertWorker) Interval() time.Duration {
@@ -122,6 +140,30 @@ func (w *AlertWorker) CheckActiveAlerts(ctx context.Context) {
 					)
 					if tgErr != nil {
 						slog.Error("Erro ao disparar mensagem de telegram de alerta", "user", aAlert.UserName, "chat_id", *aAlert.TelegramChatID, "ticker", aAlert.Ticker, "error", tgErr)
+					}
+				}(a, quote.Price, quote.Currency)
+
+				// Dispara o e-mail de alerta de forma assíncrona
+				go func(aAlert *Alert, currentVal float64, currency string) {
+					if w.mailService == nil {
+						return
+					}
+					if aAlert.UserEmail == "" {
+						slog.Info("Alerta disparado mas o usuário não possui e-mail cadastrado", "user", aAlert.UserName, "ticker", aAlert.Ticker)
+						return
+					}
+					mailErr := w.mailService.SendAlertEmail(
+						aAlert.UserEmail,
+						aAlert.UserName,
+						aAlert.Ticker,
+						aAlert.AssetName,
+						currentVal,
+						aAlert.TargetPrice,
+						aAlert.Condition,
+						currency,
+					)
+					if mailErr != nil {
+						slog.Error("Erro ao enviar e-mail de alerta", "user", aAlert.UserName, "email", aAlert.UserEmail, "ticker", aAlert.Ticker, "error", mailErr)
 					}
 				}(a, quote.Price, quote.Currency)
 			}

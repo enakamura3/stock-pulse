@@ -20,6 +20,15 @@ func (m *MockTelegramService) SendAlertMessage(chatID int64, userName, ticker, a
 	return args.Error(0)
 }
 
+type MockMailService struct {
+	mock.Mock
+}
+
+func (m *MockMailService) SendAlertEmail(to string, userName string, ticker string, assetName string, currentPrice float64, targetPrice float64, condition string, currency string) error {
+	args := m.Called(to, userName, ticker, assetName, currentPrice, targetPrice, condition, currency)
+	return args.Error(0)
+}
+
 func TestAlertWorker_StartAndStop(t *testing.T) {
 	repo := new(MockAlertRepo)
 	ms := new(MockMarketService)
@@ -282,5 +291,71 @@ func TestAlertWorker_process(t *testing.T) {
 
 		repo.AssertExpectations(t)
 		ms.AssertExpectations(t)
+	})
+
+	t.Run("Email Notification - Success", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+		tg := new(MockTelegramService)
+		mailSvc := new(MockMailService)
+
+		alerts := []*Alert{
+			{ID: "1", Ticker: "VALE3", UserName: "Eduardo", UserEmail: "eduardo@test.com", TargetPrice: 60.0, Condition: "ABOVE"},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		ms.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Price: 65.0, Currency: "BRL"}, nil).Once()
+		repo.On("MarkAlertTriggered", mock.Anything, "1").Return(nil).Once()
+		mailSvc.On("SendAlertEmail", "eduardo@test.com", "Eduardo", "VALE3", mock.Anything, 65.0, 60.0, "ABOVE", "BRL").Return(nil).Once()
+
+		w := NewAlertWorker(repo, ms, tg, mailSvc)
+		w.CheckActiveAlerts(context.Background())
+		time.Sleep(15 * time.Millisecond)
+
+		repo.AssertExpectations(t)
+		ms.AssertExpectations(t)
+		mailSvc.AssertExpectations(t)
+	})
+
+	t.Run("Email Notification - Empty Email and WithMailService", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+		mailSvc := new(MockMailService)
+
+		alerts := []*Alert{
+			{ID: "1", Ticker: "VALE3", UserName: "Eduardo", UserEmail: "", TargetPrice: 60.0, Condition: "ABOVE"},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		ms.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Price: 65.0, Currency: "BRL"}, nil).Once()
+		repo.On("MarkAlertTriggered", mock.Anything, "1").Return(nil).Once()
+
+		w := NewAlertWorker(repo, ms, nil).WithMailService(mailSvc)
+		w.CheckActiveAlerts(context.Background())
+		time.Sleep(15 * time.Millisecond)
+
+		repo.AssertExpectations(t)
+		ms.AssertExpectations(t)
+		mailSvc.AssertNotCalled(t, "SendAlertEmail")
+	})
+
+	t.Run("Email Notification - API Error", func(t *testing.T) {
+		repo := new(MockAlertRepo)
+		ms := new(MockMarketService)
+		mailSvc := new(MockMailService)
+
+		alerts := []*Alert{
+			{ID: "1", Ticker: "VALE3", UserName: "Eduardo", UserEmail: "eduardo@test.com", TargetPrice: 60.0, Condition: "ABOVE"},
+		}
+		repo.On("GetActiveAlerts", mock.Anything).Return(alerts, nil)
+		ms.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Price: 65.0, Currency: "BRL"}, nil).Once()
+		repo.On("MarkAlertTriggered", mock.Anything, "1").Return(nil).Once()
+		mailSvc.On("SendAlertEmail", "eduardo@test.com", "Eduardo", "VALE3", mock.Anything, 65.0, 60.0, "ABOVE", "BRL").Return(errors.New("smtp failure")).Once()
+
+		w := NewAlertWorker(repo, ms, nil, mailSvc)
+		w.CheckActiveAlerts(context.Background())
+		time.Sleep(15 * time.Millisecond)
+
+		repo.AssertExpectations(t)
+		ms.AssertExpectations(t)
+		mailSvc.AssertExpectations(t)
 	})
 }

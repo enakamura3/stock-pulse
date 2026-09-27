@@ -25,6 +25,7 @@ type Alert struct {
 
 	// Dados do usuário injetados na busca do Worker
 	UserName       string `json:"user_name,omitempty"`
+	UserEmail      string `json:"user_email,omitempty"`
 	TelegramChatID *int64 `json:"telegram_chat_id,omitempty"`
 }
 
@@ -139,7 +140,7 @@ func (r *Repository) ToggleAlertStatus(ctx context.Context, id string, userID st
 // GetActiveAlerts retorna todos os alertas ativos globalmente junto com dados de contato do usuário.
 func (r *Repository) GetActiveAlerts(ctx context.Context) ([]*Alert, error) {
 	query := `
-		SELECT a.id, a.user_id, a.asset_id, ast.ticker, ast.name, ast.currency, a.target_price, a.condition, a.status, a.triggered_at, a.created_at, u.name, utl.telegram_chat_id
+		SELECT a.id, a.user_id, a.asset_id, ast.ticker, ast.name, ast.currency, a.target_price, a.condition, a.status, a.triggered_at, a.created_at, u.name, u.email, utl.telegram_chat_id
 		FROM alert a
 		INNER JOIN asset ast ON a.asset_id = ast.id
 		INNER JOIN "user" u ON a.user_id = u.id
@@ -158,7 +159,7 @@ func (r *Repository) GetActiveAlerts(ctx context.Context) ([]*Alert, error) {
 		err := rows.Scan(
 			&a.ID, &a.UserID, &a.AssetID, &a.Ticker, &a.AssetName, &a.Currency,
 			&a.TargetPrice, &a.Condition, &a.Status, &a.TriggeredAt, &a.CreatedAt,
-			&a.UserName, &a.TelegramChatID,
+			&a.UserName, &a.UserEmail, &a.TelegramChatID,
 		)
 		if err != nil {
 			return nil, err

@@ -22,6 +22,7 @@ import (
 
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
+	"github.com/onigiri/stock-pulse/backend/internal/mail"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	customMiddleware "github.com/onigiri/stock-pulse/backend/internal/middleware"
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
@@ -167,8 +168,9 @@ func main() {
 		dividendWorker.WithNotifier(portfolioService, telegramBot, portfolio.NewRedisDividendDeduplicator(rdb))
 	}
 	telegramHttpHandler := telegram.NewHTTPHandler(telegramService, botUsername)
+	mailService := mail.NewService()
 
-	alertWorker := alert.NewAlertWorker(alertRepo, marketService, alertTgProvider)
+	alertWorker := alert.NewAlertWorker(alertRepo, marketService, alertTgProvider, mailService)
 
 	// Inicialização da Documentação API Swagger (Fase 4)
 	docsHandler := docs.NewHandler("docs/openapi.yaml")
