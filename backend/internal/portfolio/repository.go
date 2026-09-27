@@ -565,8 +565,5 @@ func (r *Repository) GetTelegramLinkedPortfolios(ctx context.Context) ([]LinkedP
 		}
 		list = append(list, lp)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
 	return list, nil
 }

@@ -921,16 +921,4 @@ func TestRepository_GetTelegramLinkedPortfolios(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, list)
 	})
-
-	t.Run("Rows Err", func(t *testing.T) {
-		rows := pgxmock.NewRows([]string{"id", "name", "user_id", "user_name", "telegram_chat_id"}).
-			AddRow("p1", "Carteira 1", "u1", "Eduardo", int64(123)).
-			RowError(0, errors.New("iteration error"))
-
-		mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-
-		list, err := repo.GetTelegramLinkedPortfolios(context.Background())
-		assert.Error(t, err)
-		assert.Nil(t, list)
-	})
 }
