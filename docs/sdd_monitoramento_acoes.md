@@ -37,7 +37,7 @@ O escopo inicial (MVP) contempla:
 - Cotações históricas (diárias, semanais, mensais) para ações e moedas.
 - Gestão de portfólio pessoal simples (compra, venda, preço médio).
 - Gráficos interativos de desempenho histórico.
-- Sistema básico de alertas de preço (e-mail).
+- Sistema básico de alertas de preço (notificação via bot do Telegram).
 
 ### 1.3 Público-Alvo
 Investidores pessoa física (iniciantes e intermediários) que desejam uma ferramenta centralizada para acompanhar ativos de renda variável do Brasil e do exterior, além de cotações de moedas estrangeiras.
@@ -80,7 +80,7 @@ Investidores pessoa física (iniciantes e intermediários) que desejam uma ferra
 | RF07   | O sistema deve fornecer gráficos interativos de histórico de preços (1D, 1S, 1M, 6M, 1A, 5A, Máx).   | Alta       |
 | RF08   | O usuário deve poder consultar cotações históricas de moedas estrangeiras (ex: USD/BRL, EUR/USD).      | Média      |
 | RF09   | O usuário deve poder configurar alertas de preço com condições (acima de / abaixo de).                 | Média      |
-| RF10   | O sistema deve enviar notificações por e-mail quando um alerta for acionado.                           | Média      |
+| RF10   | O sistema deve enviar notificações via bot do Telegram quando um alerta for acionado.                  | Média      |
 | RF11   | O sistema deve permitir a troca de tema (Dark Mode / Light Mode).                                      | Baixa      |
 
 ### 3.2 Requisitos Não Funcionais (RNF)
@@ -154,7 +154,7 @@ graph TD
 
     subgraph Externo
         YahooAPI["Yahoo Finance API"]
-        SMTP["Serviço de E-mail (SMTP)"]
+        TelegramAPI["Telegram Bot API"]
     end
 
     Browser -->|HTTPS| Caddy
@@ -180,7 +180,7 @@ graph TD
 
     WSHandler --> RD
 
-    AlertMod -->|SMTP| SMTP
+    AlertMod -->|Bot API| TelegramAPI
 ```
 
 ### 4.4 Fluxo de Dados: Consulta de Cotação em Tempo Real
@@ -328,7 +328,7 @@ Para garantir que os alertas de preço funcionem mesmo com o usuário offline (s
 1. O worker consulta o banco de dados buscando a lista única (`DISTINCT`) de todos os tickers que possuem alertas com status `ACTIVE`.
 2. Faz uma requisição em lote (Batch) à Yahoo API buscando o preço atual em tempo real.
 3. Se o preço cruzar o `target_price` da regra estabelecida pelo usuário, o status do alerta muda para `TRIGGERED`.
-4. O worker publica um evento na fila do Redis para que o serviço de mensageria dispare o e-mail (SMTP) de forma assíncrona, evitando gargalos no loop de verificação de preços.
+4. Se o preço cruzar o `target_price` da regra estabelecida pelo usuário, o status do alerta muda para `TRIGGERED` e o worker dispara uma notificação via bot do Telegram de forma assíncrona, evitando gargalos no loop de verificação de preços.
 
 ### 4.9 Estratégia de Fallback para Provedor de Dados
 
@@ -553,7 +553,7 @@ sequenceDiagram
 
 ### 7.3 Fluxo de Recuperação de Senha
 - O usuário solicita a redefinição pelo Frontend informando o seu e-mail cadastrado.
-- O Backend gera um token seguro, salva-o diretamente no **Redis** (com formato `pwd_reset:user_id:token` e TTL de 30 minutos, evitando poluir o PostgreSQL) e dispara o e-mail via SMTP com o link de recuperação.
+- O Backend gera um token seguro, salva-o diretamente no **Redis** (com formato `pwd_reset:user_id:token` e TTL de 30 minutos, evitando poluir o PostgreSQL). O envio do link de recuperação ao usuário está fora do escopo atual (não há infraestrutura de e-mail transacional).
 - O Frontend captura o token pela URL, coleta a nova senha e envia ao Backend, que valida o token no Redis, atualiza o `password_hash` no banco e revoga o token imediatamente.
 
 ### 7.4 Privacidade e Conformidade (LGPD)
@@ -631,7 +631,6 @@ sequenceDiagram
 ### Fase 3: Alertas e Tempo Real (Semanas 9–11)
 - [ ] Implementar WebSockets para atualização de cotações em tempo real na Watchlist.
 - [ ] Implementar módulo de Alertas (CRUD + worker de verificação em background).
-- [ ] Configurar envio de e-mails via SMTP (ex: Resend, Mailgun ou Amazon SES).
 - [ ] Implementar tela de gerenciamento de alertas no frontend.
 
 ### Fase 4: Polimento e Produção (Semanas 12–14)

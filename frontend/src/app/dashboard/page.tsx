@@ -83,7 +83,7 @@ function DashboardContent() {
       
       const data = await res.json();
       if (res.ok) {
-        setAlertSuccessMsg(`Alerta configurado com sucesso! Enviaremos um e-mail quando o preço ficar ${alertCondition === 'ABOVE' ? 'acima de' : 'abaixo de'} ${formatMoney(parseFloat(alertTargetPrice), activeQuote.currency)}.`);
+        setAlertSuccessMsg(`Alerta configurado com sucesso! Você será notificado quando o preço ficar ${alertCondition === 'ABOVE' ? 'acima de' : 'abaixo de'} ${formatMoney(parseFloat(alertTargetPrice), activeQuote.currency)}.`);
         setTimeout(() => {
           setShowAlertModal(false);
           setAlertSuccessMsg(null);
