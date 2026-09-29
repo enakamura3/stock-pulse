@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -30,11 +31,20 @@ func TestService_GetDividends(t *testing.T) {
 	})
 
 	t.Run("Cache Miss Fundamentus Success", func(t *testing.T) {
-		// Needs to hit the network, or we just let it fetch real data for PETR4.SA
-		s, _, _, rmock := setupServiceTest()
+		s, _, rdb, rmock := setupServiceTest()
 		rmock.ExpectGet("dividends:PETR4.SA").RedisNil()
-		// Cache set expectation
 		rmock.ExpectSet("dividends:PETR4.SA", mock.Anything, 12*time.Hour).SetVal("OK")
+
+		mockB3 := &mockDividendSource{}
+		mockFund := &mockDividendSource{}
+		mockSA := &mockDividendSource{}
+		mockYahoo := &mockDividendSource{}
+
+		evs := []DividendEvent{{Date: time.Now(), Amount: 1.5, Type: "Dividendo"}}
+		mockB3.On("GetDividends", mock.Anything, "PETR4.SA", "STOCK_BR").Return(evs, nil)
+		mockFund.On("GetDividends", mock.Anything, "PETR4.SA", "STOCK_BR").Return(evs, nil)
+
+		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, rdb, 12*time.Hour)
 
 		res, err := s.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
@@ -42,14 +52,25 @@ func TestService_GetDividends(t *testing.T) {
 	})
 
 	t.Run("Cache Miss StockAnalysis Success", func(t *testing.T) {
-		s, _, _, rmock := setupServiceTest()
+		s, _, rdb, rmock := setupServiceTest()
 		rmock.ExpectGet("dividends:AAPL").RedisNil()
 		rmock.ExpectSet("dividends:AAPL", mock.Anything, 12*time.Hour).SetVal("OK")
+
+		mockB3 := &mockDividendSource{}
+		mockFund := &mockDividendSource{}
+		mockSA := &mockDividendSource{}
+		mockYahoo := &mockDividendSource{}
+
+		evs := []DividendEvent{{Date: time.Now(), Amount: 0.25, Type: "Dividendo"}}
+		mockSA.On("GetDividends", mock.Anything, "AAPL", "STOCK_US").Return(evs, nil)
+
+		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, rdb, 12*time.Hour)
 
 		res, err := s.GetDividends(context.Background(), "AAPL", "STOCK_US")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, res)
 	})
+
 
 }
 
@@ -87,12 +108,37 @@ func TestService_GetHistoricalExchangeRate(t *testing.T) {
 		rmock.ExpectGet("fx:BRL=X:10y").RedisNil()
 		rmock.ExpectSet("fx:BRL=X:10y", mock.Anything, 12*time.Hour).SetVal("OK")
 
-		// Let it fetch Yahoo Finance for real
-		date := time.Now().AddDate(0, -1, 0) // One month ago
+		date := time.Now().AddDate(0, -1, 0)
+		ts := date.Unix()
+
+		chartJSON := fmt.Sprintf(`{
+			"chart": {
+				"result": [{
+					"timestamp": [%d],
+					"indicators": {
+						"quote": [{
+							"close": [5.25]
+						}]
+					}
+				}]
+			}
+		}`, ts)
+
+		mockClient := &http.Client{
+			Transport: RoundTripFunc(func(req *http.Request) *http.Response {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(chartJSON)),
+				}
+			}),
+		}
+		s.provider = &YahooFinanceProvider{client: mockClient}
+
 		rate, err := s.GetHistoricalExchangeRate(context.Background(), date)
 		assert.NoError(t, err)
-		assert.True(t, rate > 0.0)
+		assert.InDelta(t, 5.25, rate, 0.001)
 	})
+
 
 	t.Run("Date too old error", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()

@@ -140,9 +140,6 @@ func (s *service) GetTreasuryPositions(ctx context.Context, portfolioID string) 
 
 		p.IOFTax = tp.grossYield * (getTreasuryIOFRate(tp.holdingDays) / 100.0)
 		p.IRTax = (tp.grossYield - p.IOFTax) * (getTreasuryIRRate(tp.holdingDays) / 100.0)
-		if p.IRTax < 0 {
-			p.IRTax = 0
-		}
 
 		p.Taxes = p.IOFTax + p.IRTax
 		p.NetValue = p.GrossValue - p.Taxes - p.B3Fee
@@ -294,9 +291,6 @@ func (s *service) CreateTreasuryTransaction(ctx context.Context, portfolioID str
 					if totalSelicInvested > 10000.0 {
 						exemptFraction = 10000.0 / totalSelicInvested
 					}
-					if exemptFraction > 1.0 {
-						exemptFraction = 1.0
-					}
 					taxablePortion := 1.0 - exemptFraction
 					accruedFeeFactor := math.Pow(1.0+dailyB3Rate*taxablePortion, float64(busDays)) - 1.0
 					b3Fee = valAtRedemption * accruedFeeFactor
@@ -310,9 +304,6 @@ func (s *service) CreateTreasuryTransaction(ctx context.Context, portfolioID str
 
 				irRate := getTreasuryIRRate(holdingDays)
 				irTax := (grossYield - iofTax) * (irRate / 100.0)
-				if irTax < 0 {
-					irTax = 0
-				}
 
 				netYield := grossYield - iofTax - irTax - b3Fee
 				netVal := costBasis + netYield
@@ -691,9 +682,6 @@ func (s *service) rebuildTreasuryFIFO(ctx context.Context, tx pgx.Tx, portfolioI
 				if totalSelicInvested > 10000.0 {
 					exemptFraction = 10000.0 / totalSelicInvested
 				}
-				if exemptFraction > 1.0 {
-					exemptFraction = 1.0
-				}
 				taxablePortion := 1.0 - exemptFraction
 				accruedFeeFactor := math.Pow(1.0+dailyB3Rate*taxablePortion, float64(busDays)) - 1.0
 				b3Fee = valAtRedemption * accruedFeeFactor
@@ -707,9 +695,6 @@ func (s *service) rebuildTreasuryFIFO(ctx context.Context, tx pgx.Tx, portfolioI
 
 			irRate := getTreasuryIRRate(holdingDays)
 			irTax := (grossYield - iofTax) * (irRate / 100.0)
-			if irTax < 0 {
-				irTax = 0
-			}
 
 			netYield := grossYield - iofTax - irTax - b3Fee
 			netVal := costBasis + netYield
@@ -811,9 +796,6 @@ func (s *service) GetTreasuryMonthlyYields(ctx context.Context, portfolioID stri
 			}
 			lastDay := monthlyLastDay[monthStr]
 			daysHeld := int(lastDay.Sub(startDate).Hours() / 24)
-			if daysHeld < 0 {
-				daysHeld = 0
-			}
 			irRate := calculateIRRate(daysHeld)
 			allYields = append(allYields, MonthlyYield{
 				AssetID:     lot.AssetID,

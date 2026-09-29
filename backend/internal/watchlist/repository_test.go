@@ -212,3 +212,97 @@ func TestRepository_GetWatchlistsByUserID_Error(t *testing.T) {
 	_, err := repo.GetWatchlistsByUserID(context.Background(), "u1")
 	assert.ErrorContains(t, err, "db err")
 }
+
+func TestRepository_GetWatchlistsByUserID_ScanError(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	now := time.Now()
+	rows := pgxmock.NewRows([]string{"id", "user_id", "name", "created_at"}).
+		AddRow("1", "u1", "name", now).
+		RowError(0, errors.New("scan error"))
+
+	mock.ExpectQuery(`SELECT id`).
+		WithArgs("u1").
+		WillReturnRows(rows)
+
+	_, err := repo.GetWatchlistsByUserID(context.Background(), "u1")
+	assert.Error(t, err)
+}
+
+func TestRepository_GetWatchlistByID_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT id`).
+		WithArgs("1", "u1").
+		WillReturnError(errors.New("not found"))
+
+	_, err := repo.GetWatchlistByID(context.Background(), "1", "u1")
+	assert.ErrorContains(t, err, "not found")
+}
+
+func TestRepository_DeleteWatchlist_ExecError(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`DELETE FROM watchlist`).
+		WithArgs("1", "u1").
+		WillReturnError(errors.New("exec error"))
+
+	err := repo.DeleteWatchlist(context.Background(), "1", "u1")
+	assert.ErrorContains(t, err, "exec error")
+}
+
+func TestRepository_GetAssetByTicker_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT id FROM asset`).
+		WithArgs("AAPL").
+		WillReturnError(errors.New("db error"))
+
+	_, err := repo.GetAssetByTicker(context.Background(), "aapl")
+	assert.ErrorContains(t, err, "db error")
+}
+
+func TestRepository_CreateAsset_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`INSERT INTO asset`).
+		WithArgs("AAPL", "Apple", "stock", "USD").
+		WillReturnError(errors.New("insert error"))
+
+	_, err := repo.CreateAsset(context.Background(), "aapl", "Apple", "stock", "USD")
+	assert.ErrorContains(t, err, "erro ao inserir ativo")
+}
+
+func TestRepository_AddWatchlistItem_Error(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`INSERT INTO watchlist_item`).
+		WithArgs("w1", "a1").
+		WillReturnError(errors.New("insert item error"))
+
+	_, err := repo.AddWatchlistItem(context.Background(), "w1", "a1")
+	assert.ErrorContains(t, err, "insert item error")
+}
+
+func TestRepository_GetWatchlistItems_ScanError(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	now := time.Now()
+	rows := pgxmock.NewRows([]string{"id", "watchlist_id", "asset_id", "added_at", "ticker", "name", "asset_type", "currency"}).
+		AddRow("i1", "w1", "a1", now, "AAPL", "Apple", "stock", "USD").
+		RowError(0, errors.New("scan error"))
+
+	mock.ExpectQuery(`SELECT wi.id`).
+		WithArgs("w1").
+		WillReturnRows(rows)
+
+	_, err := repo.GetWatchlistItems(context.Background(), "w1")
+	assert.Error(t, err)
+}

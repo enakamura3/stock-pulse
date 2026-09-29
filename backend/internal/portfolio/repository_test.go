@@ -922,3 +922,164 @@ func TestRepository_GetTelegramLinkedPortfolios(t *testing.T) {
 		assert.Nil(t, list)
 	})
 }
+
+func TestRepository_RemainingErrors(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+	ctx := context.Background()
+	now := time.Now()
+
+	t.Run("CreatePortfolio - Begin Error", func(t *testing.T) {
+		mock.ExpectBegin().WillReturnError(errors.New("begin error"))
+		p, err := repo.CreatePortfolio(ctx, "u1", "Main", "BRL")
+		assert.Error(t, err)
+		assert.Nil(t, p)
+	})
+
+	t.Run("CreatePortfolio - Count Query Error", func(t *testing.T) {
+		mock.ExpectBegin()
+		mock.ExpectQuery(`SELECT COUNT\(\*\) FROM portfolio`).WithArgs("u1").WillReturnError(errors.New("count err"))
+		p, err := repo.CreatePortfolio(ctx, "u1", "Main", "BRL")
+		assert.Error(t, err)
+		assert.Nil(t, p)
+	})
+
+	t.Run("CreatePortfolio - Commit Error", func(t *testing.T) {
+		mock.ExpectBegin()
+		countRows := pgxmock.NewRows([]string{"count"}).AddRow(0)
+		mock.ExpectQuery(`SELECT COUNT\(\*\) FROM portfolio`).WithArgs("u1").WillReturnRows(countRows)
+		rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "is_default", "created_at"}).
+			AddRow("p1", "u1", "Main", "BRL", true, now)
+		mock.ExpectQuery(`INSERT INTO portfolio`).WithArgs("u1", "Main", "BRL", true).WillReturnRows(rows)
+		mock.ExpectCommit().WillReturnError(errors.New("commit error"))
+
+		p, err := repo.CreatePortfolio(ctx, "u1", "Main", "BRL")
+		assert.Error(t, err)
+		assert.Nil(t, p)
+	})
+
+	t.Run("GetPortfoliosByUserID - Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "user_id", "name", "base_currency", "is_default", "created_at"}).
+			AddRow("p1", "u1", "Main", "BRL", true, now).
+			RowError(0, errors.New("scan error"))
+		mock.ExpectQuery(`SELECT id, user_id, name, base_currency, is_default, created_at FROM portfolio`).
+			WithArgs("u1").
+			WillReturnRows(rows)
+
+		res, err := repo.GetPortfoliosByUserID(ctx, "u1")
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("GetTransactionsByPortfolioID - Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{
+			"id", "portfolio_id", "asset_id", "type", "quantity", "unit_price", "total_cost", "fee", "exchange_rate", "executed_at", "created_at",
+			"ticker", "name", "asset_type", "currency",
+		}).AddRow("t1", "p1", "a1", "BUY", 10.0, 10.0, 100.0, 0.0, 1.0, now, now, "AAPL", "Apple", "STOCK_US", "USD").
+			RowError(0, errors.New("scan error"))
+		mock.ExpectQuery(`SELECT t\.id`).WithArgs("p1", "u1").WillReturnRows(rows)
+
+		res, err := repo.GetTransactionsByPortfolioID(ctx, "p1", "u1")
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("GetDailyPrices - Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"asset_id", "price_date", "close_price"}).
+			AddRow("a1", now, 100.0).
+			RowError(0, errors.New("scan error"))
+		mock.ExpectQuery(`SELECT asset_id, price_date, close_price FROM asset_daily_price`).
+			WithArgs("a1", now, now).
+			WillReturnRows(rows)
+
+		res, err := repo.GetDailyPrices(ctx, "a1", now, now)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("GetDailyPricesBatch - Query Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT asset_id, price_date, close_price FROM asset_daily_price WHERE asset_id = ANY\(\$1\)`).
+			WithArgs([]string{"a1"}, now, now).
+			WillReturnError(errors.New("batch error"))
+
+		res, err := repo.GetDailyPricesBatch(ctx, []string{"a1"}, now, now)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("GetDailyPricesBatch - Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"asset_id", "price_date", "close_price"}).
+			AddRow("a1", now, 100.0).
+			RowError(0, errors.New("scan error"))
+		mock.ExpectQuery(`SELECT asset_id, price_date, close_price FROM asset_daily_price WHERE asset_id = ANY\(\$1\)`).
+			WithArgs([]string{"a1"}, now, now).
+			WillReturnRows(rows)
+
+		res, err := repo.GetDailyPricesBatch(ctx, []string{"a1"}, now, now)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("GetAssetAndCurrencyByTicker - Query Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT id, currency FROM asset WHERE ticker = UPPER\(\$1\)`).
+			WithArgs("PETR4").
+			WillReturnError(errors.New("not found"))
+
+		id, curr, err := repo.GetAssetAndCurrencyByTicker(ctx, "PETR4")
+		assert.Error(t, err)
+		assert.Empty(t, id)
+		assert.Empty(t, curr)
+	})
+
+	t.Run("GetAllAssets - Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "ticker", "currency", "asset_type"}).
+			AddRow("a1", "PETR4", "BRL", "STOCK_BR").
+			RowError(0, errors.New("scan error"))
+		mock.ExpectQuery(`SELECT id, ticker, currency, asset_type FROM asset WHERE is_active = true`).
+			WillReturnRows(rows)
+
+		res, err := repo.GetAllAssets(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("UpdateTransaction - Exec Error", func(t *testing.T) {
+		tx := Transaction{
+			ID:           "t1",
+			PortfolioID:  "p1",
+			Type:         "BUY",
+			Quantity:     10,
+			UnitPrice:    20,
+			TotalCost:    200,
+			Fee:          0,
+			ExchangeRate: 1,
+			ExecutedAt:   now,
+		}
+		mock.ExpectExec(`UPDATE transaction`).
+			WithArgs(tx.Type, tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee, tx.ExchangeRate, tx.ExecutedAt, tx.ID, tx.PortfolioID).
+			WillReturnError(errors.New("exec error"))
+
+		err := repo.UpdateTransaction(ctx, tx)
+		assert.Error(t, err)
+	})
+
+	t.Run("GetExchangeRateByDate - Query Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT p\.close_price FROM asset_daily_price p`).
+			WithArgs("USDBRL=X", now).
+			WillReturnError(errors.New("rate query error"))
+
+		rate, err := repo.GetExchangeRateByDate(ctx, "USDBRL=X", now)
+		assert.Error(t, err)
+		assert.Equal(t, 0.0, rate)
+	})
+
+	t.Run("GetOldestPriceDate - Query Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT MIN\(price_date\) FROM asset_daily_price WHERE asset_id = \$1`).
+			WithArgs("a1").
+			WillReturnError(errors.New("min date error"))
+
+		d, err := repo.GetOldestPriceDate(ctx, "a1")
+		assert.Error(t, err)
+		assert.True(t, d.IsZero())
+	})
+}

@@ -661,9 +661,6 @@ func (s *service) calculateAssetMonthlyYields(ctx context.Context, asset Asset) 
 
 		lastDay := monthlyLastDay[monthStr]
 		daysHeld := int(lastDay.Sub(startDate).Hours() / 24)
-		if daysHeld < 0 {
-			daysHeld = 0
-		}
 
 		netYield := grossYield
 		if !isTaxExempt {

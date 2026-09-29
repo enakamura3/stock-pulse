@@ -18,10 +18,11 @@ type MarketProvider interface {
 
 // Client representa uma conexão WebSocket ativa de um usuário.
 type Client struct {
-	Hub    *Hub
-	Conn   *websocket.Conn
-	Send   chan []byte
-	UserID string
+	Hub        *Hub
+	Conn       *websocket.Conn
+	Send       chan []byte
+	UserID     string
+	pingPeriod time.Duration
 
 	subscribed map[string]bool
 	mu         sync.Mutex
@@ -40,8 +41,17 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
 		Conn:       conn,
 		Send:       make(chan []byte, 256),
 		UserID:     userID,
+		pingPeriod: 54 * time.Second,
 		subscribed: make(map[string]bool),
 	}
+}
+
+// WithPingPeriod configura o intervalo de ping do cliente (útil para testes).
+func (c *Client) WithPingPeriod(d time.Duration) *Client {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pingPeriod = d
+	return c
 }
 
 // Limites de segurança e DoS para conexões WebSocket
@@ -111,6 +121,7 @@ func (c *Client) ReadPump() {
 				select {
 				case c.Send <- errPayload:
 				default:
+					slog.Warn("Canal do cliente cheio ao enviar erro de limite", "user_id", c.UserID)
 				}
 			}
 		case "unsubscribe":
@@ -125,7 +136,13 @@ func (c *Client) ReadPump() {
 
 // WritePump envia mensagens de saída do Hub para a conexão WebSocket real.
 func (c *Client) WritePump() {
-	ticker := time.NewTicker(54 * time.Second) // Envia pings periódicos
+	c.mu.Lock()
+	period := c.pingPeriod
+	c.mu.Unlock()
+	if period <= 0 {
+		period = 54 * time.Second
+	}
+	ticker := time.NewTicker(period) // Envia pings periódicos
 	defer func() {
 		ticker.Stop()
 		c.Conn.Close()
@@ -176,23 +193,53 @@ func (c *Client) IsSubscribed(symbol string) bool {
 
 // Hub coordena as conexões ativas e a orquestração do broadcast de cotações em tempo real.
 type Hub struct {
-	clients    map[*Client]bool
-	userConns  map[string]int
-	register   chan *Client
-	unregister chan *Client
-	marketSvc  MarketProvider
-	mu         sync.RWMutex
+	clients           map[*Client]bool
+	userConns         map[string]int
+	register          chan *Client
+	unregister        chan *Client
+	marketSvc         MarketProvider
+	broadcastInterval time.Duration
+	pingPeriod        time.Duration
+	mu                sync.RWMutex
 }
 
 // NewHub inicializa o WebSocket Hub central.
 func NewHub(marketSvc MarketProvider) *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		userConns:  make(map[string]int),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		marketSvc:  marketSvc,
+		clients:           make(map[*Client]bool),
+		userConns:         make(map[string]int),
+		register:          make(chan *Client),
+		unregister:        make(chan *Client),
+		marketSvc:         marketSvc,
+		broadcastInterval: 5 * time.Second,
+		pingPeriod:        54 * time.Second,
 	}
+}
+
+// WithBroadcastInterval configura o intervalo de broadcast do Hub (útil para testes).
+func (h *Hub) WithBroadcastInterval(d time.Duration) *Hub {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.broadcastInterval = d
+	return h
+}
+
+// WithPingPeriod configura o intervalo de ping dos clientes do Hub (útil para testes).
+func (h *Hub) WithPingPeriod(d time.Duration) *Hub {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.pingPeriod = d
+	return h
+}
+
+// GetPingPeriod retorna o intervalo de ping configurado no Hub.
+func (h *Hub) GetPingPeriod() time.Duration {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if h.pingPeriod <= 0 {
+		return 54 * time.Second
+	}
+	return h.pingPeriod
 }
 
 // CanConnect verifica se o usuário ainda pode abrir novas conexões WebSocket.
@@ -211,7 +258,13 @@ func (h *Hub) ActiveConnectionsCount(userID string) int {
 
 // Start gerencia o ciclo de vida de conexões e o loop periódico de broadcast de cotações (5 segundos).
 func (h *Hub) Start(ctx context.Context) {
-	broadcastTicker := time.NewTicker(5 * time.Second) // Broadcast a cada 5 segundos
+	h.mu.RLock()
+	interval := h.broadcastInterval
+	h.mu.RUnlock()
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	broadcastTicker := time.NewTicker(interval) // Broadcast periódico
 	defer broadcastTicker.Stop()
 
 	for {
