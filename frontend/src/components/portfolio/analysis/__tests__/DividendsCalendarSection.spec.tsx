@@ -1,13 +1,22 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import DividendsCalendarSection from '../DividendsCalendarSection';
 
 describe('DividendsCalendarSection', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders calendar with past, future and mixed dividend events, handles day click and navigation', () => {
     const today = new Date();
     const curYear = today.getFullYear();
-    const curMonth = today.getMonth(); // 0-indexed
+    const curMonth = today.getMonth(); // 0-indexed (5 for June)
     const curMonthStr = String(curMonth + 1).padStart(2, '0');
 
     const mockDividends = [
@@ -15,14 +24,14 @@ describe('DividendsCalendarSection', () => {
         asset_id: '1',
         ticker: 'PETR4',
         type: 'Dividendo',
-        payment_date: `${curYear}-${curMonthStr}-10T00:00:00Z`,
+        payment_date: `${curYear}-${curMonthStr}-10T00:00:00Z`, // Past (June 10 <= June 15) -> Received
         net_amount: 1500, // >= 1000 => '1.5k'
       },
       {
         asset_id: '2',
         ticker: 'VALE3',
         type: 'JCP',
-        payment_date: `${curYear}-${curMonthStr}-10T00:00:00Z`,
+        payment_date: `${curYear}-${curMonthStr}-20T00:00:00Z`, // Future (June 20 > June 15) -> Upcoming
         net_amount: 500,
       },
       {
