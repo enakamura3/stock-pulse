@@ -385,45 +385,41 @@ export default function AnnualSummary({
                 🛠️ Distribuição por Categoria
               </span>
               <div className="flex-col gap-md">
-                {activeYearData.byType.length > 0 ? (
-                  activeYearData.byType.map(item => (
-                    <div key={item.type} className="flex-col gap-xs">
-                      <div className="flex-row justify-between items-baseline">
-                        <span className="font-semibold text-sm text-primary flex-row items-center gap-xs">
-                          <span 
-                            style={{ 
-                              display: 'inline-block', 
-                              width: '8px', 
-                              height: '8px', 
-                              borderRadius: '50%', 
-                              backgroundColor: formatTypeColor(item.type) 
-                            }} 
-                          />
-                          {item.type}
-                        </span>
-                        <div className="text-right">
-                          <span className="font-bold text-sm text-primary">
-                            {formatMoney(item.amount, activeYearData.currency)}
-                          </span>
-                          <span className="text-secondary text-xs font-medium ml-xs">
-                            ({item.pct.toFixed(1)}%)
-                          </span>
-                        </div>
-                      </div>
-                      <div className="progress-bar-bg">
-                        <div 
-                          className="progress-bar-fill" 
+                {activeYearData.byType.map(item => (
+                  <div key={item.type} className="flex-col gap-xs">
+                    <div className="flex-row justify-between items-baseline">
+                      <span className="font-semibold text-sm text-primary flex-row items-center gap-xs">
+                        <span 
                           style={{ 
-                            width: `${item.pct}%`, 
+                            display: 'inline-block', 
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
                             backgroundColor: formatTypeColor(item.type) 
                           }} 
                         />
+                        {item.type}
+                      </span>
+                      <div className="text-right">
+                        <span className="font-bold text-sm text-primary">
+                          {formatMoney(item.amount, activeYearData.currency)}
+                        </span>
+                        <span className="text-secondary text-xs font-medium ml-xs">
+                          ({item.pct.toFixed(1)}%)
+                        </span>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <span className="text-secondary text-sm">Sem dados por tipo.</span>
-                )}
+                    <div className="progress-bar-bg">
+                      <div 
+                        className="progress-bar-fill" 
+                        style={{ 
+                          width: `${item.pct}%`, 
+                          backgroundColor: formatTypeColor(item.type) 
+                        }} 
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -433,39 +429,35 @@ export default function AnnualSummary({
                 🏆 Top 5 Ativos Pagadores
               </span>
               <div className="flex-col gap-md">
-                {activeYearData.topAssets.length > 0 ? (
-                  activeYearData.topAssets.map((item, index) => (
-                    <div key={item.ticker} className="flex-col gap-xs">
-                      <div className="flex-row justify-between items-baseline">
-                        <span className="font-bold text-sm text-primary flex-row items-center gap-xs">
-                          <span style={{ color: index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : '#cd7f32', marginRight: '4px' }}>
-                            {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                          </span>
-                          {item.ticker}
+                {activeYearData.topAssets.map((item, index) => (
+                  <div key={item.ticker} className="flex-col gap-xs">
+                    <div className="flex-row justify-between items-baseline">
+                      <span className="font-bold text-sm text-primary flex-row items-center gap-xs">
+                        <span style={{ color: index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : '#cd7f32', marginRight: '4px' }}>
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
                         </span>
-                        <div className="text-right">
-                          <span className="font-bold text-sm text-success">
-                            {formatMoney(item.amount, activeYearData.currency)}
-                          </span>
-                          <span className="text-secondary text-xs font-medium ml-xs">
-                            ({item.pct.toFixed(1)}%)
-                          </span>
-                        </div>
-                      </div>
-                      <div className="progress-bar-bg">
-                        <div 
-                          className="progress-bar-fill" 
-                          style={{ 
-                            width: `${item.pct}%`, 
-                            backgroundColor: 'var(--color-success)'
-                          }} 
-                        />
+                        {item.ticker}
+                      </span>
+                      <div className="text-right">
+                        <span className="font-bold text-sm text-success">
+                          {formatMoney(item.amount, activeYearData.currency)}
+                        </span>
+                        <span className="text-secondary text-xs font-medium ml-xs">
+                          ({item.pct.toFixed(1)}%)
+                        </span>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <span className="text-secondary text-sm">Sem dados de ativos.</span>
-                )}
+                    <div className="progress-bar-bg">
+                      <div 
+                        className="progress-bar-fill" 
+                        style={{ 
+                          width: `${item.pct}%`, 
+                          backgroundColor: 'var(--color-success)'
+                        }} 
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

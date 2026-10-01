@@ -5,16 +5,36 @@ import { ThemeProvider } from './ThemeProvider';
 import { vi } from 'vitest';
 
 vi.mock('recharts', () => {
-  const Original = vi.importActual('recharts');
   return {
-    ...Original,
     ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
     BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
     Bar: () => null,
     XAxis: () => null,
-    YAxis: () => null,
+    YAxis: ({ tickFormatter }: any) => (
+      <div data-testid="yaxis">{tickFormatter ? tickFormatter(150) : null}</div>
+    ),
     CartesianGrid: () => null,
-    Tooltip: () => null,
+    Tooltip: ({ content }: any) => (
+      <div data-testid="tooltip-wrapper">
+        {React.isValidElement(content)
+          ? React.cloneElement(content as any, {
+              active: true,
+              payload: [
+                { name: 'Nacionais (R$)', value: 100, color: '#10b981' },
+                { name: 'Internacionais (R$)', value: 50, color: '#3b82f6' },
+              ],
+              label: 'MAI/2026',
+            })
+          : null}
+        {React.isValidElement(content)
+          ? React.cloneElement(content as any, {
+              active: false,
+              payload: [],
+              label: '',
+            })
+          : null}
+      </div>
+    ),
     Legend: () => null,
   };
 });
@@ -40,9 +60,37 @@ describe('DividendsChart Component', () => {
       currency: 'USD',
       original_net_amount: 10,
     },
+    {
+      asset_id: 'div-3',
+      ticker: 'TESOURO',
+      cum_date: '2026-07-01',
+      payment_date: '',
+      gross_amount: 25,
+      net_amount: 25,
+      currency: 'BRL',
+      is_accrued: true,
+    },
   ];
 
-  it('renders recharts bar chart when data is available', () => {
+  it('renders recharts bar chart, custom tooltip, and handles light theme', () => {
+    // Set theme to light in localStorage
+    localStorage.setItem('theme', 'light');
+
+    render(
+      <ThemeProvider>
+        <DividendsChart data={mockData} />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByTestId('responsive-container')).toBeInTheDocument();
+    expect(screen.getByTestId('yaxis')).toHaveTextContent('R$ 150');
+    expect(screen.getByText('MAI/2026')).toBeInTheDocument();
+    expect(screen.getByText('Total:')).toBeInTheDocument();
+  });
+
+  it('renders chart in dark theme', () => {
+    localStorage.setItem('theme', 'dark');
+
     render(
       <ThemeProvider>
         <DividendsChart data={mockData} />

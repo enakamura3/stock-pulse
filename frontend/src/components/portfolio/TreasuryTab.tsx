@@ -36,7 +36,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<NewTreasuryTx>(EMPTY_TX);
-  const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
@@ -69,7 +68,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
   }, [fetchPerf]);
 
   const openModal = () => {
-    setEditingTxId(null);
     setForm(EMPTY_TX);
     setError(null);
     setShowModal(true);
@@ -77,7 +75,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
 
   const closeModal = () => {
     setShowModal(false);
-    setEditingTxId(null);
     setForm(EMPTY_TX);
     setError(null);
   };
@@ -87,7 +84,6 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
   };
 
   const handleOpenRedemption = (pos: TreasuryPosition) => {
-    setEditingTxId(null);
     setForm({
       ticker: pos.ticker,
       treasury_type: pos.treasury_type,
@@ -126,13 +122,8 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
         transaction_date: form.transaction_date,
       };
 
-      const url = editingTxId
-        ? `/portfolios/${portfolioId}/treasury/transactions/${editingTxId}`
-        : `/portfolios/${portfolioId}/treasury/transactions`;
-      const method = editingTxId ? 'PUT' : 'POST';
-
-      const res = await apiFetch(url, {
-        method,
+      const res = await apiFetch(`/portfolios/${portfolioId}/treasury/transactions`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         cache: 'no-store',
@@ -300,9 +291,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
           <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
               <h3 className="modal-title">
-                {editingTxId
-                  ? '✏️ Editar Operação de Tesouro Direto'
-                  : form.type === 'SUBSCRIPTION'
+                {form.type === 'SUBSCRIPTION'
                   ? '📥 Nova Aplicação — Tesouro Direto'
                   : '📤 Novo Resgate — Tesouro Direto'}
               </h3>

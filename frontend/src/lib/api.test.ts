@@ -124,4 +124,52 @@ describe('apiFetch Wrapper', () => {
 
     expect((global.fetch as any).mock.calls[0][0]).toBe('https://custom-api.com/endpoint');
   });
+
+  it('deve deduplicar tentativas de refresh concorrentes', async () => {
+    let refreshResolve: (val: any) => void;
+    const refreshPromise = new Promise((resolve) => {
+      refreshResolve = resolve;
+    });
+
+    const callCounts: Record<string, number> = {};
+    (global.fetch as any).mockImplementation((url: string) => {
+      callCounts[url] = (callCounts[url] || 0) + 1;
+      if (url.includes('/auth/refresh')) {
+        return refreshPromise;
+      }
+      if (callCounts[url] === 1) {
+        return Promise.resolve({ ok: false, status: 401 });
+      }
+      return Promise.resolve({ ok: true, status: 200 });
+    });
+
+    const p1 = apiFetch('/concurrent1');
+    const p2 = apiFetch('/concurrent2');
+
+    // Give time for both initial requests to 401 and trigger attemptRefresh
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Resolve refresh
+    refreshResolve!({ ok: true, status: 200 });
+
+    const [res1, res2] = await Promise.all([p1, p2]);
+    expect(res1.ok).toBe(true);
+    expect(res2.ok).toBe(true);
+
+    const refreshCalls = (global.fetch as any).mock.calls.filter((call: any[]) =>
+      call[0].includes('/auth/refresh')
+    );
+    expect(refreshCalls.length).toBe(1);
+  });
+
+  it('deve lidar com erro de rede (fetch reject) durante o refresh', async () => {
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/auth/refresh')) {
+        return Promise.reject(new Error('Network failure'));
+      }
+      return Promise.resolve({ ok: false, status: 401 });
+    });
+
+    await expect(apiFetch('/net-fail')).rejects.toThrow('Sessão expirada');
+  });
 });

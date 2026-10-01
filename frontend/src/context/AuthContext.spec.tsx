@@ -190,6 +190,46 @@ describe('AuthContext', () => {
     });
   });
 
+  it('deve repassar o erro se a chamada de login retornar !res.ok', async () => {
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 400 });
+    
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Not Auth'));
+
+    // Reseta mock e configura retorno !res.ok com erro específico
+    vi.resetAllMocks();
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'Senha incorreta' }),
+    });
+
+    await userEvent.click(screen.getByTestId('btn-login'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error')).toHaveTextContent('Senha incorreta');
+    });
+
+    // Também testar com json sem error para cobrir fallback
+    vi.resetAllMocks();
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({}),
+    });
+
+    await userEvent.click(screen.getByTestId('btn-login'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error')).toHaveTextContent('Falha ao efetuar login');
+    });
+  });
+
   it('deve efetuar registro via button', async () => {
     // 1º mock para initAuth (sem sessão)
     (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 400 });
