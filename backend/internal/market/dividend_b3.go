@@ -93,13 +93,6 @@ func (s *B3DividendSource) GetDividends(ctx context.Context, ticker string, asse
 func (s *B3DividendSource) resolveTradingName(ctx context.Context, ticker string) (string, error) {
 	symbol := strings.TrimSuffix(strings.ToUpper(ticker), ".SA")
 
-	s.mu.RLock()
-	if name, ok := s.tickerNameCache[symbol]; ok {
-		s.mu.RUnlock()
-		return name, nil
-	}
-	s.mu.RUnlock()
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
