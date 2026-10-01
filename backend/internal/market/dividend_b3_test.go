@@ -99,4 +99,25 @@ func TestB3DividendSource_GetDividends(t *testing.T) {
 		_, err = errClient.FetchCompanies(context.Background())
 		assert.Error(t, err)
 	})
+
+	t.Run("resolveTradingName Cache Hit and Miss", func(t *testing.T) {
+		client := NewB3Client()
+		client.httpClient.Transport = RoundTripFunc(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"results": []}`)),
+			}
+		})
+		source := NewB3DividendSource(client)
+
+		// First call (cache miss)
+		name1, err1 := source.resolveTradingName(context.Background(), "BBAS3")
+		assert.NoError(t, err1)
+		assert.Equal(t, "BBAS3", name1)
+
+		// Second call (cache hit)
+		name2, err2 := source.resolveTradingName(context.Background(), "BBAS3")
+		assert.NoError(t, err2)
+		assert.Equal(t, "BBAS3", name2)
+	})
 }

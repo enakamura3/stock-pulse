@@ -14,6 +14,10 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.d.ts', 'src/**/index.ts', 'src/types/**/*'],
+      thresholds: {
+        lines: 100,
+        statements: 100,
+      },
     },
     alias: {
       '@': path.resolve(__dirname, './src'),

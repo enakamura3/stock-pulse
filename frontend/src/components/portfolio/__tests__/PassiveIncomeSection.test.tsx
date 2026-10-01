@@ -47,14 +47,20 @@ vi.mock('recharts', async () => {
 
 describe('PassiveIncomeSection', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-25T12:00:00Z'));
     localStorage.clear();
     mockTheme = 'light';
     vi.restoreAllMocks();
   });
 
-  const now = new Date();
-  const curY = now.getFullYear();
-  const curM = String(now.getMonth() + 1).padStart(2, '0');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const now = new Date('2026-06-25T12:00:00Z');
+  const curY = 2026;
+  const curM = '06';
   const pastDate = `${curY}-${curM}-01`;
   const futureYear = curY + 1;
   const farFutureDate = `${curY + 3}-01-01`;
@@ -93,7 +99,7 @@ describe('PassiveIncomeSection', () => {
       asset_id: '2',
       ticker: 'AAPL',
       cum_date: pastDate,
-      payment_date: `${curY}-${curM}-12`,
+      payment_date: `${curY}-${curM}-28`,
       gross_amount: 500,
       net_amount: 500,
       original_net_amount: 100,
