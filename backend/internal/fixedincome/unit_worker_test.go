@@ -46,7 +46,7 @@ func TestWorker_SyncRates(t *testing.T) {
 	// 3. SaveIndexRates error
 	mockRepo3 := &MockFullRepo{}
 	worker3 := NewWorker(mockRepo3, registry)
-	mockRepo3.On("GetLatestIndexRate", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+	mockRepo3.On("GetLatestIndexRate", mock.Anything, mock.Anything).Return(&IndexRate{Date: time.Now().AddDate(0, -1, 0)}, nil).Maybe()
 	mockRepo3.On("SaveIndexRates", mock.Anything, mock.Anything).Return(errors.New("db save error")).Maybe()
 	worker3.SyncRates(ctx)
 
@@ -82,6 +82,7 @@ func TestAnbimaHolidayWorker_SyncHolidays(t *testing.T) {
 	w.SyncHolidays(ctx)
 
 	// 3. Needs sync for missing year
+	w.startYear = currYear
 	mockRepo.On("GetSeededHolidayYears", ctx).Return([]int{}, nil).Once()
 	mockClient.On("FetchHolidays", ctx, mock.Anything).Return([]brasilAPIHoliday{
 		{Date: "2026-01-01", Name: "Ano Novo", Type: "national"},

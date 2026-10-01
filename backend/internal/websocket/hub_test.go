@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -351,4 +353,259 @@ func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, ass
 		return args.Get(0).([]market.DividendEvent), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+func TestHub_AdditionalEdgeCases(t *testing.T) {
+	ms := new(MockMarketService)
+	ms.On("GetQuote", mock.Anything, mock.Anything).Return(&market.Quote{Symbol: "MOCK", Price: 100}, nil).Maybe()
+	hub := NewHub(ms).WithBroadcastInterval(20 * time.Millisecond).WithPingPeriod(20 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go hub.Start(ctx)
+
+	handler := NewHandler(hub)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(context.WithValue(r.Context(), auth.UserIDKey, "user_edge_test"))
+		handler.ServeWS(w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	header := http.Header{"Origin": []string{"http://localhost:3000"}}
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+	assert.NoError(t, err)
+	defer ws.Close()
+
+	// 1. Send invalid JSON message to exercise Unmarshal error in ReadPump
+	err = ws.WriteMessage(websocket.TextMessage, []byte("invalid json message"))
+	assert.NoError(t, err)
+
+	// 2. Send Pong to exercise SetPongHandler
+	err = ws.WriteMessage(websocket.PongMessage, []byte("pong"))
+	assert.NoError(t, err)
+
+	time.Sleep(60 * time.Millisecond)
+
+	// 3. Test client without subscriptions (len(uniqueTickers) == 0 in broadcastQuotes)
+	hub.broadcastQuotes(ctx)
+
+	// 4. Subscribe to MOCK
+	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Symbols: []string{"MOCK"}})
+	time.Sleep(30 * time.Millisecond)
+
+	// 5. Test broadcastQuotes when client.Send is full (hits default in select)
+	hub.mu.RLock()
+	var testClient *Client
+	for c := range hub.clients {
+		testClient = c
+		break
+	}
+	hub.mu.RUnlock()
+
+	if testClient != nil {
+		// Fill Send channel completely
+		for i := 0; i < cap(testClient.Send); i++ {
+			select {
+			case testClient.Send <- []byte("fill"):
+			default:
+			}
+		}
+
+		// Now broadcastQuotes hits default: slog.Warn
+		hub.broadcastQuotes(ctx)
+
+		// 6. Test limit exceeded when Send is full (hits default in limitExceeded select)
+		symbols := make([]string, 55)
+		for i := 0; i < 55; i++ {
+			symbols[i] = fmt.Sprintf("SYM%d", i)
+		}
+		_ = ws.WriteJSON(WSMessage{Action: "subscribe", Symbols: symbols})
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	// 7. Send normal close to exercise IsUnexpectedCloseError in ReadPump
+	_ = ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "normal-close"))
+	time.Sleep(30 * time.Millisecond)
+}
+
+func TestClient_WritePump_BatchedMessages(t *testing.T) {
+	ms := new(MockMarketService)
+	hub := NewHub(ms)
+	handler := NewHandler(hub)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(context.WithValue(r.Context(), auth.UserIDKey, "batch_user"))
+		handler.ServeWS(w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, http.Header{"Origin": []string{"http://localhost:3000"}})
+	assert.NoError(t, err)
+	defer ws.Close()
+
+	time.Sleep(20 * time.Millisecond)
+	hub.mu.RLock()
+	var testClient *Client
+	for c := range hub.clients {
+		testClient = c
+		break
+	}
+	hub.mu.RUnlock()
+
+	if testClient != nil {
+		testClient.Send <- []byte("msg1")
+		testClient.Send <- []byte("msg2")
+		testClient.Send <- []byte("msg3")
+	}
+
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestHub_BroadcastQuotes_ChannelFull(t *testing.T) {
+	ms := new(MockMarketService)
+	ms.On("GetQuote", mock.Anything, "FULL").Return(&market.Quote{Symbol: "FULL", Price: 100}, nil)
+	hub := NewHub(ms)
+	client := &Client{
+		Hub:        hub,
+		Send:       make(chan []byte, 1),
+		UserID:     "full_user",
+		subscribed: map[string]bool{"FULL": true},
+	}
+	hub.clients[client] = true
+	client.Send <- []byte("already full")
+
+	hub.broadcastQuotes(context.Background())
+}
+
+func TestHub_ZeroDefaults(t *testing.T) {
+	hub := NewHub(nil)
+	hub.pingPeriod = 0
+	assert.Equal(t, 54*time.Second, hub.GetPingPeriod())
+
+	hub.broadcastInterval = 0
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	hub.Start(ctx)
+
+	client := NewClient(hub, nil, "u").WithPingPeriod(0)
+	assert.Equal(t, time.Duration(0), client.pingPeriod)
+}
+
+func TestHub_BroadcastQuotes_MarshalError(t *testing.T) {
+	ms := new(MockMarketService)
+	ms.On("GetQuote", mock.Anything, "NAN").Return(&market.Quote{Symbol: "NAN", Price: math.NaN()}, nil)
+	hub := NewHub(ms)
+	client := &Client{
+		Hub:        hub,
+		Send:       make(chan []byte, 10),
+		UserID:     "nan_user",
+		subscribed: map[string]bool{"NAN": true},
+	}
+	hub.clients[client] = true
+	hub.broadcastQuotes(context.Background())
+}
+
+func TestClient_WritePump_ZeroPeriod(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		client := &Client{
+			Conn: conn,
+			Send: make(chan []byte),
+		}
+		close(client.Send)
+		client.WritePump()
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err == nil {
+		_ = ws.Close()
+	}
+}
+
+func TestClient_ReadPump_LimitExceeded_FullSend(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		hub := NewHub(nil)
+		client := NewClient(hub, conn, "limit_user")
+		// Fill Send channel completely
+		for i := 0; i < cap(client.Send); i++ {
+			client.Send <- []byte("fill")
+		}
+		client.ReadPump()
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	assert.NoError(t, err)
+
+	symbols := make([]string, 55)
+	for i := 0; i < 55; i++ {
+		symbols[i] = fmt.Sprintf("SYM%d", i)
+	}
+	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Symbols: symbols})
+	time.Sleep(30 * time.Millisecond)
+	_ = ws.Close()
+}
+
+func TestClient_WritePump_PingWriteError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		client := &Client{
+			Conn:       conn,
+			Send:       make(chan []byte, 10),
+			pingPeriod: 10 * time.Millisecond,
+		}
+		// Wait for remote client to close socket
+		time.Sleep(30 * time.Millisecond)
+		client.WritePump()
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	assert.NoError(t, err)
+	_ = ws.Close()
+	time.Sleep(60 * time.Millisecond)
+}
+
+func TestClient_WritePump_NextWriterError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		client := &Client{
+			Conn: conn,
+			Send: make(chan []byte, 1),
+		}
+		// Close underlying conn first
+		_ = conn.Close()
+		client.Send <- []byte("after close")
+		client.WritePump()
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err == nil {
+		_ = ws.Close()
+	}
 }

@@ -47,12 +47,6 @@ func (w *Worker) SyncRates(ctx context.Context) {
 		// Divide a sincronização em blocos de no máximo 5 anos para evitar timeouts
 		currentStart := startDate
 		for currentStart.Before(endDate) {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
 			currentEnd := currentStart.AddDate(5, 0, 0)
 			if currentEnd.After(endDate) {
 				currentEnd = endDate

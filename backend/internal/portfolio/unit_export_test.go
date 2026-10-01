@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -151,6 +152,15 @@ func TestExportPortfolio(t *testing.T) {
 				Indexer:      "CDI",
 				MaturityDate: time.Now().Add(365 * 24 * time.Hour),
 			},
+			{
+				ID:           "asset2",
+				Institution:  "Tesouro",
+				Type:         "Prefixado",
+				DebtType:     "PRE",
+				Rate:         12.5,
+				Indexer:      "PRE",
+				MaturityDate: time.Time{},
+			},
 		}
 
 		fiTxs := []fixedincome.Transaction{
@@ -159,6 +169,13 @@ func TestExportPortfolio(t *testing.T) {
 				AssetID: "asset1",
 				Type:    "APORTES",
 				Amount:  1000.0,
+				Date:    time.Now(),
+			},
+			{
+				ID:      "fitx2",
+				AssetID: "asset2",
+				Type:    "APORTES",
+				Amount:  2000.0,
 				Date:    time.Now(),
 			},
 		}
@@ -178,4 +195,92 @@ func TestExportPortfolio(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, zipReader.File, 2)
 	})
+
+	t.Run("Zip Create RV Error", func(t *testing.T) {
+		h, mockSvc := setupHandlerTest()
+		req := httptest.NewRequest("GET", "/portfolios/p1/export", nil)
+		req = reqWithUserAndParams(req, "user-123", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+
+		fiSvc := new(mockFIService)
+		mockSvc.On("GetPortfolioDetails", mock.Anything, "p1", "user-123").Return(&Portfolio{ID: "p1", Name: "MyPortfolio"}, ([]Position)(nil), nil)
+		mockSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "user-123").Return([]Transaction{}, nil)
+		mockSvc.On("GetFixedIncomeService").Return(fiSvc)
+		fiSvc.On("GetRawTransactions", mock.Anything, "p1").Return([]fixedincome.Transaction{}, nil)
+		fiSvc.On("GetAssetsByPortfolio", mock.Anything, "p1").Return([]fixedincome.Asset{}, nil)
+
+		origZip := newZipWriter
+		defer func() { newZipWriter = origZip }()
+		newZipWriter = func(w io.Writer) zipArchiveWriter {
+			return &mockCustomZipWriter{createErrOn: "renda_variavel.csv"}
+		}
+
+		h.ExportPortfolio(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Erro ao criar arquivo ZIP")
+	})
+
+	t.Run("Zip Create RF Error", func(t *testing.T) {
+		h, mockSvc := setupHandlerTest()
+		req := httptest.NewRequest("GET", "/portfolios/p1/export", nil)
+		req = reqWithUserAndParams(req, "user-123", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+
+		fiSvc := new(mockFIService)
+		mockSvc.On("GetPortfolioDetails", mock.Anything, "p1", "user-123").Return(&Portfolio{ID: "p1", Name: "MyPortfolio"}, ([]Position)(nil), nil)
+		mockSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "user-123").Return([]Transaction{}, nil)
+		mockSvc.On("GetFixedIncomeService").Return(fiSvc)
+		fiSvc.On("GetRawTransactions", mock.Anything, "p1").Return([]fixedincome.Transaction{}, nil)
+		fiSvc.On("GetAssetsByPortfolio", mock.Anything, "p1").Return([]fixedincome.Asset{}, nil)
+
+		origZip := newZipWriter
+		defer func() { newZipWriter = origZip }()
+		newZipWriter = func(w io.Writer) zipArchiveWriter {
+			return &mockCustomZipWriter{createErrOn: "renda_fixa.csv"}
+		}
+
+		h.ExportPortfolio(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Erro ao criar arquivo ZIP")
+	})
+
+	t.Run("Zip Close Error", func(t *testing.T) {
+		h, mockSvc := setupHandlerTest()
+		req := httptest.NewRequest("GET", "/portfolios/p1/export", nil)
+		req = reqWithUserAndParams(req, "user-123", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+
+		fiSvc := new(mockFIService)
+		mockSvc.On("GetPortfolioDetails", mock.Anything, "p1", "user-123").Return(&Portfolio{ID: "p1", Name: "MyPortfolio"}, ([]Position)(nil), nil)
+		mockSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "user-123").Return([]Transaction{}, nil)
+		mockSvc.On("GetFixedIncomeService").Return(fiSvc)
+		fiSvc.On("GetRawTransactions", mock.Anything, "p1").Return([]fixedincome.Transaction{}, nil)
+		fiSvc.On("GetAssetsByPortfolio", mock.Anything, "p1").Return([]fixedincome.Asset{}, nil)
+
+		origZip := newZipWriter
+		defer func() { newZipWriter = origZip }()
+		newZipWriter = func(w io.Writer) zipArchiveWriter {
+			return &mockCustomZipWriter{closeErr: errors.New("close failure")}
+		}
+
+		h.ExportPortfolio(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Erro ao finalizar ZIP")
+	})
+}
+
+type mockCustomZipWriter struct {
+	createErrOn string
+	closeErr    error
+}
+
+func (m *mockCustomZipWriter) Create(name string) (io.Writer, error) {
+	if m.createErrOn == name || m.createErrOn == "*" {
+		return nil, errors.New("zip create error")
+	}
+	return new(bytes.Buffer), nil
+}
+
+func (m *mockCustomZipWriter) Close() error {
+	return m.closeErr
 }

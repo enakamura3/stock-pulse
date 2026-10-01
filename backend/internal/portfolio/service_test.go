@@ -1212,6 +1212,21 @@ func (m *mockMultipartFile) Close() error {
 	return nil
 }
 
+type mockErrorMultipartFile struct{}
+
+func (m *mockErrorMultipartFile) Read(p []byte) (n int, err error) {
+	return 0, errors.New("read error")
+}
+func (m *mockErrorMultipartFile) Seek(offset int64, whence int) (int64, error) {
+	return 0, nil
+}
+func (m *mockErrorMultipartFile) ReadAt(p []byte, off int64) (n int, err error) {
+	return 0, errors.New("read error")
+}
+func (m *mockErrorMultipartFile) Close() error {
+	return nil
+}
+
 func TestService_BulkAddTransactions(t *testing.T) {
 	s, repo, ms, _ := setupServiceTest()
 
@@ -1220,6 +1235,13 @@ func TestService_BulkAddTransactions(t *testing.T) {
 		file := &mockMultipartFile{bytes.NewReader([]byte("date;ticker;type;qty;price"))}
 		_, err := s.BulkAddTransactions(context.Background(), "u1", "p-err", file)
 		assert.ErrorContains(t, err, "carteira não encontrada")
+	})
+
+	t.Run("CSV Read All Error", func(t *testing.T) {
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		file := &mockErrorMultipartFile{}
+		_, err := s.BulkAddTransactions(context.Background(), "u1", "p1", file)
+		assert.ErrorContains(t, err, "erro ao ler arquivo CSV")
 	})
 
 	t.Run("CSV Read Error (Empty)", func(t *testing.T) {
@@ -1233,10 +1255,19 @@ func TestService_BulkAddTransactions(t *testing.T) {
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "STOCK_BR"}, nil)
 		repo.On("GetAssetByTicker", mock.Anything, "PETR4.SA").Return("a1", nil)
+		repo.On("GetAssetByTicker", mock.Anything, "VALE3.SA").Return("a2", nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "VALE3.SA").Return(&AssetMetadata{ID: "a2", Currency: "BRL", AssetType: "STOCK_BR"}, nil)
 		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("c1", nil)
 		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
-		repo.On("CreateTransaction", mock.Anything, mock.Anything).Return(&Transaction{ID: "tx1"}, nil)
+		repo.On("GetDailyPrices", mock.Anything, "a2", mock.Anything, mock.Anything).Return([]DailyPrice{}, nil)
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Ticker == "PETR4.SA"
+		})).Return(&Transaction{ID: "tx1"}, nil)
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Ticker == "VALE3.SA"
+		})).Return(nil, errors.New("db insert tx error"))
 		ms.On("GetHistoricalPrices", mock.Anything, "PETR4.SA", "10y").Return([]market.HistoricalPrice{}, nil).Maybe()
+		ms.On("GetHistoricalPrices", mock.Anything, "VALE3.SA", "10y").Return([]market.HistoricalPrice{}, nil).Maybe()
 
 		csvContent := "Data;Ticker;Tipo;Quantidade;Preco;Cambio;Taxa\n" +
 			"invalid_row\n" +
@@ -1246,12 +1277,13 @@ func TestService_BulkAddTransactions(t *testing.T) {
 			"2024-01-10;PETR4.SA;BUY;10;-10.0\n" +
 			"invalid_date;PETR4.SA;BUY;10;30.0\n" +
 			"2024-01-10;PETR4.SA;BUY;10;30.0;1.0;2.5\n" +
-			"10/01/2024;PETR4.SA;BUY;10;30.0;1.0;2.5\n"
+			"10/01/2024;PETR4.SA;BUY;10;30.0;1.0;2.5\n" +
+			"2024-01-10;VALE3.SA;BUY;5;60.0;1.0;0.0\n"
 
 		file := &mockMultipartFile{bytes.NewReader([]byte(csvContent))}
 		res, err := s.BulkAddTransactions(context.Background(), "u1", "p1", file)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, res.Success)
-		assert.Len(t, res.Errors, 6)
+		assert.Len(t, res.Errors, 7)
 	})
 }

@@ -5,12 +5,22 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
+
+type zipArchiveWriter interface {
+	Create(name string) (io.Writer, error)
+	Close() error
+}
+
+var newZipWriter = func(w io.Writer) zipArchiveWriter {
+	return zip.NewWriter(w)
+}
 
 // ExportPortfolio gera e baixa um ZIP com o backup completo em CSV (RV e RF).
 func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +97,7 @@ func (h *Handler) ExportPortfolio(w http.ResponseWriter, r *http.Request) {
 
 	// Criar buffer do ZIP
 	buf := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(buf)
+	zipWriter := newZipWriter(buf)
 
 	// --- CSV Renda Variável ---
 	rvFile, err := zipWriter.Create("renda_variavel.csv")

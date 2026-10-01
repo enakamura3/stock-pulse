@@ -54,7 +54,7 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Inicializa e registra o cliente WebSocket no Hub central
-	client := NewClient(h.Hub, conn, userID)
+	client := NewClient(h.Hub, conn, userID).WithPingPeriod(h.Hub.GetPingPeriod())
 	h.Hub.register <- client
 
 	// Dispara Goroutines paralelas para bombear mensagens de entrada e saída

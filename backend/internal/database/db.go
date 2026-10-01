@@ -9,6 +9,13 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/config"
 )
 
+var (
+	newPoolWithConfig = pgxpool.NewWithConfig
+	pingPool          = func(p *pgxpool.Pool, ctx context.Context) error {
+		return p.Ping(ctx)
+	}
+)
+
 // NewPool cria e retorna um pool de conexões com o PostgreSQL usando pgxpool
 func NewPool() (*pgxpool.Pool, error) {
 	dbURL := config.Envs.DBURL
@@ -28,7 +35,7 @@ func NewPool() (*pgxpool.Pool, error) {
 	config.MaxConnIdleTime = 30 * time.Minute
 
 	// Criação do Pool
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	pool, err := newPoolWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao criar o connection pool: %w", err)
 	}
@@ -37,7 +44,7 @@ func NewPool() (*pgxpool.Pool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := pool.Ping(ctx); err != nil {
+	if err := pingPool(pool, ctx); err != nil {
 		return nil, fmt.Errorf("falha ao dar ping no banco de dados na inicialização: %w", err)
 	}
 
