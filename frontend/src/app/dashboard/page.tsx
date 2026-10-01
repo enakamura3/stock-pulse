@@ -419,6 +419,7 @@ function DashboardContent() {
   };
 
   const formatPercentage = (val: number) => {
+    if (val === undefined || val === null || isNaN(val)) return '0.00%';
     const isPos = val >= 0;
     return `${isPos ? '+' : ''}${val.toFixed(2)}%`;
   };

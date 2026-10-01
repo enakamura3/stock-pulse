@@ -274,4 +274,102 @@ describe('AnnualSummary Component', () => {
     // Se selectedYear é 'Todos', deve selecionar por padrão o ano mais recente (2026, total 100,00)
     expect(screen.getAllByText(/100,00/)[0]).toBeInTheDocument();
   });
+
+  it('renders correctly for a past year displaying "Calculado sobre 12 meses"', () => {
+    const mockDividends: CalculatedDividend[] = [
+      {
+        asset_id: '1',
+        ticker: 'PETR4',
+        cum_date: '2023-05-10T00:00:00Z',
+        payment_date: '2023-06-15T00:00:00Z',
+        gross_amount: 100,
+        net_amount: 100,
+        currency: 'BRL',
+        type: 'DIVIDENDO',
+        quantity: 100,
+        per_share_amount: 1,
+        asset_type: 'STOCK_BR',
+        asset_name: 'Petroleo Brasileiro'
+      }
+    ];
+
+    render(
+      <AnnualSummary
+        dividends={mockDividends}
+        selectedYear="2023"
+        setSelectedYear={mockSetSelectedYear}
+        availableYears={['2023']}
+      />
+    );
+
+    expect(screen.getByText('Calculado sobre 12 meses')).toBeInTheDocument();
+  });
+
+  it('handles unknown asset types with accrued and non-accrued, future year dividends, and empty dividends', () => {
+    const { container: emptyContainer } = render(
+      <AnnualSummary
+        dividends={[]}
+        selectedYear="2026"
+        setSelectedYear={mockSetSelectedYear}
+        availableYears={[]}
+      />
+    );
+    expect(emptyContainer.firstChild).toBeNull();
+
+    const specialDividends: CalculatedDividend[] = [
+      {
+        asset_id: '1',
+        ticker: 'UNK1',
+        cum_date: '2026-01-10T00:00:00Z',
+        payment_date: '2026-02-15T00:00:00Z',
+        gross_amount: 50,
+        net_amount: 50,
+        currency: 'BRL',
+        type: 'UNKNOWN',
+        quantity: 10,
+        per_share_amount: 5,
+        asset_type: 'UNKNOWN',
+        is_accrued: true,
+      },
+      {
+        asset_id: '2',
+        ticker: 'UNK2',
+        cum_date: '2026-01-10T00:00:00Z',
+        payment_date: '2026-02-15T00:00:00Z',
+        gross_amount: 30,
+        net_amount: 30,
+        currency: 'BRL',
+        type: 'UNKNOWN',
+        quantity: 10,
+        per_share_amount: 3,
+        asset_type: 'UNKNOWN',
+        is_accrued: false,
+      },
+      {
+        asset_id: '3',
+        ticker: 'FUT1',
+        cum_date: '2099-01-10T00:00:00Z',
+        payment_date: '2099-02-15T00:00:00Z',
+        gross_amount: 200,
+        net_amount: 200,
+        currency: 'BRL',
+        type: 'DIVIDENDO',
+        quantity: 10,
+        per_share_amount: 20,
+        asset_type: 'STOCK_BR',
+      }
+    ];
+
+    render(
+      <AnnualSummary
+        dividends={specialDividends}
+        selectedYear="2026"
+        setSelectedYear={mockSetSelectedYear}
+        availableYears={['2026', '2099']}
+      />
+    );
+
+    expect(screen.getByText('Renda Fixa')).toBeInTheDocument();
+    expect(screen.getByText('Outros')).toBeInTheDocument();
+  });
 });

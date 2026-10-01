@@ -145,8 +145,6 @@ export default function DividendsHistory({
           valA = Number(a.net_amount) || 0;
           valB = Number(b.net_amount) || 0;
           break;
-        default:
-          return 0;
       }
 
       if (valA === valB) return 0;

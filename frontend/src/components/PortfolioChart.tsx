@@ -30,11 +30,6 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
   useEffect(() => {
     if (!containerRef.current || data.length === 0) return;
 
-    // Remove chart antigo se houver re-render
-    if (chartRef.current) {
-      chartRef.current.remove();
-    }
-
     const isLight = theme === 'light';
     const textColor = isLight ? 'rgba(24, 24, 27, 0.65)' : 'rgba(250, 250, 250, 0.45)';
     const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)';

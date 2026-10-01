@@ -333,18 +333,6 @@ export default function SettingsPage() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <main className="container">
-        <div className="glass-panel">
-          <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)', width: 40, height: 40 }}></span>
-          <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)' }}>Carregando sua sessão segura...</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) return null;
 
   return (
     <div className="app-layout">

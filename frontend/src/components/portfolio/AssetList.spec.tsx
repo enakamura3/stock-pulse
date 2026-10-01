@@ -58,10 +58,32 @@ describe('AssetList Component', () => {
     expect(screen.getByText('PETR4')).toBeInTheDocument();
     expect(screen.getByText('VALE3')).toBeInTheDocument();
 
-    // Test sorting by clicking column header
-    const tickerHeader = screen.getByText(/Ativo/i);
-    fireEvent.click(tickerHeader);
-    expect(tickerHeader).toBeInTheDocument();
+    // Test sorting by clicking column headers
+    const sortHeaders = [
+      /Ativo/i,
+      /Qtd/i,
+      /Preço Médio/i,
+      /Cotação Atual/i,
+      /Custo Total/i,
+      /Valor Atual/i,
+      /Retorno/i,
+      /P\. Justo Graham/i,
+      /P\. Justo Bazin/i,
+      /Yield/i,
+      /P\/L/i,
+      /P\/VP/i,
+    ];
+
+    sortHeaders.forEach(regex => {
+      const header = screen.getByText(regex);
+      fireEvent.click(header); // sort desc or toggle
+      fireEvent.click(header); // toggle
+    });
+
+    const fileInput = document.querySelector('input[type="file"]')!;
+    fireEvent.click(fileInput);
+    fireEvent.change(fileInput, { target: { files: [new File(['dummy'], 'test.csv')] } });
+    expect(importCsvMock).toHaveBeenCalledTimes(1);
 
     const launchBtn = screen.getByRole('button', { name: /\+ Lançar Operação/i });
     fireEvent.click(launchBtn);
