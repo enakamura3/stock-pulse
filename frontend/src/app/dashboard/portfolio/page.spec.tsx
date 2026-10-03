@@ -223,6 +223,54 @@ describe('PortfolioPage Contextual Filters', () => {
     expect(screen.queryByTestId('contextual-filter-pills')).not.toBeInTheDocument();
   });
 
+  const mixedDividends = [
+    { id: '1', ticker: 'PETR4', asset_type: 'STOCK_BR', cum_date: '2026-05-01', payment_date: '2026-05-10', gross_amount: 100, net_amount: 100 },
+    { id: '2', ticker: 'HGLG11', asset_type: 'FII', cum_date: '2026-06-01', payment_date: '2026-06-15', gross_amount: 50, net_amount: 50 },
+    { id: '3', ticker: 'CDB-XP', asset_name: 'CDB-XP', asset_type: 'CDB', cum_date: '2026-06-30', payment_date: '2026-06-30', gross_amount: 30, net_amount: 30, is_accrued: true },
+  ];
+
+  it('shows aggregate "Renda Variável" pill on proventos tab when variable and fixed income coexist', () => {
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'proventos',
+      dividends: mixedDividends,
+    });
+
+    render(<PortfolioPage />);
+    const filterBar = screen.getByTestId('contextual-filter-pills');
+    const rvBtn = within(filterBar).getByRole('button', { name: 'Renda Variável' });
+    expect(rvBtn).toBeInTheDocument();
+
+    fireEvent.click(rvBtn);
+    expect(mockSetActiveCategoryFilter).toHaveBeenCalledWith('Renda Variável');
+  });
+
+  it('does not show aggregate "Renda Variável" pill when there is no fixed income dividend', () => {
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'proventos',
+      dividends: mixedDividends.slice(0, 2),
+    });
+
+    render(<PortfolioPage />);
+    const filterBar = screen.getByTestId('contextual-filter-pills');
+    expect(within(filterBar).queryByRole('button', { name: 'Renda Variável' })).not.toBeInTheDocument();
+  });
+
+  it('filters out fixed income dividends when "Renda Variável" filter is active', () => {
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'proventos',
+      activeCategoryFilter: 'Renda Variável',
+      dividends: mixedDividends,
+    });
+
+    render(<PortfolioPage />);
+    expect(screen.getAllByText('PETR4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('HGLG11').length).toBeGreaterThan(0);
+    expect(screen.queryByText('CDB-XP')).not.toBeInTheDocument();
+  });
+
   it('dynamically displays fixed income categories on renda-fixa tab when multiple types exist', () => {
     (usePortfolio as any).mockReturnValue({
       ...basePortfolioMock,

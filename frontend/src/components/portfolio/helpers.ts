@@ -102,6 +102,15 @@ export const getDividendAssetCategory = (div: { asset_type?: string; is_accrued?
   return cat;
 };
 
+/** Rótulo do filtro agregado que reúne todos os proventos de renda variável (exclui renda fixa e Tesouro). */
+export const VARIABLE_INCOME_FILTER = 'Renda Variável';
+
+/**
+ * Indica se o provento é de renda variável. Renda fixa e Tesouro são
+ * convertidos em "proventos" com is_accrued=true; o restante vem de eventos reais.
+ */
+export const isVariableIncomeDividend = (div: { is_accrued?: boolean }): boolean => !div.is_accrued;
+
 export const formatMoney = (val: number, currency: string) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
