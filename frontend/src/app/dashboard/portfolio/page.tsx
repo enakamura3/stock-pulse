@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { PortfolioProvider, usePortfolio } from '@/context/PortfolioContext';
-import { getAssetCategory, getDividendAssetCategory, formatMoney } from '@/components/portfolio/helpers';
+import { getAssetCategory, getDividendAssetCategory, formatMoney, isVariableIncomeDividend, VARIABLE_INCOME_FILTER } from '@/components/portfolio/helpers';
 import { apiFetch } from '@/lib/api';
 
 import PortfolioHeader from '@/components/portfolio/PortfolioHeader';
@@ -90,7 +90,11 @@ function PortfolioContent() {
     }
     if (activeTab === 'proventos') {
       const cats = Array.from(new Set(dividends.map(d => getDividendAssetCategory(d)).filter(c => c && c !== 'Outros' && c !== 'Desconhecido'))).sort();
-      return cats.length > 1 ? ['Todas', ...cats] : [];
+      if (cats.length <= 1) return [];
+      // Pílula agregada só faz sentido quando há renda variável e renda fixa/Tesouro juntas
+      const hasVariable = dividends.some(isVariableIncomeDividend);
+      const hasFixed = dividends.some(d => !isVariableIncomeDividend(d));
+      return hasVariable && hasFixed ? ['Todas', VARIABLE_INCOME_FILTER, ...cats] : ['Todas', ...cats];
     }
     return [];
   }, [activeTab, positions, fiPositions, treasuryPositions, dividends]);
@@ -124,6 +128,9 @@ function PortfolioContent() {
   const categoryFilteredDividends = React.useMemo(() => {
     if (activeTab !== 'proventos' || activeCategoryFilter === 'Todas') {
       return dividends;
+    }
+    if (activeCategoryFilter === VARIABLE_INCOME_FILTER) {
+      return dividends.filter(isVariableIncomeDividend);
     }
     return dividends.filter(div => getDividendAssetCategory(div) === activeCategoryFilter);
   }, [dividends, activeTab, activeCategoryFilter]);

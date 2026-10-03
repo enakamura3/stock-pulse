@@ -4,6 +4,8 @@ import {
   formatMoney,
   getAssetCategory,
   getDividendAssetCategory,
+  isVariableIncomeDividend,
+  VARIABLE_INCOME_FILTER,
   formatQuantity,
   calculateDailyFixedIncomeRate,
   calculateEstimatedDailyGain,
@@ -85,6 +87,15 @@ describe('Portfolio Helpers', () => {
       expect(getDividendAssetCategory({ asset_type: 'UNKNOWN', is_accrued: true })).toBe('Renda Fixa');
       expect(getDividendAssetCategory({ asset_type: 'UNKNOWN', is_accrued: false })).toBe('Outros');
       expect(getDividendAssetCategory({ asset_type: '', is_accrued: false })).toBe('Outros');
+    });
+  });
+
+  describe('isVariableIncomeDividend', () => {
+    it('treats accrued (fixed income / Tesouro) yields as non variable income', () => {
+      expect(isVariableIncomeDividend({ is_accrued: true })).toBe(false);
+      expect(isVariableIncomeDividend({ is_accrued: false })).toBe(true);
+      expect(isVariableIncomeDividend({})).toBe(true);
+      expect(VARIABLE_INCOME_FILTER).toBe('Renda Variável');
     });
   });
 
