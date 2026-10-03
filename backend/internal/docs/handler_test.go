@@ -10,8 +10,25 @@ import (
 )
 
 func TestNewHandler(t *testing.T) {
-	h := NewHandler("path/to/yaml")
-	assert.Equal(t, "path/to/yaml", h.yamlPath)
+	// Fallback to embedded when path does not exist
+	h := NewHandler("non-existent-path")
+	assert.NotEmpty(t, h.yamlBytes)
+
+	// Fallback when path is empty string
+	hEmpty := NewHandler("")
+	assert.NotEmpty(t, hEmpty.yamlBytes)
+
+	// With temporary file
+	tmpFile, err := os.CreateTemp("", "openapi-*.yaml")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString("openapi: 3.0.0")
+	assert.NoError(t, err)
+	tmpFile.Close()
+
+	h2 := NewHandler(tmpFile.Name())
+	assert.Equal(t, []byte("openapi: 3.0.0"), h2.yamlBytes)
 }
 
 func TestHandler_ServeYAML(t *testing.T) {
@@ -38,7 +55,7 @@ func TestHandler_ServeYAML(t *testing.T) {
 func TestHandler_ServeUI(t *testing.T) {
 	h := NewHandler("path")
 
-	req := httptest.NewRequest("GET", "/api/v1/swagger/", nil)
+	req := httptest.NewRequest("GET", "/api/v1/swagger", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeUI(rec, req)
@@ -46,4 +63,5 @@ func TestHandler_ServeUI(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get("Content-Type"))
 	assert.Contains(t, rec.Body.String(), "<title>stock-pulse - Documentação de API</title>")
+	assert.Contains(t, rec.Body.String(), "SwaggerUIBundle")
 }
