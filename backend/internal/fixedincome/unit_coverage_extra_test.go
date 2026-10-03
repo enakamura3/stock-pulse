@@ -1187,14 +1187,14 @@ func TestTreasury_UpdateDeleteRebuild_Deep(t *testing.T) {
 	err = sImpl.rebuildTreasuryFIFO(ctx, nil, "p1", "a_fifo5")
 	assert.ErrorContains(t, err, "fifo active lots err")
 
-	redTx := TreasuryTransaction{ID: "r1", Quantity: 2.0, TransactionDate: time.Now()}
-	lotTx := TreasuryTransaction{ID: "l1", RemainingQuantity: 5.0, UnitPrice: 1000.0, ContractedRate: 0.0, TransactionDate: time.Now().AddDate(0, -1, 0)}
+	redTx := TreasuryTransaction{ID: "r1", Quantity: 2.0, TransactionDate: time.Date(2025, 6, 6, 0, 0, 0, 0, time.UTC)}
+	lotTx := TreasuryTransaction{ID: "l1", RemainingQuantity: 5.0, UnitPrice: 1000.0, ContractedRate: 0.0, TransactionDate: time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC)}
 	mockRepo.On("DeleteDepletionsByAsset", ctx, mock.Anything, "p1", "a_fifo6").Return(nil).Once()
 	mockRepo.On("ResetSubscriptionsRemainingQuantity", ctx, mock.Anything, "p1", "a_fifo6").Return(nil).Once()
 	mockRepo.On("ResetRedemptionFinancials", ctx, mock.Anything, "p1", "a_fifo6").Return(nil).Once()
 	mockRepo.On("GetRedemptionsForAsset", ctx, mock.Anything, "p1", "a_fifo6").Return([]TreasuryTransaction{redTx}, nil).Once()
 	mockRepo.On("GetAnbimaHolidays", ctx).Return(map[string]bool{}, nil).Once()
-	mockRepo.On("GetSelicRates", ctx).Return(map[string]float64{time.Now().Format("2006-01-02"): 11.0}, nil).Once()
+	mockRepo.On("GetSelicRates", ctx).Return(map[string]float64{"2025-06-03": 11.0}, nil).Once()
 	mockRepo.On("GetTotalSelicInvested", ctx, mock.Anything, "p1").Return(15000.0, nil).Once()
 	mockRepo.On("GetTreasuryAssetDetails", ctx, "a_fifo6").Return("LFT", "SELIC", time.Now().AddDate(1, 0, 0), false, nil).Once()
 	mockRepo.On("GetActiveLotsForAsset", ctx, mock.Anything, "p1", "a_fifo6").Return([]TreasuryTransaction{lotTx}, nil).Once()
@@ -1207,7 +1207,7 @@ func TestTreasury_UpdateDeleteRebuild_Deep(t *testing.T) {
 	mockRepo.On("ResetRedemptionFinancials", ctx, mock.Anything, "p1", "a_fifo7").Return(nil).Once()
 	mockRepo.On("GetRedemptionsForAsset", ctx, mock.Anything, "p1", "a_fifo7").Return([]TreasuryTransaction{redTx}, nil).Once()
 	mockRepo.On("GetAnbimaHolidays", ctx).Return(map[string]bool{}, nil).Once()
-	mockRepo.On("GetSelicRates", ctx).Return(map[string]float64{}, nil).Once()
+	mockRepo.On("GetSelicRates", ctx).Return(map[string]float64{"2025-06-03": 11.25}, nil).Once()
 	mockRepo.On("GetTotalSelicInvested", ctx, mock.Anything, "p1").Return(0.0, nil).Once()
 	mockRepo.On("GetTreasuryAssetDetails", ctx, "a_fifo7").Return("LFT", "SELIC", time.Now().AddDate(1, 0, 0), false, nil).Once()
 	mockRepo.On("GetActiveLotsForAsset", ctx, mock.Anything, "p1", "a_fifo7").Return([]TreasuryTransaction{lotTx}, nil).Once()

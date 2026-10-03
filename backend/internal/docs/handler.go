@@ -1,28 +1,41 @@
 package docs
 
 import (
+	_ "embed"
 	"net/http"
+	"os"
 )
+
+//go:embed openapi.yaml
+var defaultOpenAPIYAML []byte
 
 // Handler gerencia a renderização do Swagger UI e exposição do OpenAPI YAML.
 type Handler struct {
-	yamlPath string
+	yamlBytes []byte
 }
 
-// NewHandler inicializa o Handler carregando o caminho do openapi.yaml.
+// NewHandler inicializa o Handler carregando o caminho do openapi.yaml com fallback para o embedded.
 func NewHandler(yamlPath string) *Handler {
+	if yamlPath != "" {
+		if data, err := os.ReadFile(yamlPath); err == nil && len(data) > 0 {
+			return &Handler{
+				yamlBytes: data,
+			}
+		}
+	}
 	return &Handler{
-		yamlPath: yamlPath,
+		yamlBytes: defaultOpenAPIYAML,
 	}
 }
 
 // ServeYAML serve o arquivo openapi.yaml bruto para consumo da interface.
 func (h *Handler) ServeYAML(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
-	http.ServeFile(w, r, h.yamlPath)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(h.yamlBytes)
 }
 
-// ServeUI renderiza a UI interativa do Swagger UI estilizada com o tema escuro do stock-pulse.
+// ServeUI renderiza a UI interativa do Swagger UI estilizada para o stock-pulse.
 func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
 	tmpl := `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -55,7 +68,12 @@ func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
         plugins: [
           SwaggerUIBundle.plugins.DownloadUrl
         ],
-        layout: "StandaloneLayout"
+        layout: "StandaloneLayout",
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        docExpansion: "none",
+        filter: true,
+        tryItOutEnabled: true
       });
     };
   </script>
