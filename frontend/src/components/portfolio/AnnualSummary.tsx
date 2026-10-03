@@ -211,9 +211,6 @@ export default function AnnualSummary({
 
   if (annualData.length === 0) return null;
 
-  // Lista dos anos ordenados
-  const yearsList = annualData.map(d => String(d.year));
-
   const formatTypeColor = (category: string) => {
     return CATEGORY_COLORS[category] || 'var(--accent-color)';
   };
@@ -226,26 +223,24 @@ export default function AnnualSummary({
   return (
     <div className="mb-xl">
       <style>{`
-        .summary-tab-btn {
-          padding: 0.5rem 1rem;
+        .btn-clear-year-filter {
+          padding: 0.35rem 0.75rem;
           border-radius: 8px;
           border: 1px solid var(--panel-border);
           background: rgba(255, 255, 255, 0.02);
           color: var(--text-secondary);
           cursor: pointer;
           font-weight: 500;
-          font-size: 0.85rem;
+          font-size: 0.8rem;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           transition: all 0.2s ease;
         }
-        .summary-tab-btn:hover {
+        .btn-clear-year-filter:hover {
           background: rgba(255, 255, 255, 0.06);
           color: var(--text-primary);
-        }
-        .summary-tab-btn.active {
-          background: var(--accent-bg);
           border-color: var(--accent-color);
-          color: var(--accent-color);
-          font-weight: 600;
         }
         .progress-bar-bg {
           background: rgba(255, 255, 255, 0.05);
@@ -279,31 +274,37 @@ export default function AnnualSummary({
       `}</style>
 
       <div className="flex-row justify-between items-center mb-md flex-wrap gap-sm">
-        <h4 className="font-bold text-secondary flex-row items-center gap-xs">
-          📊 Resumo Anual Consolidado
-        </h4>
-        
-        {/* Abas dos Anos */}
-        <div className="flex-row gap-sm flex-wrap">
-          {yearsList.map(yr => (
-            <button
-              key={yr}
-              className={`summary-tab-btn ${((selectedYear === 'Todos' && activeYearData?.year === parseInt(yr, 10)) || selectedYear === yr) ? 'active' : ''}`}
-              onClick={() => setSelectedYear(selectedYear === yr ? 'Todos' : yr)}
+        <div className="flex-row items-center gap-sm flex-wrap">
+          <h4 className="font-bold text-secondary flex-row items-center gap-xs">
+            📊 Resumo Anual Consolidado
+          </h4>
+          {selectedYear && selectedYear !== 'Todos' && (
+            <span
+              className="badge"
+              style={{
+                fontSize: '0.75rem',
+                padding: '0.2rem 0.55rem',
+                borderRadius: '6px',
+                background: 'var(--accent-bg)',
+                color: 'var(--accent-color)',
+                fontWeight: 600,
+                border: '1px solid var(--accent-color)'
+              }}
             >
-              {yr}
-            </button>
-          ))}
-          {selectedYear !== 'Todos' && (
-            <button
-              className="summary-tab-btn"
-              onClick={() => setSelectedYear('Todos')}
-              style={{ fontSize: '0.8rem', opacity: 0.8 }}
-            >
-              Ver Todos
-            </button>
+              Ano {selectedYear}
+            </span>
           )}
         </div>
+
+        {selectedYear && selectedYear !== 'Todos' && (
+          <button
+            className="btn-clear-year-filter"
+            onClick={() => setSelectedYear('Todos')}
+            title="Remover filtro de ano e ver consolidado geral"
+          >
+            ✕ Limpar Filtro ({selectedYear})
+          </button>
+        )}
       </div>
 
       {activeYearData && (
@@ -321,7 +322,7 @@ export default function AnnualSummary({
           <div className="flex-row gap-md mb-md flex-wrap">
             {/* Total Recebido */}
             <div className="card" style={{ flex: '1', minWidth: '200px', background: 'var(--panel-bg)', padding: '1.25rem', border: '1px solid var(--panel-border)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
-              <div className="text-secondary text-sm mb-sm font-bold">Total Líquido ({activeYearData.year})</div>
+              <div className="text-secondary text-sm mb-sm font-bold">Total Líquido ({activeYearData.year === 'Todos' ? 'Consolidado' : activeYearData.year})</div>
               <div className="font-bold text-3xl mb-xs" style={{ color: 'var(--color-success)', letterSpacing: '-0.5px' }}>
                 {formatMoney(activeYearData.totalAmount, activeYearData.currency)}
               </div>

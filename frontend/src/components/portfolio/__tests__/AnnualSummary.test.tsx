@@ -61,11 +61,10 @@ describe('AnnualSummary Component', () => {
       />
     );
 
-    // Cabeçalho e Abas
+    // Cabeçalho e Indicador de Ano Filtrado
     expect(screen.getByText(/Resumo Anual Consolidado/i)).toBeInTheDocument();
-    expect(screen.getByText('2026')).toBeInTheDocument();
-    expect(screen.getByText('2025')).toBeInTheDocument();
-    expect(screen.getByText('Ver Todos')).toBeInTheDocument();
+    expect(screen.getByText('Ano 2026')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Limpar Filtro \(2026\)/i })).toBeInTheDocument();
 
     // Total Líquido de 2026 (100,00)
     expect(screen.getByText(/Total Líquido/i)).toBeInTheDocument();
@@ -180,7 +179,7 @@ describe('AnnualSummary Component', () => {
     expect(screen.getByText('Tesouro Direto')).toBeInTheDocument();
   });
 
-  it('calls setSelectedYear when tab is clicked', () => {
+  it('calls setSelectedYear("Todos") when clear filter button is clicked', () => {
     const mockDividends: CalculatedDividend[] = [
       {
         asset_id: '1',
@@ -221,13 +220,41 @@ describe('AnnualSummary Component', () => {
       />
     );
 
-    const btn2025 = screen.getByText('2025');
-    fireEvent.click(btn2025);
-    expect(mockSetSelectedYear).toHaveBeenCalledWith('2025');
-
-    const btnTodos = screen.getByText('Ver Todos');
-    fireEvent.click(btnTodos);
+    const clearBtn = screen.getByRole('button', { name: /Limpar Filtro \(2026\)/i });
+    fireEvent.click(clearBtn);
     expect(mockSetSelectedYear).toHaveBeenCalledWith('Todos');
+  });
+
+  it('does not render filter badge or clear button when selectedYear is "Todos"', () => {
+    const mockDividends: CalculatedDividend[] = [
+      {
+        asset_id: '1',
+        ticker: 'PETR4',
+        cum_date: '2026-05-10T00:00:00Z',
+        payment_date: '2026-06-15T00:00:00Z',
+        gross_amount: 100,
+        net_amount: 100,
+        currency: 'BRL',
+        type: 'DIVIDENDO',
+        quantity: 100,
+        per_share_amount: 1,
+        asset_type: 'STOCK_BR',
+        asset_name: 'Petroleo Brasileiro'
+      }
+    ];
+
+    render(
+      <AnnualSummary
+        dividends={mockDividends}
+        selectedYear="Todos"
+        setSelectedYear={mockSetSelectedYear}
+        availableYears={availableYears}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /Limpar Filtro/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Ano /)).not.toBeInTheDocument();
+    expect(screen.getByText(/Total Líquido \(Consolidado\)/i)).toBeInTheDocument();
   });
 
   it('uses the most recent year as fallback when selectedYear is "Todos"', () => {
