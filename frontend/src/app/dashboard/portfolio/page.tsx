@@ -18,6 +18,7 @@ import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import TreasuryTab from '@/components/portfolio/TreasuryTab';
 import PortfolioAnalysis from '@/components/portfolio/PortfolioAnalysis';
 import Modals from '@/components/portfolio/Modals';
+import IdeStatusBar from '@/components/ui/IdeStatusBar';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
@@ -270,12 +271,11 @@ function PortfolioContent() {
             <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} />
 
             {dynamicCategories.length > 1 && (
-              <div className="flex-row gap-sm flex-wrap" data-testid="contextual-filter-pills" aria-label="Filtro de categorias">
+              <div className="flex-row gap-xs flex-wrap" data-testid="contextual-filter-pills" aria-label="Filtro de categorias">
                 {dynamicCategories.map(cat => (
                   <button
                     key={cat} onClick={() => setActiveCategoryFilter(cat)}
-                    className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
-                    style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'var(--accent-bg)' : 'var(--panel-bg)', color: activeCategoryFilter === cat ? 'var(--accent-color)' : 'var(--text-secondary)' }}
+                    className={`category-tag ${activeCategoryFilter === cat ? 'active' : ''}`}
                   >
                     {getCategoryLabel(cat)}
                   </button>
@@ -285,19 +285,18 @@ function PortfolioContent() {
 
           {activeTab === 'ativos' && (
             <div className="flex-col gap-xl w-full">
-              {/* ── KPI Cards ── */}
-              <div className="flex-row gap-md flex-wrap" data-testid="equity-kpi-cards">
+              {/* ── KPI Cards (IDE Matrix Grid) ── */}
+              <div className="ide-matrix" data-testid="equity-kpi-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                 {equityKpis.map((card, idx) => (
                   <div
                     key={idx}
-                    className="card"
-                    style={{ flex: '1 1 180px', minWidth: 160, padding: '1.25rem 1.5rem' }}
+                    className="ide-cell"
                   >
-                    <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>{card.icon}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.value}</div>
+                    <div style={{ fontSize: '1.2rem', marginBottom: '0.35rem' }}>{card.icon}</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{card.label}</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{card.value}</div>
                     {card.sub && (
-                      <div style={{ fontSize: '0.75rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.72rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
                         {card.sub}
                       </div>
                     )}
@@ -414,6 +413,12 @@ function PortfolioContent() {
       {/* Renderizado sem prop drilling! Todos os modais consomem o PortfolioContext */}
       <Modals />
       </main>
+
+      <IdeStatusBar
+        wsConnected={true}
+        activePortfolioName={portfolios.find(p => p.id === activePortfolioId)?.name || 'Principal'}
+        currency={kpiCurrency}
+      />
     </div>
   );
 }

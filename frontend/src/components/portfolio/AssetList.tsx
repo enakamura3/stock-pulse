@@ -96,6 +96,7 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
             <table className="data-table" style={{ width: '100%', fontSize: '0.78rem' }}>
               <thead>
                 <tr>
+                  <th className="table-line-num">#</th>
                   <th style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('ticker')}>Ativo {sortIcon('ticker')}</th>
                   <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('quantity')}>Qtd {sortIcon('quantity')}</th>
                   <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('average_price')}>Preço Médio {sortIcon('average_price')}</th>
@@ -111,10 +112,11 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
                 </tr>
               </thead>
               <tbody>
-                {sortedPositions.map((pos) => {
+                {sortedPositions.map((pos, idx) => {
                   const isPos = (pos.profit_loss || 0) >= 0;
                   return (
                     <tr key={pos.asset_id || pos.ticker}>
+                      <td className="table-line-num">{String(idx + 1).padStart(2, '0')}</td>
                       <td title={pos.name} style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'help' }}>
                         <span className="font-bold font-mono text-accent">{pos.ticker}</span>
                       </td>

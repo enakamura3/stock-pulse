@@ -18,8 +18,8 @@ export default function PortfolioSummaryCards({
   const isPos = profitLoss >= 0;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
-      <div className="card flex-col justify-center text-left" style={{ padding: '1rem 1.25rem', position: 'relative' }}>
+    <div className="ide-matrix">
+      <div className="ide-cell" style={{ position: 'relative' }}>
         <div className="flex-row items-center justify-between">
           <span className="text-secondary font-mono text-xs flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             <WalletIcon size={14} /> Patrimônio Atual
@@ -35,7 +35,7 @@ export default function PortfolioSummaryCards({
         </span>
       </div>
 
-      <div className="card flex-col justify-center text-left" style={{ padding: '1rem 1.25rem' }}>
+      <div className="ide-cell">
         <span className="text-secondary font-mono text-xs flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           <BankIcon size={14} /> Total Investido
         </span>
@@ -44,7 +44,7 @@ export default function PortfolioSummaryCards({
         </span>
       </div>
 
-      <div className="card flex-col justify-center text-left" style={{ padding: '1rem 1.25rem' }}>
+      <div className="ide-cell">
         <span className="text-secondary font-mono text-xs flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           {isPos ? <TrendingUpIcon size={14} color="var(--color-success)" /> : <TrendingDownIcon size={14} color="var(--color-danger)" />} Lucro / Prejuízo
         </span>
@@ -58,7 +58,7 @@ export default function PortfolioSummaryCards({
         </div>
       </div>
 
-      <div className="card flex-col justify-center text-left" style={{ padding: '1rem 1.25rem' }}>
+      <div className="ide-cell">
         <span className="text-secondary font-mono text-xs flex-row items-center gap-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           <CoinsIcon size={14} /> Média de Proventos (12m)
         </span>

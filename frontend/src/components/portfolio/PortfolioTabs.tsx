@@ -17,29 +17,15 @@ export default function PortfolioTabs({
   const activeP = portfolios.find(p => p.id === activePortfolioId);
 
   return (
-    <div className="flex-row justify-between items-center mb-md flex-wrap gap-md">
-      <div className="flex-row gap-xs items-center" style={{ overflowX: 'auto', paddingBottom: '0.2rem' }}>
+    <div className="flex-row justify-between items-center mb-md flex-wrap gap-xs" style={{ borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.4rem' }}>
+      <div className="ide-tabstrip" style={{ flex: '1 1 auto', borderBottom: 'none' }}>
         {portfolios.map((p) => {
           const isActive = activePortfolioId === p.id;
           return (
             <button
               key={p.id}
               onClick={() => setActivePortfolioId(p.id)}
-              className={`tab-button ${isActive ? 'active' : ''}`}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.78rem',
-                padding: '0.4rem 0.75rem',
-                borderRadius: '4px',
-                border: isActive ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)',
-                background: isActive ? 'rgba(238, 96, 24, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-                color: isActive ? 'var(--accent-color)' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: isActive ? 600 : 400,
-              }}
+              className={`ide-tab ${isActive ? 'active' : ''}`}
             >
               {p.is_default ? '⭐ ' : ''}💼 {p.name}{' '}
               <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: '2px' }}>[{p.base_currency}]</span>
@@ -48,15 +34,11 @@ export default function PortfolioTabs({
         })}
         <button
           onClick={() => setShowPortfolioModal(true)}
-          className="btn-secondary font-mono"
+          className="ide-tab"
           style={{
             borderStyle: 'dashed',
-            borderColor: 'var(--accent-color)',
             color: 'var(--accent-color)',
             background: 'transparent',
-            padding: '0.4rem 0.75rem',
-            fontSize: '0.78rem',
-            borderRadius: '4px',
           }}
         >
           + Criar Carteira
