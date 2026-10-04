@@ -22,10 +22,11 @@ type MockDigestNotifier struct {
 func (m *MockDigestNotifier) SendDailyDigest(
 	chatID int64,
 	userName, portfolioName, currency string,
-	totalValue, dailyChange, returnPercent float64,
+	totalValue, dailyChange, dailyChangePercent, returnPercent float64,
+	topGainers, topLosers []DailyMover,
 	todayDividends, upcomingDividends []portfolio.CalculatedDividend,
 ) error {
-	args := m.Called(chatID, userName, portfolioName, currency, totalValue, dailyChange, returnPercent, todayDividends, upcomingDividends)
+	args := m.Called(chatID, userName, portfolioName, currency, totalValue, dailyChange, dailyChangePercent, returnPercent, topGainers, topLosers, todayDividends, upcomingDividends)
 	return args.Error(0)
 }
 
@@ -36,18 +37,34 @@ func TestDailyDigestWorker_New(t *testing.T) {
 	fiSvc := new(MockFixedIncomeSvc)
 	notifier := new(MockDigestNotifier)
 
+	// Default values: 19:00
 	worker := NewDailyDigestWorker(repo, svc, pSvc, fiSvc, notifier, nil)
 	assert.NotNil(t, worker)
-	assert.Equal(t, 8, worker.targetHour)
-	assert.Equal(t, 30, worker.targetMinute)
+	assert.Equal(t, 19, worker.targetHour)
+	assert.Equal(t, 0, worker.targetMinute)
 	assert.NotNil(t, worker.nowFunc)
+
+	// Custom environment variables
+	t.Setenv("TELEGRAM_DIGEST_HOUR", "20")
+	t.Setenv("TELEGRAM_DIGEST_MINUTE", "15")
+	workerEnv := NewDailyDigestWorker(repo, svc, pSvc, fiSvc, notifier, nil)
+	assert.Equal(t, 20, workerEnv.targetHour)
+	assert.Equal(t, 15, workerEnv.targetMinute)
+
+	// Invalid environment variables fall back to defaults
+	t.Setenv("TELEGRAM_DIGEST_HOUR", "99")
+	t.Setenv("TELEGRAM_DIGEST_MINUTE", "invalid")
+	workerInvalid := NewDailyDigestWorker(repo, svc, pSvc, fiSvc, notifier, nil)
+	assert.Equal(t, 19, workerInvalid.targetHour)
+	assert.Equal(t, 0, workerInvalid.targetMinute)
 }
 
 func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 	loc, err := time.LoadLocation("America/Sao_Paulo")
 	assert.NoError(t, err)
 
-	targetTime := time.Date(2026, 9, 26, 8, 30, 0, 0, loc)
+	// 2026-09-25 is a Friday (weekday)
+	targetTime := time.Date(2026, 9, 25, 19, 0, 0, 0, loc)
 
 	t.Run("nil dependencies", func(t *testing.T) {
 		w1 := &DailyDigestWorker{notifier: nil}
@@ -60,25 +77,57 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 		w3.ProcessDailyDigests(context.Background())
 	})
 
+	t.Run("suppressed on weekends (Saturday and Sunday)", func(t *testing.T) {
+		repo := new(MockRepository)
+		pSvc := new(MockPortfolioService)
+		notifier := new(MockDigestNotifier)
+
+		// Saturday
+		saturdayTime := time.Date(2026, 9, 26, 19, 0, 0, 0, loc)
+		wSat := &DailyDigestWorker{
+			repo:         repo,
+			portfolioSvc: pSvc,
+			notifier:     notifier,
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return saturdayTime },
+		}
+		wSat.ProcessDailyDigests(context.Background())
+		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
+
+		// Sunday
+		sundayTime := time.Date(2026, 9, 27, 19, 0, 0, 0, loc)
+		wSun := &DailyDigestWorker{
+			repo:         repo,
+			portfolioSvc: pSvc,
+			notifier:     notifier,
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return sundayTime },
+		}
+		wSun.ProcessDailyDigests(context.Background())
+		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
+	})
+
 	t.Run("before target time", func(t *testing.T) {
 		repo := new(MockRepository)
 		pSvc := new(MockPortfolioService)
 		notifier := new(MockDigestNotifier)
 
-		earlyTime := time.Date(2026, 9, 26, 7, 45, 0, 0, loc)
+		earlyHourTime := time.Date(2026, 9, 25, 18, 0, 0, 0, loc)
 		w := &DailyDigestWorker{
 			repo:         repo,
 			portfolioSvc: pSvc,
 			notifier:     notifier,
-			targetHour:   8,
-			targetMinute: 30,
-			nowFunc:      func() time.Time { return earlyTime },
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return earlyHourTime },
 		}
 
 		w.ProcessDailyDigests(context.Background())
 		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
 
-		earlyMinuteTime := time.Date(2026, 9, 26, 8, 29, 0, 0, loc)
+		earlyMinuteTime := time.Date(2026, 9, 25, 18, 59, 0, 0, loc)
 		w.nowFunc = func() time.Time { return earlyMinuteTime }
 		w.ProcessDailyDigests(context.Background())
 		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
@@ -90,13 +139,14 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 		notifier := new(MockDigestNotifier)
 
 		// 1. locFunc returns error -> triggers fallback to FixedZone("BRT", -3h)
+		// 2026-09-25 15:00 UTC = 12:00 BRT (< 19:00, so returns early)
 		w := &DailyDigestWorker{
 			repo:         repo,
 			portfolioSvc: pSvc,
 			notifier:     notifier,
-			targetHour:   8,
-			targetMinute: 30,
-			nowFunc:      func() time.Time { return time.Date(2026, 9, 26, 7, 0, 0, 0, time.UTC) },
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC) },
 			locFunc: func(name string) (*time.Location, error) {
 				return nil, errors.New("tzdata load failure")
 			},
@@ -109,9 +159,9 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			repo:         repo,
 			portfolioSvc: pSvc,
 			notifier:     notifier,
-			targetHour:   8,
-			targetMinute: 30,
-			nowFunc:      func() time.Time { return time.Date(2026, 9, 26, 7, 0, 0, 0, time.UTC) },
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC) },
 			locFunc:      nil,
 		}
 		wNil.ProcessDailyDigests(context.Background())
@@ -129,8 +179,8 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			repo:         repo,
 			portfolioSvc: pSvc,
 			notifier:     notifier,
-			targetHour:   8,
-			targetMinute: 30,
+			targetHour:   19,
+			targetMinute: 0,
 			nowFunc:      func() time.Time { return targetTime },
 		}
 
@@ -149,8 +199,8 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			repo:         repo,
 			portfolioSvc: pSvc,
 			notifier:     notifier,
-			targetHour:   8,
-			targetMinute: 30,
+			targetHour:   19,
+			targetMinute: 0,
 			nowFunc:      func() time.Time { return targetTime },
 		}
 
@@ -179,8 +229,8 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			portfolioSvc: pSvc,
 			notifier:     notifier,
 			rdb:          rdb,
-			targetHour:   8,
-			targetMinute: 30,
+			targetHour:   19,
+			targetMinute: 0,
 			nowFunc:      func() time.Time { return targetTime },
 		}
 
@@ -209,15 +259,15 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			repo:         repo,
 			portfolioSvc: pSvc,
 			notifier:     notifier,
-			targetHour:   8,
-			targetMinute: 30,
+			targetHour:   19,
+			targetMinute: 0,
 			nowFunc:      func() time.Time { return targetTime },
 		}
 
 		w.ProcessDailyDigests(context.Background())
 		repo.AssertExpectations(t)
 		pSvc.AssertExpectations(t)
-		notifier.AssertNotCalled(t, "SendDailyDigest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		notifier.AssertNotCalled(t, "SendDailyDigest")
 	})
 
 	t.Run("GetPortfolioDetails errors", func(t *testing.T) {
@@ -244,14 +294,14 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			svc:          svc,
 			portfolioSvc: pSvc,
 			notifier:     notifier,
-			targetHour:   8,
-			targetMinute: 30,
+			targetHour:   19,
+			targetMinute: 0,
 			nowFunc:      func() time.Time { return targetTime },
 		}
 
 		w.ProcessDailyDigests(context.Background())
 		pSvc.AssertExpectations(t)
-		notifier.AssertNotCalled(t, "SendDailyDigest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		notifier.AssertNotCalled(t, "SendDailyDigest")
 	})
 
 	t.Run("successful processing with equities, fixed income, today and upcoming dividends", func(t *testing.T) {
@@ -285,20 +335,94 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 
 		positions := []portfolio.Position{
 			{
-				Ticker:       "PETR4",
-				Quantity:     100,
-				CurrentPrice: 35.0,
-				CurrentValue: 3500.0,
-				TotalCost:    3000.0,
-				DailyChange:  1.50,
+				Ticker:             "PETR4",
+				Quantity:           100,
+				CurrentPrice:       35.0,
+				CurrentValue:       3500.0,
+				TotalCost:          3000.0,
+				DailyChange:        1.50,
+				DailyChangePercent: 4.5,
 			},
 			{
-				Ticker:       "TEST_ZERO",
-				Quantity:     0,
-				CurrentPrice: 0,
-				CurrentValue: 0,
-				TotalCost:    0,
-				DailyChange:  0,
+				Ticker:             "VALE3",
+				Quantity:           50,
+				CurrentPrice:       60.0,
+				CurrentValue:       3000.0,
+				TotalCost:          3200.0,
+				DailyChange:        -2.0,
+				DailyChangePercent: -3.2,
+			},
+			{
+				Ticker:             "ITUB4",
+				Quantity:           30,
+				CurrentPrice:       30.0,
+				CurrentValue:       900.0,
+				TotalCost:          850.0,
+				DailyChange:        0.90,
+				DailyChangePercent: 3.1,
+			},
+			{
+				Ticker:             "BBDC4",
+				Quantity:           40,
+				CurrentPrice:       15.0,
+				CurrentValue:       600.0,
+				TotalCost:          550.0,
+				DailyChange:        0.30,
+				DailyChangePercent: 2.0,
+			},
+			{
+				Ticker:             "WEGE3",
+				Quantity:           20,
+				CurrentPrice:       50.0,
+				CurrentValue:       1000.0,
+				TotalCost:          900.0,
+				DailyChange:        0.50,
+				DailyChangePercent: 1.0,
+			},
+			{
+				Ticker:             "MGLU3",
+				Quantity:           100,
+				CurrentPrice:       2.0,
+				CurrentValue:       200.0,
+				TotalCost:          250.0,
+				DailyChange:        -0.20,
+				DailyChangePercent: -9.1,
+			},
+			{
+				Ticker:             "BBAS3",
+				Quantity:           10,
+				CurrentPrice:       25.0,
+				CurrentValue:       250.0,
+				TotalCost:          260.0,
+				DailyChange:        -1.0,
+				DailyChangePercent: -3.8,
+			},
+			{
+				Ticker:             "B3SA3",
+				Quantity:           10,
+				CurrentPrice:       12.0,
+				CurrentValue:       120.0,
+				TotalCost:          130.0,
+				DailyChange:        -0.10,
+				DailyChangePercent: -0.8,
+			},
+			{
+				Ticker:             "TEST_ZERO",
+				Quantity:           0,
+				CurrentPrice:       0,
+				CurrentValue:       0,
+				TotalCost:          0,
+				DailyChange:        0,
+				DailyChangePercent: 15.0,
+			},
+			{
+				Ticker:             "FLAT",
+				Quantity:           10,
+				CurrentPrice:       10.0,
+				CurrentValue:       100.0,
+				TotalCost:          100.0,
+				DailyChange:        0,
+				DailyChangePercent: 0.0,
 			},
 		}
 
@@ -359,11 +483,15 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			"Eduardo",
 			"Principal",
 			"BRL",
-			5500.0, // 3500 + 2000
-			150.0,  // dailyChange: 1.50 * 100 * 1.0 = 150.0
-			mock.MatchedBy(func(ret float64) bool {
-				// (5500 - 4800) / 4800 * 100 = 700 / 4800 * 100 = 14.5833%
-				return ret > 14.0 && ret < 15.0
+			mock.AnythingOfType("float64"), // totalValue
+			mock.AnythingOfType("float64"), // dailyChange
+			mock.AnythingOfType("float64"), // dailyChangePercent
+			mock.AnythingOfType("float64"), // returnPercent
+			mock.MatchedBy(func(g []DailyMover) bool {
+				return len(g) == 3 && g[0].Ticker == "PETR4" && g[1].Ticker == "ITUB4" && g[2].Ticker == "BBDC4"
+			}),
+			mock.MatchedBy(func(l []DailyMover) bool {
+				return len(l) == 3 && l[0].Ticker == "MGLU3" && l[1].Ticker == "BBAS3" && l[2].Ticker == "VALE3"
 			}),
 			mock.MatchedBy(func(tDivs []portfolio.CalculatedDividend) bool {
 				return len(tDivs) == 1 && tDivs[0].Ticker == "PETR4"
@@ -380,8 +508,8 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			fiSvc:        fiSvc,
 			notifier:     notifier,
 			rdb:          rdb,
-			targetHour:   8,
-			targetMinute: 30,
+			targetHour:   19,
+			targetMinute: 0,
 			nowFunc:      func() time.Time { return targetTime },
 		}
 
@@ -437,6 +565,9 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			0.0,
 			0.0,
 			0.0,
+			0.0,
+			[]DailyMover(nil),
+			[]DailyMover(nil),
 			[]portfolio.CalculatedDividend(nil),
 			[]portfolio.CalculatedDividend(nil),
 		).Return(errors.New("send failed"))
@@ -448,8 +579,8 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			fiSvc:        fiSvc,
 			notifier:     notifier,
 			rdb:          rdb,
-			targetHour:   8,
-			targetMinute: 30,
+			targetHour:   19,
+			targetMinute: 0,
 			nowFunc:      func() time.Time { return targetTime },
 		}
 

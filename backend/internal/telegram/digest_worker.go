@@ -4,18 +4,33 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"sort"
+	"strconv"
 	"time"
 
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"github.com/redis/go-redis/v9"
 )
 
-// DigestTelegramNotifier define o contrato para envio do daily digest no Telegram.
-type DigestTelegramNotifier interface {
-	SendDailyDigest(chatID int64, userName, portfolioName, currency string, totalValue, dailyChange, returnPercent float64, todayDividends, upcomingDividends []portfolio.CalculatedDividend) error
+// DailyMover representa um ativo com variação intradiária relevante no pregão.
+type DailyMover struct {
+	Ticker             string
+	DailyChangePercent float64
 }
 
-// DailyDigestWorker gerencia o disparo do resumo matinal diário de investimentos.
+// DigestTelegramNotifier define o contrato para envio do daily digest no Telegram.
+type DigestTelegramNotifier interface {
+	SendDailyDigest(
+		chatID int64,
+		userName, portfolioName, currency string,
+		totalValue, dailyChange, dailyChangePercent, returnPercent float64,
+		topGainers, topLosers []DailyMover,
+		todayDividends, upcomingDividends []portfolio.CalculatedDividend,
+	) error
+}
+
+// DailyDigestWorker gerencia o disparo do resumo de fechamento de mercado de investimentos.
 type DailyDigestWorker struct {
 	repo         Repository
 	svc          Service
@@ -29,8 +44,21 @@ type DailyDigestWorker struct {
 	locFunc      func(name string) (*time.Location, error)
 }
 
-// NewDailyDigestWorker instancia o worker de resumo diário matinal.
+// NewDailyDigestWorker instancia o worker de resumo diário de fechamento de mercado.
 func NewDailyDigestWorker(repo Repository, svc Service, pSvc PortfolioService, fiSvc FixedIncomeService, notifier DigestTelegramNotifier, rdb redis.Cmdable) *DailyDigestWorker {
+	hour := 19
+	minute := 0
+	if hStr := os.Getenv("TELEGRAM_DIGEST_HOUR"); hStr != "" {
+		if h, err := strconv.Atoi(hStr); err == nil && h >= 0 && h <= 23 {
+			hour = h
+		}
+	}
+	if mStr := os.Getenv("TELEGRAM_DIGEST_MINUTE"); mStr != "" {
+		if m, err := strconv.Atoi(mStr); err == nil && m >= 0 && m <= 59 {
+			minute = m
+		}
+	}
+
 	return &DailyDigestWorker{
 		repo:         repo,
 		svc:          svc,
@@ -38,14 +66,14 @@ func NewDailyDigestWorker(repo Repository, svc Service, pSvc PortfolioService, f
 		fiSvc:        fiSvc,
 		notifier:     notifier,
 		rdb:          rdb,
-		targetHour:   8,
-		targetMinute: 30,
+		targetHour:   hour,
+		targetMinute: minute,
 		nowFunc:      time.Now,
 		locFunc:      time.LoadLocation,
 	}
 }
 
-// ProcessDailyDigests avalia todas as contas vinculadas e envia o resumo matinal.
+// ProcessDailyDigests avalia todas as contas vinculadas e envia o resumo de fechamento de mercado.
 func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 	if w.notifier == nil || w.portfolioSvc == nil || w.repo == nil {
 		return
@@ -64,7 +92,12 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 	now := w.nowFunc().In(loc)
 	todayStr := now.Format("2006-01-02")
 
-	// Verifica se já atingiu o horário alvo da manhã (padrão: 08:30)
+	// Não envia aos fins de semana (sábado e domingo), pois a B3 não opera
+	if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+		return
+	}
+
+	// Verifica se já atingiu o horário alvo de fechamento (padrão: 19:00)
 	if now.Hour() < w.targetHour || (now.Hour() == w.targetHour && now.Minute() < w.targetMinute) {
 		return
 	}
@@ -130,6 +163,44 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 			returnPercent = ((totalValue - totalCost) / totalCost) * 100.0
 		}
 
+		var dailyChangePercent float64
+		prevValue := totalValue - totalDailyChange
+		if prevValue > 1e-6 {
+			dailyChangePercent = (totalDailyChange / prevValue) * 100.0
+		}
+
+		var gainers []DailyMover
+		var losers []DailyMover
+		for _, pos := range positions {
+			if pos.Quantity > 1e-6 {
+				if pos.DailyChangePercent > 1e-6 {
+					gainers = append(gainers, DailyMover{
+						Ticker:             pos.Ticker,
+						DailyChangePercent: pos.DailyChangePercent,
+					})
+				} else if pos.DailyChangePercent < -1e-6 {
+					losers = append(losers, DailyMover{
+						Ticker:             pos.Ticker,
+						DailyChangePercent: pos.DailyChangePercent,
+					})
+				}
+			}
+		}
+
+		sort.Slice(gainers, func(i, j int) bool {
+			return gainers[i].DailyChangePercent > gainers[j].DailyChangePercent
+		})
+		if len(gainers) > 3 {
+			gainers = gainers[:3]
+		}
+
+		sort.Slice(losers, func(i, j int) bool {
+			return losers[i].DailyChangePercent < losers[j].DailyChangePercent
+		})
+		if len(losers) > 3 {
+			losers = losers[:3]
+		}
+
 		currency := "BRL"
 		if pDetails != nil && pDetails.BaseCurrency != "" {
 			currency = pDetails.BaseCurrency
@@ -161,7 +232,10 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 			currency,
 			totalValue,
 			totalDailyChange,
+			dailyChangePercent,
 			returnPercent,
+			gainers,
+			losers,
 			todayDividends,
 			upcomingDividends,
 		)
