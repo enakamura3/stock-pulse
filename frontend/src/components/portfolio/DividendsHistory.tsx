@@ -218,28 +218,6 @@ export default function DividendsHistory({
       <div className="card">
         <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
           <h3 className="card-title">🧾 Detalhamento e Lançamentos</h3>
-          <div className="flex-row gap-sm">
-            <select
-              value={filterDivYear}
-              onChange={(e) => setFilterDivYear(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: 'var(--option-bg)', color: 'var(--option-color)', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
-            >
-              <option value="Todos">Todos os Anos</option>
-              {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-            <select
-              value={filterDivMonth}
-              onChange={(e) => setFilterDivMonth(e.target.value)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--panel-border)', background: 'var(--option-bg)', color: 'var(--option-color)', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', width: 'auto' }}
-            >
-              <option value="Todos">Todos os Meses</option>
-              {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {isLoadingDividends ? (

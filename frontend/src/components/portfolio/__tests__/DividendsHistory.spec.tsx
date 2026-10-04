@@ -231,15 +231,10 @@ describe('DividendsHistory Component', () => {
     expect(setFilterDivYear).toHaveBeenCalledWith('2024');
     expect(setFilterDivMonth).toHaveBeenCalledWith('05');
 
-    // Year select filter
-    const yearSelect = screen.getByDisplayValue('2024');
-    fireEvent.change(yearSelect, { target: { value: '2023' } });
-    expect(setFilterDivYear).toHaveBeenCalledWith('2023');
-
-    // Month select filter
-    const monthSelect = screen.getByDisplayValue('Todos os Meses');
-    fireEvent.change(monthSelect, { target: { value: '06' } });
-    expect(setFilterDivMonth).toHaveBeenCalledWith('06');
+    // Dropdowns de ano e mês foram removidos: o filtro é feito pelo Mapa de Proventos
+    expect(screen.queryByDisplayValue('2024')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Todos os Meses')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
 
     // Verify badges and rows
     expect(screen.getByText('PETR4')).toBeInTheDocument();
