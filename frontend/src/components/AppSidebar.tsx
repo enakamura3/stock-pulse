@@ -104,7 +104,7 @@ export default function AppSidebar({
         style={{
           position: 'sticky',
           top: 0,
-          height: '100vh',
+          height: 'calc(100vh - 24px)',
           width: '260px',
           flexShrink: 0,
           overflowY: 'auto',
@@ -122,11 +122,7 @@ export default function AppSidebar({
           {/* Terminal Title Bar & Brand */}
           <div className="flex-col gap-xs px-xs pb-sm" style={{ borderBottom: '1px solid var(--panel-border)' }}>
             <div className="flex-row items-center justify-between">
-              <div className="terminal-dots">
-                <span className="terminal-dot red" />
-                <span className="terminal-dot yellow" />
-                <span className="terminal-dot green" />
-              </div>
+              <span className="font-mono text-muted text-xs" style={{ letterSpacing: '0.06em' }}>[TERMINAL]</span>
               {wsConnected !== undefined && (
                 <div className="flex-row items-center gap-xs font-mono" style={{ fontSize: '0.65rem' }}>
                   <span

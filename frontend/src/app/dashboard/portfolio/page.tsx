@@ -206,26 +206,26 @@ function PortfolioContent() {
   }, [filteredEqDividends]);
 
   const equityKpis = React.useMemo(() => [
-    { label: 'Total Investido', value: formatMoney(filteredEqCost, kpiCurrency), icon: '💰' },
-    { label: 'Patrimônio Atual', value: formatMoney(filteredEqValue, kpiCurrency), icon: '📊' },
+    { label: 'Total Investido', value: formatMoney(filteredEqCost, kpiCurrency), tag: 'INV' },
+    { label: 'Patrimônio Atual', value: formatMoney(filteredEqValue, kpiCurrency), tag: 'PAT' },
     {
       label: 'Lucro / Prejuízo',
       value: formatMoney(filteredEqProfitLoss, kpiCurrency),
-      icon: '💵',
+      tag: 'P&L',
       sub: `${filteredEqReturnPercent >= 0 ? '+' : ''}${filteredEqReturnPercent.toFixed(2)}% (${filteredEqProfitLoss >= 0 ? '+' : ''}${formatMoney(filteredEqProfitLoss, kpiCurrency)})`,
       subColor: filteredEqProfitLoss >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
     },
     {
       label: 'Proventos Recebidos',
       value: formatMoney(filteredEqDividendsTotal, kpiCurrency),
-      icon: '🪙',
+      tag: 'DIV',
       sub: 'Total acumulado',
       subColor: 'var(--accent-color)',
     },
     {
       label: 'Ativos em Carteira',
       value: `${filteredPositions.length}`,
-      icon: '🏷️',
+      tag: 'QTD',
       sub: activeCategoryFilter && activeCategoryFilter !== 'Todas' ? getCategoryLabel(activeCategoryFilter) : 'Todas as categorias',
       subColor: 'var(--text-secondary)',
     },
@@ -292,7 +292,7 @@ function PortfolioContent() {
                     key={idx}
                     className="ide-cell"
                   >
-                    <div style={{ fontSize: '1.2rem', marginBottom: '0.35rem' }}>{card.icon}</div>
+                    <div className="font-mono text-accent text-xs font-bold" style={{ marginBottom: '0.35rem', letterSpacing: '0.05em' }}>[{card.tag}]</div>
                     <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{card.label}</div>
                     <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{card.value}</div>
                     {card.sub && (
@@ -307,10 +307,13 @@ function PortfolioContent() {
               <div className="card flex-col" style={{ padding: '1.75rem 2rem', minHeight: '380px' }}>
                 <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
                   <div>
-                    <h3 className="card-title">📈 Evolução da Renda Variável</h3>
+                    <h3 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+                      <span>Evolução da Renda Variável</span>
+                    </h3>
                     <p className="text-xs text-secondary mt-sm">Valores ponderados na moeda base ({kpiCurrency})</p>
                   </div>
-                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '2px', border: '1px solid var(--panel-border)' }}>
                     <select 
                       value={filterChartTicker} 
                       onChange={(e) => setFilterChartTicker(e.target.value)}
@@ -322,9 +325,9 @@ function PortfolioContent() {
                       ))}
                     </select>
                   </div>
-                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '2px', border: '1px solid var(--panel-border)' }}>
                     {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-                      <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+                      <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '2px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
                         {p}
                       </button>
                     ))}

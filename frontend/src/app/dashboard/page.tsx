@@ -522,7 +522,7 @@ function DashboardContent() {
       )}
       </main>
 
-      <IdeStatusBar wsConnected={wsConnected} activePortfolioName="MONITORAMENTO B3" />
+      <IdeStatusBar wsConnected={wsConnected} activePortfolioName={activeWL?.name || 'Favoritos'} />
     </div>
   );
 }

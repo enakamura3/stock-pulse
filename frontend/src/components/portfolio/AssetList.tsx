@@ -58,23 +58,20 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
     <div className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>
       {/* Terminal Title Bar */}
       <div className="terminal-bar">
-        <div className="flex-row items-center gap-xs">
-          <div className="terminal-dots">
-            <span className="terminal-dot red" />
-            <span className="terminal-dot yellow" />
-            <span className="terminal-dot green" />
-          </div>
-          <span style={{ marginLeft: '6px' }}>stockpulse://portfolio/positions</span>
+        <div className="flex-row items-center gap-xs font-mono">
+          <span className="text-accent" style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>▸</span>
+          <span style={{ color: 'var(--text-secondary)' }}>portfolio/positions.grid</span>
         </div>
-        <span className="badge badge-neutral" style={{ fontSize: '0.65rem' }}>
-          {positions.length} POSIÇÕES
+        <span className="badge badge-neutral font-mono" style={{ fontSize: '0.65rem' }}>
+          [ {positions.length} POSIÇÕES ]
         </span>
       </div>
 
       <div style={{ padding: '1rem 1.25rem' }}>
         <div className="flex-row justify-between items-center mb-md">
           <h3 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem' }}>
-            <TrendingUpIcon size={16} /> Posições Ativas
+            <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+            <TrendingUpIcon size={16} /> <span>Posições Ativas</span>
           </h3>
           <div className="flex-row gap-sm">
             <label className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>

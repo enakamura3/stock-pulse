@@ -10,29 +10,29 @@
   --z-tooltip: 70;
 
   /* ── Terminal Dark Definitivo (ETF1 Inspired) ── */
-  --bg-color: #08090a;
-  --panel-bg: #111318;
-  --panel-bg-hover: #171a22;
-  --panel-border: #23262f;
-  --panel-border-strong: #333844;
-  --input-bg: #0c0e12;
+  --bg-color: #050505;
+  --panel-bg: #0a0a0a;
+  --panel-bg-hover: #121212;
+  --panel-border: #1a1a1a;
+  --panel-border-strong: #282828;
+  --input-bg: #070707;
 
   --text-primary: #f3f4f6;
   --text-secondary: #9ca3af;
   --text-muted: #6b7280;
 
-  /* RGB Base para Acento Âmbar/Laranja Técnico (#ee6018) */
-  --accent-rgb: 238, 96, 24;
+  /* RGB Base para Acento Laranja Técnico ETF1 (#ff6b00) */
+  --accent-rgb: 255, 107, 0;
   --success-rgb: 16, 185, 129;
   --danger-rgb: 244, 63, 94;
   --warning-rgb: 245, 158, 11;
   --info-rgb: 56, 189, 248;
 
-  --accent-color: #ee6018;
-  --accent-gradient: linear-gradient(135deg, #ee6018 0%, #ff7828 100%);
-  --accent-bg: rgba(238, 96, 24, 0.12);
+  --accent-color: #ff6b00;
+  --accent-gradient: linear-gradient(135deg, #ff6b00 0%, #ff8833 100%);
+  --accent-bg: rgba(255, 107, 0, 0.12);
   --accent-foreground: #ffffff;
-  --shadow-glow: 0 0 20px rgba(238, 96, 24, 0.18);
+  --shadow-glow: 0 0 20px rgba(255, 107, 0, 0.18);
 
   --color-success: #10b981;
   --color-success-bg: rgba(16, 185, 129, 0.12);
@@ -43,40 +43,40 @@
   --color-info: #38bdf8;
   --color-info-bg: rgba(56, 189, 248, 0.12);
 
-  --scrollbar-track: #0e1014;
-  --scrollbar-thumb: #282c37;
-  --option-bg: #111318;
+  --scrollbar-track: #050505;
+  --scrollbar-thumb: #1f1f1f;
+  --option-bg: #0a0a0a;
   --option-color: #f3f4f6;
 
-  --overlay-bg: rgba(0, 0, 0, 0.75);
-  --tooltip-bg: #161820;
-  --tooltip-border: #282c37;
+  --overlay-bg: rgba(0, 0, 0, 0.85);
+  --tooltip-bg: #0f0f0f;
+  --tooltip-border: #222222;
 }
 
 [data-theme="light"] {
   /* Mantido compatível com o mesmo tema dark para garantir foco 100% no Dark Mode */
-  --bg-color: #08090a;
-  --panel-bg: #111318;
-  --panel-bg-hover: #171a22;
-  --panel-border: #23262f;
-  --panel-border-strong: #333844;
-  --input-bg: #0c0e12;
+  --bg-color: #050505;
+  --panel-bg: #0a0a0a;
+  --panel-bg-hover: #121212;
+  --panel-border: #1a1a1a;
+  --panel-border-strong: #282828;
+  --input-bg: #070707;
 
   --text-primary: #f3f4f6;
   --text-secondary: #9ca3af;
   --text-muted: #6b7280;
 
-  --accent-rgb: 238, 96, 24;
+  --accent-rgb: 255, 107, 0;
   --success-rgb: 16, 185, 129;
   --danger-rgb: 244, 63, 94;
   --warning-rgb: 245, 158, 11;
   --info-rgb: 56, 189, 248;
 
-  --accent-color: #ee6018;
-  --accent-gradient: linear-gradient(135deg, #ee6018 0%, #ff7828 100%);
-  --accent-bg: rgba(238, 96, 24, 0.12);
+  --accent-color: #ff6b00;
+  --accent-gradient: linear-gradient(135deg, #ff6b00 0%, #ff8833 100%);
+  --accent-bg: rgba(255, 107, 0, 0.12);
   --accent-foreground: #ffffff;
-  --shadow-glow: 0 0 20px rgba(238, 96, 24, 0.18);
+  --shadow-glow: 0 0 20px rgba(255, 107, 0, 0.18);
 
   --color-success: #10b981;
   --color-success-bg: rgba(16, 185, 129, 0.12);
@@ -87,12 +87,12 @@
   --color-info: #38bdf8;
   --color-info-bg: rgba(56, 189, 248, 0.12);
 
-  --scrollbar-track: #0e1014;
-  --scrollbar-thumb: #282c37;
-  --option-bg: #111318;
+  --scrollbar-track: #050505;
+  --scrollbar-thumb: #1f1f1f;
+  --option-bg: #0a0a0a;
   --option-color: #f3f4f6;
 
-  --overlay-bg: rgba(0, 0, 0, 0.75);
+  --overlay-bg: rgba(0, 0, 0, 0.85);
   --tooltip-bg: #161820;
   --tooltip-border: #282c37;
 }
@@ -124,7 +124,7 @@ body {
 .glass-panel {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border-radius: 2px;
   padding: 2rem;
   text-align: center;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -155,7 +155,7 @@ body {
   font-size: 0.85rem;
   font-family: var(--font-mono);
   font-weight: 700;
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
   letter-spacing: -0.01em;
   transition: all 0.15s ease;
@@ -336,7 +336,7 @@ body {
 .card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border-radius: 2px;
   padding: 1.25rem;
   transition: border-color 0.15s ease;
 }
@@ -379,7 +379,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .data-table th, .data-table td {
-  padding: 0.65rem 0.75rem;
+  padding: 0.45rem 0.65rem;
   border-bottom: 1px solid var(--panel-border);
 }
 .data-table th {
@@ -389,13 +389,20 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: #0d0f13;
+  background: #070707;
 }
 .data-table td {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+}
+.data-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.012);
 }
 .data-table tr:hover td {
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 107, 0, 0.04) !important;
+}
+.data-table tr:hover td:first-child {
+  border-left: 2px solid var(--accent-color);
 }
 
 /* Modais Terminal */
@@ -412,7 +419,7 @@ body {
 .modal-content {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border-strong);
-  border-radius: 6px;
+  border-radius: 2px;
   padding: 1.75rem;
   width: 90%;
   max-width: 520px;
@@ -439,7 +446,7 @@ body {
   color: var(--text-primary);
   border: 1px solid var(--panel-border);
   padding: 0.5rem 0.9rem;
-  border-radius: 4px;
+  border-radius: 2px;
   font-family: var(--font-mono);
   font-size: 0.82rem;
   cursor: pointer;
@@ -529,12 +536,12 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0.45rem 0.85rem;
-  background: #0d0f14;
+  background: #070707;
   border-bottom: 1px solid var(--panel-border);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--text-muted);
-  border-radius: 6px 6px 0 0;
+  border-radius: 2px 2px 0 0;
 }
 
 .terminal-dots {
@@ -584,7 +591,8 @@ body {
     position: fixed !important;
     top: 0;
     left: 0;
-    bottom: 0;
+    bottom: 24px;
+    height: calc(100vh - 24px) !important;
     transform: translateX(-100%);
   }
   .app-sidebar.open {
@@ -592,6 +600,9 @@ body {
   }
   .mobile-menu-toggle {
     display: flex !important;
+  }
+  .hide-mobile {
+    display: none !important;
   }
   .app-main-content {
     padding: 0.75rem;
@@ -624,7 +635,7 @@ body {
   gap: 1px;
   background: var(--panel-border);
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 2px;
   overflow: hidden;
   margin-bottom: 1rem;
 }
@@ -648,9 +659,9 @@ body {
   gap: 0;
   height: 36px;
   border-bottom: 1px solid var(--panel-border);
-  background: #0c0e12;
+  background: #070707;
   overflow-x: auto;
-  border-radius: 4px 4px 0 0;
+  border-radius: 2px 2px 0 0;
 }
 
 .ide-tab {
@@ -690,7 +701,7 @@ body {
   right: 0;
   height: 24px;
   z-index: var(--z-header);
-  background: #0a0c10;
+  background: #050505;
   border-top: 1px solid var(--panel-border);
   display: flex;
   align-items: center;
@@ -717,7 +728,7 @@ body {
   font-family: var(--font-mono);
   font-size: 0.74rem;
   padding: 0.25rem 0.65rem;
-  border-radius: 3px;
+  border-radius: 2px;
   border: 1px solid var(--panel-border);
   background: rgba(255, 255, 255, 0.02);
   color: var(--text-secondary);
@@ -746,7 +757,7 @@ body {
 .category-tag.active {
   border-color: var(--accent-color);
   color: var(--accent-color);
-  background: rgba(238, 96, 24, 0.12);
+  background: var(--accent-bg);
   font-weight: 600;
 }
 

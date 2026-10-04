@@ -27,8 +27,10 @@ export default function PortfolioTabs({
               onClick={() => setActivePortfolioId(p.id)}
               className={`ide-tab ${isActive ? 'active' : ''}`}
             >
-              {p.is_default ? '⭐ ' : ''}💼 {p.name}{' '}
-              <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: '2px' }}>[{p.base_currency}]</span>
+              <span className="text-accent" style={{ fontSize: '0.75rem', marginRight: '2px', opacity: isActive ? 1 : 0.6 }}>▸</span>
+              {p.is_default ? <span title="Padrão" className="text-warning" style={{ fontSize: '0.7rem' }}>★ </span> : ''}
+              <span>{p.name}</span>{' '}
+              <span style={{ fontSize: '0.65rem', opacity: 0.6, marginLeft: '2px' }}>[{p.base_currency}]</span>
             </button>
           );
         })}
