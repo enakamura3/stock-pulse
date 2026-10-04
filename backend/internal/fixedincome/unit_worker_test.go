@@ -25,7 +25,9 @@ func (m *mockAnbimaClient) FetchHolidays(ctx context.Context, year int) ([]brasi
 func TestWorker_SyncRates(t *testing.T) {
 	mockRepo := &MockFullRepo{}
 	registry := NewIndexRegistry()
-	provider := &mockIndexProvider{rates: []IndexRate{{Indexer: "CDI", Rate: 0.05, Date: time.Now().AddDate(-1, 0, 0)}}}
+	// Data fixa em dia útil (quarta-feira): o worker descarta finais de semana, então uma data relativa
+	// (time.Now().AddDate(-1,0,0)) deixaria o caminho de SaveIndexRates sem cobertura em certos dias.
+	provider := &mockIndexProvider{rates: []IndexRate{{Indexer: "CDI", Rate: 0.05, Date: time.Date(2025, 6, 4, 0, 0, 0, 0, time.UTC)}}}
 	registry.Register(IndexerConfig{Name: "CDI", PrimaryProvider: provider})
 
 	worker := NewWorker(mockRepo, registry)
