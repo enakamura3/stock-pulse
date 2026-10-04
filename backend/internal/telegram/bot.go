@@ -191,7 +191,13 @@ func (r *BotRunner) SendDividendPaymentAlert(chatID int64, userName, portfolioNa
 	return err
 }
 
-func (r *BotRunner) SendDailyDigest(chatID int64, userName, portfolioName, currency string, totalValue, dailyChange, returnPercent float64, todayDividends, upcomingDividends []portfolio.CalculatedDividend) error {
+func (r *BotRunner) SendDailyDigest(
+	chatID int64,
+	userName, portfolioName, currency string,
+	totalValue, dailyChange, dailyChangePercent, returnPercent float64,
+	topGainers, topLosers []DailyMover,
+	todayDividends, upcomingDividends []portfolio.CalculatedDividend,
+) error {
 	if r == nil || r.bot == nil {
 		return nil
 	}
@@ -200,19 +206,22 @@ func (r *BotRunner) SendDailyDigest(chatID int64, userName, portfolioName, curre
 	escapedUserName := escapeMarkdown(userName)
 	escapedPortfolioName := escapeMarkdown(portfolioName)
 
-	msg := "🌅 *BOM DIA! Seu Daily Digest* 🌅\n\n"
-	msg += "Olá, *" + escapedUserName + "*!\n"
-	msg += "Aqui está o resumo matinal da sua carteira *" + escapedPortfolioName + "*:\n\n"
+	msg := "🌆 *FECHAMENTO DE MERCADO: Seu Resumo Diário* 🌆\n\n"
+	msg += "Boa noite, *" + escapedUserName + "*!\n"
+	msg += "Aqui está o resumo de fechamento da sua carteira *" + escapedPortfolioName + "*:\n\n"
 
 	msg += "💼 *Patrimônio:* " + currency + " " + formatFinancialPrice(p, totalValue) + "\n"
 
 	badge := "⚪ "
+	dailyPercentStr := p.Sprintf("%.2f%%", 0.0)
 	if dailyChange > 1e-6 {
 		badge = "🟢 +"
+		dailyPercentStr = p.Sprintf("+%.2f%%", dailyChangePercent)
 	} else if dailyChange < -1e-6 {
 		badge = "🔴 -"
+		dailyPercentStr = p.Sprintf("%.2f%%", dailyChangePercent)
 	}
-	msg += "📊 *Variação Diária:* " + badge + currency + " " + formatFinancialPrice(p, math.Abs(dailyChange)) + "\n"
+	msg += "📊 *Resultado de Hoje:* " + badge + currency + " " + formatFinancialPrice(p, math.Abs(dailyChange)) + " (" + dailyPercentStr + ")\n"
 
 	retBadge := "⚪ "
 	if returnPercent > 1e-6 {
@@ -220,11 +229,28 @@ func (r *BotRunner) SendDailyDigest(chatID int64, userName, portfolioName, curre
 	} else if returnPercent < -1e-6 {
 		retBadge = "🔴 "
 	}
-	msg += "📈 *Rentabilidade Total:* " + retBadge + p.Sprintf("%.2f%%", returnPercent) + "\n\n"
+	msg += "📈 *Rentabilidade Geral:* " + retBadge + p.Sprintf("%.2f%%", returnPercent) + "\n\n"
 
-	// Proventos que caem hoje
+	// Destaques de mercado (Maiores Altas e Maiores Baixas)
+	if len(topGainers) > 0 {
+		msg += "🚀 *Maiores Altas:*\n"
+		for _, g := range topGainers {
+			msg += "  • *" + escapeMarkdown(g.Ticker) + "*: " + p.Sprintf("+%.2f%%", g.DailyChangePercent) + "\n"
+		}
+		msg += "\n"
+	}
+
+	if len(topLosers) > 0 {
+		msg += "🔻 *Maiores Baixas:*\n"
+		for _, l := range topLosers {
+			msg += "  • *" + escapeMarkdown(l.Ticker) + "*: " + p.Sprintf("%.2f%%", l.DailyChangePercent) + "\n"
+		}
+		msg += "\n"
+	}
+
+	// Proventos creditados hoje
 	if len(todayDividends) > 0 {
-		msg += "💰 *Cai na conta hoje:*\n"
+		msg += "💰 *Proventos creditados hoje:*\n"
 		for _, d := range todayDividends {
 			msg += "  • *" + escapeMarkdown(d.Ticker) + "* (" + escapeMarkdown(d.Type) + "): " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
 		}

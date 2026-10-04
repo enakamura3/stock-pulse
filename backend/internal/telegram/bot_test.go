@@ -197,17 +197,17 @@ func TestBotRunner_SendDividendPaymentAlert(t *testing.T) {
 func TestBotRunner_SendDailyDigest(t *testing.T) {
 	t.Run("Bot is nil", func(t *testing.T) {
 		var runner *BotRunner
-		err := runner.SendDailyDigest(123, "User", "Carteira", "BRL", 1000, 10, 1.0, nil, nil)
+		err := runner.SendDailyDigest(123, "User", "Carteira", "BRL", 1000, 10, 1.0, 1.0, nil, nil, nil, nil)
 		assert.NoError(t, err)
 	})
 
 	t.Run("Bot object is nil", func(t *testing.T) {
 		runner := &BotRunner{bot: nil}
-		err := runner.SendDailyDigest(123, "User", "Carteira", "BRL", 1000, 10, 1.0, nil, nil)
+		err := runner.SendDailyDigest(123, "User", "Carteira", "BRL", 1000, 10, 1.0, 1.0, nil, nil, nil, nil)
 		assert.NoError(t, err)
 	})
 
-	t.Run("Mock server success positive change and return with dividends", func(t *testing.T) {
+	t.Run("Mock server success positive change and return with dividends and movers", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -229,8 +229,14 @@ func TestBotRunner_SendDailyDigest(t *testing.T) {
 		upcomingDivs := []portfolio.CalculatedDividend{
 			{Ticker: "VALE3", Type: "JCP", Currency: "R$", NetAmount: 200.0, PaymentDate: time.Now().AddDate(0, 0, 3)},
 		}
+		topGainers := []DailyMover{
+			{Ticker: "PETR4", DailyChangePercent: 3.5},
+		}
+		topLosers := []DailyMover{
+			{Ticker: "VALE3", DailyChangePercent: -2.1},
+		}
 
-		err = runner.SendDailyDigest(123, "Test_User*", "Carteira_Acoes*", "R$", 50000.0, 350.50, 5.25, todayDivs, upcomingDivs)
+		err = runner.SendDailyDigest(123, "Test_User*", "Carteira_Acoes*", "R$", 50000.0, 350.50, 0.70, 5.25, topGainers, topLosers, todayDivs, upcomingDivs)
 		assert.NoError(t, err)
 	})
 
@@ -250,7 +256,7 @@ func TestBotRunner_SendDailyDigest(t *testing.T) {
 		assert.NoError(t, err)
 
 		runner := &BotRunner{bot: b}
-		err = runner.SendDailyDigest(123, "User", "Carteira", "USD", 25000.0, -120.0, -2.15, nil, nil)
+		err = runner.SendDailyDigest(123, "User", "Carteira", "USD", 25000.0, -120.0, -0.48, -2.15, nil, nil, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -270,7 +276,7 @@ func TestBotRunner_SendDailyDigest(t *testing.T) {
 		assert.NoError(t, err)
 
 		runner := &BotRunner{bot: b}
-		err = runner.SendDailyDigest(123, "User", "Carteira", "BRL", 10000.0, 0.0, 0.0, nil, nil)
+		err = runner.SendDailyDigest(123, "User", "Carteira", "BRL", 10000.0, 0.0, 0.0, 0.0, nil, nil, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -290,7 +296,7 @@ func TestBotRunner_SendDailyDigest(t *testing.T) {
 		assert.NoError(t, err)
 
 		runner := &BotRunner{bot: b}
-		err = runner.SendDailyDigest(123, "User", "Carteira", "BRL", 10000.0, 10.0, 0.5, nil, nil)
+		err = runner.SendDailyDigest(123, "User", "Carteira", "BRL", 10000.0, 10.0, 0.10, 0.5, nil, nil, nil, nil)
 		assert.Error(t, err)
 		assert.True(t, isBlockedByUser(err))
 	})

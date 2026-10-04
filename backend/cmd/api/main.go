@@ -192,7 +192,7 @@ func main() {
 	workerManager.Register(worker.NewWorker("AlertWorker", "Verifica os alertas de preços ativos e dispara notificações de push/Telegram", alertWorker.Interval(), alertWorker.CheckActiveAlerts))
 	if telegramBot != nil {
 		dailyDigestWorker := telegram.NewDailyDigestWorker(telegramRepo, telegramService, portfolioService, fiService, telegramBot, rdb)
-		workerManager.Register(worker.NewWorker("DailyDigestWorker", "Envia resumo diário matinal de investimentos para usuários com Telegram", getInterval("DAILY_DIGEST_INTERVAL", 15*time.Minute), dailyDigestWorker.ProcessDailyDigests))
+		workerManager.Register(worker.NewWorker("DailyDigestWorker", "Envia resumo diário de fechamento de mercado para usuários com Telegram", getInterval("DAILY_DIGEST_INTERVAL", 15*time.Minute), dailyDigestWorker.ProcessDailyDigests))
 	}
 
 	workerManager.StartAll(workerCtx)
