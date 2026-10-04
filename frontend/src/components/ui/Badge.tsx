@@ -55,19 +55,21 @@ export function Badge({
   const getSizeStyles = (): React.CSSProperties => {
     switch (size) {
       case 'sm':
-        return { padding: '0.2rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px' };
+        return { padding: '0.15rem 0.45rem', fontSize: '0.68rem', borderRadius: '3px' };
       case 'md':
       default:
-        return { padding: '0.3rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px' };
+        return { padding: '0.22rem 0.6rem', fontSize: '0.74rem', borderRadius: '3px' };
     }
   };
 
   const baseStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '5px',
+    fontFamily: 'var(--font-mono)',
     fontWeight: 600,
     whiteSpace: 'nowrap',
+    letterSpacing: '0.02em',
     ...getSizeStyles(),
     ...getVariantStyles(),
     ...style,

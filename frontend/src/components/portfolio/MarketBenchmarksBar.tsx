@@ -18,44 +18,37 @@ function BenchmarkCard({ item, label, icon }: { item?: BenchmarkItem; label: str
   if (!item) return null;
   const isPos = item.change_percent >= 0;
   const colorClass = isPos ? 'text-success' : 'text-danger';
-  const bgClass = isPos ? 'var(--color-success-bg)' : 'var(--color-danger-bg)';
-  const borderClass = isPos ? 'var(--color-success)' : 'var(--color-danger)';
+  const badgeVariant = isPos ? 'badge badge-success' : 'badge badge-danger';
 
   return (
     <div
-      className="flex-1 min-w-[140px] sm:min-w-[180px] p-sm rounded-lg flex-col gap-xs"
+      className="flex-1 min-w-[140px] sm:min-w-[170px] flex-col gap-xs card"
       style={{
-        background: 'var(--card-bg)',
-        border: '1px solid var(--panel-border)',
-        borderRadius: '8px',
-        padding: '0.65rem 0.9rem',
+        padding: '0.65rem 0.85rem',
+        borderRadius: '4px',
       }}
     >
       <div className="flex-row items-center justify-between gap-xs">
-        <span className="text-xs font-semibold text-secondary flex-row items-center gap-xs">
+        <span className="font-mono text-xs font-semibold text-secondary flex-row items-center gap-xs">
           <span>{icon}</span> {label}
         </span>
         <span
+          className={badgeVariant}
           style={{
-            fontSize: '0.72rem',
-            fontWeight: 700,
-            padding: '1px 6px',
-            borderRadius: '12px',
-            background: bgClass,
-            color: borderClass,
-            border: `1px solid ${borderClass}`,
-            display: 'inline-flex',
-            alignItems: 'center',
+            fontSize: '0.7rem',
+            padding: '1px 5px',
+            fontFamily: 'var(--font-mono)',
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
           {isPos ? '+' : ''}{item.change_percent.toFixed(2)}%
         </span>
       </div>
-      <div className="flex-row items-baseline justify-between mt-xs">
-        <span className="font-bold text-sm sm:text-base" style={{ color: 'var(--text-primary)' }}>
+      <div className="flex-row items-baseline justify-between mt-xs font-mono">
+        <span className="font-bold text-sm sm:text-base" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
           {formatBenchmarkValue(item)}
         </span>
-        <span className={`text-xs font-semibold ${colorClass}`}>
+        <span className={`text-xs font-semibold ${colorClass}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
           {isPos ? '▲' : '▼'} {Math.abs(item.change).toFixed(2)}
         </span>
       </div>
@@ -85,7 +78,7 @@ export default function MarketBenchmarksBar({ benchmarks, isLoading = false }: M
   return (
     <div className="flex-col gap-xs w-full">
       <div className="flex-row justify-between items-center px-xs">
-        <span className="text-xs font-semibold text-secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <span className="text-xs font-mono font-semibold text-secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           🌐 Índices e Benchmarks de Mercado
         </span>
       </div>

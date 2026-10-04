@@ -49,11 +49,11 @@ export function Button({
   const getSizeStyles = (): React.CSSProperties => {
     switch (size) {
       case 'sm':
-        return { padding: '0.35rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px' };
+        return { padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '4px' };
       case 'md':
-        return { padding: '0.5rem 1.25rem', fontSize: '0.9rem', borderRadius: '8px' };
+        return { padding: '0.45rem 1rem', fontSize: '0.82rem', borderRadius: '4px' };
       case 'lg':
-        return { padding: '0.75rem 1.75rem', fontSize: '1rem', borderRadius: '10px' };
+        return { padding: '0.65rem 1.4rem', fontSize: '0.9rem', borderRadius: '5px' };
     }
   };
 
@@ -61,12 +61,14 @@ export function Button({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
+    gap: '6px',
+    fontFamily: 'var(--font-mono)',
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all var(--transition-fast)',
     outline: 'none',
     whiteSpace: 'nowrap',
+    letterSpacing: '-0.01em',
     ...getSizeStyles(),
     ...getVariantStyles(),
     ...style,

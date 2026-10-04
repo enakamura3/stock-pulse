@@ -42,19 +42,24 @@ export default function AssetSearch({
 
       {/* Dropdown da busca */}
       {showDropdown && searchResults.length > 0 && (
-        <div className="glass-panel" style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          width: '100%',
-          marginTop: '0.5rem',
-          zIndex: 10,
-          padding: '0.5rem',
-          textAlign: 'left',
-          maxHeight: '280px',
-          overflowY: 'auto',
-          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.6)'
-        }}>
+        <div
+          className="card"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            width: '100%',
+            marginTop: '0.4rem',
+            zIndex: 10,
+            padding: '0.35rem',
+            textAlign: 'left',
+            maxHeight: '280px',
+            overflowY: 'auto',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.7)',
+            borderRadius: '4px',
+            borderColor: 'var(--panel-border-strong)',
+          }}
+        >
           {searchResults.map((item) => (
             <div
               key={item.symbol}
@@ -63,18 +68,20 @@ export default function AssetSearch({
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '0.65rem 0.9rem',
-                borderRadius: '8px',
+                padding: '0.55rem 0.75rem',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                transition: 'background-color 0.2s ease',
+                transition: 'background-color 0.15s ease',
               }}
               className="sidebar-link"
             >
               <div>
-                <span style={{ fontWeight: 700, color: 'var(--accent-color)', marginRight: '0.8rem' }}>{item.symbol}</span>
-                <span style={{ fontSize: '0.85rem', opacity: 0.85 }}>{item.name}</span>
+                <span className="font-mono" style={{ fontWeight: 700, color: 'var(--accent-color)', marginRight: '0.75rem', fontSize: '0.9rem' }}>
+                  {item.symbol}
+                </span>
+                <span style={{ fontSize: '0.82rem', opacity: 0.85 }}>{item.name}</span>
               </div>
-              <span style={{ fontSize: '0.65rem', padding: '0.2rem 0.4rem', background: 'var(--accent-bg)', color: 'var(--accent-color)', borderRadius: '4px', textTransform: 'uppercase' }}>
+              <span className="badge badge-neutral font-mono" style={{ fontSize: '0.65rem', textTransform: 'uppercase' }}>
                 {item.exchange}
               </span>
             </div>

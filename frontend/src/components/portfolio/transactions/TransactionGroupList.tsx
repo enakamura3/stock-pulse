@@ -47,10 +47,10 @@ export default function TransactionGroupList({
         key={tx.id}
         className="flex-row justify-between items-center flex-wrap gap-md"
         style={{
-          padding: '1rem 1.25rem',
+          padding: '0.85rem 1.15rem',
           background: 'var(--panel-bg)',
           border: '1px solid var(--panel-border)',
-          borderRadius: '10px',
+          borderRadius: '4px',
           transition: 'all 0.15s ease',
         }}
       >

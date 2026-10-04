@@ -55,89 +55,106 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
   };
 
   return (
-    <div className="card flex-col gap-md" style={{ width: '100%' }}>
-      <div className="flex-row justify-between items-center mb-lg">
-        <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <TrendingUpIcon size={20} /> Posições Ativas
-        </h3>
-        <div className="flex-row gap-sm">
-          <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-            <ReceiptIcon size={14} /> Importar CSV
-            <input 
-              type="file" accept=".csv,.txt" style={{ display: 'none' }}
-              onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
-              onChange={onImportCsv} 
-            />
-          </label>
-          <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
-            + Lançar Operação
-          </button>
+    <div className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>
+      {/* Terminal Title Bar */}
+      <div className="terminal-bar">
+        <div className="flex-row items-center gap-xs">
+          <div className="terminal-dots">
+            <span className="terminal-dot red" />
+            <span className="terminal-dot yellow" />
+            <span className="terminal-dot green" />
+          </div>
+          <span style={{ marginLeft: '6px' }}>stockpulse://portfolio/positions</span>
         </div>
+        <span className="badge badge-neutral" style={{ fontSize: '0.65rem' }}>
+          {positions.length} POSIÇÕES
+        </span>
       </div>
 
-      <div className="table-container flex-col" style={{ width: '100%', overflowX: 'auto' }}>
-        {positions.length > 0 ? (
-          <table className="data-table" style={{ width: '100%', fontSize: '0.8rem' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('ticker')}>Ativo {sortIcon('ticker')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('quantity')}>Qtd {sortIcon('quantity')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('average_price')}>Preço Médio {sortIcon('average_price')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('current_price')}>Cotação Atual {sortIcon('current_price')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('total_cost')}>Custo Total {sortIcon('total_cost')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('current_value')}>Valor Atual {sortIcon('current_value')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('return_percent')}>Retorno {sortIcon('return_percent')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('graham_value')}>P. Justo Graham {sortIcon('graham_value')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('bazin_value')}>P. Justo Bazin {sortIcon('bazin_value')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('dividend_yield')}>Yield {sortIcon('dividend_yield')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('pe')}>P/L {sortIcon('pe')}</th>
-                <th className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('pvp')}>P/VP {sortIcon('pvp')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedPositions.map((pos) => {
-                const isPos = (pos.profit_loss || 0) >= 0;
-                return (
-                  <tr key={pos.asset_id || pos.ticker}>
-                    <td title={pos.name} style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', cursor: 'help' }}>
-                      <span className="font-bold text-accent">{pos.ticker}</span>
-                    </td>
-                    <td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{formatQuantity(pos.quantity)}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{formatMoney(pos.average_price, pos.currency)}</td>
-                    <td className="text-right font-semibold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{formatMoney(pos.total_cost, kpiCurrency)}</td>
-                    <td className="text-right font-bold text-primary" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}</td>
-                    <td className="text-right font-bold" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', color: isPos ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                      {pos.return_percent !== undefined ? formatPercentage(pos.return_percent) : '--'}
-                    </td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
-                      {pos.graham_value ? (
-                        <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.graham_value ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                          {formatMoney(pos.graham_value, pos.currency)}
-                        </span>
-                      ) : '--'}
-                    </td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
-                      {pos.bazin_value ? (
-                        <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.bazin_value ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                          {formatMoney(pos.bazin_value, pos.currency)}
-                        </span>
-                      ) : '--'}
-                    </td>
-                    <td className="text-right font-semibold text-success" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{pos.pe ? pos.pe.toFixed(2) : '--'}</td>
-                    <td className="text-right" style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', color: pos.pvp && pos.pvp < 1.0 ? 'var(--color-success)' : 'inherit' }}>{pos.pvp ? pos.pvp.toFixed(2) : '--'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <div className="flex-col items-center justify-center text-secondary" style={{ height: '240px' }}>
-            <WalletIcon size={32} />
-            <p className="text-sm mt-sm">Esta carteira ainda não possui ativos ativos.</p>
+      <div style={{ padding: '1rem 1.25rem' }}>
+        <div className="flex-row justify-between items-center mb-md">
+          <h3 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem' }}>
+            <TrendingUpIcon size={16} /> Posições Ativas
+          </h3>
+          <div className="flex-row gap-sm">
+            <label className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <ReceiptIcon size={13} /> Importar CSV
+              <input 
+                type="file" accept=".csv,.txt" style={{ display: 'none' }}
+                onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
+                onChange={onImportCsv} 
+              />
+            </label>
+            <button className="primary-button" onClick={onLaunchOperation} style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem' }}>
+              + Lançar Operação
+            </button>
           </div>
-        )}
+        </div>
+
+        <div className="table-container flex-col" style={{ width: '100%', overflowX: 'auto' }}>
+          {positions.length > 0 ? (
+            <table className="data-table" style={{ width: '100%', fontSize: '0.78rem' }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('ticker')}>Ativo {sortIcon('ticker')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('quantity')}>Qtd {sortIcon('quantity')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('average_price')}>Preço Médio {sortIcon('average_price')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('current_price')}>Cotação Atual {sortIcon('current_price')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('total_cost')}>Custo Total {sortIcon('total_cost')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('current_value')}>Valor Atual {sortIcon('current_value')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('return_percent')}>Retorno {sortIcon('return_percent')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('graham_value')}>P. Justo Graham {sortIcon('graham_value')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('bazin_value')}>P. Justo Bazin {sortIcon('bazin_value')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('dividend_yield')}>Yield {sortIcon('dividend_yield')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('pe')}>P/L {sortIcon('pe')}</th>
+                  <th className="text-right" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => handleSort('pvp')}>P/VP {sortIcon('pvp')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedPositions.map((pos) => {
+                  const isPos = (pos.profit_loss || 0) >= 0;
+                  return (
+                    <tr key={pos.asset_id || pos.ticker}>
+                      <td title={pos.name} style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', cursor: 'help' }}>
+                        <span className="font-bold font-mono text-accent">{pos.ticker}</span>
+                      </td>
+                      <td className="text-right font-semibold font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatQuantity(pos.quantity)}</td>
+                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(pos.average_price, pos.currency)}</td>
+                      <td className="text-right font-semibold font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}</td>
+                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(pos.total_cost, kpiCurrency)}</td>
+                      <td className="text-right font-bold text-primary font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}</td>
+                      <td className="text-right font-bold font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: isPos ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                        {pos.return_percent !== undefined ? formatPercentage(pos.return_percent) : '--'}
+                      </td>
+                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                        {pos.graham_value ? (
+                          <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.graham_value ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                            {formatMoney(pos.graham_value, pos.currency)}
+                          </span>
+                        ) : '--'}
+                      </td>
+                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                        {pos.bazin_value ? (
+                          <span className="font-semibold" style={{ color: pos.current_price && pos.current_price < pos.bazin_value ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                            {formatMoney(pos.bazin_value, pos.currency)}
+                          </span>
+                        ) : '--'}
+                      </td>
+                      <td className="text-right font-semibold text-success font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{pos.dividend_yield ? `${pos.dividend_yield.toFixed(2)}%` : '--'}</td>
+                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{pos.pe ? pos.pe.toFixed(2) : '--'}</td>
+                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: pos.pvp && pos.pvp < 1.0 ? 'var(--color-success)' : 'inherit' }}>{pos.pvp ? pos.pvp.toFixed(2) : '--'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className="flex-col items-center justify-center text-secondary font-mono" style={{ height: '200px' }}>
+              <WalletIcon size={28} />
+              <p className="text-xs mt-sm text-muted">Esta carteira ainda não possui ativos ativos.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

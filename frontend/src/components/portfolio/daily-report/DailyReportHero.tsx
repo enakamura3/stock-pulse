@@ -57,17 +57,18 @@ export default function DailyReportHero({
       </div>
 
       <span
-        className="text-3xl sm:text-4xl font-extrabold mt-xs"
+        className="text-3xl sm:text-4xl font-mono font-bold mt-xs"
         style={{
           color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)',
           letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
         {isDailyPos ? '🟢 +' : '🔴 '}{formatMoney(totalDailyChange, kpiCurrency)}
       </span>
       <span
-        className="text-lg font-bold"
-        style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)' }}
+        className="text-lg font-mono font-bold"
+        style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)', fontVariantNumeric: 'tabular-nums' }}
       >
         ({isDailyPos ? '+' : ''}{totalDailyPercent.toFixed(2)}%)
       </span>
