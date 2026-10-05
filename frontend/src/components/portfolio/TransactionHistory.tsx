@@ -317,14 +317,13 @@ export default function TransactionHistory({
         style={{
           background: 'var(--panel-bg)',
           border: '1px solid var(--panel-border)',
-          borderRadius: '12px',
           padding: '1.25rem 1.5rem',
         }}
       >
         {/* KPIs Principais */}
         <div className="flex-row gap-lg flex-wrap items-center justify-between" style={{ paddingBottom: '0.5rem' }}>
           <div className="flex-row items-center gap-md">
-            <span style={{ fontSize: '1.5rem' }}>📥</span>
+            <span className="font-mono text-accent text-xs font-bold" style={{ letterSpacing: '0.05em' }}>[COMPRA]</span>
             <div className="flex-col" style={{ gap: '0.15rem' }}>
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Comprado
@@ -336,7 +335,7 @@ export default function TransactionHistory({
           </div>
 
           <div className="flex-row items-center gap-md">
-            <span style={{ fontSize: '1.5rem' }}>📤</span>
+            <span className="font-mono text-danger text-xs font-bold" style={{ letterSpacing: '0.05em' }}>[VENDA]</span>
             <div className="flex-col" style={{ gap: '0.15rem' }}>
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Vendido
@@ -348,7 +347,7 @@ export default function TransactionHistory({
           </div>
 
           <div className="flex-row items-center gap-md">
-            <span style={{ fontSize: '1.5rem' }}>💰</span>
+            <span className="font-mono text-accent text-xs font-bold" style={{ letterSpacing: '0.05em' }}>[APORTE]</span>
             <div className="flex-col" style={{ gap: '0.15rem' }}>
               <span className="text-secondary text-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Aporte Líquido
@@ -369,8 +368,8 @@ export default function TransactionHistory({
         {/* Breakdown de Aquisições no Período */}
         <div style={{ borderTop: '1px solid var(--panel-border)', paddingTop: '1rem' }}>
           <div className="flex-row justify-between items-center mb-sm">
-            <span className="text-xs font-bold text-secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              📊 Aquisições por Classe de Ativo (Clique para filtrar)
+            <span className="text-xs font-bold text-secondary font-mono" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {'//'} Aquisições por Classe de Ativo (Clique para filtrar)
             </span>
           </div>
 

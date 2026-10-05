@@ -203,7 +203,7 @@ export default function AppSidebar({
               >
                 {'// SUB-MÓDULOS'}
               </span>
-              {portfolioSubTabs.map((sub) => {
+              {portfolioSubTabs.map((sub, idx) => {
                 const isSubActive = activeTab === sub.key;
                 return (
                   <button
@@ -217,12 +217,11 @@ export default function AppSidebar({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      padding: '0.42rem 0.65rem 0.42rem 1rem',
-                      borderRadius: '3px',
+                      padding: '0.42rem 0.65rem 0.42rem 0.85rem',
                       fontFamily: 'var(--font-mono)',
                       fontSize: '0.78rem',
                       color: isSubActive ? 'var(--accent-color)' : 'var(--text-secondary)',
-                      background: isSubActive ? 'rgba(238, 96, 24, 0.06)' : 'transparent',
+                      background: isSubActive ? 'var(--accent-bg)' : 'transparent',
                       borderLeft: isSubActive ? '2px solid var(--accent-color)' : '2px solid transparent',
                       borderTop: 'none',
                       borderRight: 'none',
@@ -230,9 +229,9 @@ export default function AppSidebar({
                       cursor: 'pointer',
                       textAlign: 'left',
                       width: '100%',
-                      transition: 'all 0.15s ease',
                     }}
                   >
+                    <span className="text-muted font-mono" style={{ fontSize: '0.68rem', opacity: isSubActive ? 1 : 0.45 }}>[{idx + 1}]</span>
                     <span style={{ opacity: isSubActive ? 1 : 0.6 }}>{sub.icon}</span>
                     <span>{sub.label}</span>
                   </button>

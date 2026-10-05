@@ -672,5 +672,76 @@ describe('PortfolioPage Contextual Filters', () => {
     expect(within(kpiCards).getByText('Todas as categorias')).toBeInTheDocument();
     expect(within(kpiCards).getByText('-20.00% (-R$ 200,00)')).toBeInTheDocument();
   });
+
+  it('supports terminal hotkeys [1-7] for quick tab switching and ignores input fields and modifiers', () => {
+    (usePortfolio as any).mockReturnValue({
+      ...basePortfolioMock,
+      activeTab: 'ativos',
+    });
+
+    render(<PortfolioPage />);
+
+    // Press hotkeys 1-7
+    fireEvent.keyDown(window, { key: '1' });
+    expect(mockSetActiveTab).toHaveBeenCalledWith('ativos');
+
+    fireEvent.keyDown(window, { key: '2' });
+    expect(mockSetActiveTab).toHaveBeenCalledWith('renda-fixa');
+
+    fireEvent.keyDown(window, { key: '3' });
+    expect(mockSetActiveTab).toHaveBeenCalledWith('tesouro');
+
+    fireEvent.keyDown(window, { key: '4' });
+    expect(mockSetActiveTab).toHaveBeenCalledWith('operacoes');
+
+    fireEvent.keyDown(window, { key: '5' });
+    expect(mockSetActiveTab).toHaveBeenCalledWith('proventos');
+
+    fireEvent.keyDown(window, { key: '6' });
+    expect(mockSetActiveTab).toHaveBeenCalledWith('analise');
+
+    fireEvent.keyDown(window, { key: '7' });
+    expect(mockSetActiveTab).toHaveBeenCalledWith('diario');
+
+    mockSetActiveTab.mockClear();
+
+    // Ignore unmapped keys
+    fireEvent.keyDown(window, { key: '8' });
+    fireEvent.keyDown(window, { key: 'x' });
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+
+    // Ignore modifier keys (Ctrl, Meta, Alt)
+    fireEvent.keyDown(window, { key: '2', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '3', metaKey: true });
+    fireEvent.keyDown(window, { key: '4', altKey: true });
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+
+    // Ignore events originating from input, textarea, select, contenteditable
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    fireEvent.keyDown(input, { key: '2' });
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    fireEvent.keyDown(textarea, { key: '3' });
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+
+    const select = document.createElement('select');
+    document.body.appendChild(select);
+    fireEvent.keyDown(select, { key: '4' });
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+
+    const editable = document.createElement('div');
+    editable.setAttribute('contenteditable', 'true');
+    document.body.appendChild(editable);
+    fireEvent.keyDown(editable, { key: '5' });
+    expect(mockSetActiveTab).not.toHaveBeenCalled();
+
+    document.body.removeChild(input);
+    document.body.removeChild(textarea);
+    document.body.removeChild(select);
+    document.body.removeChild(editable);
+  });
 });
 

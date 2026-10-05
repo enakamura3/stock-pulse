@@ -74,6 +74,8 @@ export default function IdeStatusBar({
       </div>
 
       <div className="flex-row items-center gap-md font-mono text-muted">
+        <span className="hide-mobile" style={{ opacity: 0.65 }}>[1-7] ABAS &nbsp; [?] ATALHOS</span>
+        <span style={{ opacity: 0.3 }} className="hide-mobile">|</span>
         <span className="hide-mobile">TERMINAL_MODE: <span className="text-accent">ACTIVE</span></span>
         <span style={{ opacity: 0.3 }} className="hide-mobile">|</span>
         <span>stock-pulse {version}</span>

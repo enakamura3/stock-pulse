@@ -112,6 +112,42 @@ function PortfolioContent() {
     }
   }, [dynamicCategories, activeCategoryFilter, setActiveCategoryFilter]);
 
+  // Terminal hotkeys [1-7] for quick tab switching
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.getAttribute?.('contenteditable') === 'true' ||
+          target.closest?.('[contenteditable="true"]'))
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        return;
+      }
+      const tabMap: Record<string, string> = {
+        '1': 'ativos',
+        '2': 'renda-fixa',
+        '3': 'tesouro',
+        '4': 'operacoes',
+        '5': 'proventos',
+        '6': 'analise',
+        '7': 'diario',
+      };
+      if (tabMap[e.key]) {
+        setActiveTab(tabMap[e.key] as any);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setActiveTab]);
+
   const filteredPositions = React.useMemo(() => {
     if (activeTab !== 'ativos' || activeCategoryFilter === 'Todas') {
       return positions;
@@ -341,8 +377,8 @@ function PortfolioContent() {
                 ) : performanceData.length > 0 ? (
                   <PortfolioChart data={performanceData} />
                 ) : (
-                  <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
-                    <span className="text-2xl mb-sm">💼</span>
+                  <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)' }}>
+                    <span className="font-mono text-muted mb-sm" style={{ opacity: 0.5 }}>[RENTABILIDADE]</span>
                     <p className="text-sm m-0">Cadastre a sua primeira transação abaixo para começar a visualizar o histórico de rentabilidade.</p>
                   </div>
                 )}

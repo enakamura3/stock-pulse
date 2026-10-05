@@ -209,34 +209,33 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
   const totalB3 = positions.reduce((acc, p) => acc + (p.b3_fee || 0), 0);
 
   const kpis = [
-    { label: 'Total Investido', value: fmt(totalInvested), icon: '💰' },
-    { label: 'Valor Bruto', value: fmt(totalGross), icon: '📊' },
+    { label: 'Total Investido', value: fmt(totalInvested), tag: 'INV' },
+    { label: 'Valor Bruto', value: fmt(totalGross), tag: 'BRUTO' },
     {
       label: 'Valor Líquido',
       value: fmt(totalNet),
-      icon: '💵',
+      tag: 'LIQ',
       sub: `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}% (${fmt(totalProfitLoss)})`,
       subColor: returnPct >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
     },
-    { label: 'Impostos (IOF + IR)', value: fmt(totalIOF + totalIR), icon: '🏛️', sub: `IOF: ${fmt(totalIOF)} | IR: ${fmt(totalIR)}`, subColor: 'var(--color-danger)' },
-    { label: 'Taxa B3 Acumulada', value: fmt(totalB3), icon: '🏷️', sub: '0,20% a.a. pró-rata', subColor: 'var(--color-warning)' },
+    { label: 'Impostos (IOF + IR)', value: fmt(totalIOF + totalIR), tag: 'IMP', sub: `IOF: ${fmt(totalIOF)} | IR: ${fmt(totalIR)}`, subColor: 'var(--color-danger)' },
+    { label: 'Taxa B3 Acumulada', value: fmt(totalB3), tag: 'TAXA', sub: '0,20% a.a. pró-rata', subColor: 'var(--color-warning)' },
   ];
 
   return (
     <div className="flex-col gap-xl">
       {/* ── KPI Cards ── */}
-      <div className="flex-row gap-md flex-wrap">
+      <div className="ide-matrix" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         {kpis.map((card, idx) => (
           <div
             key={idx}
-            className="card"
-            style={{ flex: '1 1 180px', minWidth: 160, padding: '1.25rem 1.5rem' }}
+            className="ide-cell"
           >
-            <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>{card.icon}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.value}</div>
+            <div className="font-mono text-accent text-xs font-bold" style={{ marginBottom: '0.35rem', letterSpacing: '0.05em' }}>[{card.tag}]</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{card.label}</div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{card.value}</div>
             {card.sub && (
-              <div style={{ fontSize: '0.75rem', color: (card as any).subColor || 'var(--text-secondary)', marginTop: '0.25rem', fontWeight: 600 }}>
+              <div style={{ fontSize: '0.72rem', color: (card as any).subColor || 'var(--text-secondary)', marginTop: '0.25rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
                 {card.sub}
               </div>
             )}
@@ -248,7 +247,10 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
       <div className="card flex-col" style={{ padding: '1.75rem 2rem', minHeight: '320px' }}>
         <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
           <div>
-            <h3 className="card-title">📊 Evolução do Tesouro Direto</h3>
+            <h3 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+              <span>Evolução do Tesouro Direto</span>
+            </h3>
             <p className="text-xs text-secondary mt-sm">Marcação a Mercado (Preço de Resgate)</p>
           </div>
         </div>
@@ -262,9 +264,9 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
         ) : (
           <div
             className="flex-col items-center justify-center w-full text-secondary"
-            style={{ height: '240px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}
+            style={{ height: '240px', border: '1px dashed var(--panel-border)' }}
           >
-            <span className="text-2xl mb-sm">🏛️</span>
+            <span className="font-mono text-muted mb-sm" style={{ opacity: 0.5 }}>[TESOURO]</span>
             <p className="text-sm m-0">Nenhum dado histórico disponível ainda.</p>
             <p className="text-xs m-0 mt-sm">Registre sua primeira aplicação para começar.</p>
           </div>
