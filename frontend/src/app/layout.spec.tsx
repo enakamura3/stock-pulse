@@ -4,7 +4,7 @@ import React from 'react';
 
 vi.mock('next/font/google', () => ({
   Inter: () => ({ variable: '--font-inter' }),
-  JetBrains_Mono: () => ({ variable: '--font-mono' }),
+  JetBrains_Mono: () => ({ variable: '--font-jetbrains-mono' }),
 }));
 
 vi.mock('@/context/AuthContext', () => ({
