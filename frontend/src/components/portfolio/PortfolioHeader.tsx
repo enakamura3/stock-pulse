@@ -50,7 +50,7 @@ export default function PortfolioHeader({ userName, onLogout }: PortfolioHeaderP
               gap: '6px',
             }}
           >
-            💼 Minha Carteira
+            [CARTEIRA] Minha Carteira
           </Link>
           <Link
             href="/dashboard"
@@ -64,7 +64,7 @@ export default function PortfolioHeader({ userName, onLogout }: PortfolioHeaderP
               gap: '6px',
             }}
           >
-            📊 Monitoramento
+            [MONITOR] Monitoramento
           </Link>
           <Link
             href="/dashboard/alerts"
@@ -78,7 +78,7 @@ export default function PortfolioHeader({ userName, onLogout }: PortfolioHeaderP
               gap: '6px',
             }}
           >
-            🔔 Meus Alertas
+            [ALERTAS] Meus Alertas
           </Link>
           <Link
             href="/dashboard/settings"
@@ -92,7 +92,7 @@ export default function PortfolioHeader({ userName, onLogout }: PortfolioHeaderP
               gap: '6px',
             }}
           >
-            ⚙️ Configurações
+            [CONFIG] Configurações
           </Link>
         </div>
       </div>

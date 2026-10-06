@@ -36,12 +36,12 @@ export default function WatchlistSidebar({
 }: WatchlistSidebarProps) {
   return (
     <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div className="card" style={{ padding: '1.25rem', textAlign: 'left', display: 'flex', flexDirection: 'column', height: '100%', borderRadius: '6px' }}>
+      <div className="card" style={{ padding: '1.25rem', textAlign: 'left', display: 'flex', flexDirection: 'column', height: '100%' }}>
         
         {/* Seletor de Watchlists */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h3 className="font-mono" style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--accent-color)' }}>
-            ⭐ Favoritos
+            [WL] Listas de Ativos
           </h3>
           
           {/* Botão de excluir watchlist ativa */}

@@ -29,7 +29,7 @@ export default function AssetSearch({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           onFocus={onFocus}
-          placeholder="🔍 Pesquise ativos... (Ex: PETR4, AAPL, VALE3, BTC-USD)"
+          placeholder="> Pesquise ativos... (Ex: PETR4, AAPL, VALE3, BTC-USD)"
           autoComplete="off"
           style={{ fontSize: '1rem', padding: '0.9rem 1.2rem' }}
         />
@@ -55,8 +55,6 @@ export default function AssetSearch({
             textAlign: 'left',
             maxHeight: '280px',
             overflowY: 'auto',
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.7)',
-            borderRadius: '4px',
             borderColor: 'var(--panel-border-strong)',
           }}
         >

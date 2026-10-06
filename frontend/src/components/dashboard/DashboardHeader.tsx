@@ -68,7 +68,7 @@ export default function DashboardHeader({ userName, wsConnected, onLogout }: Das
               gap: '6px',
             }}
           >
-            💼 Minha Carteira
+            [CARTEIRA] Minha Carteira
           </Link>
           <Link
             href="/dashboard"
@@ -84,7 +84,7 @@ export default function DashboardHeader({ userName, wsConnected, onLogout }: Das
               gap: '6px',
             }}
           >
-            📊 Monitoramento
+            [MONITOR] Monitoramento
           </Link>
           <Link
             href="/dashboard/alerts"
@@ -98,7 +98,7 @@ export default function DashboardHeader({ userName, wsConnected, onLogout }: Das
               gap: '6px',
             }}
           >
-            🔔 Meus Alertas
+            [ALERTAS] Meus Alertas
           </Link>
           <Link
             href="/dashboard/settings"
@@ -112,7 +112,7 @@ export default function DashboardHeader({ userName, wsConnected, onLogout }: Das
               gap: '6px',
             }}
           >
-            ⚙️ Configurações
+            [CONFIG] Configurações
           </Link>
         </div>
       </div>

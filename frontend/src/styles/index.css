@@ -206,7 +206,6 @@ body {
 .primary-button:hover {
   background: #ff7828;
   border-color: #ff7828;
-  box-shadow: 0 0 16px rgba(238, 96, 24, 0.4);
 }
 
 /* Estilos de Formulários Premium (Autenticação) */
@@ -217,14 +216,13 @@ body {
 }
 
 .auth-card h2 {
-  font-size: 2rem;
+  font-size: 1.85rem;
   margin-bottom: 0.5rem;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--text-primary);
   text-align: center;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
+  font-family: var(--font-mono);
 }
 
 .auth-card .subtitle {
