@@ -79,20 +79,20 @@ export default function DividendsChart({ data }: DividendsChartProps) {
       return (
         <div style={{
           background: 'var(--panel-bg)',
-          border: '1px solid var(--panel-border)',
-          padding: '1rem',
-          borderRadius: '8px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          backdropFilter: 'blur(10px)'
+          border: '1px solid var(--panel-border-strong)',
+          padding: '0.75rem 1rem',
+          borderRadius: 0,
+          boxShadow: 'none',
+          fontFamily: 'var(--font-mono)',
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: 'var(--text-primary)' }}>{label}</p>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem', letterSpacing: '0.02em' }}>{label}</p>
           {payload.map((entry: any, index: number) => (
-            <p key={index} style={{ margin: '0.25rem 0', fontSize: '0.85rem', color: entry.color, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+            <p key={index} style={{ margin: '0.25rem 0', fontSize: '0.8rem', color: entry.color, display: 'flex', justifyContent: 'space-between', gap: '1.5rem', fontVariantNumeric: 'tabular-nums' }}>
               <span>{entry.name}:</span>
               <span style={{ fontWeight: 700 }}>R$ {entry.value.toFixed(2)}</span>
             </p>
           ))}
-          <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
             <span>Total:</span>
             <span>R$ {total.toFixed(2)}</span>
           </div>
@@ -108,27 +108,27 @@ export default function DividendsChart({ data }: DividendsChartProps) {
         data={chartData}
         margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+        <CartesianGrid strokeDasharray="2 2" stroke={gridColor} vertical={false} />
         <XAxis 
           dataKey="name" 
           stroke={strokeColor} 
-          fontSize={12} 
+          fontSize={11} 
           tickMargin={10}
           axisLine={false}
           tickLine={false}
         />
         <YAxis 
           stroke={strokeColor} 
-          fontSize={12}
+          fontSize={11}
           tickFormatter={(value) => `R$ ${value}`}
           axisLine={false}
           tickLine={false}
         />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.02)' }} />
-        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-        <Bar dataKey="Nacionais (R$)" stackId="a" fill="var(--color-success)" radius={[0, 0, 4, 4]} barSize={40} />
-        <Bar dataKey="Internacionais (R$)" stackId="a" fill="var(--accent-color)" radius={[0, 0, 0, 0]} barSize={40} />
-        <Bar dataKey="Renda Fixa (R$)" stackId="a" fill="var(--color-warning)" radius={[4, 4, 0, 0]} barSize={40} />
+        <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }} iconType="square" iconSize={8} />
+        <Bar dataKey="Nacionais (R$)" stackId="a" fill="var(--color-success)" radius={[0, 0, 0, 0]} barSize={36} />
+        <Bar dataKey="Internacionais (R$)" stackId="a" fill="var(--accent-color)" radius={[0, 0, 0, 0]} barSize={36} />
+        <Bar dataKey="Renda Fixa (R$)" stackId="a" fill="var(--color-warning)" radius={[0, 0, 0, 0]} barSize={36} />
       </BarChart>
     </ResponsiveContainer>
   );

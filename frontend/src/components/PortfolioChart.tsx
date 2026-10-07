@@ -52,6 +52,18 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
         vertLines: { color: gridColor },
         horzLines: { color: gridColor },
       },
+      crosshair: {
+        vertLine: {
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.2)',
+          width: 1,
+          style: 3,
+        },
+        horzLine: {
+          color: isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.2)',
+          width: 1,
+          style: 3,
+        },
+      },
       width: containerRef.current.clientWidth,
       height: 300,
       timeScale: {
@@ -75,9 +87,9 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     if (showValue) {
       valueSeries = chart.addSeries(AreaSeries, {
         lineColor: colors.accent,
-        topColor: toRgba(colors.accent, 0.15),
+        topColor: toRgba(colors.accent, 0.05),
         bottomColor: toRgba(colors.accent, 0.0),
-        lineWidth: 2,
+        lineWidth: 1,
         priceFormat,
       });
 
@@ -95,9 +107,9 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     if (showInvested) {
       investedSeries = chart.addSeries(AreaSeries, {
         lineColor: colors.success,
-        topColor: toRgba(colors.success, 0.15),
+        topColor: toRgba(colors.success, 0.03),
         bottomColor: toRgba(colors.success, 0.0),
-        lineWidth: 2,
+        lineWidth: 1,
         priceFormat,
       });
 
@@ -159,17 +171,18 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
         </div>
         
         {/* Toggle Moeda / Percentual */}
-        <div style={{ display: 'flex', gap: '8px', background: 'var(--input-bg)', padding: '2px', borderRadius: '6px' }}>
+        <div style={{ display: 'flex', gap: '4px', background: 'var(--panel-bg)', padding: '2px', border: '1px solid var(--panel-border)' }}>
           <button 
             onClick={() => setViewMode('currency')}
             style={{ 
               padding: '2px 8px', 
-              borderRadius: '4px', 
-              border: 'none',
-              background: viewMode === 'currency' ? 'var(--accent-gradient)' : 'transparent', 
-              color: viewMode === 'currency' ? 'var(--accent-foreground)' : 'var(--text-secondary)',
+              borderRadius: 0, 
+              border: viewMode === 'currency' ? '1px solid var(--accent-color)' : '1px solid transparent',
+              background: viewMode === 'currency' ? 'var(--accent-bg, rgba(255, 107, 0, 0.15))' : 'transparent', 
+              color: viewMode === 'currency' ? 'var(--accent-color)' : 'var(--text-secondary)',
               cursor: 'pointer',
-              fontWeight: 600
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)'
             }}
           >
             R$
@@ -178,12 +191,13 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
             onClick={() => setViewMode('percent')}
             style={{ 
               padding: '2px 8px', 
-              borderRadius: '4px', 
-              border: 'none',
-              background: viewMode === 'percent' ? 'var(--accent-gradient)' : 'transparent', 
-              color: viewMode === 'percent' ? 'var(--accent-foreground)' : 'var(--text-secondary)',
+              borderRadius: 0, 
+              border: viewMode === 'percent' ? '1px solid var(--accent-color)' : '1px solid transparent',
+              background: viewMode === 'percent' ? 'var(--accent-bg, rgba(255, 107, 0, 0.15))' : 'transparent', 
+              color: viewMode === 'percent' ? 'var(--accent-color)' : 'var(--text-secondary)',
               cursor: 'pointer',
-              fontWeight: 600
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)'
             }}
           >
             %

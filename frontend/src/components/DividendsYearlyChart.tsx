@@ -51,14 +51,14 @@ export default function DividendsYearlyChart({ data }: DividendsYearlyChartProps
       return (
         <div style={{
           background: 'var(--panel-bg)',
-          border: '1px solid var(--panel-border)',
-          padding: '1rem',
-          borderRadius: '8px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          backdropFilter: 'blur(10px)'
+          border: '1px solid var(--panel-border-strong)',
+          padding: '0.75rem 1rem',
+          borderRadius: 0,
+          boxShadow: 'none',
+          fontFamily: 'var(--font-mono)',
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: 'var(--text-primary)' }}>Ano: {label}</p>
-          <p style={{ margin: '0', color: 'var(--accent-color)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>Ano: {label}</p>
+          <p style={{ margin: '0', color: 'var(--accent-color)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '1.5rem', fontSize: '0.8rem', fontVariantNumeric: 'tabular-nums' }}>
             <span>Total:</span>
             <span>R$ {payload[0].value.toFixed(2)}</span>
           </p>
@@ -71,11 +71,11 @@ export default function DividendsYearlyChart({ data }: DividendsYearlyChartProps
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-        <XAxis dataKey="name" stroke={strokeColor} fontSize={12} tickLine={false} axisLine={false} />
-        <YAxis stroke={strokeColor} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} />
+        <CartesianGrid strokeDasharray="2 2" stroke={gridColor} vertical={false} />
+        <XAxis dataKey="name" stroke={strokeColor} fontSize={11} tickLine={false} axisLine={false} />
+        <YAxis stroke={strokeColor} fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)' }} />
-        <Bar dataKey="total" fill="var(--accent-color)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+        <Bar dataKey="total" fill="var(--accent-color)" radius={[0, 0, 0, 0]} maxBarSize={36} />
       </BarChart>
     </ResponsiveContainer>
   );
