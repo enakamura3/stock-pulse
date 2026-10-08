@@ -387,7 +387,12 @@ export default function PassiveIncomeSection({
         {/* Bar chart */}
         {dividendsMonthly.length > 0 ? (
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={dividendsMonthly} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+            <BarChart
+              data={dividendsMonthly}
+              margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+              barGap={2}
+              barCategoryGap="18%"
+            >
               <CartesianGrid strokeDasharray="2 2" stroke="rgba(255,255,255,0.04)" vertical={false} />
               <XAxis
                 dataKey="name"
@@ -406,9 +411,9 @@ export default function PassiveIncomeSection({
               />
               <Tooltip content={<DividendBarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
               <Legend wrapperStyle={{ paddingTop: '16px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }} iconType="square" iconSize={8} />
-              <Bar dataKey="Nacionais (R$)" stackId="a" fill={DIVIDENDS_COLORS.nacionais} radius={[0, 0, 0, 0]} barSize={36} />
-              <Bar dataKey="Internacionais (R$)" stackId="a" fill={DIVIDENDS_COLORS.internacionais} radius={[0, 0, 0, 0]} barSize={36} />
-              <Bar dataKey="Renda Fixa (R$)" stackId="a" fill={DIVIDENDS_COLORS.rendaFixa} radius={[0, 0, 0, 0]} barSize={36} />
+              <Bar dataKey="Nacionais (R$)" fill={DIVIDENDS_COLORS.nacionais} radius={[0, 0, 0, 0]} maxBarSize={14} />
+              <Bar dataKey="Internacionais (R$)" fill={DIVIDENDS_COLORS.internacionais} radius={[0, 0, 0, 0]} maxBarSize={14} />
+              <Bar dataKey="Renda Fixa (R$)" fill={DIVIDENDS_COLORS.rendaFixa} radius={[0, 0, 0, 0]} maxBarSize={14} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
@@ -600,26 +605,26 @@ export default function PassiveIncomeSection({
                    style={{ 
                      width: '100%', 
                      display: 'flex',
-                     flexDirection: 'column',
-                     justifyContent: 'flex-end',
-                     height: `${Math.max(item.pctPast + item.pctFuture, 1)}%`, 
-                     minHeight: '4px',
-                     borderRadius: 0,
-                     overflow: 'hidden'
+                     flexDirection: 'row',
+                     alignItems: 'flex-end',
+                     justifyContent: 'center',
+                     gap: '2px',
+                     height: `${Math.max(item.pctPast, item.pctFuture, 1)}%`, 
+                     minHeight: '4px'
                    }} 
                 >
-                   {item.pctFuture > 0 && (
-                      <div style={{ 
-                          width: '100%', 
-                          height: `${(item.pctFuture / (item.pctPast + item.pctFuture)) * 100}%`, 
-                          background: 'var(--color-warning)'
-                      }} />
-                   )}
                    {item.pctPast > 0 && (
                       <div style={{ 
-                          width: '100%', 
-                          height: `${(item.pctPast / (item.pctPast + item.pctFuture)) * 100}%`, 
+                          flex: 1, 
+                          height: `${(item.pctPast / Math.max(item.pctPast, item.pctFuture)) * 100}%`, 
                           background: item.isCurrent ? 'var(--color-success)' : 'var(--accent-color)' 
+                      }} />
+                   )}
+                   {item.pctFuture > 0 && (
+                      <div style={{ 
+                          flex: 1, 
+                          height: `${(item.pctFuture / Math.max(item.pctPast, item.pctFuture)) * 100}%`, 
+                          background: 'var(--color-warning)' 
                       }} />
                    )}
                 </div>

@@ -107,6 +107,8 @@ export default function DividendsChart({ data }: DividendsChartProps) {
       <BarChart
         data={chartData}
         margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+        barGap={2}
+        barCategoryGap="18%"
       >
         <CartesianGrid strokeDasharray="2 2" stroke={gridColor} vertical={false} />
         <XAxis 
@@ -126,9 +128,9 @@ export default function DividendsChart({ data }: DividendsChartProps) {
         />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.02)' }} />
         <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }} iconType="square" iconSize={8} />
-        <Bar dataKey="Nacionais (R$)" stackId="a" fill="var(--color-success)" radius={[0, 0, 0, 0]} barSize={36} />
-        <Bar dataKey="Internacionais (R$)" stackId="a" fill="var(--accent-color)" radius={[0, 0, 0, 0]} barSize={36} />
-        <Bar dataKey="Renda Fixa (R$)" stackId="a" fill="var(--color-warning)" radius={[0, 0, 0, 0]} barSize={36} />
+        <Bar dataKey="Nacionais (R$)" fill="var(--color-success)" radius={[0, 0, 0, 0]} maxBarSize={14} />
+        <Bar dataKey="Internacionais (R$)" fill="var(--accent-color)" radius={[0, 0, 0, 0]} maxBarSize={14} />
+        <Bar dataKey="Renda Fixa (R$)" fill="var(--color-warning)" radius={[0, 0, 0, 0]} maxBarSize={14} />
       </BarChart>
     </ResponsiveContainer>
   );
