@@ -337,7 +337,9 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			{
 				Ticker:             "PETR4",
 				Quantity:           100,
+				Currency:           "BRL",
 				CurrentPrice:       35.0,
+				OpenPrice:          34.0,
 				CurrentValue:       3500.0,
 				TotalCost:          3000.0,
 				DailyChange:        1.50,
@@ -488,7 +490,10 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 			mock.AnythingOfType("float64"), // dailyChangePercent
 			mock.AnythingOfType("float64"), // returnPercent
 			mock.MatchedBy(func(g []DailyMover) bool {
-				return len(g) == 3 && g[0].Ticker == "PETR4" && g[1].Ticker == "ITUB4" && g[2].Ticker == "BBDC4"
+				return len(g) == 3 && g[0].Ticker == "PETR4" && g[0].Currency == "BRL" &&
+					(g[0].OpenPrice > 33.99 && g[0].OpenPrice < 34.01) &&
+					(g[0].CurrentPrice > 34.99 && g[0].CurrentPrice < 35.01) &&
+					g[1].Ticker == "ITUB4" && g[2].Ticker == "BBDC4"
 			}),
 			mock.MatchedBy(func(l []DailyMover) bool {
 				return len(l) == 3 && l[0].Ticker == "MGLU3" && l[1].Ticker == "BBAS3" && l[2].Ticker == "VALE3"

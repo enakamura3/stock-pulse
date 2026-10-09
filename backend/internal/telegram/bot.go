@@ -235,7 +235,7 @@ func (r *BotRunner) SendDailyDigest(
 	if len(topGainers) > 0 {
 		msg += "🚀 *Maiores Altas:*\n"
 		for _, g := range topGainers {
-			msg += "  • *" + escapeMarkdown(g.Ticker) + "*: " + p.Sprintf("+%.2f%%", g.DailyChangePercent) + "\n"
+			msg += formatDailyMover(p, g, currency, true)
 		}
 		msg += "\n"
 	}
@@ -243,7 +243,7 @@ func (r *BotRunner) SendDailyDigest(
 	if len(topLosers) > 0 {
 		msg += "🔻 *Maiores Baixas:*\n"
 		for _, l := range topLosers {
-			msg += "  • *" + escapeMarkdown(l.Ticker) + "*: " + p.Sprintf("%.2f%%", l.DailyChangePercent) + "\n"
+			msg += formatDailyMover(p, l, currency, false)
 		}
 		msg += "\n"
 	}
@@ -280,6 +280,29 @@ func (r *BotRunner) SendDailyDigest(
 		slog.Warn("Usuário bloqueou o bot do Telegram ao receber daily digest", "chatID", chatID, "error", err)
 	}
 	return err
+}
+
+func formatDailyMover(p *message.Printer, m DailyMover, defaultCurrency string, isGainer bool) string {
+	if p == nil {
+		p = message.NewPrinter(language.Portuguese)
+	}
+	sign := ""
+	if isGainer {
+		sign = "+"
+	}
+	line := "  • *" + escapeMarkdown(m.Ticker) + "*: " + p.Sprintf(sign+"%.2f%%", m.DailyChangePercent) + "\n"
+	if m.CurrentPrice > 1e-6 {
+		curr := m.Currency
+		if curr == "" {
+			curr = defaultCurrency
+		}
+		if m.OpenPrice > 1e-6 {
+			line += "    Abert. " + curr + " " + formatFinancialPrice(p, m.OpenPrice) + " → Atual " + curr + " " + formatFinancialPrice(p, m.CurrentPrice) + "\n"
+		} else {
+			line += "    Atual " + curr + " " + formatFinancialPrice(p, m.CurrentPrice) + "\n"
+		}
+	}
+	return line
 }
 
 func rateLimitMiddleware() telebot.MiddlewareFunc {

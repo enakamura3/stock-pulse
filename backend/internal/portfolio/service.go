@@ -245,6 +245,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 				pos.DailyChange = quote.Change
 				pos.DailyChangePercent = quote.ChangePercent
 				pos.PreviousClose = quote.PreviousClose
+				pos.OpenPrice = quote.Open
 				pos.Volume = quote.Volume
 				pos.CurrentValue, pos.ProfitLoss, pos.ReturnPercent = calculator.CalculatePositionMetrics(
 					pos.Quantity, quote.Price, pos.TotalCost, rate,

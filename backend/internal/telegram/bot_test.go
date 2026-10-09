@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,8 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
 )
 
@@ -208,7 +211,10 @@ func TestBotRunner_SendDailyDigest(t *testing.T) {
 	})
 
 	t.Run("Mock server success positive change and return with dividends and movers", func(t *testing.T) {
+		var receivedBody string
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, _ := io.ReadAll(r.Body)
+			receivedBody = string(bodyBytes)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 10, "chat": {"id": 123}}}`))
@@ -230,14 +236,16 @@ func TestBotRunner_SendDailyDigest(t *testing.T) {
 			{Ticker: "VALE3", Type: "JCP", Currency: "R$", NetAmount: 200.0, PaymentDate: time.Now().AddDate(0, 0, 3)},
 		}
 		topGainers := []DailyMover{
-			{Ticker: "PETR4", DailyChangePercent: 3.5},
+			{Ticker: "PETR4", DailyChangePercent: 3.5, Currency: "R$", OpenPrice: 34.0, CurrentPrice: 35.0},
 		}
 		topLosers := []DailyMover{
-			{Ticker: "VALE3", DailyChangePercent: -2.1},
+			{Ticker: "VALE3", DailyChangePercent: -2.1, Currency: "R$", OpenPrice: 61.5, CurrentPrice: 60.0},
 		}
 
 		err = runner.SendDailyDigest(123, "Test_User*", "Carteira_Acoes*", "R$", 50000.0, 350.50, 0.70, 5.25, topGainers, topLosers, todayDivs, upcomingDivs)
 		assert.NoError(t, err)
+		assert.Contains(t, receivedBody, "Abert.")
+		assert.Contains(t, receivedBody, "Atual")
 	})
 
 	t.Run("Mock server success negative change and return without dividends", func(t *testing.T) {
@@ -389,6 +397,70 @@ func TestRateLimitMiddleware(t *testing.T) {
 		mCtxLimit.On("Send", mock.Anything, mock.Anything).Return(nil)
 		err := handler(mCtxLimit)
 		assert.NoError(t, err)
+	})
+}
+
+func TestFormatDailyMover(t *testing.T) {
+	p := message.NewPrinter(language.Portuguese)
+
+	t.Run("Gainer with open and current price", func(t *testing.T) {
+		m := DailyMover{
+			Ticker:             "PETR4",
+			DailyChangePercent: 2.35,
+			Currency:           "R$",
+			OpenPrice:          38.10,
+			CurrentPrice:       38.95,
+		}
+		res := formatDailyMover(p, m, "BRL", true)
+		assert.Contains(t, res, "• *PETR4*: +2,35%")
+		assert.Contains(t, res, "Abert. R$ 38,10 → Atual R$ 38,95")
+	})
+
+	t.Run("Loser with open and current price", func(t *testing.T) {
+		m := DailyMover{
+			Ticker:             "VALE3",
+			DailyChangePercent: -1.80,
+			Currency:           "R$",
+			OpenPrice:          60.00,
+			CurrentPrice:       58.92,
+		}
+		res := formatDailyMover(p, m, "BRL", false)
+		assert.Contains(t, res, "• *VALE3*: -1,80%")
+		assert.Contains(t, res, "Abert. R$ 60,00 → Atual R$ 58,92")
+	})
+
+	t.Run("Current price only without open price", func(t *testing.T) {
+		m := DailyMover{
+			Ticker:             "AAPL",
+			DailyChangePercent: 1.50,
+			Currency:           "USD",
+			CurrentPrice:       150.00,
+		}
+		res := formatDailyMover(p, m, "USD", true)
+		assert.Contains(t, res, "• *AAPL*: +1,50%")
+		assert.Contains(t, res, "Atual USD 150,00")
+		assert.NotContains(t, res, "Abert.")
+	})
+
+	t.Run("No prices available", func(t *testing.T) {
+		m := DailyMover{
+			Ticker:             "MOCK",
+			DailyChangePercent: -0.50,
+		}
+		res := formatDailyMover(p, m, "BRL", false)
+		assert.Equal(t, "  • *MOCK*: -0,50%\n", res)
+	})
+
+	t.Run("Fallback to default currency and nil printer", func(t *testing.T) {
+		m := DailyMover{
+			Ticker:             "BBDC4",
+			DailyChangePercent: 3.10,
+			OpenPrice:          14.00,
+			CurrentPrice:       14.43,
+		}
+		res := formatDailyMover(nil, m, "BRL", true)
+		assert.Contains(t, res, "• *BBDC4*: +3,10%")
+		assert.Contains(t, res, "Abert. BRL 14,00 → Atual BRL 14,43")
 	})
 }
 

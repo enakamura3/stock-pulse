@@ -17,6 +17,9 @@ import (
 type DailyMover struct {
 	Ticker             string
 	DailyChangePercent float64
+	Currency           string
+	OpenPrice          float64
+	CurrentPrice       float64
 }
 
 // DigestTelegramNotifier define o contrato para envio do daily digest no Telegram.
@@ -169,20 +172,30 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 			dailyChangePercent = (totalDailyChange / prevValue) * 100.0
 		}
 
+		currency := "BRL"
+		if pDetails != nil && pDetails.BaseCurrency != "" {
+			currency = pDetails.BaseCurrency
+		}
+
 		var gainers []DailyMover
 		var losers []DailyMover
 		for _, pos := range positions {
 			if pos.Quantity > 1e-6 {
+				posCurr := pos.Currency
+				if posCurr == "" {
+					posCurr = currency
+				}
+				mover := DailyMover{
+					Ticker:             pos.Ticker,
+					DailyChangePercent: pos.DailyChangePercent,
+					Currency:           posCurr,
+					OpenPrice:          pos.OpenPrice,
+					CurrentPrice:       pos.CurrentPrice,
+				}
 				if pos.DailyChangePercent > 1e-6 {
-					gainers = append(gainers, DailyMover{
-						Ticker:             pos.Ticker,
-						DailyChangePercent: pos.DailyChangePercent,
-					})
+					gainers = append(gainers, mover)
 				} else if pos.DailyChangePercent < -1e-6 {
-					losers = append(losers, DailyMover{
-						Ticker:             pos.Ticker,
-						DailyChangePercent: pos.DailyChangePercent,
-					})
+					losers = append(losers, mover)
 				}
 			}
 		}
@@ -199,11 +212,6 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 		})
 		if len(losers) > 3 {
 			losers = losers[:3]
-		}
-
-		currency := "BRL"
-		if pDetails != nil && pDetails.BaseCurrency != "" {
-			currency = pDetails.BaseCurrency
 		}
 
 		var todayDividends []portfolio.CalculatedDividend
