@@ -349,6 +349,14 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 
 		msg += p.Sprintf("%s `%s`: *R$ %.2f* | Dia: %+.2f%% | L/P: %+.2f%%\n",
 			symbol, pos.Ticker, pos.CurrentValue, pos.DailyChangePercent, totalReturn)
+		if pos.CurrentPrice > 1e-6 {
+			curr := getCurrencySymbol(pos.Currency)
+			if pos.OpenPrice > 1e-6 {
+				msg += p.Sprintf("   Abert. %s %s → Atual %s %s\n", curr, formatFinancialPrice(p, pos.OpenPrice), curr, formatFinancialPrice(p, pos.CurrentPrice))
+			} else {
+				msg += p.Sprintf("   Atual %s %s\n", curr, formatFinancialPrice(p, pos.CurrentPrice))
+			}
+		}
 	}
 
 	menu := &telebot.ReplyMarkup{}

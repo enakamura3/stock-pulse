@@ -1609,9 +1609,9 @@ func TestHandleAssetList(t *testing.T) {
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 
 		positions := []portfolio.Position{
-			{Ticker: "PETR4", Quantity: 100, CurrentPrice: 30, CurrentValue: 3000, TotalCost: 2500, DailyChangePercent: 2.5},
-			{Ticker: "VALE3", Quantity: 50, CurrentPrice: 60, CurrentValue: 3000, TotalCost: 3200, DailyChangePercent: -1.2},
-			{Ticker: "WEGE3", Quantity: 10, CurrentPrice: 40, CurrentValue: 400, TotalCost: 400, DailyChangePercent: 0.0},
+			{Ticker: "PETR4", Quantity: 100, CurrentPrice: 30, OpenPrice: 29.5, Currency: "BRL", CurrentValue: 3000, TotalCost: 2500, DailyChangePercent: 2.5},
+			{Ticker: "VALE3", Quantity: 50, CurrentPrice: 60, OpenPrice: 61, Currency: "BRL", CurrentValue: 3000, TotalCost: 3200, DailyChangePercent: -1.2},
+			{Ticker: "WEGE3", Quantity: 10, CurrentPrice: 40, Currency: "BRL", CurrentValue: 400, TotalCost: 400, DailyChangePercent: 0.0},
 		}
 		portSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolios[0], positions, nil).Once()
 
@@ -1627,6 +1627,9 @@ func TestHandleAssetList(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, sentMsg, "Página 1 de 1")
 		assert.Contains(t, sentMsg, "PETR4")
+		assert.Contains(t, sentMsg, "Abert. R$ 29,50 → Atual R$ 30,00")
+		assert.Contains(t, sentMsg, "Abert. R$ 61,00 → Atual R$ 60,00")
+		assert.Contains(t, sentMsg, "Atual R$ 40,00")
 	})
 
 	t.Run("empty positions", func(t *testing.T) {
