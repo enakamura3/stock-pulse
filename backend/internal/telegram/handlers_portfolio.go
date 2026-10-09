@@ -347,8 +347,8 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 			totalReturn = ((pos.CurrentValue - pos.TotalCost) / pos.TotalCost) * 100
 		}
 
-		msg += p.Sprintf("%s `%s`: *R$ %.2f* | Dia: %+.2f%% | L/P: %+.2f%%\n",
-			symbol, pos.Ticker, pos.CurrentValue, pos.DailyChangePercent, totalReturn)
+		msg += p.Sprintf("%s `%s`: Dia: %+.2f%% | L/P: %+.2f%%\n",
+			symbol, pos.Ticker, pos.DailyChangePercent, totalReturn)
 		if pos.CurrentPrice > 1e-6 {
 			curr := getCurrencySymbol(pos.Currency)
 			if pos.OpenPrice > 1e-6 {
