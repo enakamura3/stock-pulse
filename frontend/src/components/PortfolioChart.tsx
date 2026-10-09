@@ -43,7 +43,7 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const valueSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
-  const investedSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const investedSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
 
   const [showValue, setShowValue] = useState(true);
   const [showInvested, setShowInvested] = useState(true);
@@ -96,20 +96,21 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     });
 
     let valueSeries: ISeriesApi<'Area'> | null = null;
-    let investedSeries: ISeriesApi<'Line'> | null = null;
+    let investedSeries: ISeriesApi<'Area'> | null = null;
 
     // Formatador de preço
     const priceFormat = viewMode === 'percent' 
       ? { type: 'custom' as const, formatter: (price: number) => `${price.toFixed(2)}%`, minMove: 0.01 }
       : { type: 'price' as const, precision: 2, minMove: 0.01 };
 
-    // Série 1: Valor de Mercado (Patrimônio) - Linha fina de 1px com degradê névoa ultra-leve (2.5%)
+    // Série 1: Valor de Mercado (Patrimônio) - Linha fina de 1px com degradê névoa (5%)
     if (showValue) {
       valueSeries = chart.addSeries(AreaSeries, {
         lineColor: colors.accent,
-        topColor: toRgba(colors.accent, 0.025),
+        topColor: toRgba(colors.accent, 0.05),
         bottomColor: toRgba(colors.accent, 0.0),
         lineWidth: 1,
+        lineStyle: LineStyle.Solid,
         lastValueVisible: true,
         priceLineVisible: true,
         priceFormat,
@@ -125,10 +126,13 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       valueSeries.setData(valueData);
     }
 
-    // Série 2: Valor Investido (Referência) - Linha tracejada sem preenchimento e sem badge colidente no eixo Y
+    // Série 2: Valor Investido (Referência) - Linha tracejada fina de 1px com degradê névoa (5%)
     if (showInvested) {
-      investedSeries = chart.addSeries(LineSeries, {
-        color: colors.success,
+      const isPercent = viewMode === 'percent';
+      investedSeries = chart.addSeries(AreaSeries, {
+        lineColor: colors.success,
+        topColor: toRgba(colors.success, isPercent ? 0.0 : 0.05),
+        bottomColor: toRgba(colors.success, 0.0),
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         lastValueVisible: false, // Suprime badge duplicado/colidente no eixo Y
