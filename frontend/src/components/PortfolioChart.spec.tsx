@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import PortfolioChart from './PortfolioChart';
+import PortfolioChart, { toRgba } from './PortfolioChart';
 import React from 'react';
 import { vi } from 'vitest';
 import { ThemeProvider } from './ThemeProvider';
@@ -158,5 +158,14 @@ describe('PortfolioChart', () => {
     );
 
     expect(screen.getByTestId('portfolio-chart-hud')).toHaveTextContent('2023-01-03');
+  });
+
+  it('converts colors to rgba with expected opacity across all branches', () => {
+    expect(toRgba('', 0.5)).toBe('rgba(255, 107, 0, 0.5)');
+    expect(toRgba('rgb(50, 100, 150)', 0.5)).toBe('rgba(50, 100, 150, 0.5)');
+    expect(toRgba('rgba(50, 100, 150, 0.9)', 0.2)).toBe('rgba(50, 100, 150, 0.2)');
+    expect(toRgba('#ff6b00', 0.025)).toBe('rgba(255, 107, 0, 0.025)');
+    expect(toRgba('#f80', 0.025)).toBe('rgba(255, 136, 0, 0.025)');
+    expect(toRgba('hsl(20, 100%, 50%)', 0.5)).toBe('hsl(20, 100%, 50%)');
   });
 });

@@ -16,6 +16,27 @@ interface PortfolioChartProps {
   data: ChartPoint[];
 }
 
+export function toRgba(colorStr: string, opacity: number): string {
+  if (!colorStr) return `rgba(255, 107, 0, ${opacity})`;
+  if (colorStr.startsWith('rgb(')) {
+    return colorStr.replace('rgb(', 'rgba(').replace(')', `, ${opacity})`);
+  }
+  if (colorStr.startsWith('rgba(')) {
+    return colorStr.replace(/,\s*[\d.]+\)$/, `, ${opacity})`);
+  }
+  if (colorStr.startsWith('#')) {
+    let hex = colorStr.slice(1);
+    if (hex.length === 3) {
+      hex = hex.split('').map(c => c + c).join('');
+    }
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 0;
+    const b = parseInt(hex.substring(4, 6), 16) || 0;
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+  return colorStr;
+}
+
 export default function PortfolioChart({ data }: PortfolioChartProps) {
   const { theme } = useTheme();
   const colors = useThemeColors();
@@ -38,13 +59,6 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
     const isLight = theme === 'light';
     const textColor = isLight ? 'rgba(24, 24, 27, 0.65)' : 'rgba(250, 250, 250, 0.45)';
     const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)';
-
-    const toRgba = (colorStr: string, opacity: number) => {
-      if (colorStr.startsWith('rgb(')) {
-        return colorStr.replace('rgb(', 'rgba(').replace(')', `, ${opacity})`);
-      }
-      return colorStr;
-    };
 
     // Configuração do container do gráfico
     const chart = createChart(containerRef.current, {
@@ -89,13 +103,13 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       ? { type: 'custom' as const, formatter: (price: number) => `${price.toFixed(2)}%`, minMove: 0.01 }
       : { type: 'price' as const, precision: 2, minMove: 0.01 };
 
-    // Série 1: Valor de Mercado (Patrimônio) - Linha sólida em destaque com gradiente sutil
+    // Série 1: Valor de Mercado (Patrimônio) - Linha fina de 1px com degradê névoa ultra-leve (2.5%)
     if (showValue) {
       valueSeries = chart.addSeries(AreaSeries, {
         lineColor: colors.accent,
-        topColor: toRgba(colors.accent, 0.08),
+        topColor: toRgba(colors.accent, 0.025),
         bottomColor: toRgba(colors.accent, 0.0),
-        lineWidth: 2,
+        lineWidth: 1,
         lastValueVisible: true,
         priceLineVisible: true,
         priceFormat,
