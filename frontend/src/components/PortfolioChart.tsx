@@ -103,11 +103,11 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       ? { type: 'custom' as const, formatter: (price: number) => `${price.toFixed(2)}%`, minMove: 0.01 }
       : { type: 'price' as const, precision: 2, minMove: 0.01 };
 
-    // Série 1: Valor de Mercado (Patrimônio) - Linha fina de 1px com degradê névoa (10%)
+    // Série 1: Valor de Mercado (Patrimônio) - Linha fina de 1px com degradê (25%)
     if (showValue) {
       valueSeries = chart.addSeries(AreaSeries, {
         lineColor: colors.accent,
-        topColor: toRgba(colors.accent, 0.10),
+        topColor: toRgba(colors.accent, 0.25),
         bottomColor: toRgba(colors.accent, 0.0),
         lineWidth: 1,
         lineStyle: LineStyle.Solid,
@@ -126,12 +126,12 @@ export default function PortfolioChart({ data }: PortfolioChartProps) {
       valueSeries.setData(valueData);
     }
 
-    // Série 2: Valor Investido (Referência) - Linha tracejada fina de 1px com degradê névoa (10%)
+    // Série 2: Valor Investido (Referência) - Linha tracejada fina de 1px com degradê (25%)
     if (showInvested) {
       const isPercent = viewMode === 'percent';
       investedSeries = chart.addSeries(AreaSeries, {
         lineColor: colors.success,
-        topColor: toRgba(colors.success, isPercent ? 0.0 : 0.10),
+        topColor: toRgba(colors.success, isPercent ? 0.0 : 0.25),
         bottomColor: toRgba(colors.success, 0.0),
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
