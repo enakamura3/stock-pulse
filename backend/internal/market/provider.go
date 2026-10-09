@@ -19,6 +19,7 @@ type Quote struct {
 	Change        float64 `json:"change"`
 	ChangePercent float64 `json:"change_percent"`
 	PreviousClose float64 `json:"previous_close,omitempty"`
+	Open          float64 `json:"open,omitempty"`
 	High          float64 `json:"high"`
 	Low           float64 `json:"low"`
 	Volume        int64   `json:"volume"`
@@ -76,6 +77,11 @@ type chartResponse struct {
 				RegularMarketDayLow  float64 `json:"regularMarketDayLow"`
 				RegularMarketVolume  int64   `json:"regularMarketVolume"`
 			} `json:"meta"`
+			Indicators struct {
+				Quote []struct {
+					Open []*float64 `json:"open"`
+				} `json:"quote"`
+			} `json:"indicators"`
 		} `json:"result"`
 		Error interface{} `json:"error"`
 	} `json:"chart"`
@@ -142,6 +148,17 @@ func (y *YahooFinanceProvider) GetQuote(ctx context.Context, symbol string) (*Qu
 		changePercent = (change / meta.ChartPreviousClose) * 100
 	}
 
+	var openPrice float64
+	indicators := data.Chart.Result[0].Indicators
+	if len(indicators.Quote) > 0 && len(indicators.Quote[0].Open) > 0 {
+		for _, o := range indicators.Quote[0].Open {
+			if o != nil {
+				openPrice = *o
+				break
+			}
+		}
+	}
+
 	quote := &Quote{
 		Symbol:        meta.Symbol,
 		Name:          name,
@@ -149,6 +166,7 @@ func (y *YahooFinanceProvider) GetQuote(ctx context.Context, symbol string) (*Qu
 		Change:        change,
 		ChangePercent: changePercent,
 		PreviousClose: meta.ChartPreviousClose,
+		Open:          openPrice,
 		High:          meta.RegularMarketDayHigh,
 		Low:           meta.RegularMarketDayLow,
 		Volume:        meta.RegularMarketVolume,

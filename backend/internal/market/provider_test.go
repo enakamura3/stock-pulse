@@ -140,6 +140,63 @@ func TestProvider_GetQuote(t *testing.T) {
 		_, err := p.GetQuote(context.Background(), "AAPL")
 		assert.ErrorContains(t, err, "ativo não encontrado")
 	})
+
+	t.Run("Open Price From Indicators", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"chart": {
+					"result": [{
+						"meta": {
+							"symbol": "PETR4.SA",
+							"regularMarketPrice": 38.95,
+							"chartPreviousClose": 38.00
+						},
+						"indicators": {
+							"quote": [{
+								"open": [38.10]
+							}]
+						}
+					}]
+				}
+			}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		q, err := p.GetQuote(context.Background(), "PETR4.SA")
+		assert.NoError(t, err)
+		assert.InDelta(t, 38.10, q.Open, 0.0001)
+		assert.InDelta(t, 38.95, q.Price, 0.0001)
+		assert.InDelta(t, 38.00, q.PreviousClose, 0.0001)
+	})
+
+	t.Run("Open Price With Nil First Element", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"chart": {
+					"result": [{
+						"meta": {
+							"symbol": "VALE3.SA",
+							"regularMarketPrice": 60.00
+						},
+						"indicators": {
+							"quote": [{
+								"open": [null, 59.20]
+							}]
+						}
+					}]
+				}
+			}`))
+		}
+		p, server := setupProviderTest(handler)
+		defer server.Close()
+
+		q, err := p.GetQuote(context.Background(), "VALE3.SA")
+		assert.NoError(t, err)
+		assert.InDelta(t, 59.20, q.Open, 0.0001)
+	})
 }
 
 func TestProvider_SearchAssets(t *testing.T) {
