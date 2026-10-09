@@ -14,6 +14,8 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
 )
 
@@ -1911,8 +1913,8 @@ func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 
 		positions := []portfolio.Position{
-			{Ticker: "VALE3", Quantity: 100, CurrentPrice: 50, CurrentValue: 5000, TotalCost: 6000, DailyChange: -2, DailyChangePercent: -3.85},
-			{Ticker: "MGLU3", Quantity: 100, CurrentPrice: 10, CurrentValue: 1000, TotalCost: 1500, DailyChange: -1, DailyChangePercent: -9.09},
+			{Ticker: "VALE3", Quantity: 100, CurrentPrice: 50, OpenPrice: 52, CurrentValue: 5000, TotalCost: 6000, DailyChange: -2, DailyChangePercent: -3.85},
+			{Ticker: "MGLU3", Quantity: 100, CurrentPrice: 10, OpenPrice: 11, CurrentValue: 1000, TotalCost: 1500, DailyChange: -1, DailyChangePercent: -9.09},
 			{Ticker: "B3SA3", Quantity: 100, CurrentPrice: 12, CurrentValue: 1200, TotalCost: 1200, DailyChange: 0, DailyChangePercent: 0.0},
 		}
 		portSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolios[0], positions, nil).Once()
@@ -1929,6 +1931,8 @@ func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
 
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
 			return strings.Contains(msg, "Maiores Baixas do Dia") &&
+				strings.Contains(msg, "Abert.") &&
+				strings.Contains(msg, "Atual") &&
 				strings.Contains(msg, "Vencimentos Próximos")
 		}), mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -2943,5 +2947,70 @@ func TestHandlers_UndoAndOperations(t *testing.T) {
 
 		err := h.finalizeTransaction(mCtx, state, 2.50, true)
 		assert.NoError(t, err)
+	})
+}
+
+func TestFormatPositionMover(t *testing.T) {
+	p := message.NewPrinter(language.BrazilianPortuguese)
+
+	t.Run("Riser with open and current price", func(t *testing.T) {
+		pos := portfolio.Position{
+			Ticker:             "PETR4",
+			DailyChangePercent: 2.35,
+			Currency:           "BRL",
+			OpenPrice:          38.10,
+			CurrentPrice:       38.95,
+		}
+		res := formatPositionMover(p, pos, true)
+		assert.Contains(t, res, "• `PETR4`: +2,35%")
+		assert.Contains(t, res, "Abert. R$ 38,10 → Atual R$ 38,95")
+	})
+
+	t.Run("Faller with open and current price", func(t *testing.T) {
+		pos := portfolio.Position{
+			Ticker:             "VALE3",
+			DailyChangePercent: -1.80,
+			Currency:           "BRL",
+			OpenPrice:          60.00,
+			CurrentPrice:       58.92,
+		}
+		res := formatPositionMover(p, pos, false)
+		assert.Contains(t, res, "• `VALE3`: -1,80%")
+		assert.Contains(t, res, "Abert. R$ 60,00 → Atual R$ 58,92")
+	})
+
+	t.Run("Current price only without open price", func(t *testing.T) {
+		pos := portfolio.Position{
+			Ticker:             "AAPL",
+			DailyChangePercent: 1.50,
+			Currency:           "USD",
+			CurrentPrice:       150.00,
+		}
+		res := formatPositionMover(p, pos, true)
+		assert.Contains(t, res, "• `AAPL`: +1,50%")
+		assert.Contains(t, res, "Atual US$ 150,00")
+		assert.NotContains(t, res, "Abert.")
+	})
+
+	t.Run("No prices available", func(t *testing.T) {
+		pos := portfolio.Position{
+			Ticker:             "MOCK",
+			DailyChangePercent: -0.50,
+		}
+		res := formatPositionMover(p, pos, false)
+		assert.Equal(t, "• `MOCK`: -0,50%\n", res)
+	})
+
+	t.Run("Nil printer fallback", func(t *testing.T) {
+		pos := portfolio.Position{
+			Ticker:             "BBDC4",
+			DailyChangePercent: 3.10,
+			Currency:           "BRL",
+			OpenPrice:          14.00,
+			CurrentPrice:       14.43,
+		}
+		res := formatPositionMover(nil, pos, true)
+		assert.Contains(t, res, "• `BBDC4`: +3,10%")
+		assert.Contains(t, res, "Abert. R$ 14,00 → Atual R$ 14,43")
 	})
 }

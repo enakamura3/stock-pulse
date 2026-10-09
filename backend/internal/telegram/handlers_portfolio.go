@@ -182,9 +182,9 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	var fallers []portfolio.Position
 
 	for _, pos := range sortedPos {
-		if pos.DailyChangePercent > 0 {
+		if pos.DailyChangePercent > 1e-6 {
 			risers = append(risers, pos)
-		} else if pos.DailyChangePercent < 0 {
+		} else if pos.DailyChangePercent < -1e-6 {
 			fallers = append(fallers, pos)
 		}
 	}
@@ -196,7 +196,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			limit = len(risers)
 		}
 		for i := 0; i < limit; i++ {
-			msg += p.Sprintf("• `%s`: +%.2f%%\n", risers[i].Ticker, risers[i].DailyChangePercent)
+			msg += formatPositionMover(p, risers[i], true)
 		}
 	}
 
@@ -207,7 +207,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			limit = len(fallers)
 		}
 		for i := len(fallers) - 1; i >= len(fallers)-limit; i-- {
-			msg += p.Sprintf("• `%s`: %.2f%%\n", fallers[i].Ticker, fallers[i].DailyChangePercent)
+			msg += formatPositionMover(p, fallers[i], false)
 		}
 	}
 
@@ -462,4 +462,24 @@ func (h *Handlers) handleSelectedPortfolio(c telebot.Context, portfolioID string
 
 	// Após trocar com sucesso, voltar ao menu
 	return h.sendOrEditMenu(c)
+}
+
+func formatPositionMover(p *message.Printer, pos portfolio.Position, isRiser bool) string {
+	if p == nil {
+		p = message.NewPrinter(language.BrazilianPortuguese)
+	}
+	sign := ""
+	if isRiser {
+		sign = "+"
+	}
+	line := p.Sprintf("• `%s`: "+sign+"%.2f%%\n", pos.Ticker, pos.DailyChangePercent)
+	if pos.CurrentPrice > 1e-6 {
+		curr := getCurrencySymbol(pos.Currency)
+		if pos.OpenPrice > 1e-6 {
+			line += p.Sprintf("  Abert. %s %s → Atual %s %s\n", curr, formatFinancialPrice(p, pos.OpenPrice), curr, formatFinancialPrice(p, pos.CurrentPrice))
+		} else {
+			line += p.Sprintf("  Atual %s %s\n", curr, formatFinancialPrice(p, pos.CurrentPrice))
+		}
+	}
+	return line
 }
