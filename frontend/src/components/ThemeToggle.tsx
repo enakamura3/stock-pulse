@@ -11,13 +11,14 @@ export default function ThemeToggle() {
       onClick={toggleTheme}
       className="btn-secondary"
       style={{
-        padding: '0.4rem 0.75rem',
-        fontSize: '0.8rem',
+        padding: '0.35rem 0.65rem',
+        fontSize: '0.74rem',
+        fontFamily: 'var(--font-mono)',
         display: 'inline-flex',
         alignItems: 'center',
         gap: '6px',
         cursor: 'pointer',
-        borderRadius: '8px',
+        borderRadius: '2px',
         transition: 'all 0.2s ease',
       }}
       title={theme === 'dark' ? 'Alternar para Tema Claro' : 'Alternar para Tema Escuro'}

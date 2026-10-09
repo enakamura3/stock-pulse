@@ -320,21 +320,21 @@ export default function PassiveIncomeSection({
     const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
     return (
       <div style={{
-        background: 'rgba(15, 23, 42, 0.95)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        padding: '1rem',
-        borderRadius: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
-        backdropFilter: 'blur(12px)',
+        background: 'var(--panel-bg)',
+        border: '1px solid var(--panel-border-strong)',
+        padding: '0.75rem 1rem',
+        borderRadius: 0,
+        boxShadow: 'none',
+        fontFamily: 'var(--font-mono)',
       }}>
-        <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: '#fff' }}>{label}</p>
+        <p style={{ margin: '0 0 0.4rem 0', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{label}</p>
         {payload.map((entry: any, i: number) => (
-          <p key={i} style={{ margin: '0.25rem 0', fontSize: '0.85rem', color: entry.color, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+          <p key={i} style={{ margin: '0.2rem 0', fontSize: '0.8rem', color: entry.color, display: 'flex', justifyContent: 'space-between', gap: '1.5rem', fontVariantNumeric: 'tabular-nums' }}>
             <span>{entry.name}:</span>
             <span style={{ fontWeight: 700 }}>R$ {entry.value.toFixed(2)}</span>
           </p>
         ))}
-        <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 700, color: '#fff' }}>
+        <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
           <span>Total:</span>
           <span>R$ {total.toFixed(2)}</span>
         </div>
@@ -347,19 +347,19 @@ export default function PassiveIncomeSection({
     const item = payload[0].payload;
     return (
       <div style={{
-        background: 'rgba(15, 23, 42, 0.95)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        padding: '0.85rem 1rem',
-        borderRadius: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
-        backdropFilter: 'blur(12px)',
+        background: 'var(--panel-bg)',
+        border: '1px solid var(--panel-border-strong)',
+        padding: '0.75rem 1rem',
+        borderRadius: 0,
+        boxShadow: 'none',
+        fontFamily: 'var(--font-mono)',
       }}>
-        <p style={{ margin: '0 0 0.4rem 0', fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>Projeção em {label}</p>
-        <p style={{ margin: '0.2rem 0', fontSize: '0.8rem', color: '#4ade80', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+        <p style={{ margin: '0 0 0.4rem 0', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>Projeção em {label}</p>
+        <p style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: '#4ade80', display: 'flex', justifyContent: 'space-between', gap: '1.5rem', fontVariantNumeric: 'tabular-nums' }}>
           <span>Renda Mensal Projetada:</span>
           <span style={{ fontWeight: 700 }}>{formatMoney(item.monthlyIncome, 'BRL')}</span>
         </p>
-        <p style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+        <p style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', gap: '1.5rem', fontVariantNumeric: 'tabular-nums' }}>
           <span>Patrimônio Acumulado:</span>
           <span style={{ fontWeight: 600 }}>{formatMoney(item.portfolio, 'BRL')}</span>
         </p>
@@ -387,8 +387,13 @@ export default function PassiveIncomeSection({
         {/* Bar chart */}
         {dividendsMonthly.length > 0 ? (
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={dividendsMonthly} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <BarChart
+              data={dividendsMonthly}
+              margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+              barGap={2}
+              barCategoryGap="18%"
+            >
+              <CartesianGrid strokeDasharray="2 2" stroke="rgba(255,255,255,0.04)" vertical={false} />
               <XAxis
                 dataKey="name"
                 stroke="rgba(255,255,255,0.4)"
@@ -405,16 +410,16 @@ export default function PassiveIncomeSection({
                 tickLine={false}
               />
               <Tooltip content={<DividendBarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-              <Legend wrapperStyle={{ paddingTop: '16px', fontSize: '0.75rem' }} />
-              <Bar dataKey="Nacionais (R$)" stackId="a" fill={DIVIDENDS_COLORS.nacionais} radius={[0, 0, 4, 4]} barSize={36} />
-              <Bar dataKey="Internacionais (R$)" stackId="a" fill={DIVIDENDS_COLORS.internacionais} radius={[0, 0, 0, 0]} barSize={36} />
-              <Bar dataKey="Renda Fixa (R$)" stackId="a" fill={DIVIDENDS_COLORS.rendaFixa} radius={[4, 4, 0, 0]} barSize={36} />
+              <Legend wrapperStyle={{ paddingTop: '16px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }} iconType="square" iconSize={8} />
+              <Bar dataKey="Nacionais (R$)" fill={DIVIDENDS_COLORS.nacionais} radius={[0, 0, 0, 0]} maxBarSize={14} />
+              <Bar dataKey="Internacionais (R$)" fill={DIVIDENDS_COLORS.internacionais} radius={[0, 0, 0, 0]} maxBarSize={14} />
+              <Bar dataKey="Renda Fixa (R$)" fill={DIVIDENDS_COLORS.rendaFixa} radius={[0, 0, 0, 0]} maxBarSize={14} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--panel-border)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
+          <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--panel-border)', borderRadius: 0, color: 'var(--text-secondary)' }}>
             <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💸</span>
-            <p style={{ fontSize: '0.85rem', margin: 0 }}>Nenhum provento registrado nos últimos 12 meses.</p>
+            <p style={{ fontSize: '0.85rem', margin: 0, fontFamily: 'var(--font-mono)' }}>Nenhum provento registrado nos últimos 12 meses.</p>
           </div>
         )}
       </AnalysisCard>
@@ -548,11 +553,11 @@ export default function PassiveIncomeSection({
           <AreaChart data={snowballProjection.timeline} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
             <defs>
               <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4ade80" stopOpacity={0.4} />
+                <stop offset="5%" stopColor="#4ade80" stopOpacity={0.12} />
                 <stop offset="95%" stopColor="#4ade80" stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+            <CartesianGrid strokeDasharray="2 2" stroke={gridColor} vertical={false} />
             <XAxis
               dataKey="label"
               stroke={strokeColor}
@@ -573,7 +578,7 @@ export default function PassiveIncomeSection({
               dataKey="monthlyIncome"
               name="Renda Mensal Projetada"
               stroke="#4ade80"
-              strokeWidth={2.5}
+              strokeWidth={1.5}
               fillOpacity={1}
               fill="url(#colorIncome)"
             />
@@ -600,26 +605,26 @@ export default function PassiveIncomeSection({
                    style={{ 
                      width: '100%', 
                      display: 'flex',
-                     flexDirection: 'column',
-                     justifyContent: 'flex-end',
-                     height: `${Math.max(item.pctPast + item.pctFuture, 1)}%`, 
-                     minHeight: '4px',
-                     borderRadius: '4px 4px 0 0',
-                     overflow: 'hidden'
+                     flexDirection: 'row',
+                     alignItems: 'flex-end',
+                     justifyContent: 'center',
+                     gap: '2px',
+                     height: `${Math.max(item.pctPast, item.pctFuture, 1)}%`, 
+                     minHeight: '4px'
                    }} 
                 >
-                   {item.pctFuture > 0 && (
-                      <div style={{ 
-                          width: '100%', 
-                          height: `${(item.pctFuture / (item.pctPast + item.pctFuture)) * 100}%`, 
-                          background: 'var(--color-warning)'
-                      }} />
-                   )}
                    {item.pctPast > 0 && (
                       <div style={{ 
-                          width: '100%', 
-                          height: `${(item.pctPast / (item.pctPast + item.pctFuture)) * 100}%`, 
+                          flex: 1, 
+                          height: `${(item.pctPast / Math.max(item.pctPast, item.pctFuture)) * 100}%`, 
                           background: item.isCurrent ? 'var(--color-success)' : 'var(--accent-color)' 
+                      }} />
+                   )}
+                   {item.pctFuture > 0 && (
+                      <div style={{ 
+                          flex: 1, 
+                          height: `${(item.pctFuture / Math.max(item.pctPast, item.pctFuture)) * 100}%`, 
+                          background: 'var(--color-warning)' 
                       }} />
                    )}
                 </div>

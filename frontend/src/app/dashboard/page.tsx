@@ -10,6 +10,7 @@ import AssetSearch from '@/components/dashboard/AssetSearch';
 import ActiveQuoteCard from '@/components/dashboard/ActiveQuoteCard';
 import WatchlistSidebar from '@/components/dashboard/WatchlistSidebar';
 import CreateAlertModal from '@/components/dashboard/CreateAlertModal';
+import IdeStatusBar from '@/components/ui/IdeStatusBar';
 
 function DashboardContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -520,6 +521,8 @@ function DashboardContent() {
         />
       )}
       </main>
+
+      <IdeStatusBar wsConnected={wsConnected} activePortfolioName={activeWL?.name || 'Favoritos'} />
     </div>
   );
 }

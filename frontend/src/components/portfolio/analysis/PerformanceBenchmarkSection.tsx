@@ -66,18 +66,18 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
     if (!active || !payload || payload.length === 0) return null;
     return (
       <div style={{
-        background: 'rgba(15, 23, 42, 0.95)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        padding: '0.85rem 1rem',
-        borderRadius: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
-        backdropFilter: 'blur(12px)',
+        background: 'var(--panel-bg)',
+        border: '1px solid var(--panel-border-strong)',
+        padding: '0.75rem 1rem',
+        borderRadius: 0,
+        boxShadow: 'none',
+        fontFamily: 'var(--font-mono)',
       }}>
-        <p style={{ margin: '0 0 0.4rem 0', fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>{label}</p>
+        <p style={{ margin: '0 0 0.4rem 0', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{label}</p>
         {payload.map((entry: any, i: number) => (
-          <p key={i} style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: entry.color, display: 'flex', justifyContent: 'space-between', gap: '1.5rem' }}>
+          <p key={i} style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: entry.color, display: 'flex', justifyContent: 'space-between', gap: '1.5rem', fontVariantNumeric: 'tabular-nums' }}>
             <span>{entry.name}:</span>
-            <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{entry.value.toFixed(2)}%</span>
+            <span style={{ fontWeight: 700 }}>{entry.value.toFixed(2)}%</span>
           </p>
         ))}
       </div>
@@ -100,15 +100,16 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
           <button
             onClick={() => setShowReal(!showReal)}
             style={{
-              background: showReal ? 'var(--accent-bg)' : 'var(--input-bg)',
-              border: `1px solid ${showReal ? 'rgba(var(--accent-rgb), 0.4)' : 'var(--panel-border)'}`,
-              borderRadius: '8px',
-              padding: '0.4rem 0.85rem',
+              background: showReal ? 'var(--accent-bg, rgba(255,107,0,0.15))' : 'var(--input-bg)',
+              border: `1px solid ${showReal ? 'var(--accent-color)' : 'var(--panel-border)'}`,
+              borderRadius: 0,
+              padding: '0.35rem 0.75rem',
               fontSize: '0.75rem',
               fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
               color: showReal ? 'var(--accent-color)' : 'var(--text-secondary)',
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
+              transition: 'all 0.15s ease',
             }}
           >
             {showReal ? '📊 Retorno Real (IPCA)' : '📊 Retorno Nominal'}
@@ -120,7 +121,7 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
         <>
           <ResponsiveContainer width="100%" height={340}>
             <LineChart data={chartData} margin={{ top: 10, right: 15, left: 5, bottom: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+              <CartesianGrid strokeDasharray="2 2" stroke={gridColor} vertical={false} />
               <XAxis
                 dataKey="label"
                 stroke={strokeColor}
@@ -139,38 +140,39 @@ export default function PerformanceBenchmarkSection({ performanceData }: Perform
               />
               <Tooltip content={<BenchmarkTooltip />} />
               <Legend
-                wrapperStyle={{ paddingTop: '16px', fontSize: '0.75rem' }}
-                iconType="circle"
+                wrapperStyle={{ paddingTop: '16px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}
+                iconType="square"
                 iconSize={8}
               />
-              <Line type="monotone" dataKey="portfolio" name="Carteira" stroke={BENCHMARK_COLORS.portfolio} strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-              <Line type="monotone" dataKey="cdi" name="CDI" stroke={BENCHMARK_COLORS.cdi} strokeWidth={1.5} dot={false} strokeDasharray="6 3" opacity={0.7} />
+              <Line type="monotone" dataKey="portfolio" name="Carteira" stroke={BENCHMARK_COLORS.portfolio} strokeWidth={2} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} />
+              <Line type="monotone" dataKey="cdi" name="CDI" stroke={BENCHMARK_COLORS.cdi} strokeWidth={1.2} dot={false} strokeDasharray="6 3" opacity={0.7} />
               {!showReal && (
-                <Line type="monotone" dataKey="ipca" name="IPCA+" stroke={BENCHMARK_COLORS.ipca} strokeWidth={1.5} dot={false} strokeDasharray="4 4" opacity={0.6} />
+                <Line type="monotone" dataKey="ipca" name="IPCA+" stroke={BENCHMARK_COLORS.ipca} strokeWidth={1.2} dot={false} strokeDasharray="4 4" opacity={0.6} />
               )}
-              <Line type="monotone" dataKey="ifix" name="IFIX" stroke={BENCHMARK_COLORS.ifix} strokeWidth={1.5} dot={false} strokeDasharray="8 4" opacity={0.6} />
-              <Line type="monotone" dataKey="ibov" name="Ibovespa" stroke={BENCHMARK_COLORS.ibov} strokeWidth={1.5} dot={false} strokeDasharray="5 5" opacity={0.6} />
-              <Line type="monotone" dataKey="sp500" name="S&P 500" stroke={BENCHMARK_COLORS.sp500} strokeWidth={1.5} dot={false} strokeDasharray="3 6" opacity={0.6} />
+              <Line type="monotone" dataKey="ifix" name="IFIX" stroke={BENCHMARK_COLORS.ifix} strokeWidth={1.2} dot={false} strokeDasharray="8 4" opacity={0.6} />
+              <Line type="monotone" dataKey="ibov" name="Ibovespa" stroke={BENCHMARK_COLORS.ibov} strokeWidth={1.2} dot={false} strokeDasharray="5 5" opacity={0.6} />
+              <Line type="monotone" dataKey="sp500" name="S&P 500" stroke={BENCHMARK_COLORS.sp500} strokeWidth={1.2} dot={false} strokeDasharray="3 6" opacity={0.6} />
             </LineChart>
           </ResponsiveContainer>
 
           <div style={{
             marginTop: '0.75rem',
             padding: '0.6rem 0.85rem',
-            background: 'rgba(0,242,254,0.04)',
-            borderRadius: '10px',
-            border: '1px solid rgba(0,242,254,0.1)',
+            background: 'var(--panel-bg)',
+            borderRadius: 0,
+            border: '1px solid var(--panel-border)',
             fontSize: '0.72rem',
+            fontFamily: 'var(--font-mono)',
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
           }}>
-            💡 <strong style={{ color: 'var(--text-primary)' }}>Nota:</strong> Os benchmarks utilizam dados históricos reais obtidos da B3 (IFIX e Ibovespa), Banco Central (CDI e IPCA) e S&P 500 (com câmbio ajustado para BRL se a moeda base da carteira for Real). {showReal && 'No modo Retorno Real, os valores são deflacionados pelo IPCA acumulado do período.'}
+            <strong style={{ color: 'var(--text-primary)' }}>[NOTA]</strong> Os benchmarks utilizam dados históricos reais obtidos da B3 (IFIX e Ibovespa), Banco Central (CDI e IPCA) e S&P 500 (com câmbio ajustado para BRL se a moeda base da carteira for Real). {showReal && 'No modo Retorno Real, os valores são deflacionados pelo IPCA acumulado do período.'}
           </div>
         </>
       ) : (
-        <div style={{ height: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--panel-border)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
+        <div style={{ height: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--panel-border)', borderRadius: 0, color: 'var(--text-secondary)' }}>
           <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📉</span>
-          <p style={{ fontSize: '0.85rem', margin: 0 }}>Dados de performance insuficientes para gerar a comparação.</p>
+          <p style={{ fontSize: '0.85rem', margin: 0, fontFamily: 'var(--font-mono)' }}>Dados de performance insuficientes para gerar a comparação.</p>
         </div>
       )}
     </AnalysisCard>

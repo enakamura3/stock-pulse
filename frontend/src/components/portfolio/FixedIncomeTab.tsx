@@ -85,26 +85,26 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
   }, [filteredPositions]);
 
   const kpis = [
-    { label: 'Total Aplicado', value: formatMoney(totalInvested, 'BRL'), icon: '💰' },
-    { label: 'Valor Bruto', value: formatMoney(totalGross, 'BRL'), icon: '📊' },
+    { label: 'Total Aplicado', value: formatMoney(totalInvested, 'BRL'), tag: 'INV' },
+    { label: 'Valor Bruto', value: formatMoney(totalGross, 'BRL'), tag: 'BRUTO' },
     {
       label: 'Valor Líquido',
       value: formatMoney(totalNet, 'BRL'),
-      icon: '💵',
+      tag: 'LIQ',
       sub: `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}% (${formatMoney(totalProfitLoss, 'BRL')})`,
       subColor: returnPct >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
     },
     {
       label: 'Impostos (IOF + IR)',
       value: formatMoney(totalTaxes, 'BRL'),
-      icon: '🏛️',
+      tag: 'IMP',
       sub: totalTaxes > 1e-6 ? 'IR e IOF provisionados' : 'Isento ou sem retenção',
       subColor: totalTaxes > 1e-6 ? 'var(--color-danger)' : 'var(--text-secondary)',
     },
     {
       label: 'Títulos Ativos',
       value: `${filteredPositions.length}`,
-      icon: '🏷️',
+      tag: 'QTD',
       sub: categoryFilter && categoryFilter !== 'Todas' ? categoryFilter : 'Todas as categorias',
       subColor: 'var(--text-secondary)',
     },
@@ -251,18 +251,17 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
   return (
     <div className="flex-col gap-xl" style={{ width: '100%' }}>
       {/* ── KPI Cards ── */}
-      <div className="flex-row gap-md flex-wrap" data-testid="fixed-income-kpi-cards">
+      <div className="ide-matrix" data-testid="fixed-income-kpi-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         {kpis.map((card, idx) => (
           <div
             key={idx}
-            className="card"
-            style={{ flex: '1 1 180px', minWidth: 160, padding: '1.25rem 1.5rem' }}
+            className="ide-cell"
           >
-            <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>{card.icon}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.value}</div>
+            <div className="font-mono text-accent text-xs font-bold" style={{ marginBottom: '0.35rem', letterSpacing: '0.05em' }}>[{card.tag}]</div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{card.label}</div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{card.value}</div>
             {card.sub && (
-              <div style={{ fontSize: '0.75rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600 }}>
+              <div style={{ fontSize: '0.72rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
                 {card.sub}
               </div>
             )}
@@ -273,12 +272,15 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
       <div className="card flex-col mb-lg" style={{ padding: '1.75rem 2rem', border: '1px solid var(--panel-border)' }}>
         <div className="flex-row justify-between items-center mb-md flex-wrap gap-md">
           <div>
-            <h4 className="m-0" style={{ fontSize: '1.1rem' }}>📈 Evolução da Renda Fixa</h4>
+            <h4 className="m-0 font-mono" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+              <span>Evolução da Renda Fixa</span>
+            </h4>
             <p className="text-xs text-secondary mt-xs">Curva de juros compostos acumulada</p>
           </div>
-          <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+          <div className="flex-row gap-sm" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.2rem', border: '1px solid var(--panel-border)' }}>
             {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+              <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
                 {p}
               </button>
             ))}
@@ -292,8 +294,8 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
         ) : performanceData.length > 0 ? (
           <PortfolioChart data={performanceData} />
         ) : (
-          <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
-            <span className="text-2xl mb-sm">🏛️</span>
+          <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)' }}>
+            <span className="font-mono text-muted mb-sm" style={{ opacity: 0.5 }}>[RENDA-FIXA]</span>
             <p className="text-sm m-0">Nenhum dado histórico de Renda Fixa no período selecionado.</p>
           </div>
         )}
@@ -301,7 +303,10 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
 
       <div className="card flex-col gap-md" style={{ flex: '2 1 600px', minHeight: '380px' }}>
         <div className="flex-row justify-between items-center mb-lg">
-          <h3 className="card-title">🏛️ Posições de Renda Fixa</h3>
+          <h3 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+            <span>Posições de Renda Fixa</span>
+          </h3>
           <div className="flex-row gap-sm">
             <label className="btn-secondary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', cursor: 'pointer' }}>
               📥 Importar CSV
@@ -401,7 +406,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
           </table>
         ) : (
           <div className="flex-col items-center justify-center text-secondary" style={{ height: '240px' }}>
-            <span className="text-2xl mb-sm">🏛️</span>
+            <span className="font-mono text-muted mb-sm" style={{ opacity: 0.5 }}>[RENDA-FIXA]</span>
             <p className="text-sm">
               {categoryFilter && categoryFilter !== 'Todas'
                 ? `Nenhuma aplicação de Renda Fixa encontrada para a categoria "${categoryFilter}".`
@@ -413,9 +418,12 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
       </div>
 
       {redeemTarget && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="modal-content card" style={{ width: '100%', maxWidth: '400px', padding: '1.5rem' }}>
-            <h3 className="card-title mb-md">💵 Resgatar Aplicação</h3>
+            <h3 className="card-title mb-md font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+              <span>Resgatar Aplicação</span>
+            </h3>
             <p className="text-sm text-secondary mb-md">
               Você está resgatando recursos de <strong>{redeemTarget.asset.institution} ({redeemTarget.asset.type})</strong>.
               O saldo líquido atual é de <span className="font-bold text-success">{formatMoney(redeemTarget.net_value, 'BRL')}</span>.

@@ -18,6 +18,7 @@ import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import TreasuryTab from '@/components/portfolio/TreasuryTab';
 import PortfolioAnalysis from '@/components/portfolio/PortfolioAnalysis';
 import Modals from '@/components/portfolio/Modals';
+import IdeStatusBar from '@/components/ui/IdeStatusBar';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
@@ -110,6 +111,42 @@ function PortfolioContent() {
       setActiveCategoryFilter('Todas');
     }
   }, [dynamicCategories, activeCategoryFilter, setActiveCategoryFilter]);
+
+  // Terminal hotkeys [1-7] for quick tab switching
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.getAttribute?.('contenteditable') === 'true' ||
+          target.closest?.('[contenteditable="true"]'))
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        return;
+      }
+      const tabMap: Record<string, string> = {
+        '1': 'ativos',
+        '2': 'renda-fixa',
+        '3': 'tesouro',
+        '4': 'operacoes',
+        '5': 'proventos',
+        '6': 'analise',
+        '7': 'diario',
+      };
+      if (tabMap[e.key]) {
+        setActiveTab(tabMap[e.key] as any);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setActiveTab]);
 
   const filteredPositions = React.useMemo(() => {
     if (activeTab !== 'ativos' || activeCategoryFilter === 'Todas') {
@@ -205,26 +242,26 @@ function PortfolioContent() {
   }, [filteredEqDividends]);
 
   const equityKpis = React.useMemo(() => [
-    { label: 'Total Investido', value: formatMoney(filteredEqCost, kpiCurrency), icon: '💰' },
-    { label: 'Patrimônio Atual', value: formatMoney(filteredEqValue, kpiCurrency), icon: '📊' },
+    { label: 'Total Investido', value: formatMoney(filteredEqCost, kpiCurrency), tag: 'INV' },
+    { label: 'Patrimônio Atual', value: formatMoney(filteredEqValue, kpiCurrency), tag: 'PAT' },
     {
       label: 'Lucro / Prejuízo',
       value: formatMoney(filteredEqProfitLoss, kpiCurrency),
-      icon: '💵',
+      tag: 'P&L',
       sub: `${filteredEqReturnPercent >= 0 ? '+' : ''}${filteredEqReturnPercent.toFixed(2)}% (${filteredEqProfitLoss >= 0 ? '+' : ''}${formatMoney(filteredEqProfitLoss, kpiCurrency)})`,
       subColor: filteredEqProfitLoss >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
     },
     {
       label: 'Proventos Recebidos',
       value: formatMoney(filteredEqDividendsTotal, kpiCurrency),
-      icon: '🪙',
+      tag: 'DIV',
       sub: 'Total acumulado',
       subColor: 'var(--accent-color)',
     },
     {
       label: 'Ativos em Carteira',
       value: `${filteredPositions.length}`,
-      icon: '🏷️',
+      tag: 'QTD',
       sub: activeCategoryFilter && activeCategoryFilter !== 'Todas' ? getCategoryLabel(activeCategoryFilter) : 'Todas as categorias',
       subColor: 'var(--text-secondary)',
     },
@@ -270,12 +307,11 @@ function PortfolioContent() {
             <PortfolioSummaryCards totalCost={totalCost} currentValue={currentValue} profitLoss={profitLoss} returnPercent={returnPercent} avgDividends12m={avgDividends12m} kpiCurrency={kpiCurrency} isLoadingTreasury={isLoadingTreasury} />
 
             {dynamicCategories.length > 1 && (
-              <div className="flex-row gap-sm flex-wrap" data-testid="contextual-filter-pills" aria-label="Filtro de categorias">
+              <div className="flex-row gap-xs flex-wrap" data-testid="contextual-filter-pills" aria-label="Filtro de categorias">
                 {dynamicCategories.map(cat => (
                   <button
                     key={cat} onClick={() => setActiveCategoryFilter(cat)}
-                    className={`badge ${activeCategoryFilter === cat ? 'font-bold' : 'font-semibold'}`}
-                    style={{ padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', border: activeCategoryFilter === cat ? '1px solid var(--accent-color)' : '1px solid var(--panel-border)', background: activeCategoryFilter === cat ? 'var(--accent-bg)' : 'var(--panel-bg)', color: activeCategoryFilter === cat ? 'var(--accent-color)' : 'var(--text-secondary)' }}
+                    className={`category-tag ${activeCategoryFilter === cat ? 'active' : ''}`}
                   >
                     {getCategoryLabel(cat)}
                   </button>
@@ -285,19 +321,18 @@ function PortfolioContent() {
 
           {activeTab === 'ativos' && (
             <div className="flex-col gap-xl w-full">
-              {/* ── KPI Cards ── */}
-              <div className="flex-row gap-md flex-wrap" data-testid="equity-kpi-cards">
+              {/* ── KPI Cards (IDE Matrix Grid) ── */}
+              <div className="ide-matrix" data-testid="equity-kpi-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                 {equityKpis.map((card, idx) => (
                   <div
                     key={idx}
-                    className="card"
-                    style={{ flex: '1 1 180px', minWidth: 160, padding: '1.25rem 1.5rem' }}
+                    className="ide-cell"
                   >
-                    <div style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>{card.icon}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{card.value}</div>
+                    <div className="font-mono text-accent text-xs font-bold" style={{ marginBottom: '0.35rem', letterSpacing: '0.05em' }}>[{card.tag}]</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{card.label}</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{card.value}</div>
                     {card.sub && (
-                      <div style={{ fontSize: '0.75rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.72rem', color: card.subColor, marginTop: '0.25rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
                         {card.sub}
                       </div>
                     )}
@@ -308,10 +343,13 @@ function PortfolioContent() {
               <div className="card flex-col" style={{ padding: '1.75rem 2rem', minHeight: '380px' }}>
                 <div className="flex-row justify-between items-center mb-lg flex-wrap gap-md">
                   <div>
-                    <h3 className="card-title">📈 Evolução da Renda Variável</h3>
+                    <h3 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+                      <span>Evolução da Renda Variável</span>
+                    </h3>
                     <p className="text-xs text-secondary mt-sm">Valores ponderados na moeda base ({kpiCurrency})</p>
                   </div>
-                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '2px', border: '1px solid var(--panel-border)' }}>
                     <select 
                       value={filterChartTicker} 
                       onChange={(e) => setFilterChartTicker(e.target.value)}
@@ -323,9 +361,9 @@ function PortfolioContent() {
                       ))}
                     </select>
                   </div>
-                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                  <div className="flex-row gap-sm" style={{ background: 'var(--input-bg)', padding: '0.2rem', borderRadius: '2px', border: '1px solid var(--panel-border)' }}>
                     {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
-                      <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '4px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
+                      <button key={p} onClick={() => setPeriod(p)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem', borderRadius: '2px', border: 'none', background: period === p ? 'var(--accent-gradient)' : 'transparent', color: period === p ? 'var(--accent-foreground)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 700 }}>
                         {p}
                       </button>
                     ))}
@@ -339,8 +377,8 @@ function PortfolioContent() {
                 ) : performanceData.length > 0 ? (
                   <PortfolioChart data={performanceData} />
                 ) : (
-                  <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)', borderRadius: '12px' }}>
-                    <span className="text-2xl mb-sm">💼</span>
+                  <div className="flex-col items-center justify-center w-full text-secondary" style={{ height: '300px', border: '1px dashed var(--panel-border)' }}>
+                    <span className="font-mono text-muted mb-sm" style={{ opacity: 0.5 }}>[RENTABILIDADE]</span>
                     <p className="text-sm m-0">Cadastre a sua primeira transação abaixo para começar a visualizar o histórico de rentabilidade.</p>
                   </div>
                 )}
@@ -414,6 +452,12 @@ function PortfolioContent() {
       {/* Renderizado sem prop drilling! Todos os modais consomem o PortfolioContext */}
       <Modals />
       </main>
+
+      <IdeStatusBar
+        wsConnected={true}
+        activePortfolioName={portfolios.find(p => p.id === activePortfolioId)?.name || 'Principal'}
+        currency={kpiCurrency}
+      />
     </div>
   );
 }

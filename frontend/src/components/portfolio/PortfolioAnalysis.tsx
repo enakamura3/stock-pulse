@@ -30,7 +30,7 @@ export default function PortfolioAnalysis({
   if (positions.length === 0 && fiPositions.length === 0 && treasuryPositions.length === 0) {
     return (
       <div className="text-center text-secondary" style={{ padding: '3rem' }}>
-        <span className="text-2xl" style={{ display: 'block', marginBottom: '0.5rem' }}>📊</span>
+        <span className="font-mono text-muted mb-sm" style={{ display: 'block', marginBottom: '0.5rem', opacity: 0.5 }}>[ANALISE]</span>
         <p>Adicione ativos à carteira para visualizar a análise completa.</p>
       </div>
     );

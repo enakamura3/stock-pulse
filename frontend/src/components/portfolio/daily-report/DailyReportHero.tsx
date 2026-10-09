@@ -57,17 +57,18 @@ export default function DailyReportHero({
       </div>
 
       <span
-        className="text-3xl sm:text-4xl font-extrabold mt-xs"
+        className="text-3xl sm:text-4xl font-mono font-bold mt-xs"
         style={{
           color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)',
           letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {isDailyPos ? '🟢 +' : '🔴 '}{formatMoney(totalDailyChange, kpiCurrency)}
+        {isDailyPos ? '▲ +' : '▼ '}{formatMoney(totalDailyChange, kpiCurrency)}
       </span>
       <span
-        className="text-lg font-bold"
-        style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)' }}
+        className="text-lg font-mono font-bold"
+        style={{ color: isDailyPos ? 'var(--color-success)' : 'var(--color-danger)', fontVariantNumeric: 'tabular-nums' }}
       >
         ({isDailyPos ? '+' : ''}{totalDailyPercent.toFixed(2)}%)
       </span>
@@ -76,7 +77,7 @@ export default function DailyReportHero({
         className="flex-row items-center gap-md mt-sm flex-wrap justify-center text-xs text-secondary"
         aria-live="polite"
       >
-        <span>🕐 Cotações em: <strong>{lastUpdateStr}</strong></span>
+        <span>{'//'} Cotações em: <strong>{lastUpdateStr}</strong></span>
         {onRefresh && (
           <div className="flex-row items-center gap-xs">
             <button
@@ -87,7 +88,6 @@ export default function DailyReportHero({
               style={{
                 padding: '0.25rem 0.65rem',
                 fontSize: '0.75rem',
-                borderRadius: '4px',
                 cursor: isRefreshing ? 'not-allowed' : 'pointer',
               }}
               title="Recarregar cotações e resumo do portfólio"
@@ -102,7 +102,6 @@ export default function DailyReportHero({
               style={{
                 padding: '0.25rem 0.5rem',
                 fontSize: '0.7rem',
-                borderRadius: '4px',
                 cursor: isRefreshing ? 'not-allowed' : 'pointer',
                 opacity: 0.85,
               }}
@@ -119,16 +118,15 @@ export default function DailyReportHero({
           style={{
             background: 'var(--card-bg)',
             padding: '4px 10px',
-            borderRadius: '6px',
             border: '1px solid var(--panel-border)',
           }}
         >
-          <span className="text-secondary">🏛️ Rendimento Diário Est. (Renda Fixa + Tesouro):</span>
+          <span className="text-secondary font-mono">[RF+TD] Rendimento Diário Est.:</span>
           <strong className="text-success">+{formatMoney(totalEstimatedFixedIncomeGain, kpiCurrency)}/dia</strong>
         </div>
       )}
       <span className="text-xs text-secondary mt-xs" style={{ opacity: 0.65, fontSize: '0.7rem' }}>
-        💡 Cotações de renda variável possuem cache do provedor (TTL 15 min).
+        {'//'} Cotações de renda variável possuem cache do provedor (TTL 15 min).
       </span>
     </div>
   );
