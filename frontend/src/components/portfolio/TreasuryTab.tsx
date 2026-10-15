@@ -7,6 +7,7 @@ const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ss
 
 import { TreasuryPosition, TreasuryPerfPoint } from './types';
 import { apiFetch } from '@/lib/api';
+import { getLocalDateString } from './helpers';
 import { NewTreasuryTx, SortKey, SortDir, fmt } from './treasury/types';
 import TreasuryPositionTable from './treasury/TreasuryPositionTable';
 
@@ -26,7 +27,7 @@ const EMPTY_TX: NewTreasuryTx = {
   quantity: '',
   unit_price: '',
   contracted_rate: '',
-  transaction_date: new Date().toISOString().split('T')[0],
+  transaction_date: getLocalDateString(),
 };
 
 export default function TreasuryTab({ portfolioId, positions, isLoadingPositions, onRefresh }: TreasuryTabProps) {
@@ -93,7 +94,7 @@ export default function TreasuryTab({ portfolioId, positions, isLoadingPositions
       quantity: pos.quantity,
       unit_price: pos.unit_price,
       contracted_rate: 0,
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: getLocalDateString(),
     });
     setError(null);
     setShowModal(true);

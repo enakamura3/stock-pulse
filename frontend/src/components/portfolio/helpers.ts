@@ -422,7 +422,7 @@ export function exportDailyReportCSV(
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     link.setAttribute('href', url);
     link.setAttribute('download', `${filenamePrefix}_${today}.csv`);
     document.body.appendChild(link);
@@ -434,6 +434,18 @@ export function exportDailyReportCSV(
   }
 
   return csvContent;
+}
+
+/**
+ * Retorna a data no formato 'YYYY-MM-DD' considerando o fuso horário local do usuário,
+ * evitando discrepâncias onde new Date().toISOString() avança para o dia seguinte
+ * durante a noite (ex: após as 21h no Brasil, UTC-3).
+ */
+export function getLocalDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 

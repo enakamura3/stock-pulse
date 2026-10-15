@@ -13,7 +13,7 @@ import {
   UnifiedTransaction,
   TreasuryPosition,
 } from '@/components/portfolio/types';
-import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatExchangeRateInput } from '@/components/portfolio/helpers';
+import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatExchangeRateInput, getLocalDateString } from '@/components/portfolio/helpers';
 
 interface PortfolioContextType {
   // Data
@@ -191,7 +191,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [txUnitPrice, setTxUnitPrice] = useState<string | number>('');
   const [txFee, setTxFee] = useState<string | number>('');
   const [txExchangeRate, setTxExchangeRate] = useState<string | number>(1.0);
-  const [txExecutedAt, setTxExecutedAt] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [txExecutedAt, setTxExecutedAt] = useState<string>(getLocalDateString());
   const [isAddingTx, setIsAddingTx] = useState(false);
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   
@@ -208,7 +208,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [fiIndexer, setFiIndexer] = useState('CDI');
   const [fiRate, setFiRate] = useState<string | number>('');
   const [fiAmount, setFiAmount] = useState<string | number>('');
-  const [fiApplicationDate, setFiApplicationDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [fiApplicationDate, setFiApplicationDate] = useState<string>(getLocalDateString());
   const [fiMaturityDate, setFiMaturityDate] = useState<string>('');
   const [fiTxType, setFiTxType] = useState<string>('SUBSCRIPTION');
   const [isAddingFI, setIsAddingFI] = useState(false);
@@ -557,7 +557,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       if (!txRes.ok) throw new Error("Erro ao criar transação");
       
       setShowFIModal(false);
-      setFiInstitution(''); setFiRate(''); setFiAmount(''); setFiMaturityDate(''); setFiApplicationDate(new Date().toISOString().split('T')[0]);
+      setFiInstitution(''); setFiRate(''); setFiAmount(''); setFiMaturityDate(''); setFiApplicationDate(getLocalDateString());
       
       await loadPortfolioDetails(activePortfolioId);
       await loadDividends(activePortfolioId);

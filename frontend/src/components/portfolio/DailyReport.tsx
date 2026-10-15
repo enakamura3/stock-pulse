@@ -86,7 +86,8 @@ export default function DailyReport({
     fiPositions,
     treasuryPositions,
     dividends,
-    kpiCurrency
+    kpiCurrency,
+    refDate
   );
 
   const hasNoData = positions.length === 0 && fiPositions.length === 0 && treasuryPositions.length === 0;

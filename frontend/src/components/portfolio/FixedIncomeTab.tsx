@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 import { FixedIncomePosition, PerformancePoint } from './types';
-import { formatMoney, formatPercentage } from './helpers';
+import { formatMoney, formatPercentage, getLocalDateString } from './helpers';
 import { apiFetch } from '@/lib/api';
 import { usePortfolioOptional } from '@/context/PortfolioContext';
 
@@ -23,7 +23,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
   // Estados para o modal de resgate
   const [redeemTarget, setRedeemTarget] = useState<FixedIncomePosition | null>(null);
   const [redeemAmount, setRedeemAmount] = useState<number | ''>('');
-  const [redeemDate, setRedeemDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [redeemDate, setRedeemDate] = useState<string>(getLocalDateString());
   const [isSubmittingRedeem, setIsSubmittingRedeem] = useState(false);
 
   type SortKey = 'institution' | 'rate' | 'start_date' | 'maturity_date' | 'total_invested' | 'gross_value' | 'net_value' | 'net_return_percent';
@@ -392,7 +392,7 @@ export default function FixedIncomeTab({ portfolioId, onLaunchOperation, categor
                         onClick={() => {
                           setRedeemTarget(pos);
                           setRedeemAmount(pos.net_value);
-                          setRedeemDate(new Date().toISOString().split('T')[0]);
+                          setRedeemDate(getLocalDateString());
                         }} 
                         style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid rgba(var(--danger-rgb), 0.3)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                       >
