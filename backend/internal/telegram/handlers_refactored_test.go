@@ -1042,6 +1042,7 @@ func TestHandlers_Agenda(t *testing.T) {
 			{Ticker: "BBAS3", AssetType: "AÇÕES", Type: "JCP", Currency: "BRL", PaymentDate: day2, Quantity: 0, PerShareAmount: 0, NetAmount: 30.0},
 			{Ticker: "HGLG11.SA", AssetType: "FII", Type: "RENDIMENTO", Currency: "", PaymentDate: day5, Quantity: 10.0, PerShareAmount: 1.10, NetAmount: 11.0},
 			{Ticker: "AAPL", AssetType: "STOCK", Type: "DIV", Currency: "USD", PaymentDate: day5, Quantity: 5.0, PerShareAmount: 0.25, NetAmount: 1.25},
+			{Ticker: "ITUB4", AssetType: "AÇÕES", Type: "DIVIDENDO", Currency: "BRL", PaymentDate: time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC), Quantity: 50.0, PerShareAmount: 0.20, NetAmount: 10.0},
 		}
 
 		// Callback with "message is not modified"
@@ -1060,6 +1061,7 @@ func TestHandlers_Agenda(t *testing.T) {
 				strings.Contains(msg, "BBAS3") &&
 				strings.Contains(msg, "HGLG11") &&
 				strings.Contains(msg, "AAPL") &&
+				strings.Contains(msg, "ITUB4") &&
 				strings.Contains(msg, "Total Previsto a Receber")
 		}), mock.Anything, mock.Anything).Return(errors.New("message is not modified")).Once()
 
