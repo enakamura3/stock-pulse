@@ -1,11 +1,48 @@
-# Docker Compose - Perfil de Produção com Isolamento do Docker Socket (HIGH-3 / Tarefa 14)
-# Em produção, o Promtail não deve ter acesso direto ao socket do Docker.
-# O tecnativa/docker-socket-proxy intercepta o daemon e expõe apenas endpoints de leitura de logs.
+# Docker Compose - Perfil de Produção (Isolamento de Portas, Caddy e Docker Socket Proxy)
 #
 # Uso:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: stock-pulse-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - stock-pulse-net
+    depends_on:
+      - backend
+      - frontend
+
+  # Em produção, remove o mapeamento de portas externas no host (apenas Caddy expõe 80/443)
+  backend:
+    ports: !reset []
+
+  frontend:
+    ports: !reset []
+
+  prometheus:
+    ports: !reset []
+
+  loki:
+    ports: !reset []
+
+  grafana:
+    ports: !reset []
+
+  db:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     container_name: stock-pulse-docker-proxy
@@ -25,3 +62,7 @@ services:
     depends_on:
       - loki
       - docker-socket-proxy
+
+volumes:
+  caddy-data:
+  caddy-config:
