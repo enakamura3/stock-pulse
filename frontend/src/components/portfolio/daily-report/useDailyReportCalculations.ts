@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Position, FixedIncomePosition, TreasuryPosition, CalculatedDividend } from '../types';
-import { calculateDailyFixedIncomeRate, calculateEstimatedDailyGain } from '../helpers';
+import { calculateDailyFixedIncomeRate, calculateEstimatedDailyGain, getLocalDateString } from '../helpers';
 import { SortKey, SortDir, EnrichedPosition, AssetTypeBadge, DailyReportCalculations } from './types';
 
 // Helper: calcula a taxa de câmbio de uma posição para a moeda base
@@ -33,13 +33,17 @@ export function useDailyReportCalculations(
   fiPositions: FixedIncomePosition[] = [],
   treasuryPositions: TreasuryPosition[] = [],
   dividends: CalculatedDividend[] = [],
-  kpiCurrency: string = 'BRL'
+  kpiCurrency: string = 'BRL',
+  refDate?: Date | null
 ): DailyReportCalculations {
   const [sortKey, setSortKey] = useState<SortKey>('impact');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // Proventos creditados hoje (T6)
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Proventos creditados hoje (calculados usando a data local para evitar fuso horário UTC avançar à noite)
+  const todayStr = useMemo(() => {
+    return getLocalDateString(refDate || new Date());
+  }, [refDate]);
+
   const todayDividends = useMemo(() => {
     return (dividends || []).filter(d => {
       if (!d.payment_date) return false;

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import DailyReport from '../DailyReport';
 import { Position, FixedIncomePosition, TreasuryPosition } from '../types';
+import { getLocalDateString } from '../helpers';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -583,7 +584,7 @@ describe('DailyReport Component', () => {
   });
 
   it('renders dividends received today section when dividends match today date', () => {
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = getLocalDateString();
     const mockDividends = [
       {
         asset_id: 'pos1',
@@ -638,6 +639,64 @@ describe('DailyReport Component', () => {
     );
 
     expect(screen.getByText(/Proventos Recebidos Hoje \(1\)/i)).toBeInTheDocument();
+  });
+
+  it('does not include tomorrow dividends in today dividends section even when called late at night', () => {
+    const today = new Date();
+    const todayStr = getLocalDateString(today);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = getLocalDateString(tomorrow);
+
+    const mockDividends = [
+      {
+        asset_id: 'pos_div_today',
+        ticker: 'DIVTODAY',
+        type: 'DIVIDENDO',
+        gross_amount: 100,
+        net_amount: 100,
+        currency: 'BRL',
+        quantity: 100,
+        per_share_amount: 1.0,
+        asset_type: 'STOCK_BR',
+        asset_name: 'Dividendo Hoje Corp',
+        payment_date: `${todayStr}T00:00:00Z`,
+        cum_date: '2026-08-01',
+      },
+      {
+        asset_id: 'pos_div_tomorrow',
+        ticker: 'TOMORROW3',
+        type: 'DIVIDENDO',
+        gross_amount: 50,
+        net_amount: 50,
+        currency: 'BRL',
+        quantity: 50,
+        per_share_amount: 1.0,
+        asset_type: 'STOCK_BR',
+        asset_name: 'Tomorrow Corp',
+        payment_date: `${tomorrowStr}T00:00:00Z`,
+        cum_date: '2026-08-01',
+      },
+    ];
+
+    render(
+      <DailyReport
+        positions={mockPositions}
+        dividends={mockDividends}
+        kpiCurrency="BRL"
+      />
+    );
+
+    // Deve exibir apenas DIVTODAY (hoje), nunca TOMORROW3 (amanhã)
+    expect(screen.getByText(/Proventos Recebidos Hoje \(1\)/i)).toBeInTheDocument();
+    expect(screen.getByText('DIVTODAY')).toBeInTheDocument();
+    expect(screen.queryByText('TOMORROW3')).not.toBeInTheDocument();
+  });
+
+  it('getLocalDateString correctly returns YYYY-MM-DD in local time and prevents UTC date leap at night', () => {
+    const d = new Date(2026, 9, 14, 23, 30, 0); // 14 de Outubro às 23:30 local
+    const str = getLocalDateString(d);
+    expect(str).toBe('2026-10-14');
   });
 
   it('renders negative returns for fixed income and treasury positions with danger styling', () => {
