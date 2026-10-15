@@ -354,8 +354,8 @@ func (h *Handlers) HandleAgenda(c telebot.Context) error {
 	}
 
 	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	limitDate := today.AddDate(0, 0, 30).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	todayStr := now.Format("2006-01-02")
+	limitDateStr := now.AddDate(0, 0, 30).Format("2006-01-02")
 
 	var upcoming []portfolio.CalculatedDividend
 	totals := make(map[string]float64)
@@ -364,7 +364,8 @@ func (h *Handlers) HandleAgenda(c telebot.Context) error {
 		if d.PaymentDate.IsZero() {
 			continue
 		}
-		if !d.PaymentDate.Before(today) && !d.PaymentDate.After(limitDate) {
+		pDateStr := d.PaymentDate.Format("2006-01-02")
+		if pDateStr >= todayStr && pDateStr <= limitDateStr {
 			upcoming = append(upcoming, d)
 			curr := d.Currency
 			if curr == "" {

@@ -245,8 +245,10 @@ func (w *DividendWorker) NotifyPaidDividends(ctx context.Context) {
 			if d.PaymentDate.IsZero() {
 				continue
 			}
-			payDate := d.PaymentDate.In(loc)
-			if payDate.Format("2006-01-02") != todayStr {
+			// PaymentDate é uma data de calendário (DATE no banco, escaneada como UTC meia-noite).
+			// Não aplicar .In(loc) pois converter UTC 00:00 para America/Sao_Paulo (UTC-3) subtrai 3 horas,
+			// mudando a data para o dia anterior (21:00) e causando o envio antecipado de notificações.
+			if d.PaymentDate.Format("2006-01-02") != todayStr {
 				continue
 			}
 

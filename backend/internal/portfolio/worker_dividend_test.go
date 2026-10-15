@@ -478,6 +478,66 @@ func TestDividendWorker_NotifyPaidDividends(t *testing.T) {
 		notifier.AssertExpectations(t)
 		dedup.AssertNotCalled(t, "MarkDividendNotified")
 	})
+
+	t.Run("PaymentDate in UTC midnight correctly matches today and skips tomorrow", func(t *testing.T) {
+		repo := new(MockPortfolioRepo)
+		ms := new(MockMarketService)
+		calc := new(MockDividendCalculator)
+		notifier := new(MockDividendNotifier)
+		dedup := new(MockDividendDeduplicator)
+		worker := NewDividendWorker(repo, ms).WithNotifier(calc, notifier, dedup)
+
+		linked := []LinkedPortfolio{
+			{PortfolioID: "p1", PortfolioName: "Carteira 1", UserID: "u1", UserName: "Eduardo", TelegramChatID: 123},
+		}
+		repo.On("GetTelegramLinkedPortfolios", mock.Anything).Return(linked, nil).Once()
+
+		loc, _ := time.LoadLocation("America/Sao_Paulo")
+		now := time.Now().In(loc)
+		// Simula formato exato de scan do banco de dados (DATE escaneado como UTC midnight)
+		todayUTC := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		tomorrowUTC := todayUTC.AddDate(0, 0, 1)
+
+		divs := []CalculatedDividend{
+			{
+				AssetID:        "a-today",
+				Ticker:         "TODAY3",
+				Type:           "DIVIDENDO",
+				Quantity:       100.0,
+				PerShareAmount: 1.0,
+				NetAmount:      100.0,
+				Currency:       "BRL",
+				PaymentDate:    todayUTC,
+			},
+			{
+				AssetID:        "a-tomorrow",
+				Ticker:         "TOMORROW3",
+				Type:           "DIVIDENDO",
+				Quantity:       100.0,
+				PerShareAmount: 1.0,
+				NetAmount:      100.0,
+				Currency:       "BRL",
+				PaymentDate:    tomorrowUTC,
+			},
+		}
+		calc.On("GetPortfolioDividends", mock.Anything, "p1", "u1").Return(divs, nil).Once()
+
+		todayStr := now.Format("2006-01-02")
+		dedupKey := "notified_dividend:u1:p1:a-today:DIVIDENDO:" + todayStr
+		dedup.On("IsDividendNotified", mock.Anything, dedupKey).Return(false, nil).Once()
+		dedup.On("MarkDividendNotified", mock.Anything, dedupKey, 48*time.Hour).Return(nil).Once()
+
+		// Apenas TODAY3 deve ser notificado. TOMORROW3 NUNCA deve ser notificado hoje com 1 dia de antecedência.
+		notifier.On("SendDividendPaymentAlert", int64(123), "Eduardo", "Carteira 1", mock.MatchedBy(func(items []DividendNotificationItem) bool {
+			return len(items) == 1 && items[0].Ticker == "TODAY3"
+		})).Return(nil).Once()
+
+		worker.NotifyPaidDividends(ctx)
+		repo.AssertExpectations(t)
+		calc.AssertExpectations(t)
+		notifier.AssertExpectations(t)
+		dedup.AssertExpectations(t)
+	})
 }
 
 func TestRedisDividendDeduplicator(t *testing.T) {

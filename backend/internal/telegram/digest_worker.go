@@ -218,16 +218,15 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 		var upcomingDividends []portfolio.CalculatedDividend
 		divs, err := w.portfolioSvc.GetPortfolioDividends(ctx, portfolioID, u.UserID.String())
 		if err == nil {
-			sevenDaysLater := now.AddDate(0, 0, 7)
+			sevenDaysLaterStr := now.AddDate(0, 0, 7).Format("2006-01-02")
 			for _, d := range divs {
 				if d.PaymentDate.IsZero() {
 					continue
 				}
-				pDate := d.PaymentDate.In(loc)
-				pDateStr := pDate.Format("2006-01-02")
+				pDateStr := d.PaymentDate.Format("2006-01-02")
 				if pDateStr == todayStr {
 					todayDividends = append(todayDividends, d)
-				} else if pDate.After(now) && !pDate.After(sevenDaysLater) {
+				} else if pDateStr > todayStr && pDateStr <= sevenDaysLaterStr {
 					upcomingDividends = append(upcomingDividends, d)
 				}
 			}

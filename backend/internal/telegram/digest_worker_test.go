@@ -595,4 +595,75 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 		_, err = rdb.Get(context.Background(), "daily_digest_sent:"+uID.String()+":"+targetTime.Format("2006-01-02")).Result()
 		assert.Equal(t, redis.Nil, err)
 	})
+
+	t.Run("dividends with UTC midnight are correctly categorized as today and upcoming", func(t *testing.T) {
+		repo := new(MockRepository)
+		svc := new(MockService)
+		pSvc := new(MockPortfolioService)
+		fiSvc := new(MockFixedIncomeSvc)
+		notifier := new(MockDigestNotifier)
+
+		uID := uuid.New()
+		pID := "port-utc"
+
+		repo.On("GetLinkedUsers", mock.Anything).Return([]TelegramUserLink{
+			{UserID: uID, TelegramChatID: 201, UserName: "Eduardo"},
+		}, nil)
+
+		svc.On("GetActivePortfolio", mock.Anything, int64(201)).Return(pID, nil)
+		pSvc.On("GetPortfolios", mock.Anything, uID.String()).Return([]portfolio.Portfolio{
+			{ID: pID, Name: "Principal", BaseCurrency: "BRL"},
+		}, nil)
+		pSvc.On("GetPortfolioDetails", mock.Anything, pID, uID.String()).Return(&portfolio.Portfolio{ID: pID, Name: "Principal", BaseCurrency: "BRL"}, []portfolio.Position{}, nil)
+		fiSvc.On("GetPortfolioPositions", mock.Anything, pID).Return([]fixedincome.Position{}, nil)
+
+		// targetTime = 2026-09-25 19:00:00 -03:00 (America/Sao_Paulo)
+		todayUTC := time.Date(2026, 9, 25, 0, 0, 0, 0, time.UTC)
+		tomorrowUTC := time.Date(2026, 9, 26, 0, 0, 0, 0, time.UTC)
+		inSevenDaysUTC := time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC)
+		inEightDaysUTC := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
+		yesterdayUTC := time.Date(2026, 9, 24, 0, 0, 0, 0, time.UTC)
+
+		divs := []portfolio.CalculatedDividend{
+			{Ticker: "TODAY", NetAmount: 50.0, PaymentDate: todayUTC},
+			{Ticker: "TOMORROW", NetAmount: 100.0, PaymentDate: tomorrowUTC},
+			{Ticker: "IN7DAYS", NetAmount: 120.0, PaymentDate: inSevenDaysUTC},
+			{Ticker: "IN8DAYS", NetAmount: 150.0, PaymentDate: inEightDaysUTC},
+			{Ticker: "YESTERDAY", NetAmount: 20.0, PaymentDate: yesterdayUTC},
+		}
+		pSvc.On("GetPortfolioDividends", mock.Anything, pID, uID.String()).Return(divs, nil)
+
+		notifier.On("SendDailyDigest",
+			int64(201),
+			"Eduardo",
+			"Principal",
+			"BRL",
+			mock.AnythingOfType("float64"),
+			mock.AnythingOfType("float64"),
+			mock.AnythingOfType("float64"),
+			mock.AnythingOfType("float64"),
+			mock.Anything,
+			mock.Anything,
+			mock.MatchedBy(func(tDivs []portfolio.CalculatedDividend) bool {
+				return len(tDivs) == 1 && tDivs[0].Ticker == "TODAY"
+			}),
+			mock.MatchedBy(func(uDivs []portfolio.CalculatedDividend) bool {
+				return len(uDivs) == 2 && uDivs[0].Ticker == "TOMORROW" && uDivs[1].Ticker == "IN7DAYS"
+			}),
+		).Return(nil)
+
+		w := &DailyDigestWorker{
+			repo:         repo,
+			svc:          svc,
+			portfolioSvc: pSvc,
+			fiSvc:        fiSvc,
+			notifier:     notifier,
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return targetTime },
+		}
+
+		w.ProcessDailyDigests(context.Background())
+		notifier.AssertExpectations(t)
+	})
 }
