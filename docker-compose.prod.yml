@@ -21,11 +21,21 @@ services:
       - backend
       - frontend
 
-  # Em produção, remove o mapeamento de portas externas no host (apenas Caddy expõe 80/443)
+  # Em produção, utiliza imagens multi-stage não-root sem montagem de código do host
   backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes: !reset []
+    environment:
+      - ENV=production
     ports: !reset []
 
   frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes: !reset []
     ports: !reset []
 
   prometheus:
