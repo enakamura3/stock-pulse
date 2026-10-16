@@ -1,4 +1,4 @@
-# Configuração do Caddy para Produção e Teste Local (Opção 2A)
+# Configuração do Caddy para Produção, Homelab e Teste Local
 
 # Domínio do Frontend (Produção)
 stock-pulse.com, www.stock-pulse.com {
@@ -13,11 +13,15 @@ stock-pulse.com, www.stock-pulse.com {
 		-Server
 	}
 
+	# Rotas da API e WebSockets
+	@api path /api/* /api
+	reverse_proxy @api backend:8080
+
 	# Proxy reverso direcionando para o container Next.js
 	reverse_proxy frontend:3000
 }
 
-# Domínio do Backend (Produção - API & WebSockets)
+# Domínio do Backend (Produção - API dedicada)
 api.stock-pulse.com {
 	# Habilita compressão de conteúdo
 	encode zstd gzip
@@ -38,10 +42,15 @@ api.stock-pulse.com {
 	reverse_proxy backend:8080
 }
 
-# Bloco de Desenvolvimento / Teste Local (Acesso HTTP)
-http://stock-pulse.localhost, http://localhost {
+# Bloco para Homelab e Desenvolvimento Local (Acesso HTTP na porta 80 por qualquer IP local ou localhost)
+:80, http://stock-pulse.localhost, http://localhost {
 	encode zstd gzip
 
+	# Bloqueia acesso externo ao endpoint de métricas do Prometheus (LOW-4)
+	@metrics path /metrics /metrics/*
+	respond @metrics "Not Found" 404
+
+	# Headers de Segurança (LOW-3)
 	header {
 		X-Frame-Options "DENY"
 		X-Content-Type-Options "nosniff"
@@ -49,6 +58,11 @@ http://stock-pulse.localhost, http://localhost {
 		-Server
 	}
 
+	# Rotas da API v1 e WebSockets encaminhadas para o backend Go
+	@api path /api/* /api
+	reverse_proxy @api backend:8080
+
+	# Demais rotas (telas Next.js, static files, login) encaminhadas para o frontend
 	reverse_proxy frontend:3000
 }
 
