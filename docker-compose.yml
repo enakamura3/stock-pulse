@@ -55,7 +55,7 @@ services:
     container_name: stock-pulse-backend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
     environment:
       - ENV=${ENV:-development}
       - DB_URL=${DB_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable}
@@ -88,7 +88,7 @@ services:
     container_name: stock-pulse-frontend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -143,7 +143,7 @@ services:
     container_name: stock-pulse-grafana
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3001:3000"
+      - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
