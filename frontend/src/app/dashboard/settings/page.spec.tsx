@@ -134,8 +134,12 @@ describe('SettingsPage', () => {
   });
 
   it('handles formatDate exception gracefully', async () => {
-    const toLocaleSpy = vi.spyOn(Date.prototype, 'toLocaleString').mockImplementationOnce(() => {
-      throw new Error('Locale error');
+    const originalToLocaleString = Date.prototype.toLocaleString;
+    const toLocaleSpy = vi.spyOn(Date.prototype, 'toLocaleString').mockImplementation(function (this: Date, ...args: any[]) {
+      if (args[0] === 'pt-BR') {
+        throw new Error('Locale error');
+      }
+      return originalToLocaleString.apply(this, args as any);
     });
 
     render(
@@ -256,8 +260,8 @@ describe('SettingsPage', () => {
     consoleError.mockRestore();
   });
 
-  it('handles admin key input, localStorage persistence, and reload with key', async () => {
-    localStorage.setItem('admin_api_key', 'initial-key');
+  it('handles admin key input in-memory (never persisted in localStorage) and reload with key', async () => {
+    localStorage.setItem('admin_api_key', 'stale-key-in-storage');
 
     render(
       <ThemeProvider>
@@ -266,11 +270,14 @@ describe('SettingsPage', () => {
     );
 
     const keyInput = screen.getByLabelText(/Chave de Administração/i) as HTMLInputElement;
-    expect(keyInput.value).toBe('initial-key');
+    // Initial value is empty in-memory state, NOT read from localStorage
+    expect(keyInput.value).toBe('');
 
     // Change key input
     fireEvent.change(keyInput, { target: { value: 'new-secret-key' } });
-    expect(localStorage.getItem('admin_api_key')).toBe('new-secret-key');
+    expect(keyInput.value).toBe('new-secret-key');
+    // Must NOT persist to localStorage (protects against XSS key harvesting)
+    expect(localStorage.getItem('admin_api_key')).toBe('stale-key-in-storage');
 
     // Click Conectar
     const connectBtn = screen.getByRole('button', { name: 'Conectar' });
@@ -298,6 +305,7 @@ describe('SettingsPage', () => {
       })
     );
   });
+
 
   it('handles triggering workers (success, server error, and network error)', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
