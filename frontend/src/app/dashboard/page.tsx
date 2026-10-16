@@ -142,7 +142,8 @@ function DashboardContent() {
     if (!user) return;
 
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `${wsProto}//localhost:8080/api/v1/ws`;
+    const defaultWsHost = typeof window !== 'undefined' && window.location.host ? `${window.location.host}/api/v1/ws` : 'localhost:8080/api/v1/ws';
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `${wsProto}//${defaultWsHost}`;
     
     let socket: WebSocket;
     let reconnectTimeout: NodeJS.Timeout;
