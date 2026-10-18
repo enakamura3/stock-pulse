@@ -41,6 +41,7 @@ type PortfolioRepository interface {
 	GetAssetAndCurrencyByTicker(ctx context.Context, ticker string) (string, string, error)
 	GetAssetMetadataByTicker(ctx context.Context, ticker string) (*AssetMetadata, error)
 	UpdateAssetType(ctx context.Context, assetID, assetType string) error
+	UpsertPortfolioAssetOverride(ctx context.Context, portfolioID, assetID, assetType string) error
 	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
 	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
 	UpsertAssetEvent(ctx context.Context, event AssetEvent) error
@@ -316,10 +317,10 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		assetID = meta.ID
 		currency = meta.Currency
 		if tx.AssetType != "" && tx.AssetType != meta.AssetType {
-			if err := s.repo.UpdateAssetType(ctx, meta.ID, tx.AssetType); err != nil {
-				slog.WarnContext(ctx, "falha ao atualizar tipo do ativo", slog.String("ticker", tx.Ticker), slog.Any("error", err))
+			if err := s.repo.UpsertPortfolioAssetOverride(ctx, tx.PortfolioID, meta.ID, tx.AssetType); err != nil {
+				slog.WarnContext(ctx, "falha ao atualizar override do tipo do ativo", slog.String("ticker", tx.Ticker), slog.Any("error", err))
 			} else {
-				slog.InfoContext(ctx, "tipo do ativo atualizado pelo usuário", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType))
+				slog.InfoContext(ctx, "override de tipo do ativo salvo para a carteira", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType), slog.String("portfolio_id", tx.PortfolioID))
 			}
 		}
 	}
@@ -513,10 +514,10 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 	currency := meta.Currency
 
 	if tx.AssetType != "" && tx.AssetType != meta.AssetType {
-		if err := s.repo.UpdateAssetType(ctx, meta.ID, tx.AssetType); err != nil {
-			slog.WarnContext(ctx, "falha ao atualizar tipo do ativo na edição", slog.String("ticker", tx.Ticker), slog.Any("error", err))
+		if err := s.repo.UpsertPortfolioAssetOverride(ctx, portfolioID, meta.ID, tx.AssetType); err != nil {
+			slog.WarnContext(ctx, "falha ao atualizar override do tipo do ativo na edição", slog.String("ticker", tx.Ticker), slog.Any("error", err))
 		} else {
-			slog.InfoContext(ctx, "tipo do ativo atualizado na edição de transação", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType))
+			slog.InfoContext(ctx, "override de tipo do ativo salvo na edição de transação", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType), slog.String("portfolio_id", portfolioID))
 		}
 	}
 

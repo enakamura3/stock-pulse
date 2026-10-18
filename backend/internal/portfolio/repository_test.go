@@ -699,6 +699,31 @@ func TestRepository_UpdateAssetType(t *testing.T) {
 	})
 }
 
+func TestRepository_UpsertPortfolioAssetOverride(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	t.Run("Success", func(t *testing.T) {
+		mock.ExpectExec(`INSERT INTO portfolio_asset_override`).
+			WithArgs("p1", "a1", "FII").
+			WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+		err := repo.UpsertPortfolioAssetOverride(context.Background(), "p1", "a1", "FII")
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		mock.ExpectExec(`INSERT INTO portfolio_asset_override`).
+			WithArgs("p1", "a1", "FII").
+			WillReturnError(errors.New("db error"))
+
+		err := repo.UpsertPortfolioAssetOverride(context.Background(), "p1", "a1", "FII")
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 func TestRepository_SetDefaultPortfolio_Branches(t *testing.T) {
 	t.Run("Portfolio Not Found or Query Error", func(t *testing.T) {
 		mock, repo := setupRepoTest(t)

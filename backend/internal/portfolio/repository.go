@@ -256,10 +256,11 @@ func (r *Repository) CreateTransaction(ctx context.Context, tx *Transaction) (*T
 func (r *Repository) GetTransactionsByPortfolioID(ctx context.Context, portfolioID, userID string) ([]Transaction, error) {
 	query := `
 		SELECT t.id, t.portfolio_id, t.asset_id, t.type, t.quantity, t.unit_price, t.total_cost, t.fee, t.exchange_rate, t.executed_at, t.created_at,
-		       a.ticker, a.name, a.asset_type, a.currency
+		       a.ticker, a.name, COALESCE(pao.asset_type, a.asset_type) AS asset_type, a.currency
 		FROM transaction t
 		INNER JOIN asset a ON t.asset_id = a.id
 		INNER JOIN portfolio p ON t.portfolio_id = p.id
+		LEFT JOIN portfolio_asset_override pao ON pao.portfolio_id = t.portfolio_id AND pao.asset_id = t.asset_id
 		WHERE t.portfolio_id = $1 AND p.user_id = $2
 		ORDER BY t.executed_at DESC, t.created_at DESC
 	`
@@ -446,6 +447,18 @@ func (r *Repository) GetAssetMetadataByTicker(ctx context.Context, ticker string
 func (r *Repository) UpdateAssetType(ctx context.Context, assetID, assetType string) error {
 	query := `UPDATE asset SET asset_type = $1, updated_at = NOW() WHERE id = $2`
 	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, assetType, assetID)
+	return err
+}
+
+// UpsertPortfolioAssetOverride define ou atualiza a categoria personalizada de um ativo para uma carteira específica.
+func (r *Repository) UpsertPortfolioAssetOverride(ctx context.Context, portfolioID, assetID, assetType string) error {
+	query := `
+		INSERT INTO portfolio_asset_override (portfolio_id, asset_id, asset_type, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (portfolio_id, asset_id)
+		DO UPDATE SET asset_type = EXCLUDED.asset_type, updated_at = NOW()
+	`
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, portfolioID, assetID, assetType)
 	return err
 }
 

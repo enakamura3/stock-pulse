@@ -121,6 +121,11 @@ func (m *MockPortfolioRepo) UpdateAssetType(ctx context.Context, assetID, assetT
 	return args.Error(0)
 }
 
+func (m *MockPortfolioRepo) UpsertPortfolioAssetOverride(ctx context.Context, portfolioID, assetID, assetType string) error {
+	args := m.Called(ctx, portfolioID, assetID, assetType)
+	return args.Error(0)
+}
+
 func (m *MockPortfolioRepo) CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error) {
 	args := m.Called(ctx, ticker, name, assetType, currency)
 	return args.String(0), args.Error(1)
@@ -465,7 +470,7 @@ func TestService_AddTransaction(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(nil)
+		repo.On("UpsertPortfolioAssetOverride", mock.Anything, "p1", "a1", "STOCK_BR").Return(nil)
 
 		tx := &Transaction{PortfolioID: "p1", Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35}
 		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
@@ -482,7 +487,7 @@ func TestService_AddTransaction(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(errors.New("db error"))
+		repo.On("UpsertPortfolioAssetOverride", mock.Anything, "p1", "a1", "STOCK_BR").Return(errors.New("db error"))
 
 		tx := &Transaction{PortfolioID: "p1", Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35}
 		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
@@ -493,6 +498,24 @@ func TestService_AddTransaction(t *testing.T) {
 		res, err := s.AddTransaction(context.Background(), "u1", tx)
 		assert.NoError(t, err)
 		assert.Equal(t, "tx1", res.ID)
+	})
+
+	t.Run("Tenant Isolation - User A overrides asset_type to FII does not mutate global asset or affect User B", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "uA").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4.SA").Return(&AssetMetadata{ID: "asset-petr", Currency: "BRL", AssetType: "STOCK_BR"}, nil)
+		repo.On("UpsertPortfolioAssetOverride", mock.Anything, "p1", "asset-petr", "FII").Return(nil)
+
+		txA := &Transaction{PortfolioID: "p1", Ticker: "PETR4.SA", AssetType: "FII", Quantity: 100, UnitPrice: 38}
+		repo.On("CreateTransaction", mock.Anything, txA).Return(&Transaction{ID: "tx-A"}, nil)
+		repo.On("GetDailyPrices", mock.Anything, "asset-petr", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
+		repo.On("GetOldestPriceDate", mock.Anything, "asset-petr").Return(time.Time{}, nil)
+
+		resA, err := s.AddTransaction(context.Background(), "uA", txA)
+		assert.NoError(t, err)
+		assert.Equal(t, "tx-A", resA.ID)
+
+		repo.AssertNotCalled(t, "UpdateAssetType", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Asset Lookup DB Error", func(t *testing.T) {
@@ -781,7 +804,7 @@ func TestService_UpdateTransaction(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(nil)
+		repo.On("UpsertPortfolioAssetOverride", mock.Anything, "p1", "a1", "STOCK_BR").Return(nil)
 		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
 		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err"))
 
@@ -793,7 +816,7 @@ func TestService_UpdateTransaction(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(errors.New("db fail"))
+		repo.On("UpsertPortfolioAssetOverride", mock.Anything, "p1", "a1", "STOCK_BR").Return(errors.New("db fail"))
 		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
 		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err"))
 
