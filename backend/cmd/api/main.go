@@ -149,7 +149,7 @@ func main() {
 	alertHandler := alert.NewHandler(alertService)
 
 	historyService := history.NewService(portfolioService, fiService)
-	historyHandler := history.NewHandler(historyService)
+	historyHandler := history.NewHandler(historyService, fiRepo)
 
 	// Telegram Bot
 	telegramRepo := telegram.NewRepository(dbPool)

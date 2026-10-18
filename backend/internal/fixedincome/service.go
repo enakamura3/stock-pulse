@@ -444,6 +444,10 @@ func (s *service) GetAssetsByPortfolio(ctx context.Context, portfolioID string) 
 }
 
 func (s *service) GetUnifiedTransactions(ctx context.Context, portfolioID, userID string) ([]history.UnifiedTransaction, error) {
+	if err := s.repo.ValidatePortfolioOwnership(ctx, portfolioID, userID); err != nil {
+		return nil, err
+	}
+
 	// Need to fetch transactions AND their assets to get the asset name.
 	txs, err := s.repo.GetTransactionsByPortfolio(ctx, portfolioID)
 	if err != nil {
