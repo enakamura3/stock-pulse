@@ -38,12 +38,19 @@ func (m *MockRepository) GetTreasuryTransactionsList(ctx context.Context, portfo
 	return args.Get(0).([]TreasuryTxRequest), args.Error(1)
 }
 
+func (m *MockRepository) ValidatePortfolioOwnership(ctx context.Context, portfolioID, userID string) error {
+	args := m.Called(ctx, portfolioID, userID)
+	return args.Error(0)
+}
+
 func TestGetUnifiedTransactions_IncludesTreasury(t *testing.T) {
 	mockRepo := &MockRepository{}
 	svc := NewService(mockRepo, nil)
 
 	portfolioID := "test-portfolio-123"
 	ctx := context.Background()
+
+	mockRepo.On("ValidatePortfolioOwnership", ctx, portfolioID, "user-123").Return(nil)
 
 	// 1. Mock standard fixed income transactions & assets
 	maturityDate := time.Date(2028, 12, 31, 0, 0, 0, 0, time.UTC)
@@ -178,6 +185,7 @@ func TestGetUnifiedTransactions_Hibrido_OrMissingAsset(t *testing.T) {
 		},
 	}, nil)
 
+	mockRepo.On("ValidatePortfolioOwnership", ctx, portfolioID, "user-123").Return(nil)
 	mockRepo.On("GetTreasuryTransactionsList", ctx, portfolioID).Return([]TreasuryTxRequest{}, nil)
 
 	unified, err := svc.GetUnifiedTransactions(ctx, portfolioID, "user-123")
@@ -193,9 +201,19 @@ func TestGetUnifiedTransactions_Errors(t *testing.T) {
 	ctx := context.Background()
 	portfolioID := "test-portfolio-errors"
 
+	t.Run("ValidatePortfolioOwnership error", func(t *testing.T) {
+		mockRepo := &MockRepository{}
+		svc := NewService(mockRepo, nil)
+		mockRepo.On("ValidatePortfolioOwnership", ctx, portfolioID, "user-123").Return(assert.AnError)
+
+		_, err := svc.GetUnifiedTransactions(ctx, portfolioID, "user-123")
+		assert.Error(t, err)
+	})
+
 	t.Run("GetTransactionsByPortfolio error", func(t *testing.T) {
 		mockRepo := &MockRepository{}
 		svc := NewService(mockRepo, nil)
+		mockRepo.On("ValidatePortfolioOwnership", ctx, portfolioID, "user-123").Return(nil)
 		mockRepo.On("GetTransactionsByPortfolio", ctx, portfolioID).Return([]Transaction(nil), assert.AnError)
 
 		_, err := svc.GetUnifiedTransactions(ctx, portfolioID, "user-123")
@@ -205,6 +223,7 @@ func TestGetUnifiedTransactions_Errors(t *testing.T) {
 	t.Run("GetAssetsByPortfolio error", func(t *testing.T) {
 		mockRepo := &MockRepository{}
 		svc := NewService(mockRepo, nil)
+		mockRepo.On("ValidatePortfolioOwnership", ctx, portfolioID, "user-123").Return(nil)
 		mockRepo.On("GetTransactionsByPortfolio", ctx, portfolioID).Return([]Transaction{}, nil)
 		mockRepo.On("GetAssetsByPortfolio", ctx, portfolioID).Return([]Asset(nil), assert.AnError)
 
@@ -215,6 +234,7 @@ func TestGetUnifiedTransactions_Errors(t *testing.T) {
 	t.Run("GetTreasuryTransactionsList error", func(t *testing.T) {
 		mockRepo := &MockRepository{}
 		svc := NewService(mockRepo, nil)
+		mockRepo.On("ValidatePortfolioOwnership", ctx, portfolioID, "user-123").Return(nil)
 		mockRepo.On("GetTransactionsByPortfolio", ctx, portfolioID).Return([]Transaction{}, nil)
 		mockRepo.On("GetAssetsByPortfolio", ctx, portfolioID).Return([]Asset{}, nil)
 		mockRepo.On("GetTreasuryTransactionsList", ctx, portfolioID).Return([]TreasuryTxRequest(nil), assert.AnError)
@@ -231,6 +251,7 @@ func TestGetUnifiedTransactions_InvalidDates(t *testing.T) {
 	portfolioID := "test-portfolio-invalid-dates"
 	ctx := context.Background()
 
+	mockRepo.On("ValidatePortfolioOwnership", ctx, portfolioID, "user-123").Return(nil)
 	mockRepo.On("GetTransactionsByPortfolio", ctx, portfolioID).Return([]Transaction{}, nil)
 	mockRepo.On("GetAssetsByPortfolio", ctx, portfolioID).Return([]Asset{}, nil)
 
