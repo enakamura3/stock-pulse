@@ -43,6 +43,7 @@ type PortfolioRepository interface {
 	UpdateAssetType(ctx context.Context, assetID, assetType string) error
 	CreateAsset(ctx context.Context, ticker, name, assetType, currency string) (string, error)
 	GetAllAssets(ctx context.Context) ([]AssetCompact, error)
+	GetAllAssetsMetadata(ctx context.Context) ([]AssetMetadata, error)
 	UpsertAssetEvent(ctx context.Context, event AssetEvent) error
 	GetAssetEvents(ctx context.Context, assetID string) ([]AssetEvent, error)
 	GetAssetEventsByDate(ctx context.Context, assetID string, exDate time.Time) ([]AssetEvent, error)
@@ -302,10 +303,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 			return nil, fmt.Errorf("ativo '%s' não encontrado no mercado: %w", tx.Ticker, err)
 		}
 
-		assetType := tx.AssetType
-		if assetType == "" {
-			assetType = determineAssetType(tx.Ticker, quote.Name, quote.Currency)
-		}
+		assetType := determineAssetType(tx.Ticker, quote.Name, quote.Currency)
 
 		assetID, err = s.repo.CreateAsset(ctx, tx.Ticker, quote.Name, assetType, quote.Currency)
 		if err != nil {
@@ -315,13 +313,6 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	} else {
 		assetID = meta.ID
 		currency = meta.Currency
-		if tx.AssetType != "" && tx.AssetType != meta.AssetType {
-			if err := s.repo.UpdateAssetType(ctx, meta.ID, tx.AssetType); err != nil {
-				slog.WarnContext(ctx, "falha ao atualizar tipo do ativo", slog.String("ticker", tx.Ticker), slog.Any("error", err))
-			} else {
-				slog.InfoContext(ctx, "tipo do ativo atualizado pelo usuário", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType))
-			}
-		}
 	}
 
 	tx.AssetID = assetID
@@ -512,14 +503,6 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 	tx.AssetID = meta.ID
 	currency := meta.Currency
 
-	if tx.AssetType != "" && tx.AssetType != meta.AssetType {
-		if err := s.repo.UpdateAssetType(ctx, meta.ID, tx.AssetType); err != nil {
-			slog.WarnContext(ctx, "falha ao atualizar tipo do ativo na edição", slog.String("ticker", tx.Ticker), slog.Any("error", err))
-		} else {
-			slog.InfoContext(ctx, "tipo do ativo atualizado na edição de transação", slog.String("ticker", tx.Ticker), slog.String("old_type", meta.AssetType), slog.String("new_type", tx.AssetType))
-		}
-	}
-
 	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
 	tx.ExchangeRate = s.resolveTransactionExchangeRate(ctx, currency, p.BaseCurrency, tx.ExecutedAt, tx.ExchangeRate)
 
@@ -652,3 +635,14 @@ func (s *Service) GetAssetMetadata(ctx context.Context, ticker string) (*AssetMe
 	}
 	return s.repo.GetAssetMetadataByTicker(ctx, ticker)
 }
+
+// ListAssetsAdmin lista todos os ativos ativos cadastrados no catálogo global (uso administrativo).
+func (s *Service) ListAssetsAdmin(ctx context.Context) ([]AssetMetadata, error) {
+	return s.repo.GetAllAssetsMetadata(ctx)
+}
+
+// UpdateAssetTypeAdmin atualiza a categoria global de um ativo pelo ID (uso administrativo).
+func (s *Service) UpdateAssetTypeAdmin(ctx context.Context, assetID, assetType string) error {
+	return s.repo.UpdateAssetType(ctx, assetID, assetType)
+}
+

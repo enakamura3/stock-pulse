@@ -30,6 +30,8 @@ type PortfolioService interface {
 	GetPortfolioPerformance(ctx context.Context, portfolioID, userID, period string, filterTickers []string) ([]PerformancePoint, error)
 	GetPortfolioDividends(ctx context.Context, portfolioID, userID string) ([]CalculatedDividend, error)
 	GetAssetMetadata(ctx context.Context, ticker string) (*AssetMetadata, error)
+	ListAssetsAdmin(ctx context.Context) ([]AssetMetadata, error)
+	UpdateAssetTypeAdmin(ctx context.Context, assetID, assetType string) error
 
 	// Utilizado especificamente pelo Handler para recuperar transações puras
 	GetPortfolioTransactions(ctx context.Context, portfolioID, userID string) ([]Transaction, error)
@@ -526,3 +528,57 @@ func (h *Handler) GetDividends(w http.ResponseWriter, r *http.Request) {
 
 	httputils.RespondWithJSON(w, http.StatusOK, divs)
 }
+
+type updateAssetTypePayload struct {
+	AssetType string `json:"asset_type"`
+}
+
+// ListAssetsAdmin lista todos os ativos cadastrados no catálogo global para administração.
+func (h *Handler) ListAssetsAdmin(w http.ResponseWriter, r *http.Request) {
+	assets, err := h.service.ListAssetsAdmin(ctxOrDefault(r))
+	if err != nil {
+		slog.Error("falha ao listar ativos no catálogo admin", "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao listar ativos")
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, assets)
+}
+
+// UpdateAssetTypeAdmin altera a categoria de um ativo do catálogo global (requer chave admin).
+func (h *Handler) UpdateAssetTypeAdmin(w http.ResponseWriter, r *http.Request) {
+	assetID := strings.TrimSpace(chi.URLParam(r, "id"))
+	if assetID == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID do ativo é obrigatório")
+		return
+	}
+
+	var payload updateAssetTypePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Corpo da requisição excede o limite máximo permitido (1MB)")
+			return
+		}
+		httputils.RespondWithError(w, http.StatusBadRequest, "Payload inválido")
+		return
+	}
+
+	assetType := strings.ToUpper(strings.TrimSpace(payload.AssetType))
+	if !validAssetTypes[assetType] {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de ativo inválido")
+		return
+	}
+
+	if err := h.service.UpdateAssetTypeAdmin(ctxOrDefault(r), assetID, assetType); err != nil {
+		slog.Error("falha ao atualizar categoria do ativo via admin", "asset_id", assetID, "asset_type", assetType, "error", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao atualizar categoria do ativo")
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{
+		"message":    "Categoria do ativo atualizada com sucesso",
+		"asset_id":   assetID,
+		"asset_type": assetType,
+	})
+}
+

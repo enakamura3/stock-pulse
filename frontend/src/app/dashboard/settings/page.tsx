@@ -6,11 +6,20 @@ import AppSidebar from '@/components/AppSidebar';
 import { apiFetch } from '@/lib/api';
 import { SettingsIcon } from '@/components/ui/icons';
 import IdeStatusBar from '@/components/ui/IdeStatusBar';
+import { ASSET_TYPE_OPTIONS } from '@/components/portfolio/helpers';
 
 interface TelegramStatus {
   linked: boolean;
   chat_id: number;
   bot_username: string;
+}
+
+interface AdminAssetInfo {
+  id: string;
+  ticker: string;
+  name: string;
+  asset_type: string;
+  currency: string;
 }
 
 export default function SettingsPage() {
@@ -51,6 +60,14 @@ export default function SettingsPage() {
   const [triggeringWorker, setTriggeringWorker] = useState<string | null>(null);
   const [workerSuccess, setWorkerSuccess] = useState<string | null>(null);
   const [adminKey, setAdminKey] = useState<string>('');
+
+  // Estados do Catálogo de Ativos (Admin)
+  const [adminAssets, setAdminAssets] = useState<AdminAssetInfo[]>([]);
+  const [isLoadingAssets, setIsLoadingAssets] = useState(true);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [assetsSuccess, setAssetsSuccess] = useState<string | null>(null);
+  const [savingAssetId, setSavingAssetId] = useState<string | null>(null);
+  const [assetSearchFilter, setAssetSearchFilter] = useState('');
 
   const getAdminHeaders = (keyToUse?: string) => {
     const key = keyToUse !== undefined ? keyToUse : adminKey;
@@ -114,6 +131,62 @@ export default function SettingsPage() {
     }
   };
 
+  const loadAdminAssets = async (keyToUse?: string) => {
+    setIsLoadingAssets(true);
+    setAssetsError(null);
+    try {
+      const headers = getAdminHeaders(keyToUse);
+      const res = await apiFetch(`/admin/assets`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setAdminAssets(data);
+        } else {
+          setAdminAssets([]);
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAssetsError(data.error || data.message || 'Não foi possível carregar o catálogo de ativos.');
+      }
+    } catch (err) {
+      console.error(err);
+      setAssetsError('Erro de conexão ao carregar catálogo de ativos.');
+    } finally {
+      setIsLoadingAssets(false);
+    }
+  };
+
+  const handleUpdateAssetType = async (assetId: string, ticker: string, newType: string) => {
+    setSavingAssetId(assetId);
+    setAssetsError(null);
+    setAssetsSuccess(null);
+    try {
+      const headers = {
+        ...getAdminHeaders(),
+        'Content-Type': 'application/json',
+      };
+      const res = await apiFetch(`/admin/assets/${assetId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ asset_type: newType }),
+      });
+      if (res.ok) {
+        setAdminAssets((prev) =>
+          prev.map((a) => (a.id === assetId ? { ...a, asset_type: newType } : a))
+        );
+        setAssetsSuccess(`Categoria de "${ticker}" atualizada para ${newType}!`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAssetsError(data.error || data.message || `Não foi possível atualizar o ativo "${ticker}".`);
+      }
+    } catch (err) {
+      console.error(err);
+      setAssetsError(`Erro de rede ao atualizar o ativo "${ticker}".`);
+    } finally {
+      setSavingAssetId(null);
+    }
+  };
+
   const handleTriggerWorker = async (name: string) => {
     setTriggeringWorker(name);
     setWorkerSuccess(null);
@@ -159,6 +232,7 @@ export default function SettingsPage() {
   useEffect(() => {
     loadTelegramStatus();
     loadWorkers();
+    loadAdminAssets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -583,7 +657,10 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       className="btn-secondary font-mono"
-                      onClick={() => loadWorkers(adminKey)}
+                      onClick={() => {
+                        loadWorkers(adminKey);
+                        loadAdminAssets(adminKey);
+                      }}
                       style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
                     >
                       Conectar
@@ -676,7 +753,113 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Seção 5: Zona de Perigo */}
+          {/* Seção 5: Catálogo Global de Ativos (Admin) */}
+          <section className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>
+            <div className="terminal-bar">
+              <div className="flex-row items-center gap-xs font-mono">
+                <span className="text-accent" style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>▸</span>
+                <span style={{ color: 'var(--text-secondary)' }}>settings/assets.catalog</span>
+              </div>
+              <span className="badge badge-neutral font-mono" style={{ fontSize: '0.65rem' }}>
+                [ {adminAssets.length} ATIVOS ]
+              </span>
+            </div>
+            <div style={{ padding: '1.25rem' }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 1rem 0', margin: 0, borderBottom: '1px solid var(--panel-border)', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <h2 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', margin: 0 }}>
+                  <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+                  <span>🗂️ Catálogo de Ativos (Admin)</span>
+                </h2>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Filtrar por ticker ou nome..."
+                    value={assetSearchFilter}
+                    onChange={(e) => setAssetSearchFilter(e.target.value)}
+                    className="form-input font-mono"
+                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', width: '220px' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary font-mono"
+                    onClick={() => loadAdminAssets()}
+                    disabled={isLoadingAssets}
+                    style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    {isLoadingAssets ? 'Carregando...' : '🔄 Recarregar Catálogo'}
+                  </button>
+                </div>
+              </div>
+
+              {assetsError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{assetsError}</div>}
+              {assetsSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.9rem', padding: '0.5rem 0', fontWeight: 600, marginBottom: '1rem', fontFamily: 'var(--font-mono)' }}>{assetsSuccess}</div>}
+
+              {isLoadingAssets && adminAssets.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                  <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)' }}></span>
+                  <span style={{ marginLeft: '10px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>Carregando catálogo de ativos...</span>
+                </div>
+              ) : (
+                <div className="table-container" style={{ WebkitOverflowScrolling: 'touch', border: '1px solid var(--panel-border)', borderRadius: '2px', maxHeight: '420px', overflowY: 'auto' }}>
+                  <table className="data-table" style={{ tableLayout: 'auto' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '32px', textAlign: 'center', padding: '0.75rem 0.4rem' }}>#</th>
+                        <th style={{ padding: '0.75rem 0.5rem' }}>Ticker</th>
+                        <th style={{ padding: '0.75rem 0.5rem' }}>Nome</th>
+                        <th style={{ padding: '0.75rem 0.5rem' }}>Moeda</th>
+                        <th style={{ padding: '0.75rem 0.5rem' }}>Categoria Oficial</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminAssets
+                        .filter((a) => {
+                          const q = assetSearchFilter.trim().toLowerCase();
+                          return !q || a.ticker.toLowerCase().includes(q) || a.name.toLowerCase().includes(q);
+                        })
+                        .map((asset, idx) => (
+                          <tr key={asset.id}>
+                            <td className="table-line-num">{String(idx + 1).padStart(2, '0')}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{asset.ticker}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{asset.name}</td>
+                            <td style={{ padding: '0.75rem 0.5rem' }}>
+                              <span className="badge badge-neutral font-mono" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
+                                {asset.currency}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 0.5rem' }}>
+                              <select
+                                aria-label={`Categoria ${asset.ticker}`}
+                                className="form-input font-mono"
+                                value={asset.asset_type}
+                                disabled={savingAssetId === asset.id}
+                                onChange={(e) => handleUpdateAssetType(asset.id, asset.ticker, e.target.value)}
+                                style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem', minWidth: '180px' }}
+                              >
+                                {ASSET_TYPE_OPTIONS.map((opt) => (
+                                  <option key={opt.value} value={opt.value} style={{ background: '#1c1f24' }}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      {adminAssets.length === 0 && (
+                        <tr>
+                          <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem', fontFamily: 'var(--font-mono)' }}>
+                            Nenhum ativo encontrado no catálogo.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Seção 6: Zona de Perigo */}
           <section className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden', borderColor: 'rgba(var(--danger-rgb), 0.3)', background: 'var(--color-danger-bg)' }}>
             <div className="terminal-bar" style={{ background: 'rgba(var(--danger-rgb), 0.08)', borderBottomColor: 'rgba(var(--danger-rgb), 0.2)' }}>
               <div className="flex-row items-center gap-xs font-mono">

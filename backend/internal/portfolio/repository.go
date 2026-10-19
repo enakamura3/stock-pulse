@@ -491,6 +491,26 @@ func (r *Repository) GetAllAssets(ctx context.Context) ([]AssetCompact, error) {
 	return list, nil
 }
 
+// GetAllAssetsMetadata retorna todos os ativos cadastrados com seus metadados completos, ordenados por ticker.
+func (r *Repository) GetAllAssetsMetadata(ctx context.Context) ([]AssetMetadata, error) {
+	query := `SELECT id, ticker, name, asset_type, currency FROM asset WHERE is_active = true ORDER BY ticker ASC`
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := []AssetMetadata{}
+	for rows.Next() {
+		var a AssetMetadata
+		if err := rows.Scan(&a.ID, &a.Ticker, &a.Name, &a.AssetType, &a.Currency); err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, nil
+}
+
 func (r *Repository) UpdateTransaction(ctx context.Context, tx Transaction) error {
 	query := `
 		UPDATE transaction

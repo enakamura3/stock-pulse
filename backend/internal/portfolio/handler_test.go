@@ -102,6 +102,18 @@ func (m *MockPortfolioService) GetAssetMetadata(ctx context.Context, ticker stri
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioService) ListAssetsAdmin(ctx context.Context) ([]AssetMetadata, error) {
+	args := m.Called(ctx)
+	if args.Get(0) != nil {
+		return args.Get(0).([]AssetMetadata), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockPortfolioService) UpdateAssetTypeAdmin(ctx context.Context, assetID, assetType string) error {
+	return m.Called(ctx, assetID, assetType).Error(0)
+}
+
 func setupHandlerTest() (*Handler, *MockPortfolioService) {
 	s := new(MockPortfolioService)
 	return NewHandler(s), s
@@ -829,3 +841,82 @@ func TestHandler_GetAssetMetadata(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), "STOCK_BR")
 	})
 }
+
+func TestHandler_ListAssetsAdmin(t *testing.T) {
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("ListAssetsAdmin", mock.Anything).Return(([]AssetMetadata)(nil), errors.New("db error"))
+		req := httptest.NewRequest("GET", "/admin/assets", nil)
+		rec := httptest.NewRecorder()
+		h.ListAssetsAdmin(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("ListAssetsAdmin", mock.Anything).Return([]AssetMetadata{
+			{ID: "a1", Ticker: "TAEE11.SA", Name: "Taesa", AssetType: "STOCK_BR", Currency: "BRL"},
+		}, nil)
+		req := httptest.NewRequest("GET", "/admin/assets", nil)
+		rec := httptest.NewRecorder()
+		h.ListAssetsAdmin(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "TAEE11.SA")
+	})
+}
+
+func TestHandler_UpdateAssetTypeAdmin(t *testing.T) {
+	t.Run("Missing Asset ID", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("PATCH", "/admin/assets/", bytes.NewBufferString(`{"asset_type":"STOCK_BR"}`)), "", map[string]string{"id": ""})
+		rec := httptest.NewRecorder()
+		h.UpdateAssetTypeAdmin(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Invalid JSON", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("PATCH", "/admin/assets/a1", bytes.NewBufferString("invalid")), "", map[string]string{"id": "a1"})
+		rec := httptest.NewRecorder()
+		h.UpdateAssetTypeAdmin(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Payload Too Large", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"asset_type": "STOCK_BR_LONG_PAYLOAD"}`
+		rec := httptest.NewRecorder()
+		req := reqWithUserAndParams(httptest.NewRequest("PATCH", "/admin/assets/a1", bytes.NewBufferString(body)), "", map[string]string{"id": "a1"})
+		req.Body = http.MaxBytesReader(rec, req.Body, 5)
+		h.UpdateAssetTypeAdmin(rec, req)
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	})
+
+	t.Run("Invalid Asset Type", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		req := reqWithUserAndParams(httptest.NewRequest("PATCH", "/admin/assets/a1", bytes.NewBufferString(`{"asset_type":"INVALID_TYPE"}`)), "", map[string]string{"id": "a1"})
+		rec := httptest.NewRecorder()
+		h.UpdateAssetTypeAdmin(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("UpdateAssetTypeAdmin", mock.Anything, "a1", "STOCK_BR").Return(errors.New("db error"))
+		req := reqWithUserAndParams(httptest.NewRequest("PATCH", "/admin/assets/a1", bytes.NewBufferString(`{"asset_type":"stock_br"}`)), "", map[string]string{"id": "a1"})
+		rec := httptest.NewRecorder()
+		h.UpdateAssetTypeAdmin(rec, req)
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("UpdateAssetTypeAdmin", mock.Anything, "a1", "STOCK_BR").Return(nil)
+		req := reqWithUserAndParams(httptest.NewRequest("PATCH", "/admin/assets/a1", bytes.NewBufferString(`{"asset_type":"stock_br"}`)), "", map[string]string{"id": "a1"})
+		rec := httptest.NewRecorder()
+		h.UpdateAssetTypeAdmin(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "STOCK_BR")
+	})
+}
+

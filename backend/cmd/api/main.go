@@ -311,6 +311,13 @@ func main() {
 			r.Use(customMiddleware.RequireAdminKey(config.Envs.AdminAPIKey))
 			workerHandler.RegisterRoutes(r)
 		})
+
+		// Catálogo Global de Ativos (Protegido por ADMIN_API_KEY)
+		r.Route("/admin/assets", func(r chi.Router) {
+			r.Use(customMiddleware.RequireAdminKey(config.Envs.AdminAPIKey))
+			r.Get("/", portfolioHandler.ListAssetsAdmin)
+			r.Patch("/{id}", portfolioHandler.UpdateAssetTypeAdmin)
+		})
 	})
 
 	// Configuração do Servidor HTTP
