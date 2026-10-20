@@ -1083,3 +1083,47 @@ func TestRepository_RemainingErrors(t *testing.T) {
 		assert.True(t, d.IsZero())
 	})
 }
+
+func TestRepository_GetAllAssetsMetadata(t *testing.T) {
+	mock, repo := setupRepoTest(t)
+	defer mock.Close()
+
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "ticker", "name", "asset_type", "currency"}).
+			AddRow("a1", "HGLG11.SA", "CSHG Logística", "FII", "BRL").
+			AddRow("a2", "PETR4.SA", "Petrobras PN", "STOCK_BR", "BRL")
+		mock.ExpectQuery(`SELECT id, ticker, name, asset_type, currency FROM asset WHERE is_active = true ORDER BY ticker ASC`).
+			WillReturnRows(rows)
+
+		res, err := repo.GetAllAssetsMetadata(ctx)
+		assert.NoError(t, err)
+		assert.Len(t, res, 2)
+		assert.Equal(t, "HGLG11.SA", res[0].Ticker)
+		assert.Equal(t, "FII", res[0].AssetType)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Query Error", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT id, ticker, name, asset_type, currency FROM asset WHERE is_active = true ORDER BY ticker ASC`).
+			WillReturnError(errors.New("query error"))
+
+		res, err := repo.GetAllAssetsMetadata(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("Scan Error", func(t *testing.T) {
+		rows := pgxmock.NewRows([]string{"id", "ticker", "name", "asset_type", "currency"}).
+			AddRow("a1", "HGLG11.SA", "CSHG Logística", "FII", "BRL").
+			RowError(0, errors.New("scan error"))
+		mock.ExpectQuery(`SELECT id, ticker, name, asset_type, currency FROM asset WHERE is_active = true ORDER BY ticker ASC`).
+			WillReturnRows(rows)
+
+		res, err := repo.GetAllAssetsMetadata(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+}
+

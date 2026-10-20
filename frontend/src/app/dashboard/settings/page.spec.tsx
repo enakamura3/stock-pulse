@@ -821,4 +821,188 @@ describe('SettingsPage', () => {
 
     consoleError.mockRestore();
   });
+
+  it('loads admin assets catalog, filters by ticker/name, and updates asset category', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/telegram/status') {
+        return Promise.resolve({ ok: true, json: async () => ({ linked: false }) });
+      }
+      if (url === '/workers') {
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+      if (url === '/admin/assets') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'a1', ticker: 'TAEE11.SA', name: 'Transmissora Aliança', asset_type: 'FII', currency: 'BRL' },
+            { id: 'a2', ticker: 'PETR4.SA', name: 'Petrobras PN', asset_type: 'STOCK_BR', currency: 'BRL' },
+          ],
+        });
+      }
+      if (url === '/admin/assets/a1' && opts?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ message: 'ok', asset_id: 'a1', asset_type: 'STOCK_BR' }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+
+    render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('TAEE11.SA')).toBeInTheDocument();
+      expect(screen.getByText('PETR4.SA')).toBeInTheDocument();
+    });
+
+    // Test search filter by ticker and by name
+    const filterInput = screen.getByPlaceholderText('Filtrar por ticker ou nome...');
+    fireEvent.change(filterInput, { target: { value: 'aliança' } });
+    expect(screen.getByText('TAEE11.SA')).toBeInTheDocument();
+    expect(screen.queryByText('PETR4.SA')).not.toBeInTheDocument();
+
+    fireEvent.change(filterInput, { target: { value: '' } });
+    expect(screen.getByText('PETR4.SA')).toBeInTheDocument();
+
+    // Update category of TAEE11.SA from FII to STOCK_BR
+    const selectTaee = screen.getByLabelText('Categoria TAEE11.SA') as HTMLSelectElement;
+    expect(selectTaee.value).toBe('FII');
+
+    await act(async () => {
+      fireEvent.change(selectTaee, { target: { value: 'STOCK_BR' } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Categoria de "TAEE11.SA" atualizada para STOCK_BR!')).toBeInTheDocument();
+      expect(selectTaee.value).toBe('STOCK_BR');
+    });
+
+    // Test reload catalog button
+    const reloadBtn = screen.getByRole('button', { name: /Recarregar Catálogo/i });
+    await act(async () => {
+      fireEvent.click(reloadBtn);
+    });
+
+    // Test update error with server message, fallback message, and network error
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/admin/assets/a1' && opts?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => ({ error: 'Chave de administração inválida' }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await act(async () => {
+      fireEvent.change(selectTaee, { target: { value: 'FII' } });
+    });
+    expect(screen.getByText('Chave de administração inválida')).toBeInTheDocument();
+
+    // Fallback message when JSON parse fails on PATCH error
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/admin/assets/a1' && opts?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => { throw new Error('bad json'); },
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await act(async () => {
+      fireEvent.change(selectTaee, { target: { value: 'FII' } });
+    });
+    expect(screen.getByText('Não foi possível atualizar o ativo "TAEE11.SA".')).toBeInTheDocument();
+
+    // Network error on PATCH
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/admin/assets/a1' && opts?.method === 'PATCH') {
+        return Promise.reject(new Error('network fail'));
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await act(async () => {
+      fireEvent.change(selectTaee, { target: { value: 'FII' } });
+    });
+    expect(screen.getByText('Erro de rede ao atualizar o ativo "TAEE11.SA".')).toBeInTheDocument();
+
+    consoleError.mockRestore();
+  });
+
+  it('handles admin assets load errors (server error, json parse error, network error)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // 1. Server error with message
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/admin/assets') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => ({ error: 'Não autorizado para catálogo' }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    const { unmount } = render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Não autorizado para catálogo')).toBeInTheDocument();
+    });
+    unmount();
+
+    // 2. Server error with JSON parse failure (fallback message)
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/admin/assets') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => { throw new Error('bad json'); },
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    const { unmount: unmount2 } = render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Não foi possível carregar o catálogo de ativos.')).toBeInTheDocument();
+    });
+    unmount2();
+
+    // 3. Network error
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/admin/assets') {
+        return Promise.reject(new Error('net err'));
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Erro de conexão ao carregar catálogo de ativos.')).toBeInTheDocument();
+    });
+
+    consoleError.mockRestore();
+  });
 });
+

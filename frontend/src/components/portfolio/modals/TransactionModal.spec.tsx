@@ -262,20 +262,14 @@ describe('TransactionModal', () => {
     expect(screen.queryByText(/Total Operação:/i)).toBeNull();
   });
 
-  it('handles form changes for asset type, quantity, and executed date', () => {
-    const setTxAssetTypeMock = vi.fn();
+  it('handles form changes for quantity and executed date', () => {
     const setTxExecutedAtMock = vi.fn();
 
     render(
       <TransactionModalWrapper
-        setTxAssetType={setTxAssetTypeMock}
         setTxExecutedAt={setTxExecutedAtMock}
       />
     );
-
-    const assetTypeSelect = screen.getByRole('combobox');
-    fireEvent.change(assetTypeSelect, { target: { value: 'FII' } });
-    expect(setTxAssetTypeMock).toHaveBeenCalledWith('FII');
 
     const qtyInput = screen.getByLabelText(/Quantidade/i);
     fireEvent.change(qtyInput, { target: { value: '50' } });

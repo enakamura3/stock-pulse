@@ -134,6 +134,14 @@ func (m *MockPortfolioRepo) GetAllAssets(ctx context.Context) ([]AssetCompact, e
 	return nil, args.Error(1)
 }
 
+func (m *MockPortfolioRepo) GetAllAssetsMetadata(ctx context.Context) ([]AssetMetadata, error) {
+	args := m.Called(ctx)
+	if args.Get(0) != nil {
+		return args.Get(0).([]AssetMetadata), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockPortfolioRepo) UpsertAssetEvent(ctx context.Context, event AssetEvent) error {
 	args := m.Called(ctx, event)
 	return args.Error(0)
@@ -461,11 +469,10 @@ func TestService_AddTransaction(t *testing.T) {
 		assert.Equal(t, "tx1", res.ID)
 	})
 
-	t.Run("Existing Asset with Type Update", func(t *testing.T) {
+	t.Run("Existing Asset Ignores User AssetType", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(nil)
 
 		tx := &Transaction{PortfolioID: "p1", Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35}
 		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
@@ -476,23 +483,7 @@ func TestService_AddTransaction(t *testing.T) {
 		res, err := s.AddTransaction(context.Background(), "u1", tx)
 		assert.NoError(t, err)
 		assert.Equal(t, "tx1", res.ID)
-	})
-
-	t.Run("Existing Asset with Type Update Failure", func(t *testing.T) {
-		s, repo, _, _ := setupServiceTest()
-		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
-		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(errors.New("db error"))
-
-		tx := &Transaction{PortfolioID: "p1", Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35}
-		repo.On("CreateTransaction", mock.Anything, tx).Return(&Transaction{ID: "tx1"}, nil)
-
-		repo.On("GetDailyPrices", mock.Anything, "a1", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil)
-		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, nil)
-
-		res, err := s.AddTransaction(context.Background(), "u1", tx)
-		assert.NoError(t, err)
-		assert.Equal(t, "tx1", res.ID)
+		repo.AssertNotCalled(t, "UpdateAssetType", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Asset Lookup DB Error", func(t *testing.T) {
@@ -777,27 +768,37 @@ func TestService_UpdateTransaction(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("Success with Type Update", func(t *testing.T) {
+	t.Run("Success Ignores User AssetType", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(nil)
 		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
 		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err"))
 
 		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35})
 		assert.NoError(t, err)
+		repo.AssertNotCalled(t, "UpdateAssetType", mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+func TestService_AdminAssets(t *testing.T) {
+	t.Run("ListAssetsAdmin Success", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetAllAssetsMetadata", mock.Anything).Return([]AssetMetadata{
+			{ID: "a1", Ticker: "TAEE11.SA", Name: "Taesa", AssetType: "STOCK_BR", Currency: "BRL"},
+		}, nil)
+
+		assets, err := s.ListAssetsAdmin(context.Background())
+		assert.NoError(t, err)
+		assert.Len(t, assets, 1)
+		assert.Equal(t, "TAEE11.SA", assets[0].Ticker)
 	})
 
-	t.Run("Success with Type Update Error (Non-fatal)", func(t *testing.T) {
+	t.Run("UpdateAssetTypeAdmin Success", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
-		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
-		repo.On("GetAssetMetadataByTicker", mock.Anything, "TAEE11.SA").Return(&AssetMetadata{ID: "a1", Currency: "BRL", AssetType: "FII"}, nil)
-		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(errors.New("db fail"))
-		repo.On("UpdateTransaction", mock.Anything, mock.Anything).Return(nil)
-		repo.On("GetOldestPriceDate", mock.Anything, "a1").Return(time.Time{}, errors.New("err"))
+		repo.On("UpdateAssetType", mock.Anything, "a1", "STOCK_BR").Return(nil)
 
-		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", &Transaction{Ticker: "TAEE11.SA", AssetType: "STOCK_BR", Quantity: 10, UnitPrice: 35})
+		err := s.UpdateAssetTypeAdmin(context.Background(), "a1", "STOCK_BR")
 		assert.NoError(t, err)
 	})
 }
