@@ -2,7 +2,6 @@ package telegram
 
 import (
 	"fmt"
-	"strings"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -12,7 +11,7 @@ import (
 func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	defer c.Respond()
 	if h.fiSvc == nil {
-		return c.Edit("⚠️ Módulo de Renda Fixa não está ativo.")
+		return h.sendOrEdit(c, "⚠️ Módulo de Renda Fixa não está ativo.")
 	}
 
 	page := 0
@@ -30,7 +29,7 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
-		return c.Edit("⚠️ Nenhuma carteira encontrada.")
+		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada.")
 	}
 
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
@@ -38,11 +37,11 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	treasuryPositions, err2 := h.fiSvc.GetTreasuryPositions(ctx, portfolioID)
 
 	if (err1 != nil && err2 != nil) || (err1 != nil && len(treasuryPositions) == 0) {
-		return c.Edit("❌ Erro ao buscar posições de Renda Fixa.")
+		return h.sendOrEdit(c, "❌ Erro ao buscar posições de Renda Fixa.")
 	}
 
 	if len(positions) == 0 && len(treasuryPositions) == 0 {
-		return c.Edit("🏛️ Você ainda não possui ativos de Renda Fixa ou Tesouro Direto cadastrados.")
+		return h.sendOrEdit(c, "🏛️ Você ainda não possui ativos de Renda Fixa ou Tesouro Direto cadastrados.")
 	}
 
 	var totalBruto, totalLiquido, totalCusto float64
@@ -153,9 +152,5 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 
 	menu.Inline(rows...)
 
-	err = c.Edit(msg, telebot.ModeMarkdown, menu)
-	if err != nil && strings.Contains(err.Error(), "message is not modified") {
-		return nil
-	}
-	return err
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }

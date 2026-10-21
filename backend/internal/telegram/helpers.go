@@ -24,6 +24,54 @@ func escapeMarkdown(s string) string {
 	return b.String()
 }
 
+// sendOrEdit envia uma nova mensagem se invocado por comando de texto ou edita a mensagem atual se for callback inline.
+func (h *Handlers) sendOrEdit(c telebot.Context, msg string, opts ...interface{}) error {
+	if c.Callback() != nil {
+		err := c.Edit(msg, opts...)
+		if err != nil && strings.Contains(err.Error(), "message is not modified") {
+			return nil
+		}
+		return err
+	}
+
+	return c.Send(msg, opts...)
+}
+
+// getTickerDefaultCurrency infere o símbolo da moeda do ativo com base nas convenções de ticker.
+func getTickerDefaultCurrency(ticker string) string {
+	t := strings.ToUpper(strings.TrimSpace(ticker))
+	if strings.HasSuffix(t, ".SA") {
+		return "R$"
+	}
+	if strings.Contains(t, "-USD") {
+		return "US$"
+	}
+	if strings.Contains(t, "-EUR") {
+		return "€"
+	}
+	// Ticker padrão B3 (ex: PETR4, VALE3, HGLG11)
+	if len(t) >= 5 && len(t) <= 6 {
+		lastChar := t[len(t)-1]
+		if lastChar >= '0' && lastChar <= '9' {
+			return "R$"
+		}
+	}
+	// Ticker de ações/ETFs americanos (ex: AAPL, MSFT, VOO)
+	if len(t) >= 1 && len(t) <= 5 && !strings.Contains(t, ".") {
+		allLetters := true
+		for _, r := range t {
+			if r < 'A' || r > 'Z' {
+				allLetters = false
+				break
+			}
+		}
+		if allLetters {
+			return "US$"
+		}
+	}
+	return "R$"
+}
+
 // formatFinancialPrice formata um valor monetário respeitando a precisão necessária para ativos padrão e fracionários/criptoativos.
 // Valores >= 1.0 utilizam 2 casas decimais.
 // Valores entre 0.01 e 1.0 utilizam 4 casas decimais.

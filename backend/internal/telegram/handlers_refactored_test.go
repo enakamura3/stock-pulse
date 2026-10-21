@@ -22,6 +22,38 @@ import (
 func TestHandlers_AuthMiddleware(t *testing.T) {
 	h, svc, _, _, _, _ := setupHandlersTest()
 
+	t.Run("reject non-private chat (negative ID)", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: -100123456789})
+		mCtx.On("Send", "⚠️ O Stock Pulse Bot funciona apenas em conversas privadas individuais.", mock.Anything).Return(nil).Once()
+
+		called := false
+		next := func(c telebot.Context) error {
+			called = true
+			return nil
+		}
+
+		err := h.AuthMiddleware(next)(mCtx)
+		assert.NoError(t, err)
+		assert.False(t, called)
+	})
+
+	t.Run("reject non-private chat (group type)", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123, Type: telebot.ChatGroup})
+		mCtx.On("Send", "⚠️ O Stock Pulse Bot funciona apenas em conversas privadas individuais.", mock.Anything).Return(nil).Once()
+
+		called := false
+		next := func(c telebot.Context) error {
+			called = true
+			return nil
+		}
+
+		err := h.AuthMiddleware(next)(mCtx)
+		assert.NoError(t, err)
+		assert.False(t, called)
+	})
+
 	t.Run("ignore /start message", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Message").Return(&telebot.Message{})
@@ -1861,6 +1893,11 @@ func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
 		mCtx.On("Callback").Return(&telebot.Callback{Data: "\funknown_btn"}).Once()
 		err := h.HandleDynamicCallback(mCtx)
 		assert.NoError(t, err)
+
+		mCtxNil := new(MockTelebotContext)
+		mCtxNil.On("Callback").Return((*telebot.Callback)(nil)).Once()
+		err = h.HandleDynamicCallback(mCtxNil)
+		assert.NoError(t, err)
 	})
 
 	t.Run("HandleText SELL success", func(t *testing.T) {
@@ -1878,7 +1915,7 @@ func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
 			ExecutedAt:  "2026-09-12",
 		}
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(state, nil).Once()
-		portSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.Anything).Return(&portfolio.Transaction{}, nil).Once()
+		portSvc.On("AddTransaction", mock.Anything, "00000000-0000-0000-0000-000000000000", mock.Anything).Return(&portfolio.Transaction{Currency: "USD"}, nil).Once()
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
 			return strings.Contains(msg, "VENDA")
@@ -2421,11 +2458,13 @@ func TestHandlers_DeepBranchCoverage(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Text").Return("some text")
+		mCtx.On("Send", mock.Anything, mock.Anything).Return(nil).Once()
 
 		state := &ConversationState{
 			Step: "UNKNOWN_STEP",
 		}
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(state, nil).Once()
+		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
 		err := h.HandleText(mCtx)
 		assert.NoError(t, err)
 	})
@@ -2875,7 +2914,7 @@ func TestHandlers_UndoAndOperations(t *testing.T) {
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1", Name: "Principal"}}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return([]portfolio.Transaction{
-			{ID: "tx-1", Ticker: "PETR4", Type: "BUY", Quantity: 100, UnitPrice: 35.0, TotalCost: 3505.0, Fee: 5.0, ExecutedAt: time.Now()},
+			{ID: "tx-1", Ticker: "PETR4", Type: "BUY", Quantity: 100, UnitPrice: 35.0, TotalCost: 3505.0, Fee: 5.0, Currency: "USD", ExecutedAt: time.Now()},
 		}, nil).Once()
 		mCtxBuy.On("Send", mock.MatchedBy(func(msg string) bool {
 			return strings.Contains(msg, "Confirmar cancelamento da última operação") &&

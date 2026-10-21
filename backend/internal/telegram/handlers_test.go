@@ -20,6 +20,8 @@ type MockTelebotContext struct {
 	mock.Mock
 	telebot.Context // embed to panic on unimplemented methods instead of failing compilation if interface grows
 	store           map[string]interface{}
+	callbackCached  *telebot.Callback
+	cachedCallback  bool
 }
 
 func (m *MockTelebotContext) Get(key string) interface{} {
@@ -64,9 +66,14 @@ func (m *MockTelebotContext) Send(what interface{}, opts ...interface{}) error {
 }
 
 func (m *MockTelebotContext) Chat() *telebot.Chat {
-	args := m.Called()
-	if args.Get(0) != nil {
-		return args.Get(0).(*telebot.Chat)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Chat" {
+			args := m.Called()
+			if args.Get(0) != nil {
+				return args.Get(0).(*telebot.Chat)
+			}
+			return nil
+		}
 	}
 	return nil
 }
@@ -77,8 +84,13 @@ func (m *MockTelebotContext) Args() []string {
 }
 
 func (m *MockTelebotContext) Respond(resp ...*telebot.CallbackResponse) error {
-	args := m.Called(resp)
-	return args.Error(0)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Respond" {
+			args := m.Called(resp)
+			return args.Error(0)
+		}
+	}
+	return nil
 }
 
 func (m *MockTelebotContext) Data() string {
@@ -110,13 +122,27 @@ func (m *MockTelebotContext) Edit(what interface{}, opts ...interface{}) error {
 }
 
 func (m *MockTelebotContext) Callback() *telebot.Callback {
+	if m.cachedCallback {
+		return m.callbackCached
+	}
 	for _, call := range m.ExpectedCalls {
 		if call.Method == "Callback" {
 			args := m.Called()
+			m.cachedCallback = true
 			if args.Get(0) != nil {
-				return args.Get(0).(*telebot.Callback)
+				m.callbackCached = args.Get(0).(*telebot.Callback)
+				return m.callbackCached
 			}
 			return nil
+		}
+	}
+	// Se o teste configurou Edit mas não mockou Callback explicitamente,
+	// infere que este mock representa um contexto de callback (inline query).
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Edit" {
+			m.cachedCallback = true
+			m.callbackCached = &telebot.Callback{}
+			return m.callbackCached
 		}
 	}
 	return nil

@@ -156,6 +156,7 @@ func (s *service) UnlinkAccount(ctx context.Context, userID uuid.UUID) error {
 	if err == nil && chatID != 0 {
 		key := fmt.Sprintf("telegram_active_portfolio:%d", chatID)
 		_ = s.redis.Del(ctx, key).Err()
+		_ = s.ClearConversationState(ctx, chatID)
 	}
 	return s.repo.UnlinkAccount(ctx, userID)
 }

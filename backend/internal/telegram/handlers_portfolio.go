@@ -25,14 +25,14 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
-		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
+		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
-		return c.Edit("❌ Ocorreu um erro ao buscar sua carteira.")
+		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar sua carteira.")
 	}
 
 	var totalValue, totalCost, totalDailyChange float64
@@ -265,11 +265,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 	menu.Inline(menu.Row(btnRefresh, btnAtivos), menu.Row(btnBack))
 
-	err = c.Edit(msg, telebot.ModeMarkdown, menu)
-	if err != nil && strings.Contains(err.Error(), "message is not modified") {
-		return nil
-	}
-	return err
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleAssetList(c telebot.Context) error {
@@ -290,14 +286,14 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
-		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
+		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
-		return c.Edit("❌ Ocorreu um erro ao buscar sua carteira.")
+		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar sua carteira.")
 	}
 
 	if len(positions) == 0 {
@@ -305,7 +301,7 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		btnBack := menu.Data("⬅️ Voltar ao Resumo", "btn_resumo")
 		btnMenu := menu.Data("🏠 Menu", "btn_menu")
 		menu.Inline(menu.Row(btnBack, btnMenu))
-		return c.Edit(fmt.Sprintf("📋 *Ativos: %s*\n\nNenhum ativo encontrado nesta carteira.", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
+		return h.sendOrEdit(c, fmt.Sprintf("📋 *Ativos: %s*\n\nNenhum ativo encontrado nesta carteira.", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
 	}
 
 	posByValue := make([]portfolio.Position, len(positions))
@@ -377,11 +373,7 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	rows = append(rows, menu.Row(btnBack, btnMenu))
 	menu.Inline(rows...)
 
-	err = c.Edit(msg, telebot.ModeMarkdown, menu)
-	if err != nil && strings.Contains(err.Error(), "message is not modified") {
-		return nil
-	}
-	return err
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
 
 func getMacroCategoryKey(assetType, ticker string) string {

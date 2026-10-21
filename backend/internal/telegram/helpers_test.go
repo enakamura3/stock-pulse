@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
@@ -101,5 +102,69 @@ func TestIsBlockedByUser(t *testing.T) {
 	t.Run("other error", func(t *testing.T) {
 		err := errors.New("network timeout")
 		assert.False(t, isBlockedByUser(err))
+	})
+}
+
+func TestGetTickerDefaultCurrency(t *testing.T) {
+	tests := []struct {
+		ticker   string
+		expected string
+	}{
+		{"PETR4.SA", "R$"},
+		{"VALE3.SA", "R$"},
+		{"BTC-USD", "US$"},
+		{"ETH-USD", "US$"},
+		{"SAP-EUR", "€"},
+		{"PETR4", "R$"},
+		{"HGLG11", "R$"},
+		{"AAPL", "US$"},
+		{"VOO", "US$"},
+		{"123", "R$"},
+		{"unknown-ticker-999", "R$"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ticker, func(t *testing.T) {
+			assert.Equal(t, tt.expected, getTickerDefaultCurrency(tt.ticker))
+		})
+	}
+}
+
+func TestHandlers_SendOrEdit(t *testing.T) {
+	h := &Handlers{}
+
+	t.Run("callback is not nil calls Edit success", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", "test message", mock.Anything).Return(nil).Once()
+
+		err := h.sendOrEdit(mCtx, "test message")
+		assert.NoError(t, err)
+	})
+
+	t.Run("callback is not nil calls Edit message not modified returns nil", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", "test message", mock.Anything).Return(errors.New("telegram: message is not modified")).Once()
+
+		err := h.sendOrEdit(mCtx, "test message")
+		assert.NoError(t, err)
+	})
+
+	t.Run("callback is not nil calls Edit generic error returns error", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Edit", "test message", mock.Anything).Return(errors.New("network fail")).Once()
+
+		err := h.sendOrEdit(mCtx, "test message")
+		assert.EqualError(t, err, "network fail")
+	})
+
+	t.Run("callback is nil calls Send", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Send", "test message", mock.Anything).Return(nil).Once()
+
+		err := h.sendOrEdit(mCtx, "test message")
+		assert.NoError(t, err)
 	})
 }

@@ -113,13 +113,13 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
-		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
+		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
-		return c.Edit("❌ Ocorreu um erro ao buscar seus ativos.")
+		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar seus ativos.")
 	}
 
 	err = h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{
@@ -127,7 +127,7 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 		PortfolioID: portfolioID,
 	})
 	if err != nil {
-		return c.Edit("❌ Erro interno ao iniciar operação.")
+		return h.sendOrEdit(c, "❌ Erro interno ao iniciar operação.")
 	}
 
 	menu := &telebot.ReplyMarkup{}
@@ -146,11 +146,16 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 
 	menu.Inline(rows...)
 
-	return c.Edit(fmt.Sprintf("🏢 *Carteira Ativa:* %s\nPara qual ativo deseja lançar a operação?", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
+	return h.sendOrEdit(c, fmt.Sprintf("🏢 *Carteira Ativa:* %s\nPara qual ativo deseja lançar a operação?", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
-	data := c.Callback().Data
+	cb := c.Callback()
+	if cb == nil {
+		return nil
+	}
+
+	data := cb.Data
 	data = strings.TrimPrefix(data, "\f")
 
 	if strings.HasPrefix(data, "btn_ticker_") {
@@ -335,7 +340,7 @@ func (h *Handlers) HandleDateToday(c telebot.Context) error {
 	state.Step = "EXPECT_FEE"
 	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
-	return h.askFee(c, true)
+	return h.askFee(c, state.Ticker, true)
 }
 
 func (h *Handlers) HandleFeeZero(c telebot.Context) error {
@@ -352,7 +357,9 @@ func (h *Handlers) HandleFeeZero(c telebot.Context) error {
 	return h.finalizeTransaction(c, state, 0, true)
 }
 
-func (h *Handlers) askFee(c telebot.Context, isCallback bool) error {
+func (h *Handlers) askFee(c telebot.Context, ticker string, isCallback bool) error {
+	currSymbol := getTickerDefaultCurrency(ticker)
+
 	feeMenu := &telebot.ReplyMarkup{}
 	btnNoFee := feeMenu.Data("0️⃣ Sem Taxas", "btn_op_fee_zero")
 	btnBack := feeMenu.Data("⬅️ Voltar", "btn_op_back")
@@ -362,7 +369,7 @@ func (h *Handlers) askFee(c telebot.Context, isCallback bool) error {
 		feeMenu.Row(btnBack, btnCancel),
 	)
 
-	text := "💵 *Taxas / Corretagem*\n\nInforme o valor total de taxas em R$ (ex: `4.50`) ou clique em *Sem Taxas*:"
+	text := fmt.Sprintf("💵 *Taxas / Corretagem*\n\nInforme o valor total de taxas em %s (ex: `4.50`) ou clique em *Sem Taxas*:", currSymbol)
 	if isCallback {
 		return c.Edit(text, telebot.ModeMarkdown, feeMenu)
 	}
@@ -416,14 +423,19 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 
 	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 
+	currSymbol := getTickerDefaultCurrency(state.Ticker)
+	if savedTx != nil && savedTx.Currency != "" {
+		currSymbol = getCurrencySymbol(savedTx.Currency)
+	}
+
 	tipoStr := "COMPRA"
 	if state.Type == "SELL" {
 		tipoStr = "VENDA"
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço Unitário: R$ %.2f\n• Taxas: R$ %.2f\n• Data: %s\n• Total: R$ %.2f",
-		state.Ticker, tipoStr, state.Quantity, state.UnitPrice, fee, executedAt.Format("02/01/2006"), totalCost)
+	successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço Unitário: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f",
+		state.Ticker, tipoStr, state.Quantity, currSymbol, state.UnitPrice, currSymbol, fee, executedAt.Format("02/01/2006"), currSymbol, totalCost)
 
 	successMenu := &telebot.ReplyMarkup{}
 	var rows []telebot.Row
@@ -469,9 +481,14 @@ func (h *Handlers) HandleUndoLastOperation(c telebot.Context) error {
 		tipoStr = "VENDA"
 	}
 
+	currSymbol := "R$"
+	if lastTx.Currency != "" {
+		currSymbol = getCurrencySymbol(lastTx.Currency)
+	}
+
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("⚠️ *Confirmar cancelamento da última operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço: R$ %.2f\n• Taxas: R$ %.2f\n• Data: %s\n• Total: R$ %.2f\n\nDeseja realmente excluir esta operação?",
-		portName, lastTx.Ticker, tipoStr, lastTx.Quantity, lastTx.UnitPrice, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), lastTx.TotalCost)
+	msg := p.Sprintf("⚠️ *Confirmar cancelamento da última operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f\n\nDeseja realmente excluir esta operação?",
+		portName, lastTx.Ticker, tipoStr, lastTx.Quantity, currSymbol, lastTx.UnitPrice, currSymbol, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), currSymbol, lastTx.TotalCost)
 
 	menu := &telebot.ReplyMarkup{}
 	btnConfirm := menu.Data("🗑️ Sim, Desfazer", "btn_tx_del_"+lastTx.ID)
@@ -608,7 +625,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		state.Step = "EXPECT_FEE"
 		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
-		return h.askFee(c, false)
+		return h.askFee(c, state.Ticker, false)
 
 	case "EXPECT_FEE":
 		textClean := strings.ReplaceAll(text, ",", ".")
@@ -722,7 +739,9 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	case "WL_EXPECT_TICKER":
 		return h.handleWatchlistAddTicker(c, text)
-	}
 
-	return nil
+	default:
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+		return c.Send("⚠️ Ação não reconhecida ou expirada. Envie /menu para navegar pelas opções.")
+	}
 }
