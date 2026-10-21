@@ -160,14 +160,6 @@ func TestHandlers_SendOrEdit(t *testing.T) {
 		assert.EqualError(t, err, "network fail")
 	})
 
-	t.Run("callback is nil but mock has Edit calls Edit", func(t *testing.T) {
-		mCtx := new(MockTelebotContext)
-		mCtx.On("Edit", "test message", mock.Anything).Return(nil).Once()
-
-		err := h.sendOrEdit(mCtx, "test message")
-		assert.NoError(t, err)
-	})
-
 	t.Run("callback is nil calls Send", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Send", "test message", mock.Anything).Return(nil).Once()

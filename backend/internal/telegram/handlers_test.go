@@ -136,6 +136,15 @@ func (m *MockTelebotContext) Callback() *telebot.Callback {
 			return nil
 		}
 	}
+	// Se o teste configurou Edit mas não mockou Callback explicitamente,
+	// infere que este mock representa um contexto de callback (inline query).
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Edit" {
+			m.cachedCallback = true
+			m.callbackCached = &telebot.Callback{}
+			return m.callbackCached
+		}
+	}
 	return nil
 }
 

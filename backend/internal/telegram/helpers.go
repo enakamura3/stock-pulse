@@ -34,24 +34,6 @@ func (h *Handlers) sendOrEdit(c telebot.Context, msg string, opts ...interface{}
 		return err
 	}
 
-	// Fallback para mocks de teste que configuraram apenas Edit
-	if mCtx, ok := c.(*MockTelebotContext); ok {
-		hasEdit := false
-		for _, call := range mCtx.ExpectedCalls {
-			if call.Method == "Edit" {
-				hasEdit = true
-				break
-			}
-		}
-		if hasEdit {
-			err := c.Edit(msg, opts...)
-			if err != nil && strings.Contains(err.Error(), "message is not modified") {
-				return nil
-			}
-			return err
-		}
-	}
-
 	return c.Send(msg, opts...)
 }
 
