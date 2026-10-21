@@ -73,6 +73,31 @@ func TestMergeAndDedupDividends(t *testing.T) {
 		assert.Equal(t, 1.5, merged[0].Amount)
 		assert.Equal(t, 2.0, merged[1].Amount)
 	})
+
+	t.Run("Stock JCP and Dividendo reconciliation in base and secondary", func(t *testing.T) {
+		date1 := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
+		pay1 := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)
+		date2 := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+		pay2 := time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC)
+
+		// Base (e.g. B3) has duplicate with Dividendo then JCP on date1, and Dividendo on date2
+		fundEvents := []DividendEvent{
+			{Date: date1, PaymentDate: pay1, Amount: 0.02, Type: "Dividendo"},
+			{Date: date1, PaymentDate: pay1, Amount: 0.02, Type: "JCP"},
+			{Date: date2, PaymentDate: pay2, Amount: 0.05, Type: "Dividendo"},
+		}
+		// Secondary (e.g. Fundamentus) has JCP on date2 (with 1-day cum_date offset but same PaymentDate and Amount)
+		saEvents := []DividendEvent{
+			{Date: date2.AddDate(0, 0, 1), PaymentDate: pay2, Amount: 0.05, Type: "JCP"},
+		}
+
+		merged := mergeAndDedupDividends(saEvents, fundEvents, "STOCK_BR")
+		assert.Len(t, merged, 2)
+		assert.Equal(t, "JCP", merged[0].Type)
+		assert.Equal(t, 0.05, merged[0].Amount)
+		assert.Equal(t, "JCP", merged[1].Type)
+		assert.Equal(t, 0.02, merged[1].Amount)
+	})
 }
 
 func TestDividendGateway_GetDividends(t *testing.T) {

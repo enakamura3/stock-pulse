@@ -55,15 +55,7 @@ func (s *FundamentusDividendSource) GetDividends(ctx context.Context, ticker str
 		}
 
 		// Formatar o Tipo para um padrão limpo
-		tipoUpper := strings.ToUpper(raw.Type)
-		cleanType := "Dividendo"
-		if strings.Contains(tipoUpper, "JRS CAP PROPRIO") || strings.Contains(tipoUpper, "JCP") {
-			cleanType = "JCP"
-		} else if strings.Contains(tipoUpper, "RENDIMENTO") {
-			cleanType = "Rendimento"
-		} else if strings.Contains(tipoUpper, "AMORTIZACAO") {
-			cleanType = "Amortização"
-		}
+		cleanType := normalizeDividendType(raw.Type, assetType)
 
 		events = append(events, DividendEvent{
 			Date:        exDate,

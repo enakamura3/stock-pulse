@@ -97,6 +97,20 @@ func (w *DividendWorker) WithNotifier(calc DividendCalculator, notifier Dividend
 	return w
 }
 
+func sameCalendarDate(a, b time.Time) bool {
+	if a.IsZero() || b.IsZero() {
+		return a.IsZero() && b.IsZero()
+	}
+	return a.Format("2006-01-02") == b.Format("2006-01-02")
+}
+
+func resolveDividendEventType(existingType, incomingType string) string {
+	if existingType != "Dividendo" && incomingType == "Dividendo" {
+		return existingType
+	}
+	return incomingType
+}
+
 func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 	assets, err := w.repo.GetAllAssets(ctx)
 	if err != nil {
@@ -120,6 +134,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		}
 
 		var successCount int
+		matchedIDs := make(map[string]bool)
 		for i, ev := range events {
 			existingEvents, err := w.repo.GetAssetEventsByDate(assetCtx, asset.ID, ev.Date)
 			if err != nil {
@@ -132,7 +147,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 
 			for j := range existingEvents {
 				existing := &existingEvents[j]
-				if existing.Type != ev.Type {
+				if matchedIDs[existing.ID] || existing.Type != ev.Type {
 					continue
 				}
 
@@ -145,14 +160,39 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 				}
 			}
 
+			// Conciliação entre tipo genérico ("Dividendo") e específico ("JCP", etc.)
+			// quando possuem mesma Data Com, mesma Data de Pagamento e valor compatível.
+			if bestMatch == nil {
+				for j := range existingEvents {
+					existing := &existingEvents[j]
+					if matchedIDs[existing.ID] {
+						continue
+					}
+					if (existing.Type == "Dividendo" || ev.Type == "Dividendo") &&
+						sameCalendarDate(existing.PaymentDate, ev.PaymentDate) {
+						diff := math.Abs(existing.GrossAmount - ev.Amount)
+						if diff <= calculator.FuzzyMatchGrossAmountThreshold {
+							if minDiff == -1 || diff < minDiff {
+								minDiff = diff
+								bestMatch = existing
+							}
+						}
+					}
+				}
+			}
+
 			if bestMatch != nil {
-				if minDiff < calculator.FinancialEpsilon && bestMatch.PaymentDate.Equal(ev.PaymentDate) {
+				matchedIDs[bestMatch.ID] = true
+				resolvedType := resolveDividendEventType(bestMatch.Type, ev.Type)
+				if minDiff < calculator.FinancialEpsilon &&
+					sameCalendarDate(bestMatch.PaymentDate, ev.PaymentDate) &&
+					bestMatch.Type == resolvedType {
 					successCount++
 					continue
 				}
 
 				// Update existing
-				err = w.repo.UpdateAssetEventValueByID(assetCtx, bestMatch.ID, ev.Amount, ev.Amount, ev.PaymentDate)
+				err = w.repo.UpdateAssetEventValueByID(assetCtx, bestMatch.ID, resolvedType, ev.Amount, ev.Amount, ev.PaymentDate)
 				if err != nil {
 					slog.ErrorContext(assetCtx, "erro ao atualizar dividendo (Fuzzy Match)",
 						slog.Int("current", i+1),

@@ -156,6 +156,7 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 	}
 
 	// Deduplica proventos mensais de FII/FIAGRO/ETF no mesmo mês/ano
+	// e concilia proventos de ações com mesma Data Com, Data de Pagamento e Valor por Ação (ex: JCP vs Dividendo)
 	dedupedResults := make([]CalculatedDividend, 0, len(results))
 	seenMonth := make(map[string]bool)
 
@@ -171,7 +172,29 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 				continue
 			}
 			seenMonth[key] = true
+			dedupedResults = append(dedupedResults, res)
+			continue
 		}
+
+		dupIdx := -1
+		for i := range dedupedResults {
+			existing := &dedupedResults[i]
+			if existing.Ticker == res.Ticker &&
+				sameCalendarDate(existing.CumDate, res.CumDate) &&
+				sameCalendarDate(existing.PaymentDate, res.PaymentDate) &&
+				math.Abs(existing.PerShareAmount-res.PerShareAmount) < calculator.FinancialEpsilon {
+				dupIdx = i
+				break
+			}
+		}
+
+		if dupIdx >= 0 {
+			if dedupedResults[dupIdx].Type == "Dividendo" && res.Type != "Dividendo" {
+				dedupedResults[dupIdx] = res
+			}
+			continue
+		}
+
 		dedupedResults = append(dedupedResults, res)
 	}
 

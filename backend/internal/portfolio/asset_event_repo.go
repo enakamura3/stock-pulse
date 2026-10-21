@@ -97,17 +97,17 @@ func (r *Repository) GetAssetEventsByDate(ctx context.Context, assetID string, c
 	return list, nil
 }
 
-func (r *Repository) UpdateAssetEventValueByID(ctx context.Context, eventID string, newGross, newNet float64, newPayment time.Time) error {
+func (r *Repository) UpdateAssetEventValueByID(ctx context.Context, eventID, newType string, newGross, newNet float64, newPayment time.Time) error {
 	query := `
 		UPDATE asset_event
-		SET gross_amount = $1, net_amount = $2, payment_date = $3, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $4
+		SET type = $1, gross_amount = $2, net_amount = $3, payment_date = $4, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $5
 	`
 	var paymentDate interface{} = newPayment
 	if newPayment.IsZero() {
 		paymentDate = nil
 	}
 
-	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, newGross, newNet, paymentDate, eventID)
+	_, err := database.GetDB(ctx, r.db).Exec(ctx, query, newType, newGross, newNet, paymentDate, eventID)
 	return err
 }
