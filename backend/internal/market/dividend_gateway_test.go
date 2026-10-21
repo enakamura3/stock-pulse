@@ -117,8 +117,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 	evWithCurrDate := DividendEvent{Type: "Dividendo", Date: currMonthDate}
 
 	t.Run("Primary Success", func(t *testing.T) {
-		rmock.ExpectGet("dividends:v2:TICKER1").RedisNil()
-		rmock.ExpectSet("dividends:v2:TICKER1", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:TICKER1").RedisNil()
+		rmock.ExpectSet("dividends:TICKER1", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		primary.On("GetDividends", mock.Anything, "TICKER1", "STOCK_BR").Return([]DividendEvent{evWithCurrDate}, nil).Once()
 		secondary.On("GetDividends", mock.Anything, "TICKER1", "STOCK_BR").Return([]DividendEvent{evWithCurrDate}, nil).Once()
@@ -129,8 +129,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 	})
 
 	t.Run("Primary and Secondary Fail, Fallback Success", func(t *testing.T) {
-		rmock.ExpectGet("dividends:v2:FAIL1").RedisNil()
-		rmock.ExpectSet("dividends:v2:FAIL1", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:FAIL1").RedisNil()
+		rmock.ExpectSet("dividends:FAIL1", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		primary.On("GetDividends", mock.Anything, "FAIL1", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
 		secondary.On("GetDividends", mock.Anything, "FAIL1", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
@@ -142,7 +142,7 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 	})
 
 	t.Run("All Fail", func(t *testing.T) {
-		rmock.ExpectGet("dividends:v2:ALL_FAIL").RedisNil()
+		rmock.ExpectGet("dividends:ALL_FAIL").RedisNil()
 
 		primary.On("GetDividends", mock.Anything, "ALL_FAIL", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
 		secondary.On("GetDividends", mock.Anything, "ALL_FAIL", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
@@ -161,8 +161,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("Primary and Secondary nil, Fallback only", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:v2:FALL_ONLY").RedisNil()
-		rmock.ExpectSet("dividends:v2:FALL_ONLY", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:FALL_ONLY").RedisNil()
+		rmock.ExpectSet("dividends:FALL_ONLY", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		gw := NewDividendGateway(nil, nil, fallback, fallback, rdb, 12*time.Hour)
 		fallback.On("GetDividends", mock.Anything, "FALL_ONLY", "CRYPTO").Return([]DividendEvent{evWithCurrDate}, nil).Once()
@@ -174,8 +174,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("Enrich with Fallback error", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:v2:ENRICH_ERR").RedisNil()
-		rmock.ExpectSet("dividends:v2:ENRICH_ERR", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:ENRICH_ERR").RedisNil()
+		rmock.ExpectSet("dividends:ENRICH_ERR", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		oldEv := DividendEvent{Type: "Dividendo", Date: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}
 
@@ -195,8 +195,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("Primary Error, Secondary Success", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:v2:SEC_SUCC").RedisNil()
-		rmock.ExpectSet("dividends:v2:SEC_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:SEC_SUCC").RedisNil()
+		rmock.ExpectSet("dividends:SEC_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		myPrimary := new(mockDividendSource)
 		mySecondary := new(mockDividendSource)
@@ -214,8 +214,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("FII Primary and Secondary Success", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:v2:FII_SUCC").RedisNil()
-		rmock.ExpectSet("dividends:v2:FII_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:FII_SUCC").RedisNil()
+		rmock.ExpectSet("dividends:FII_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		myPrimary := new(mockDividendSource)
 		mySecondary := new(mockDividendSource)

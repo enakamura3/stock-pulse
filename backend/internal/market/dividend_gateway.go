@@ -76,7 +76,7 @@ func NewDividendGateway(
 
 func (g *DividendGateway) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
-	cacheKey := fmt.Sprintf("dividends:v2:%s", ticker)
+	cacheKey := fmt.Sprintf("dividends:%s", ticker)
 
 	// 1. Verificar cache Redis
 	val, err := g.cache.Get(ctx, cacheKey).Result()
