@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -184,6 +185,40 @@ func TestTimeoutMiddleware(t *testing.T) {
 		err := handler(mCtx)
 		assert.NoError(t, err)
 		assert.True(t, executed)
+	})
+
+	t.Run("handler timeout with text message sends timeout notice", func(t *testing.T) {
+		mw := TimeoutMiddleware(10 * time.Millisecond)
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Set", "ctx", mock.Anything).Return()
+		mCtx.On("Callback").Return((*telebot.Callback)(nil))
+		mCtx.On("Send", "⏱️ A operação demorou mais que o esperado. Por favor, tente novamente em instantes.", mock.Anything).Return(nil).Once()
+
+		handler := mw(func(c telebot.Context) error {
+			return context.DeadlineExceeded
+		})
+
+		err := handler(mCtx)
+		assert.NoError(t, err)
+		mCtx.AssertCalled(t, "Send", "⏱️ A operação demorou mais que o esperado. Por favor, tente novamente em instantes.", mock.Anything)
+	})
+
+	t.Run("handler timeout with callback responds with alert", func(t *testing.T) {
+		mw := TimeoutMiddleware(10 * time.Millisecond)
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Set", "ctx", mock.Anything).Return()
+		mCtx.On("Callback").Return(&telebot.Callback{})
+		mCtx.On("Respond", mock.MatchedBy(func(resps []*telebot.CallbackResponse) bool {
+			return len(resps) > 0 && resps[0].ShowAlert && strings.Contains(resps[0].Text, "A operação demorou mais que o esperado")
+		})).Return(nil).Once()
+
+		handler := mw(func(c telebot.Context) error {
+			return context.DeadlineExceeded
+		})
+
+		err := handler(mCtx)
+		assert.NoError(t, err)
+		mCtx.AssertCalled(t, "Respond", mock.Anything)
 	})
 }
 

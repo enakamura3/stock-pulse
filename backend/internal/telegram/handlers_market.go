@@ -21,6 +21,10 @@ func (h *Handlers) HandleQuote(c telebot.Context) error {
 }
 
 func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
+	if c.Callback() != nil {
+		_ = c.Respond()
+	}
+
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
@@ -118,6 +122,10 @@ func (h *Handlers) HandleAnalysisStart(c telebot.Context) error {
 }
 
 func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
+	if c.Callback() != nil {
+		_ = c.Respond()
+	}
+
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 

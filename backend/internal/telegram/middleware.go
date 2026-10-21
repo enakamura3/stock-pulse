@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -90,13 +91,31 @@ func TimeoutMiddleware(timeout time.Duration) telebot.MiddlewareFunc {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			c.Set("ctx", ctx)
-			return next(c)
+			err := next(c)
+			if err != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded)) {
+				slog.Warn("Telegram handler execution timed out", "error", err)
+				if c.Callback() != nil {
+					_ = c.Respond(&telebot.CallbackResponse{
+						Text:      "⏱️ A operação demorou mais que o esperado. Tente novamente.",
+						ShowAlert: true,
+					})
+					return nil
+				}
+				_ = c.Send("⏱️ A operação demorou mais que o esperado. Por favor, tente novamente em instantes.")
+				return nil
+			}
+			return err
 		}
 	}
 }
 
 func (h *Handlers) AuthMiddleware(next telebot.HandlerFunc) telebot.HandlerFunc {
 	return func(c telebot.Context) error {
+		// Bloqueia chats não-privados (grupos, supergrupos, canais com IDs negativos ou tipos explícitos)
+		if c.Chat() != nil && (c.Chat().ID < 0 || (c.Chat().Type != "" && c.Chat().Type != telebot.ChatPrivate)) {
+			return c.Send("⚠️ O Stock Pulse Bot funciona apenas em conversas privadas individuais.")
+		}
+
 		// Ignore /start as it is used for linking
 		if c.Message() != nil && strings.HasPrefix(c.Text(), "/start") {
 			return next(c)

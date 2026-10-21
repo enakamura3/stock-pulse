@@ -21,7 +21,7 @@ func (h *Handlers) HandleAlerts(c telebot.Context) error {
 
 func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 	if h.alertSvc == nil {
-		return c.Edit("⚠️ Módulo de alertas não está ativo.")
+		return h.sendOrEdit(c, "⚠️ Módulo de alertas não está ativo.")
 	}
 
 	userIDStr, err := h.getUserID(c)
@@ -35,7 +35,7 @@ func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 	alerts, err := h.alertSvc.GetAlerts(ctx, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch alerts for telegram bot", "error", err)
-		return c.Edit("❌ Ocorreu um erro ao buscar seus alertas.")
+		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar seus alertas.")
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
@@ -124,11 +124,7 @@ func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 		rows = append(rows, menu.Row(btnCreate, btnRefresh), menu.Row(btnBack))
 		menu.Inline(rows...)
 
-		err = c.Edit(msg, telebot.ModeMarkdown, menu)
-		if err != nil && strings.Contains(err.Error(), "message is not modified") {
-			return nil
-		}
-		return err
+		return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 	}
 
 	menu := &telebot.ReplyMarkup{}
@@ -137,11 +133,7 @@ func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 	menu.Inline(menu.Row(btnCreate, btnRefresh), menu.Row(btnBack))
 
-	err = c.Edit(msg, telebot.ModeMarkdown, menu)
-	if err != nil && strings.Contains(err.Error(), "message is not modified") {
-		return nil
-	}
-	return err
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleAlertCreate(c telebot.Context) error {

@@ -27,6 +27,10 @@ func TestRepository_LinkAccount(t *testing.T) {
 	chatID := int64(123456)
 
 	t.Run("Success", func(t *testing.T) {
+		mock.ExpectExec(`DELETE FROM user_telegram_link WHERE telegram_chat_id = \$1 AND user_id != \$2`).
+			WithArgs(chatID, uID).
+			WillReturnResult(pgxmock.NewResult("DELETE", 0))
+
 		mock.ExpectExec(`INSERT INTO user_telegram_link`).
 			WithArgs(uID, chatID, pgxmock.AnyArg()).
 			WillReturnResult(pgxmock.NewResult("INSERT", 1))
@@ -36,7 +40,21 @@ func TestRepository_LinkAccount(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("Clean Error", func(t *testing.T) {
+		mock.ExpectExec(`DELETE FROM user_telegram_link WHERE telegram_chat_id = \$1 AND user_id != \$2`).
+			WithArgs(chatID, uID).
+			WillReturnError(errors.New("db clean error"))
+
+		err := repo.LinkAccount(context.Background(), uID, chatID)
+		assert.ErrorContains(t, err, "failed to clean existing chat link")
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("Error", func(t *testing.T) {
+		mock.ExpectExec(`DELETE FROM user_telegram_link WHERE telegram_chat_id = \$1 AND user_id != \$2`).
+			WithArgs(chatID, uID).
+			WillReturnResult(pgxmock.NewResult("DELETE", 0))
+
 		mock.ExpectExec(`INSERT INTO user_telegram_link`).
 			WithArgs(uID, chatID, pgxmock.AnyArg()).
 			WillReturnError(errors.New("db error"))

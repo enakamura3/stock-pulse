@@ -33,6 +33,12 @@ func NewRepository(db database.DBTX) Repository {
 }
 
 func (r *repository) LinkAccount(ctx context.Context, userID uuid.UUID, telegramChatID int64) error {
+	// Remove qualquer vínculo anterior desse chatID para outro usuário antes de associar (evita colisão de UNIQUE telegram_chat_id)
+	delQuery := `DELETE FROM user_telegram_link WHERE telegram_chat_id = $1 AND user_id != $2;`
+	if _, err := database.GetDB(ctx, r.db).Exec(ctx, delQuery, telegramChatID, userID); err != nil {
+		return fmt.Errorf("failed to clean existing chat link: %w", err)
+	}
+
 	query := `
 		INSERT INTO user_telegram_link (user_id, telegram_chat_id, created_at)
 		VALUES ($1, $2, $3)

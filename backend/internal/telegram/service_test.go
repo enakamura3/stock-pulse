@@ -219,6 +219,7 @@ func TestService_GetChatIDByUserID_And_Unlink(t *testing.T) {
 		uID := uuid.New()
 		chatID := int64(98765)
 		mr.Set("telegram_active_portfolio:98765", "p1")
+		mr.Set("telegram_state:98765", `{"step":"EXPECT_TICKER"}`)
 
 		repo.On("GetChatIDByUserID", mock.Anything, uID).Return(chatID, nil)
 		repo.On("UnlinkAccount", mock.Anything, uID).Return(nil)
@@ -226,6 +227,7 @@ func TestService_GetChatIDByUserID_And_Unlink(t *testing.T) {
 		err := svc.UnlinkAccount(context.Background(), uID)
 		assert.NoError(t, err)
 		assert.False(t, mr.Exists("telegram_active_portfolio:98765"))
+		assert.False(t, mr.Exists("telegram_state:98765"))
 	})
 
 	t.Run("UnlinkAccount when chatID is not found", func(t *testing.T) {

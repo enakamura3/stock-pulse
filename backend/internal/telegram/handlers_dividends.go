@@ -157,7 +157,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 	divs, portfolioName, err := h.fetchDividends(c)
 	if err != nil {
 		slog.Error("Failed to fetch dividends for telegram bot", "error", err)
-		return c.Edit("❌ Ocorreu um erro ao buscar os proventos da sua carteira.")
+		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar os proventos da sua carteira.")
 	}
 
 	totalPaidMonth := make(map[string]float64)
@@ -331,11 +331,7 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 		menu.Inline(menu.Row(btnRefresh), menu.Row(btnBack))
 	}
 
-	err = c.Edit(msg, telebot.ModeMarkdown, menu)
-	if err != nil && strings.Contains(err.Error(), "message is not modified") {
-		return nil
-	}
-	return err
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleAgenda(c telebot.Context) error {

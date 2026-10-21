@@ -23,21 +23,21 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
-		return c.Edit("⚠️ Nenhuma carteira encontrada.")
+		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada.")
 	}
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
 	txs, err := h.portfolioSvc.GetPortfolioTransactions(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch transactions for telegram bot", "error", err, "user_id", userIDStr)
-		return c.Edit("❌ Ocorreu um erro ao buscar o histórico.")
+		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar o histórico.")
 	}
 
 	if len(txs) == 0 {
 		menu := &telebot.ReplyMarkup{}
 		btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 		menu.Inline(menu.Row(btnBack))
-		return c.Edit("📜 Nenhuma operação encontrada na sua carteira.", menu)
+		return h.sendOrEdit(c, "📜 Nenhuma operação encontrada na sua carteira.", menu)
 	}
 
 	// Parse callback data: "PAGE:FILTER" (ex: "0:ALL", "1:BUY", "0:SELL")
@@ -147,9 +147,5 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 
 	menu.Inline(rows...)
 
-	err = c.Edit(msg, telebot.ModeMarkdown, menu)
-	if err != nil && strings.Contains(err.Error(), "message is not modified") {
-		return nil
-	}
-	return err
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
