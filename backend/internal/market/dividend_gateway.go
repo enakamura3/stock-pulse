@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -74,7 +76,7 @@ func NewDividendGateway(
 
 func (g *DividendGateway) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
-	cacheKey := fmt.Sprintf("dividends:%s", ticker)
+	cacheKey := fmt.Sprintf("dividends:v2:%s", ticker)
 
 	// 1. Verificar cache Redis
 	val, err := g.cache.Get(ctx, cacheKey).Result()
@@ -162,6 +164,30 @@ func isMonthlyYieldAsset(assetType string) bool {
 	return upper == "FII" || upper == "FIAGRO" || upper == "ETF" || upper == "ETF_BR"
 }
 
+func normalizeDividendType(rawType, assetType string) string {
+	tipoUpper := strings.ToUpper(rawType)
+	if strings.Contains(tipoUpper, "JRS") || strings.Contains(tipoUpper, "JUROS") || strings.Contains(tipoUpper, "JCP") {
+		return "JCP"
+	}
+	if strings.Contains(tipoUpper, "RENDIMENTO") {
+		return "Rendimento"
+	}
+	if strings.Contains(tipoUpper, "AMORTIZA") {
+		return "Amortização"
+	}
+	if isFiiType(assetType) {
+		return "Rendimento"
+	}
+	return "Dividendo"
+}
+
+func sameCalendarDay(a, b time.Time) bool {
+	if a.IsZero() || b.IsZero() {
+		return a.IsZero() && b.IsZero()
+	}
+	return a.Format("2006-01-02") == b.Format("2006-01-02")
+}
+
 func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType string) []DividendEvent {
 	isMonthly := isMonthlyYieldAsset(assetType)
 	isFii := isFiiType(assetType)
@@ -173,26 +199,53 @@ func mergeAndDedupDividends(saEvents, fundEvents []DividendEvent, assetType stri
 		baseEvents = saEvents
 		secondaryEvents = fundEvents
 	} else {
-		// Prioriza Fundamentus para Ações, para manter JCP e valores brutos corretos
+		// Prioriza Fundamentus/B3 para Ações, para manter JCP e valores brutos corretos
 		baseEvents = fundEvents
 		secondaryEvents = saEvents
 	}
 
-	deduped := append([]DividendEvent{}, baseEvents...)
+	deduped := make([]DividendEvent, 0, len(baseEvents))
+	for _, bEv := range baseEvents {
+		if !isMonthly {
+			dupIdx := -1
+			for idx, dEv := range deduped {
+				if sameCalendarDay(bEv.Date, dEv.Date) &&
+					sameCalendarDay(bEv.PaymentDate, dEv.PaymentDate) &&
+					math.Abs(bEv.Amount-dEv.Amount) < calculator.FinancialEpsilon {
+					dupIdx = idx
+					break
+				}
+			}
+			if dupIdx >= 0 {
+				if deduped[dupIdx].Type == "Dividendo" && bEv.Type != "Dividendo" {
+					deduped[dupIdx].Type = bEv.Type
+				}
+				continue
+			}
+		}
+		deduped = append(deduped, bEv)
+	}
 
 	for _, sEv := range secondaryEvents {
 		exists := false
-		for _, dEv := range deduped {
+		for idx, dEv := range deduped {
 			if isMonthly {
 				if sEv.Date.Month() == dEv.Date.Month() && sEv.Date.Year() == dEv.Date.Year() {
 					exists = true
 					break
 				}
 			} else {
-				// Para Ações: se o Fundamentus (base) já reportou QUALQUER provento nesta Data Com,
-				// ignoramos o evento do StockAnalysis (secundário). O StockAnalysis costuma agrupar
-				// JCP + Dividendo do mesmo dia num único valor, o que quebra a conciliação.
-				if sEv.Date.Equal(dEv.Date) {
+				// Para Ações: se a base já reportou provento nesta Data Com (ou mesma Data de Pagamento + mesmo valor),
+				// reconciliamos o tipo (preferindo JCP/específico sobre "Dividendo" genérico) e evitamos duplicação.
+				sameCumDate := sameCalendarDay(sEv.Date, dEv.Date)
+				samePayAndAmount := !sEv.PaymentDate.IsZero() &&
+					sameCalendarDay(sEv.PaymentDate, dEv.PaymentDate) &&
+					math.Abs(sEv.Amount-dEv.Amount) < calculator.FinancialEpsilon
+				if sameCumDate || samePayAndAmount {
+					if math.Abs(sEv.Amount-dEv.Amount) < calculator.FinancialEpsilon &&
+						deduped[idx].Type == "Dividendo" && sEv.Type != "Dividendo" {
+						deduped[idx].Type = sEv.Type
+					}
 					exists = true
 					break
 				}

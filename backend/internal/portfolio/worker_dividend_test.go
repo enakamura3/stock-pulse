@@ -56,7 +56,7 @@ func TestDividendWorker_SyncAllDividends_FuzzyMatch(t *testing.T) {
 	repo.On("GetAssetEventsByDate", mock.Anything, "asset-1", exDate).Return(existingEvents, nil)
 
 	// Should update since 1.54 - 1.50 = 0.04 <= 0.05
-	repo.On("UpdateAssetEventValueByID", mock.Anything, "evt-1", 1.54, 1.54, payDate).Return(nil)
+	repo.On("UpdateAssetEventValueByID", mock.Anything, "evt-1", "Dividendo", 1.54, 1.54, payDate).Return(nil)
 
 	worker.SyncAllDividends(ctx)
 
@@ -227,7 +227,82 @@ func TestDividendWorker_SyncAllDividends_ErrorScenariosAndBranches(t *testing.T)
 		repo.On("GetAssetEventsByDate", mock.Anything, "asset-1", exDate3).Return([]AssetEvent{
 			{ID: "update-err", Type: "Rendimento", GrossAmount: 2.98, CumDate: exDate3, PaymentDate: payDate},
 		}, nil)
-		repo.On("UpdateAssetEventValueByID", mock.Anything, "update-err", 3.0, 3.0, payDate).Return(assert.AnError)
+		repo.On("UpdateAssetEventValueByID", mock.Anything, "update-err", "Rendimento", 3.0, 3.0, payDate).Return(assert.AnError)
+
+		worker.SyncAllDividends(context.Background())
+		repo.AssertExpectations(t)
+		ms.AssertExpectations(t)
+	})
+
+	t.Run("Cross-type reconciliation (Dividendo vs JCP) and matchedIDs tracking", func(t *testing.T) {
+		repo := new(MockPortfolioRepo)
+		ms := new(MockMarketService)
+		worker := NewDividendWorker(repo, ms)
+
+		assets := []AssetCompact{
+			{ID: "asset-itsa", Ticker: "ITSA4.SA", AssetType: "STOCK_BR"},
+		}
+		repo.On("GetAllAssets", mock.Anything).Return(assets, nil)
+
+		cumDate := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
+		payDate := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)
+
+		// Event 1: incoming JCP matches existing Dividendo on same CumDate & PaymentDate -> upgrades existing to JCP
+		// Event 2: incoming Dividendo (e.g. fallback) matches existing JCP on same CumDate & PaymentDate -> skips to preserve JCP
+		scrapedEvents := []market.DividendEvent{
+			{Date: cumDate, Type: "JCP", Amount: 0.02, PaymentDate: payDate},
+			{Date: cumDate, Type: "Dividendo", Amount: 0.02, PaymentDate: payDate},
+		}
+		ms.On("GetDividends", mock.Anything, "ITSA4.SA", "STOCK_BR").Return(scrapedEvents, nil)
+
+		existingEvents := []AssetEvent{
+			{ID: "evt-div", AssetID: "asset-itsa", Type: "Dividendo", GrossAmount: 0.02, CumDate: cumDate, PaymentDate: payDate},
+			{ID: "evt-jcp", AssetID: "asset-itsa", Type: "JCP", GrossAmount: 0.02, CumDate: cumDate, PaymentDate: payDate},
+		}
+		repo.On("GetAssetEventsByDate", mock.Anything, "asset-itsa", cumDate).Return(existingEvents, nil)
+
+		// First event (JCP) matches evt-jcp (Pass 1 exact match -> skip).
+		// Second event (Dividendo) matches evt-div (Pass 1 exact match -> skip).
+		worker.SyncAllDividends(context.Background())
+		repo.AssertExpectations(t)
+		repo.AssertNotCalled(t, "UpdateAssetEventValueByID")
+		repo.AssertNotCalled(t, "UpsertAssetEvent")
+	})
+
+	t.Run("Cross-type pass 2 upgrade Dividendo to JCP and preserve JCP against Dividendo", func(t *testing.T) {
+		repo := new(MockPortfolioRepo)
+		ms := new(MockMarketService)
+		worker := NewDividendWorker(repo, ms)
+
+		assets := []AssetCompact{
+			{ID: "asset-itsa", Ticker: "ITSA4.SA", AssetType: "STOCK_BR"},
+		}
+		repo.On("GetAllAssets", mock.Anything).Return(assets, nil)
+
+		cumDate1 := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
+		cumDate2 := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+		payDate1 := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)
+		payDate2 := time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC)
+
+		scrapedEvents := []market.DividendEvent{
+			// First on cumDate1: matches evt-already-matched in Pass 1 (marking it in matchedIDs)
+			{Date: cumDate1, Type: "JCP", Amount: 0.50, PaymentDate: payDate1},
+			// Second on cumDate1: incoming JCP, skips evt-already-matched in Pass 2, matches Dividendo (evt-1) -> upgrades DB row to JCP
+			{Date: cumDate1, Type: "JCP", Amount: 0.02, PaymentDate: payDate1},
+			// On cumDate2: incoming Dividendo, DB has JCP -> skips update and preserves JCP
+			{Date: cumDate2, Type: "Dividendo", Amount: 0.05, PaymentDate: payDate2},
+		}
+		ms.On("GetDividends", mock.Anything, "ITSA4.SA", "STOCK_BR").Return(scrapedEvents, nil)
+
+		repo.On("GetAssetEventsByDate", mock.Anything, "asset-itsa", cumDate1).Return([]AssetEvent{
+			{ID: "evt-already-matched", AssetID: "asset-itsa", Type: "JCP", GrossAmount: 0.50, CumDate: cumDate1, PaymentDate: payDate1},
+			{ID: "evt-1", AssetID: "asset-itsa", Type: "Dividendo", GrossAmount: 0.02, CumDate: cumDate1, PaymentDate: payDate1},
+		}, nil)
+		repo.On("UpdateAssetEventValueByID", mock.Anything, "evt-1", "JCP", 0.02, 0.02, payDate1).Return(nil)
+
+		repo.On("GetAssetEventsByDate", mock.Anything, "asset-itsa", cumDate2).Return([]AssetEvent{
+			{ID: "evt-2", AssetID: "asset-itsa", Type: "JCP", GrossAmount: 0.05, CumDate: cumDate2, PaymentDate: payDate2},
+		}, nil)
 
 		worker.SyncAllDividends(context.Background())
 		repo.AssertExpectations(t)

@@ -160,8 +160,8 @@ func (m *MockPortfolioRepo) GetAssetEventsByDate(ctx context.Context, assetID st
 	return args.Get(0).([]AssetEvent), args.Error(1)
 }
 
-func (m *MockPortfolioRepo) UpdateAssetEventValueByID(ctx context.Context, eventID string, newGross, newNet float64, newPayment time.Time) error {
-	args := m.Called(ctx, eventID, newGross, newNet, newPayment)
+func (m *MockPortfolioRepo) UpdateAssetEventValueByID(ctx context.Context, eventID, newType string, newGross, newNet float64, newPayment time.Time) error {
+	args := m.Called(ctx, eventID, newType, newGross, newNet, newPayment)
 	return args.Error(0)
 }
 
@@ -1074,6 +1074,29 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, divs, 1) // Deduped to 1
 		assert.InDelta(t, 10.0, divs[0].GrossAmount, 1e-6)
+	})
+
+	t.Run("Stock Deduplication JCP vs Dividendo on Same CumDate and PaymentDate", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
+
+		cumDate := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
+		payDate := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)
+		txs := []Transaction{
+			{AssetID: "itsa4", Ticker: "ITSA4.SA", Type: "BUY", Quantity: 100, ExecutedAt: cumDate.AddDate(0, -1, 0), Currency: "BRL", AssetType: "STOCK_BR"},
+		}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
+		repo.On("GetAssetEvents", mock.Anything, "itsa4").Return([]AssetEvent{
+			{AssetID: "itsa4", CumDate: cumDate, PaymentDate: payDate, GrossAmount: 0.02, Type: "Dividendo"},
+			{AssetID: "itsa4", CumDate: cumDate, PaymentDate: payDate, GrossAmount: 0.02, Type: "JCP"},
+			{AssetID: "itsa4", CumDate: cumDate, PaymentDate: payDate, GrossAmount: 0.02, Type: "Dividendo"},
+		}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 1)
+		assert.Equal(t, "JCP", divs[0].Type)
+		assert.InDelta(t, 2.0*0.85, divs[0].NetAmount, 1e-6)
 	})
 }
 

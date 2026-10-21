@@ -67,17 +67,7 @@ func (s *B3DividendSource) GetDividends(ctx context.Context, ticker string, asse
 		}
 
 		// mapCorporateAction
-		tipoUpper := strings.ToUpper(raw.CorporateAction)
-		cleanType := "Dividendo"
-		if strings.Contains(tipoUpper, "JRS CAP PROPRIO") || strings.Contains(tipoUpper, "JCP") {
-			cleanType = "JCP"
-		} else if strings.Contains(tipoUpper, "RENDIMENTO") {
-			cleanType = "Rendimento"
-		} else if strings.Contains(tipoUpper, "AMORTIZACAO") {
-			cleanType = "Amortização"
-		} else if strings.ToUpper(assetType) == "FII" || strings.ToUpper(assetType) == "FIAGRO" {
-			cleanType = "Rendimento"
-		}
+		cleanType := normalizeDividendType(raw.CorporateAction, assetType)
 
 		events = append(events, DividendEvent{
 			Date:        exDate,

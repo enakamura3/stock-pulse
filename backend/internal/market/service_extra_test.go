@@ -22,7 +22,7 @@ func TestService_GetDividends(t *testing.T) {
 		events := []DividendEvent{{Type: "DIVIDEND", Amount: 1.5}}
 		b, _ := json.Marshal(events)
 
-		rmock.ExpectGet("dividends:PETR4.SA").SetVal(string(b))
+		rmock.ExpectGet("dividends:v2:PETR4.SA").SetVal(string(b))
 
 		res, err := s.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
@@ -32,8 +32,8 @@ func TestService_GetDividends(t *testing.T) {
 
 	t.Run("Cache Miss Fundamentus Success", func(t *testing.T) {
 		s, _, rdb, rmock := setupServiceTest()
-		rmock.ExpectGet("dividends:PETR4.SA").RedisNil()
-		rmock.ExpectSet("dividends:PETR4.SA", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:PETR4.SA").RedisNil()
+		rmock.ExpectSet("dividends:v2:PETR4.SA", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		mockB3 := &mockDividendSource{}
 		mockFund := &mockDividendSource{}
@@ -53,8 +53,8 @@ func TestService_GetDividends(t *testing.T) {
 
 	t.Run("Cache Miss StockAnalysis Success", func(t *testing.T) {
 		s, _, rdb, rmock := setupServiceTest()
-		rmock.ExpectGet("dividends:AAPL").RedisNil()
-		rmock.ExpectSet("dividends:AAPL", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:AAPL").RedisNil()
+		rmock.ExpectSet("dividends:v2:AAPL", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		mockB3 := &mockDividendSource{}
 		mockFund := &mockDividendSource{}

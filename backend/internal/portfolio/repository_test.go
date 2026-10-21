@@ -632,11 +632,11 @@ func TestRepository_AssetEvents(t *testing.T) {
 	})
 
 	t.Run("UpdateAssetEventValueByID", func(t *testing.T) {
-		mock.ExpectExec(`UPDATE asset_event SET gross_amount = \$1, net_amount = \$2, payment_date = \$3`).
-			WithArgs(2.0, 2.0, pay, "e1").
+		mock.ExpectExec(`UPDATE asset_event SET type = \$1, gross_amount = \$2, net_amount = \$3, payment_date = \$4`).
+			WithArgs("JCP", 2.0, 2.0, pay, "e1").
 			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
-		err := repo.UpdateAssetEventValueByID(context.Background(), "e1", 2.0, 2.0, pay)
+		err := repo.UpdateAssetEventValueByID(context.Background(), "e1", "JCP", 2.0, 2.0, pay)
 		assert.NoError(t, err)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -871,11 +871,11 @@ func TestRepository_AssetEvents_Branches(t *testing.T) {
 	})
 
 	t.Run("UpdateAssetEventValueByID Zero Payment Date", func(t *testing.T) {
-		mock.ExpectExec(`UPDATE asset_event SET gross_amount = \$1, net_amount = \$2, payment_date = \$3`).
-			WithArgs(2.0, 2.0, nil, "e1").
+		mock.ExpectExec(`UPDATE asset_event SET type = \$1, gross_amount = \$2, net_amount = \$3, payment_date = \$4`).
+			WithArgs("Dividendo", 2.0, 2.0, nil, "e1").
 			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
-		err := repo.UpdateAssetEventValueByID(context.Background(), "e1", 2.0, 2.0, time.Time{})
+		err := repo.UpdateAssetEventValueByID(context.Background(), "e1", "Dividendo", 2.0, 2.0, time.Time{})
 		assert.NoError(t, err)
 	})
 }

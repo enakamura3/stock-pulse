@@ -73,6 +73,31 @@ func TestMergeAndDedupDividends(t *testing.T) {
 		assert.Equal(t, 1.5, merged[0].Amount)
 		assert.Equal(t, 2.0, merged[1].Amount)
 	})
+
+	t.Run("Stock JCP and Dividendo reconciliation in base and secondary", func(t *testing.T) {
+		date1 := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
+		pay1 := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)
+		date2 := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+		pay2 := time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC)
+
+		// Base (e.g. B3) has duplicate with Dividendo then JCP on date1, and Dividendo on date2
+		fundEvents := []DividendEvent{
+			{Date: date1, PaymentDate: pay1, Amount: 0.02, Type: "Dividendo"},
+			{Date: date1, PaymentDate: pay1, Amount: 0.02, Type: "JCP"},
+			{Date: date2, PaymentDate: pay2, Amount: 0.05, Type: "Dividendo"},
+		}
+		// Secondary (e.g. Fundamentus) has JCP on date2 (with 1-day cum_date offset but same PaymentDate and Amount)
+		saEvents := []DividendEvent{
+			{Date: date2.AddDate(0, 0, 1), PaymentDate: pay2, Amount: 0.05, Type: "JCP"},
+		}
+
+		merged := mergeAndDedupDividends(saEvents, fundEvents, "STOCK_BR")
+		assert.Len(t, merged, 2)
+		assert.Equal(t, "JCP", merged[0].Type)
+		assert.Equal(t, 0.05, merged[0].Amount)
+		assert.Equal(t, "JCP", merged[1].Type)
+		assert.Equal(t, 0.02, merged[1].Amount)
+	})
 }
 
 func TestDividendGateway_GetDividends(t *testing.T) {
@@ -92,8 +117,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 	evWithCurrDate := DividendEvent{Type: "Dividendo", Date: currMonthDate}
 
 	t.Run("Primary Success", func(t *testing.T) {
-		rmock.ExpectGet("dividends:TICKER1").RedisNil()
-		rmock.ExpectSet("dividends:TICKER1", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:TICKER1").RedisNil()
+		rmock.ExpectSet("dividends:v2:TICKER1", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		primary.On("GetDividends", mock.Anything, "TICKER1", "STOCK_BR").Return([]DividendEvent{evWithCurrDate}, nil).Once()
 		secondary.On("GetDividends", mock.Anything, "TICKER1", "STOCK_BR").Return([]DividendEvent{evWithCurrDate}, nil).Once()
@@ -104,8 +129,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 	})
 
 	t.Run("Primary and Secondary Fail, Fallback Success", func(t *testing.T) {
-		rmock.ExpectGet("dividends:FAIL1").RedisNil()
-		rmock.ExpectSet("dividends:FAIL1", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:FAIL1").RedisNil()
+		rmock.ExpectSet("dividends:v2:FAIL1", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		primary.On("GetDividends", mock.Anything, "FAIL1", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
 		secondary.On("GetDividends", mock.Anything, "FAIL1", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
@@ -117,7 +142,7 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 	})
 
 	t.Run("All Fail", func(t *testing.T) {
-		rmock.ExpectGet("dividends:ALL_FAIL").RedisNil()
+		rmock.ExpectGet("dividends:v2:ALL_FAIL").RedisNil()
 
 		primary.On("GetDividends", mock.Anything, "ALL_FAIL", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
 		secondary.On("GetDividends", mock.Anything, "ALL_FAIL", "STOCK_BR").Return([]DividendEvent{}, errors.New("err")).Once()
@@ -136,8 +161,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("Primary and Secondary nil, Fallback only", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:FALL_ONLY").RedisNil()
-		rmock.ExpectSet("dividends:FALL_ONLY", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:FALL_ONLY").RedisNil()
+		rmock.ExpectSet("dividends:v2:FALL_ONLY", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		gw := NewDividendGateway(nil, nil, fallback, fallback, rdb, 12*time.Hour)
 		fallback.On("GetDividends", mock.Anything, "FALL_ONLY", "CRYPTO").Return([]DividendEvent{evWithCurrDate}, nil).Once()
@@ -149,8 +174,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("Enrich with Fallback error", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:ENRICH_ERR").RedisNil()
-		rmock.ExpectSet("dividends:ENRICH_ERR", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:ENRICH_ERR").RedisNil()
+		rmock.ExpectSet("dividends:v2:ENRICH_ERR", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		oldEv := DividendEvent{Type: "Dividendo", Date: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}
 
@@ -170,8 +195,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("Primary Error, Secondary Success", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:SEC_SUCC").RedisNil()
-		rmock.ExpectSet("dividends:SEC_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:SEC_SUCC").RedisNil()
+		rmock.ExpectSet("dividends:v2:SEC_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		myPrimary := new(mockDividendSource)
 		mySecondary := new(mockDividendSource)
@@ -189,8 +214,8 @@ func TestDividendGateway_GetDividends(t *testing.T) {
 
 	t.Run("FII Primary and Secondary Success", func(t *testing.T) {
 		rdb, rmock := redismock.NewClientMock()
-		rmock.ExpectGet("dividends:FII_SUCC").RedisNil()
-		rmock.ExpectSet("dividends:FII_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
+		rmock.ExpectGet("dividends:v2:FII_SUCC").RedisNil()
+		rmock.ExpectSet("dividends:v2:FII_SUCC", mock.Anything, 12*time.Hour).SetVal("OK")
 
 		myPrimary := new(mockDividendSource)
 		mySecondary := new(mockDividendSource)
