@@ -137,6 +137,20 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	var rows []telebot.Row
 	rows = append(rows, menu.Row(btnAll, btnBuy, btnSell))
 
+	// Atalhos para exclusão pontual de operações exibidas na página
+	var delBtns []telebot.Btn
+	for _, tx := range filtered[start:end] {
+		btnDel := menu.Data(fmt.Sprintf("🗑️ %s (%s)", tx.Ticker, tx.ExecutedAt.Format("02/01")), "btn_tx_del_"+tx.ID)
+		delBtns = append(delBtns, btnDel)
+	}
+	for i := 0; i < len(delBtns); i += 2 {
+		if i+1 < len(delBtns) {
+			rows = append(rows, menu.Row(delBtns[i], delBtns[i+1]))
+		} else {
+			rows = append(rows, menu.Row(delBtns[i]))
+		}
+	}
+
 	var navBtns []telebot.Btn
 	if start > 0 {
 		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_history", fmt.Sprintf("%d:%s", page-1, filter)))

@@ -765,6 +765,9 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx2.On("Respond", mock.Anything).Return(nil).Once()
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_TYPE", PortfolioID: "p1", Ticker: "AAPL"}, nil).Once()
+		pSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolio.Portfolio{}, []portfolio.Position{
+			{Ticker: "AAPL", Quantity: 50, AveragePrice: 150.0},
+		}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_QTY", PortfolioID: "p1", Ticker: "AAPL", Type: "SELL"}).Return(nil).Once()
 		mCtx2.On("Edit", mock.Anything, mock.Anything).Return(nil)
 
@@ -778,6 +781,7 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_QTY", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY"}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL", Price: 150.0}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10}).Return(nil).Once()
 		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
 
@@ -809,8 +813,11 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Text").Return("10,5")
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_QTY", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY"}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL", Price: 150.0}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10.5}).Return(nil).Once()
-		mCtx.On("Send", "Qual o preço unitário da transação? (ex: 15.50)", mock.Anything).Return(nil)
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "preço unitário")
+		}), mock.Anything).Return(nil)
 
 		err := h.HandleText(mCtx)
 		assert.NoError(t, err)

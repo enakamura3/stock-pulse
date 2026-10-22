@@ -322,6 +322,11 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		return posByValue[i].CurrentValue > posByValue[j].CurrentValue
 	})
 
+	totalPortValue := 0.0
+	for _, pos := range positions {
+		totalPortValue += pos.CurrentValue
+	}
+
 	pageSize := 10
 	totalPages := (len(posByValue) + pageSize - 1) / pageSize
 	if page < 0 {
@@ -380,6 +385,10 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	if len(navBtns) > 0 {
 		rows = append(rows, menu.Row(navBtns...))
 	}
+	btnOp := menu.Data("💵 Lançar Operação", "btn_operacao")
+	btnCotacao := menu.Data("📈 Cotação", "btn_cotacao")
+	rows = append(rows, menu.Row(btnOp, btnCotacao))
+
 	btnBack := menu.Data("⬅️ Voltar ao Resumo", "btn_resumo")
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
 	rows = append(rows, menu.Row(btnBack, btnMenu))

@@ -130,7 +130,10 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_new_asset", h.HandleNewAsset)
 	bot.Handle("\fbtn_buy", h.HandleSetTypeBuy)
 	bot.Handle("\fbtn_sell", h.HandleSetTypeSell)
+	bot.Handle("\fbtn_qty_all", h.HandleQtyAll)
+	bot.Handle("\fbtn_qty_half", h.HandleQtyHalf)
 	bot.Handle("\fbtn_op_date_today", h.HandleDateToday)
+	bot.Handle("\fbtn_op_date_yesterday", h.HandleDateYesterday)
 	bot.Handle("\fbtn_op_fee_zero", h.HandleFeeZero)
 
 	// Intercepta todos os callbacks para capturar a seleção dinâmica de ticker e portfólio
