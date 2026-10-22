@@ -168,3 +168,25 @@ func TestHandlers_SendOrEdit(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestIsB3TickerAndNormalize(t *testing.T) {
+	assert.True(t, isB3Ticker("PETR4"))
+	assert.True(t, isB3Ticker("vale3"))
+	assert.True(t, isB3Ticker("HGLG11"))
+	assert.True(t, isB3Ticker("PETR4.SA"))
+	assert.True(t, isB3Ticker("PETR4F"))
+	assert.True(t, isB3Ticker("petr4f.sa"))
+
+	assert.False(t, isB3Ticker("AAPL"))
+	assert.False(t, isB3Ticker("BTC-USD"))
+	assert.False(t, isB3Ticker("P1"))
+	assert.False(t, isB3Ticker("TOOLONG11"))
+	assert.False(t, isB3Ticker("12345"))
+	assert.False(t, isB3Ticker("PETRA"))
+	assert.False(t, isB3Ticker("PETR4X"))
+
+	assert.Equal(t, "PETR4.SA", normalizeB3Ticker("petr4"))
+	assert.Equal(t, "VALE3.SA", normalizeB3Ticker("VALE3.SA"))
+	assert.Equal(t, "AAPL", normalizeB3Ticker("AAPL"))
+	assert.Equal(t, "BTC-USD", normalizeB3Ticker("BTC-USD"))
+}

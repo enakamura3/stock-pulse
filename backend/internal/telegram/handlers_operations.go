@@ -535,7 +535,16 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
-		return h.sendOrEditMenu(c)
+		menu := &telebot.ReplyMarkup{}
+		btnMenu := menu.Data("🏠 Abrir Menu Principal", "btn_menu")
+		menu.Inline(menu.Row(btnMenu))
+		msg := "🤖 *Olá!*\n\nNão entendi esse comando ou mensagem solta.\n\n" +
+			"💡 *Você pode:*\n" +
+			"• Usar o botão abaixo para abrir o menu interativo\n" +
+			"• Consultar um ativo: `/cotacao PETR4`\n" +
+			"• Fazer análise fundamentalista: `/analise WEGE3`\n" +
+			"• Ver todos os comandos disponíveis: `/help`"
+		return c.Send(msg, telebot.ModeMarkdown, menu)
 	}
 
 	text := strings.TrimSpace(c.Text())
@@ -546,12 +555,16 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 	switch state.Step {
 	case "EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
-		_, err := h.marketSvc.GetQuote(ctx, ticker)
+		quote, err := h.getQuoteWithFallback(ctx, ticker)
 		if err != nil {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
+		resolvedTicker := ticker
+		if quote != nil && quote.Symbol != "" {
+			resolvedTicker = quote.Symbol
+		}
 
-		return h.handleSelectedTicker(c, ticker)
+		return h.handleSelectedTicker(c, resolvedTicker)
 
 	case "EXPECT_QTY":
 		text = strings.ReplaceAll(text, ",", ".")
@@ -647,12 +660,16 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	case "ALERT_EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
-		_, err := h.marketSvc.GetQuote(ctx, ticker)
+		quote, err := h.getQuoteWithFallback(ctx, ticker)
 		if err != nil {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
+		resolvedTicker := ticker
+		if quote != nil && quote.Symbol != "" {
+			resolvedTicker = quote.Symbol
+		}
 
-		state.Ticker = ticker
+		state.Ticker = resolvedTicker
 		state.Step = "ALERT_EXPECT_COND"
 		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
@@ -666,7 +683,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			condMenu.Row(btnBack, btnCancelOp),
 		)
 
-		return c.Send(fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(ticker)), telebot.ModeMarkdown, condMenu)
+		return c.Send(fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(resolvedTicker)), telebot.ModeMarkdown, condMenu)
 
 	case "ALERT_EXPECT_PRICE":
 		text = strings.ReplaceAll(text, ",", ".")
@@ -714,18 +731,23 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	case "QUOTE_EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
-		quote, err := h.marketSvc.GetQuote(ctx, ticker)
+		quote, err := h.getQuoteWithFallback(ctx, ticker)
 		if err != nil {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
 
 		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 
-		msg := formatQuoteMessage(ticker, quote)
+		resolvedTicker := ticker
+		if quote != nil && quote.Symbol != "" {
+			resolvedTicker = quote.Symbol
+		}
+
+		msg := formatQuoteMessage(resolvedTicker, quote)
 
 		replyMenu := &telebot.ReplyMarkup{}
-		btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+ticker)
-		btnAnalise := replyMenu.Data("🔍 Análise Fundamentalista", "btn_analise_"+ticker)
+		btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+resolvedTicker)
+		btnAnalise := replyMenu.Data("🔍 Análise Fundamentalista", "btn_analise_"+resolvedTicker)
 		btnNew := replyMenu.Data("🔍 Consultar Outro", "btn_cotacao")
 		btnMenuBtn := replyMenu.Data("🏠 Menu", "btn_menu")
 		replyMenu.Inline(replyMenu.Row(btnRefresh, btnAnalise), replyMenu.Row(btnNew, btnMenuBtn))

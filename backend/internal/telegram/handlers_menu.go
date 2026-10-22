@@ -24,7 +24,11 @@ func (h *Handlers) HandleStart(c telebot.Context) error {
 			slog.Error("Erro ao vincular conta telegram", "error", err, "chat_id", c.Chat().ID)
 			return c.Send("❌ Ocorreu um erro interno ao vincular sua conta. Tente novamente.")
 		}
-		return c.Send("✅ Conta vinculada com sucesso! Bem-vindo ao Stock Pulse.\n\nEnvie /menu para ver as opções.")
+		menu := &telebot.ReplyMarkup{}
+		btnMenu := menu.Data("🏠 Abrir Menu Principal", "btn_menu")
+		btnResumo := menu.Data("📊 Ver Resumo", "btn_resumo")
+		menu.Inline(menu.Row(btnMenu, btnResumo))
+		return c.Send("✅ Conta vinculada com sucesso! Bem-vindo ao Stock Pulse.\n\nEscolha uma opção para começar:", menu)
 	}
 
 	return c.Send("Bem-vindo ao bot do Stock Pulse! Para usar este bot, vá até as configurações no sistema web e clique em 'Vincular Telegram'.")
@@ -48,8 +52,11 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
-	// Se houver estado pendente, vamos limpar
-	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	var chatID int64
+	if c.Chat() != nil {
+		chatID = c.Chat().ID
+		_ = h.svc.ClearConversationState(ctx, chatID)
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
@@ -60,37 +67,38 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
-	btnResumo := menu.Data("📊 Resumo da Carteira", "btn_resumo")
-	btnProventos := menu.Data("💸 Ver Proventos", "btn_proventos")
-	btnHistory := menu.Data("📜 Histórico", "btn_history")
+	btnResumo := menu.Data("📊 Resumo", "btn_resumo")
+	btnAtivos := menu.Data("📋 Meus Ativos", "btn_ativos")
+	btnProventos := menu.Data("💸 Proventos", "btn_proventos")
+	btnAgenda := menu.Data("📅 Agenda", "btn_agenda")
 	btnRendaFixa := menu.Data("🏛️ Renda Fixa", "btn_renda_fixa")
-	btnOperacao := menu.Data("💵 Lançar Operação", "btn_operacao")
-	btnAlertas := menu.Data("🔔 Meus Alertas", "btn_alerts")
+	btnHistory := menu.Data("📜 Histórico", "btn_history")
+	btnOperacao := menu.Data("💵 Lançar Op.", "btn_operacao")
+	btnAlertas := menu.Data("🔔 Alertas", "btn_alerts")
 	btnFavoritos := menu.Data("⭐ Favoritos", "btn_watchlist")
-	btnCotacao := menu.Data("📈 Cotação Rápida", "btn_cotacao")
-
+	btnCotacao := menu.Data("📈 Cotação", "btn_cotacao")
+	btnAnalise := menu.Data("🔍 Análise", "btn_analise")
 	btnHelp := menu.Data("❓ Ajuda e Comandos", "btn_help")
 
 	rows := []telebot.Row{
-		menu.Row(btnResumo),
-		menu.Row(btnProventos),
-		menu.Row(btnHistory),
-		menu.Row(btnRendaFixa),
-		menu.Row(btnOperacao),
-		menu.Row(btnAlertas),
-		menu.Row(btnFavoritos),
-		menu.Row(btnCotacao),
+		menu.Row(btnResumo, btnAtivos),
+		menu.Row(btnProventos, btnAgenda),
+		menu.Row(btnRendaFixa, btnHistory),
+		menu.Row(btnOperacao, btnAlertas),
+		menu.Row(btnFavoritos, btnCotacao),
 	}
 
 	if len(portfolios) > 1 {
 		btnTrocarCarteira := menu.Data("🔄 Trocar Carteira", "btn_change_portfolio")
-		rows = append(rows, menu.Row(btnTrocarCarteira))
+		rows = append(rows, menu.Row(btnAnalise, btnTrocarCarteira))
+		rows = append(rows, menu.Row(btnHelp))
+	} else {
+		rows = append(rows, menu.Row(btnAnalise, btnHelp))
 	}
-	rows = append(rows, menu.Row(btnHelp))
 
 	menu.Inline(rows...)
 
-	_, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	_, portfolioName := h.resolveActivePortfolio(ctx, chatID, portfolios)
 	msgText := fmt.Sprintf("🏢 *Carteira Ativa:* %s\nEscolha uma opção:", escapeMarkdown(portfolioName))
 
 	if c.Callback() != nil {
@@ -100,6 +108,12 @@ func (h *Handlers) sendOrEditMenu(c telebot.Context) error {
 }
 
 func (h *Handlers) HandleHelp(c telebot.Context) error {
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	if c.Chat() != nil {
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
 	msg := "🤖 *Comandos do Stock Pulse Bot*\n\n"
 	msg += "• /menu — Abre o menu principal interativo\n"
 	msg += "• /cotacao `<ticker>` — Consulta cotação rápida (ex: `/cotacao PETR4`)\n"
@@ -130,7 +144,7 @@ func resolveActivePortfolio(ctx context.Context, svc Service, chatID int64, port
 		return "", ""
 	}
 
-	if svc != nil {
+	if svc != nil && chatID != 0 {
 		activeID, err := svc.GetActivePortfolio(ctx, chatID)
 		if err == nil && activeID != "" {
 			for _, p := range portfolios {

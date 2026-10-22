@@ -12,6 +12,11 @@ import (
 
 func (h *Handlers) HandleWatchlist(c telebot.Context) error {
 	defer c.Respond()
+	if c.Chat() != nil {
+		ctx, cancel := h.getContext(c)
+		defer cancel()
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
 	page := 0
 	if rawData := c.Data(); rawData != "" {
 		fmt.Sscanf(rawData, "%d", &page)
@@ -190,7 +195,14 @@ func (h *Handlers) handleWatchlistAddTicker(c telebot.Context, text string) erro
 		return c.Send("❌ Erro ao buscar lista de favoritos.")
 	}
 
+	resolvedTicker := ticker
 	_, err = h.watchlistSvc.AddAssetToWatchlist(ctx, lists[0].ID, userIDStr, ticker)
+	if err != nil && isB3Ticker(ticker) && !strings.HasSuffix(ticker, ".SA") {
+		if _, errSA := h.watchlistSvc.AddAssetToWatchlist(ctx, lists[0].ID, userIDStr, ticker+".SA"); errSA == nil {
+			resolvedTicker = ticker + ".SA"
+			err = nil
+		}
+	}
 	if err != nil {
 		menu := &telebot.ReplyMarkup{}
 		btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
@@ -205,12 +217,14 @@ func (h *Handlers) handleWatchlistAddTicker(c telebot.Context, text string) erro
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
 	menu.Inline(menu.Row(btnWatchlist, btnMenu))
 
-	msg := fmt.Sprintf("✅ Ativo *`%s`* adicionado aos seus Favoritos com sucesso!", escapeMarkdown(ticker))
+	msg := fmt.Sprintf("✅ Ativo *`%s`* adicionado aos seus Favoritos com sucesso!", escapeMarkdown(resolvedTicker))
 	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) handleWatchlistDelete(c telebot.Context, payload string) error {
-	defer c.Respond()
+	defer func() {
+		_ = c.Respond(&telebot.CallbackResponse{Text: "🗑️ Favorito removido!"})
+	}()
 	if h.watchlistSvc == nil {
 		return c.Edit("⚠️ Módulo de Favoritos não está ativo.")
 	}

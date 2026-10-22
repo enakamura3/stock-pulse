@@ -216,19 +216,51 @@ type MockMarketSvc struct {
 }
 
 func (m *MockMarketSvc) GetQuote(ctx context.Context, ticker string) (*market.Quote, error) {
-	args := m.Called(ctx, ticker)
-	if args.Get(0) != nil {
-		return args.Get(0).(*market.Quote), args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetQuote" && len(call.Arguments) > 1 && call.Arguments[1] == ticker {
+			args := m.Called(ctx, ticker)
+			if args.Get(0) != nil {
+				return args.Get(0).(*market.Quote), args.Error(1)
+			}
+			return nil, args.Error(1)
+		}
 	}
-	return nil, args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetQuote" && len(call.Arguments) > 1 {
+			if _, ok := call.Arguments[1].(mock.AnythingOfTypeArgument); ok || call.Arguments[1] == mock.Anything {
+				args := m.Called(ctx, ticker)
+				if args.Get(0) != nil {
+					return args.Get(0).(*market.Quote), args.Error(1)
+				}
+				return nil, args.Error(1)
+			}
+		}
+	}
+	return nil, errors.New("not found")
 }
 
 func (m *MockMarketSvc) GetFundamentals(ctx context.Context, symbol string) (*market.Fundamentals, error) {
-	args := m.Called(ctx, symbol)
-	if args.Get(0) != nil {
-		return args.Get(0).(*market.Fundamentals), args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetFundamentals" && len(call.Arguments) > 1 && call.Arguments[1] == symbol {
+			args := m.Called(ctx, symbol)
+			if args.Get(0) != nil {
+				return args.Get(0).(*market.Fundamentals), args.Error(1)
+			}
+			return nil, args.Error(1)
+		}
 	}
-	return nil, args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetFundamentals" && len(call.Arguments) > 1 {
+			if _, ok := call.Arguments[1].(mock.AnythingOfTypeArgument); ok || call.Arguments[1] == mock.Anything {
+				args := m.Called(ctx, symbol)
+				if args.Get(0) != nil {
+					return args.Get(0).(*market.Fundamentals), args.Error(1)
+				}
+				return nil, args.Error(1)
+			}
+		}
+	}
+	return nil, errors.New("not found")
 }
 
 func (m *MockMarketSvc) GetBenchmarks(ctx context.Context) (*market.MarketBenchmarks, error) {
@@ -315,11 +347,27 @@ func (m *MockWatchlistSvc) GetWatchlist(ctx context.Context, id, userID string) 
 }
 
 func (m *MockWatchlistSvc) AddAssetToWatchlist(ctx context.Context, watchlistID, userID, ticker string) (*watchlist.Item, error) {
-	args := m.Called(ctx, watchlistID, userID, ticker)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "AddAssetToWatchlist" && len(call.Arguments) > 3 && call.Arguments[3] == ticker {
+			args := m.Called(ctx, watchlistID, userID, ticker)
+			if args.Get(0) == nil {
+				return nil, args.Error(1)
+			}
+			return args.Get(0).(*watchlist.Item), args.Error(1)
+		}
 	}
-	return args.Get(0).(*watchlist.Item), args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "AddAssetToWatchlist" && len(call.Arguments) > 3 {
+			if _, ok := call.Arguments[3].(mock.AnythingOfTypeArgument); ok || call.Arguments[3] == mock.Anything {
+				args := m.Called(ctx, watchlistID, userID, ticker)
+				if args.Get(0) == nil {
+					return nil, args.Error(1)
+				}
+				return args.Get(0).(*watchlist.Item), args.Error(1)
+			}
+		}
+	}
+	return nil, errors.New("not found")
 }
 
 func (m *MockWatchlistSvc) RemoveAssetFromWatchlist(ctx context.Context, watchlistID, userID, ticker string) error {

@@ -27,12 +27,18 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
+	var chatID int64
+	if c.Chat() != nil {
+		chatID = c.Chat().ID
+		_ = h.svc.ClearConversationState(ctx, chatID)
+	}
+
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada.")
 	}
 
-	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, chatID, portfolios)
 	positions, err1 := h.fiSvc.GetPortfolioPositions(ctx, portfolioID)
 	treasuryPositions, err2 := h.fiSvc.GetTreasuryPositions(ctx, portfolioID)
 
