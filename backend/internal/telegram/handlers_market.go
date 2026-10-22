@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 
@@ -11,6 +12,13 @@ import (
 )
 
 func (h *Handlers) HandleQuote(c telebot.Context) error {
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	if c.Chat() != nil {
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
+
 	args := c.Args()
 	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
 		ticker := strings.ToUpper(strings.TrimSpace(args[0]))
@@ -18,6 +26,34 @@ func (h *Handlers) HandleQuote(c telebot.Context) error {
 	}
 
 	return h.HandleQuoteStart(c)
+}
+
+// getQuoteWithFallback busca a cotação do ativo e tenta adicionar .SA para ativos B3 caso a consulta inicial falhe.
+func (h *Handlers) getQuoteWithFallback(ctx context.Context, ticker string) (*market.Quote, error) {
+	quote, err := h.marketSvc.GetQuote(ctx, ticker)
+	if err == nil && quote != nil {
+		return quote, nil
+	}
+	if isB3Ticker(ticker) && !strings.HasSuffix(ticker, ".SA") {
+		if quoteSA, errSA := h.marketSvc.GetQuote(ctx, ticker+".SA"); errSA == nil && quoteSA != nil {
+			return quoteSA, nil
+		}
+	}
+	return nil, err
+}
+
+// getFundamentalsWithFallback busca múltiplos fundamentalistas e tenta adicionar .SA para ativos B3 caso falhe.
+func (h *Handlers) getFundamentalsWithFallback(ctx context.Context, ticker string) (*market.Fundamentals, error) {
+	fund, err := h.marketSvc.GetFundamentals(ctx, ticker)
+	if err == nil && fund != nil {
+		return fund, nil
+	}
+	if isB3Ticker(ticker) && !strings.HasSuffix(ticker, ".SA") {
+		if fundSA, errSA := h.marketSvc.GetFundamentals(ctx, ticker+".SA"); errSA == nil && fundSA != nil {
+			return fundSA, nil
+		}
+	}
+	return nil, err
 }
 
 func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
@@ -28,7 +64,7 @@ func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
-	quote, err := h.marketSvc.GetQuote(ctx, ticker)
+	quote, err := h.getQuoteWithFallback(ctx, ticker)
 	if err != nil {
 		msgErr := "⚠️ Ativo não encontrado. Verifique o código e tente novamente."
 		if c.Callback() != nil {
@@ -84,6 +120,13 @@ func (h *Handlers) HandleQuoteStart(c telebot.Context) error {
 }
 
 func (h *Handlers) HandleAnalysis(c telebot.Context) error {
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	if c.Chat() != nil {
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
+
 	args := c.Args()
 	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
 		ticker := strings.ToUpper(strings.TrimSpace(args[0]))
@@ -129,17 +172,17 @@ func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
-	fund, err := h.marketSvc.GetFundamentals(ctx, ticker)
+	fund, err := h.getFundamentalsWithFallback(ctx, ticker)
 	if err != nil || fund == nil {
 		slog.Error("Failed to fetch fundamentals for telegram", "ticker", ticker, "error", err)
-		msgErr := "⚠️ Dados fundamentalistas não encontrados para `" + ticker + "`. Verifique o código e tente novamente."
+		msgErr := "⚠️ Dados fundamentalistas não encontrados para `" + escapeMarkdown(ticker) + "`. Verifique o código e tente novamente."
 		if c.Callback() != nil {
 			return c.Edit(msgErr, telebot.ModeMarkdown)
 		}
 		return c.Send(msgErr, telebot.ModeMarkdown)
 	}
 
-	quote, _ := h.marketSvc.GetQuote(ctx, ticker)
+	quote, _ := h.getQuoteWithFallback(ctx, ticker)
 	currentPrice := 0.0
 	curr := "BRL"
 	if quote != nil {

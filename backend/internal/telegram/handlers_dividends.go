@@ -153,6 +153,11 @@ func sortCurrencies(currencies []string) {
 
 func (h *Handlers) HandleDividends(c telebot.Context) error {
 	defer c.Respond()
+	if c.Chat() != nil {
+		ctx, cancel := h.getContext(c)
+		defer cancel()
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
 
 	divs, portfolioName, err := h.fetchDividends(c)
 	if err != nil {
@@ -337,6 +342,11 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 func (h *Handlers) HandleAgenda(c telebot.Context) error {
 	if c.Callback() != nil {
 		defer c.Respond()
+	}
+	if c.Chat() != nil {
+		ctx, cancel := h.getContext(c)
+		defer cancel()
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 	}
 
 	divs, portfolioName, err := h.fetchDividends(c)

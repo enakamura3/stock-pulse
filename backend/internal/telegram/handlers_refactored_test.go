@@ -1344,11 +1344,9 @@ func TestHandlers_TextErrors(t *testing.T) {
 		mCtx.On("Callback").Return((*telebot.Callback)(nil))
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return((*ConversationState)(nil), nil).Once()
 
-		// For menu redirection
-		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
-		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{{ID: "p1"}}, nil).Once()
-		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
-		mCtx.On("Send", mock.Anything, mock.Anything).Return(nil)
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Olá")
+		}), mock.Anything).Return(nil).Once()
 
 		err := h.HandleText(mCtx)
 		assert.NoError(t, err)

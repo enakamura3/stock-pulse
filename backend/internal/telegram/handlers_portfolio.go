@@ -23,12 +23,18 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
+	var chatID int64
+	if c.Chat() != nil {
+		chatID = c.Chat().ID
+		_ = h.svc.ClearConversationState(ctx, chatID)
+	}
+
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
-	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, chatID, portfolios)
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
@@ -284,12 +290,18 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
+	var chatID int64
+	if c.Chat() != nil {
+		chatID = c.Chat().ID
+		_ = h.svc.ClearConversationState(ctx, chatID)
+	}
+
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
-	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, chatID, portfolios)
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
@@ -408,16 +420,28 @@ func (h *Handlers) HandleChangePortfolio(c telebot.Context) error {
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
+	var chatID int64
+	if c.Chat() != nil {
+		chatID = c.Chat().ID
+		_ = h.svc.ClearConversationState(ctx, chatID)
+	}
+
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil || len(portfolios) == 0 {
 		return c.Edit("⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
 
+	activeID, _ := h.resolveActivePortfolio(ctx, chatID, portfolios)
+
 	menu := &telebot.ReplyMarkup{}
 	var rows []telebot.Row
 
 	for _, p := range portfolios {
-		btn := menu.Data(fmt.Sprintf("📂 %s", p.Name), "btn_sel_port_"+p.ID)
+		label := fmt.Sprintf("📂 %s", p.Name)
+		if p.ID == activeID {
+			label = fmt.Sprintf("✅ %s (Ativa)", p.Name)
+		}
+		btn := menu.Data(label, "btn_sel_port_"+p.ID)
 		rows = append(rows, menu.Row(btn))
 	}
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
@@ -436,6 +460,10 @@ func (h *Handlers) handleSelectedPortfolio(c telebot.Context, portfolioID string
 
 	ctx, cancel := h.getContext(c)
 	defer cancel()
+
+	if c.Chat() != nil {
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
 
 	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
 	if err != nil {

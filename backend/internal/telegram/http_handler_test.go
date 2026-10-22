@@ -40,7 +40,12 @@ func (m *MockService) GetConversationState(ctx context.Context, chatID int64) (*
 	return nil, args.Error(1)
 }
 func (m *MockService) ClearConversationState(ctx context.Context, chatID int64) error {
-	return m.Called(ctx, chatID).Error(0)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "ClearConversationState" && call.Repeatability >= 0 {
+			return m.Called(ctx, chatID).Error(0)
+		}
+	}
+	return nil
 }
 func (m *MockService) SetActivePortfolio(ctx context.Context, chatID int64, portfolioID string) error {
 	return m.Called(ctx, chatID, portfolioID).Error(0)

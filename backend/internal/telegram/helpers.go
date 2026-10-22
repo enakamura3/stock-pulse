@@ -72,6 +72,46 @@ func getTickerDefaultCurrency(ticker string) string {
 	return "R$"
 }
 
+// isB3Ticker verifica se uma string possui o formato característico de ticker da B3.
+// Exemplos aceitos: PETR4, VALE3, HGLG11, MXRF11, AAPL34, PETR4F, etc.
+func isB3Ticker(ticker string) bool {
+	t := strings.ToUpper(strings.TrimSpace(ticker))
+	if strings.HasSuffix(t, ".SA") {
+		t = strings.TrimSuffix(t, ".SA")
+	}
+	// Padrão B3: 4 letras seguidas de 1 ou 2 dígitos (opcionalmente com F no fracionário)
+	if len(t) < 5 || len(t) > 7 {
+		return false
+	}
+	for i := 0; i < 4; i++ {
+		if t[i] < 'A' || t[i] > 'Z' {
+			return false
+		}
+	}
+	digits := t[4:]
+	if strings.HasSuffix(digits, "F") && len(digits) > 1 {
+		digits = digits[:len(digits)-1]
+	}
+	if len(digits) < 1 || len(digits) > 2 {
+		return false
+	}
+	for _, r := range digits {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// normalizeB3Ticker retorna o ticker com o sufixo .SA se for padrão B3 e não possuir o sufixo ainda.
+func normalizeB3Ticker(ticker string) string {
+	t := strings.ToUpper(strings.TrimSpace(ticker))
+	if isB3Ticker(t) && !strings.HasSuffix(t, ".SA") && !strings.Contains(t, ".") {
+		return t + ".SA"
+	}
+	return t
+}
+
 // formatFinancialPrice formata um valor monetário respeitando a precisão necessária para ativos padrão e fracionários/criptoativos.
 // Valores >= 1.0 utilizam 2 casas decimais.
 // Valores entre 0.01 e 1.0 utilizam 4 casas decimais.

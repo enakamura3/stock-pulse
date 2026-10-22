@@ -12,6 +12,11 @@ import (
 
 func (h *Handlers) HandleAlerts(c telebot.Context) error {
 	defer c.Respond()
+	if c.Chat() != nil {
+		ctx, cancel := h.getContext(c)
+		defer cancel()
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
 	page := 0
 	if rawData := c.Data(); rawData != "" {
 		fmt.Sscanf(rawData, "%d", &page)
@@ -219,7 +224,9 @@ func (h *Handlers) handleAlertToggle(c telebot.Context, payload string) error {
 }
 
 func (h *Handlers) handleAlertDelete(c telebot.Context, payload string) error {
-	defer c.Respond()
+	defer func() {
+		_ = c.Respond(&telebot.CallbackResponse{Text: "🗑️ Alerta removido!"})
+	}()
 
 	userIDStr, err := h.getUserID(c)
 	if err != nil {
