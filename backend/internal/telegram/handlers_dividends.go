@@ -406,7 +406,7 @@ func (h *Handlers) HandleAgenda(c telebot.Context) error {
 		}
 		msg += "\n"
 
-		for _, d := range upcoming {
+		for i, d := range upcoming {
 			curr := d.Currency
 			if curr == "" {
 				curr = "BRL"
@@ -415,13 +415,22 @@ func (h *Handlers) HandleAgenda(c telebot.Context) error {
 			tickerClean := cleanTickerForDisplay(d.Ticker)
 			tipoAbbr := abbreviateDividendType(d.Type)
 
-			msg += p.Sprintf("📅 *%s* — %s `%s` (%s)\n", d.PaymentDate.Format("02/01/2006"), emoji, tickerClean, tipoAbbr)
+			entry := p.Sprintf("📅 *%s* — %s `%s` (%s)\n", d.PaymentDate.Format("02/01/2006"), emoji, tickerClean, tipoAbbr)
 			if d.Quantity > 0 && d.PerShareAmount > 0 {
-				msg += p.Sprintf("   ↳ *%s %.2f* _(%s un x %s %s)_\n",
+				entry += p.Sprintf("   ↳ *%s %.2f* _(%s un x %s %s)_\n",
 					getCurrencySymbol(curr), d.NetAmount, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
 			} else {
-				msg += p.Sprintf("   ↳ *%s %.2f*\n", getCurrencySymbol(curr), d.NetAmount)
+				entry += p.Sprintf("   ↳ *%s %.2f*\n", getCurrencySymbol(curr), d.NetAmount)
 			}
+
+			// Previne estouro do limite de 4096 caracteres do Telegram
+			if len(msg)+len(entry)+150 > 3800 {
+				remaining := len(upcoming) - i
+				msg += p.Sprintf("\n_... e mais %d provento(s) no período._\n", remaining)
+				break
+			}
+
+			msg += entry
 		}
 		msg += p.Sprintf("\n_Total de eventos no período: %d_", len(upcoming))
 	}
@@ -526,7 +535,7 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	currentYear := now.Year()
 	currentMonth := int(now.Month())
 
-	for _, y := range years {
+	for i, y := range years {
 		currencies := make([]string, 0, len(grouped[y]))
 		for c := range grouped[y] {
 			currencies = append(currencies, c)
@@ -619,18 +628,27 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 		}
 		topLine := strings.Join(topStrings, " | ")
 
+		var yearBlock string
 		if y <= 1 {
-			msg += "📅 *A Definir*\n"
-			msg += p.Sprintf("• *Total:* %s\n", totalLine)
-			msg += p.Sprintf("• *Tipos:* %s\n", typeLine)
-			msg += p.Sprintf("• *Top Ativos:* %s\n\n", topLine)
+			yearBlock = "📅 *A Definir*\n"
+			yearBlock += p.Sprintf("• *Total:* %s\n", totalLine)
+			yearBlock += p.Sprintf("• *Tipos:* %s\n", typeLine)
+			yearBlock += p.Sprintf("• *Top Ativos:* %s\n\n", topLine)
 		} else {
-			msg += fmt.Sprintf("📅 *Ano %d*\n", y)
-			msg += p.Sprintf("• *Total:* %s\n", totalLine)
-			msg += p.Sprintf("• *Média Mensal:* %s\n", avgLine)
-			msg += p.Sprintf("• *Tipos:* %s\n", typeLine)
-			msg += p.Sprintf("• *Top Ativos:* %s\n\n", topLine)
+			yearBlock = fmt.Sprintf("📅 *Ano %d*\n", y)
+			yearBlock += p.Sprintf("• *Total:* %s\n", totalLine)
+			yearBlock += p.Sprintf("• *Média Mensal:* %s\n", avgLine)
+			yearBlock += p.Sprintf("• *Tipos:* %s\n", typeLine)
+			yearBlock += p.Sprintf("• *Top Ativos:* %s\n\n", topLine)
 		}
+
+		// Previne estouro do limite de 4096 caracteres do Telegram
+		if len(msg)+len(yearBlock)+100 > 3800 {
+			remainingYears := len(years) - i
+			msg += p.Sprintf("_... e mais %d ano(s) com histórico no Stock Pulse._\n\n", remainingYears)
+			break
+		}
+		msg += yearBlock
 	}
 
 	menu := &telebot.ReplyMarkup{}

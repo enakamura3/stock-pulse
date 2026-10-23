@@ -187,6 +187,14 @@ func (m *mockService) GetTreasuryMonthlyYields(ctx context.Context, portfolioID 
 	return args.Get(0).([]MonthlyYield), args.Error(1)
 }
 
+func (m *mockService) GetAnbimaHolidays(ctx context.Context) (map[string]bool, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]bool), args.Error(1)
+}
+
 func setupHandlerTest() (*Handler, *mockService, *MockFullRepo, *chi.Mux) {
 	svc := &mockService{}
 	repo := &MockFullRepo{}

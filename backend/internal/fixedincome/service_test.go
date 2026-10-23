@@ -43,6 +43,14 @@ func (m *MockRepository) ValidatePortfolioOwnership(ctx context.Context, portfol
 	return args.Error(0)
 }
 
+func (m *MockRepository) GetAnbimaHolidays(ctx context.Context) (map[string]bool, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]bool), args.Error(1)
+}
+
 func TestGetUnifiedTransactions_IncludesTreasury(t *testing.T) {
 	mockRepo := &MockRepository{}
 	svc := NewService(mockRepo, nil)
@@ -277,4 +285,17 @@ func TestGetUnifiedTransactions_InvalidDates(t *testing.T) {
 	tx := unified[0]
 	assert.WithinDuration(t, time.Now(), tx.Date, 5*time.Second)
 	assert.Nil(t, tx.MaturityDate)
+}
+
+func TestService_GetAnbimaHolidays(t *testing.T) {
+	mockRepo := &MockRepository{}
+	svc := NewService(mockRepo, nil)
+	ctx := context.Background()
+
+	expected := map[string]bool{"2026-01-01": true}
+	mockRepo.On("GetAnbimaHolidays", ctx).Return(expected, nil)
+
+	res, err := svc.GetAnbimaHolidays(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, res)
 }

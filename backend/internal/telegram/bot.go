@@ -199,6 +199,7 @@ func (r *BotRunner) SendDailyDigest(
 	totalValue, dailyChange, dailyChangePercent, returnPercent float64,
 	topGainers, topLosers []DailyMover,
 	todayDividends, upcomingDividends []portfolio.CalculatedDividend,
+	extraAlerts ...string,
 ) error {
 	if r == nil || r.bot == nil {
 		return nil
@@ -264,6 +265,15 @@ func (r *BotRunner) SendDailyDigest(
 		msg += "📅 *Próximos Proventos (7 dias):*\n"
 		for _, d := range upcomingDividends {
 			msg += "  • *" + escapeMarkdown(d.Ticker) + "*: " + d.PaymentDate.Format("02/01") + " — " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
+		}
+		msg += "\n"
+	}
+
+	// Alertas de Carteira (Data Com, Vencimentos)
+	if len(extraAlerts) > 0 {
+		msg += "📌 *Avisos & Vencimentos:*\n"
+		for _, a := range extraAlerts {
+			msg += "  • " + a + "\n"
 		}
 		msg += "\n"
 	}

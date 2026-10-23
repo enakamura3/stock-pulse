@@ -30,6 +30,7 @@ type MarketService interface {
 type FixedIncomeService interface {
 	GetPortfolioPositions(ctx context.Context, portfolioID string) ([]fixedincome.Position, error)
 	GetTreasuryPositions(ctx context.Context, portfolioID string) ([]fixedincome.TreasuryPosition, error)
+	GetAnbimaHolidays(ctx context.Context) (map[string]bool, error)
 }
 
 type AlertService interface {

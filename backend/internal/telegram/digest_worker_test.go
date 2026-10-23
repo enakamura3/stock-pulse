@@ -25,8 +25,14 @@ func (m *MockDigestNotifier) SendDailyDigest(
 	totalValue, dailyChange, dailyChangePercent, returnPercent float64,
 	topGainers, topLosers []DailyMover,
 	todayDividends, upcomingDividends []portfolio.CalculatedDividend,
+	extraAlerts ...string,
 ) error {
-	args := m.Called(chatID, userName, portfolioName, currency, totalValue, dailyChange, dailyChangePercent, returnPercent, topGainers, topLosers, todayDividends, upcomingDividends)
+	var callArgs []interface{}
+	callArgs = append(callArgs, chatID, userName, portfolioName, currency, totalValue, dailyChange, dailyChangePercent, returnPercent, topGainers, topLosers, todayDividends, upcomingDividends)
+	if len(extraAlerts) > 0 {
+		callArgs = append(callArgs, extraAlerts)
+	}
+	args := m.Called(callArgs...)
 	return args.Error(0)
 }
 
@@ -47,16 +53,20 @@ func TestDailyDigestWorker_New(t *testing.T) {
 	// Custom environment variables
 	t.Setenv("TELEGRAM_DIGEST_HOUR", "20")
 	t.Setenv("TELEGRAM_DIGEST_MINUTE", "15")
+	t.Setenv("TELEGRAM_DIGEST_PACING_MS", "100")
 	workerEnv := NewDailyDigestWorker(repo, svc, pSvc, fiSvc, notifier, nil)
 	assert.Equal(t, 20, workerEnv.targetHour)
 	assert.Equal(t, 15, workerEnv.targetMinute)
+	assert.Equal(t, 100*time.Millisecond, workerEnv.pacingDelay)
 
 	// Invalid environment variables fall back to defaults
 	t.Setenv("TELEGRAM_DIGEST_HOUR", "99")
 	t.Setenv("TELEGRAM_DIGEST_MINUTE", "invalid")
+	t.Setenv("TELEGRAM_DIGEST_PACING_MS", "invalid")
 	workerInvalid := NewDailyDigestWorker(repo, svc, pSvc, fiSvc, notifier, nil)
 	assert.Equal(t, 19, workerInvalid.targetHour)
 	assert.Equal(t, 0, workerInvalid.targetMinute)
+	assert.Equal(t, 50*time.Millisecond, workerInvalid.pacingDelay)
 }
 
 func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
@@ -107,6 +117,51 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 		}
 		wSun.ProcessDailyDigests(context.Background())
 		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
+	})
+
+	t.Run("suppressed on ANBIMA / B3 national holidays", func(t *testing.T) {
+		repo := new(MockRepository)
+		pSvc := new(MockPortfolioService)
+		notifier := new(MockDigestNotifier)
+		fiSvc := new(MockFixedIncomeSvc)
+
+		holidayTime := time.Date(2026, 9, 25, 19, 0, 0, 0, loc)
+		fiSvc.On("GetAnbimaHolidays", mock.Anything).Return(map[string]bool{"2026-09-25": true}, nil).Once()
+
+		w := &DailyDigestWorker{
+			repo:         repo,
+			portfolioSvc: pSvc,
+			fiSvc:        fiSvc,
+			notifier:     notifier,
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return holidayTime },
+		}
+		w.ProcessDailyDigests(context.Background())
+		repo.AssertNotCalled(t, "GetLinkedUsers", mock.Anything)
+	})
+
+	t.Run("continues if GetAnbimaHolidays returns error", func(t *testing.T) {
+		repo := new(MockRepository)
+		pSvc := new(MockPortfolioService)
+		notifier := new(MockDigestNotifier)
+		fiSvc := new(MockFixedIncomeSvc)
+
+		holidayTime := time.Date(2026, 9, 25, 19, 0, 0, 0, loc)
+		fiSvc.On("GetAnbimaHolidays", mock.Anything).Return(map[string]bool(nil), errors.New("db error")).Once()
+		repo.On("GetLinkedUsers", mock.Anything).Return([]TelegramUserLink{}, nil).Once()
+
+		w := &DailyDigestWorker{
+			repo:         repo,
+			portfolioSvc: pSvc,
+			fiSvc:        fiSvc,
+			notifier:     notifier,
+			targetHour:   19,
+			targetMinute: 0,
+			nowFunc:      func() time.Time { return holidayTime },
+		}
+		w.ProcessDailyDigests(context.Background())
+		repo.AssertExpectations(t)
 	})
 
 	t.Run("before target time", func(t *testing.T) {
@@ -664,6 +719,187 @@ func TestDailyDigestWorker_ProcessDailyDigests(t *testing.T) {
 		}
 
 		w.ProcessDailyDigests(context.Background())
+		notifier.AssertExpectations(t)
+	})
+
+	t.Run("blocked by user records dedup key in redis and stops retrying", func(t *testing.T) {
+		mr := miniredis.RunT(t)
+		rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+
+		repo := new(MockRepository)
+		svc := new(MockService)
+		pSvc := new(MockPortfolioService)
+		fiSvc := new(MockFixedIncomeSvc)
+		notifier := new(MockDigestNotifier)
+
+		uID := uuid.New()
+		pID := "port-blocked"
+
+		repo.On("GetLinkedUsers", mock.Anything).Return([]TelegramUserLink{
+			{UserID: uID, TelegramChatID: 202, UserName: "BlockedUser"},
+		}, nil)
+
+		svc.On("GetActivePortfolio", mock.Anything, int64(202)).Return(pID, nil)
+		pSvc.On("GetPortfolios", mock.Anything, uID.String()).Return([]portfolio.Portfolio{
+			{ID: pID, Name: "Ações", BaseCurrency: "BRL"},
+		}, nil)
+		pSvc.On("GetPortfolioDetails", mock.Anything, pID, uID.String()).Return(
+			&portfolio.Portfolio{ID: pID, Name: "Ações", BaseCurrency: "BRL"},
+			[]portfolio.Position{},
+			nil,
+		)
+		pSvc.On("GetPortfolioDividends", mock.Anything, pID, uID.String()).Return([]portfolio.CalculatedDividend{}, nil)
+
+		notifier.On("SendDailyDigest",
+			int64(202),
+			"BlockedUser",
+			"Ações",
+			"BRL",
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			[]DailyMover(nil),
+			[]DailyMover(nil),
+			[]portfolio.CalculatedDividend(nil),
+			[]portfolio.CalculatedDividend(nil),
+		).Return(errors.New("telegram: bot was blocked by the user (403)"))
+
+		w := &DailyDigestWorker{
+			repo:         repo,
+			svc:          svc,
+			portfolioSvc: pSvc,
+			fiSvc:        fiSvc,
+			notifier:     notifier,
+			rdb:          rdb,
+			targetHour:   19,
+			targetMinute: 0,
+			pacingDelay:  time.Millisecond,
+			nowFunc:      func() time.Time { return targetTime },
+		}
+
+		w.ProcessDailyDigests(context.Background())
+
+		// Assert Redis dedup key IS set for blocked user to avoid spam retrying
+		dedupVal, err := rdb.Get(context.Background(), "daily_digest_sent:"+uID.String()+":"+targetTime.Format("2006-01-02")).Result()
+		assert.NoError(t, err)
+		assert.Equal(t, "1", dedupVal)
+
+		portDedup, err := rdb.Get(context.Background(), "daily_digest_sent:"+uID.String()+":"+pID+":"+targetTime.Format("2006-01-02")).Result()
+		assert.NoError(t, err)
+		assert.Equal(t, "1", portDedup)
+	})
+
+	t.Run("treasury positions and CumDate alert included and multiple portfolios", func(t *testing.T) {
+		mr := miniredis.RunT(t)
+		rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+
+		repo := new(MockRepository)
+		svc := new(MockService)
+		pSvc := new(MockPortfolioService)
+		fiSvc := new(MockFixedIncomeSvc)
+		notifier := new(MockDigestNotifier)
+
+		uID := uuid.New()
+		pID1 := "port-1"
+		pID2 := "port-empty"
+
+		repo.On("GetLinkedUsers", mock.Anything).Return([]TelegramUserLink{
+			{UserID: uID, TelegramChatID: 203, UserName: "MultiUser"},
+		}, nil)
+
+		svc.On("GetActivePortfolio", mock.Anything, int64(203)).Return(pID1, nil)
+		pSvc.On("GetPortfolios", mock.Anything, uID.String()).Return([]portfolio.Portfolio{
+			{ID: pID2, Name: "Vazia", BaseCurrency: "BRL"},
+			{ID: pID1, Name: "Principal", BaseCurrency: "BRL"},
+		}, nil)
+
+		pSvc.On("GetPortfolioDetails", mock.Anything, pID1, uID.String()).Return(
+			&portfolio.Portfolio{ID: pID1, Name: "Principal", BaseCurrency: "BRL"},
+			[]portfolio.Position{
+				{Ticker: "PETR4", Quantity: 100, CurrentPrice: 30.0, CurrentValue: 3000.0, TotalCost: 2500.0, DailyChange: 1.0, DailyChangePercent: 3.45},
+			},
+			nil,
+		)
+		pSvc.On("GetPortfolioDetails", mock.Anything, pID2, uID.String()).Return(
+			&portfolio.Portfolio{ID: pID2, Name: "Vazia", BaseCurrency: "BRL"},
+			[]portfolio.Position{},
+			nil,
+		)
+
+		fiPositions := []fixedincome.Position{
+			{
+				Asset: fixedincome.Asset{
+					Institution: "Banco Inter",
+					Type:        "CDB",
+				},
+				DaysToMaturity: 3,
+				IsMatured:      false,
+				NetValue:       1000.0,
+				TotalInvested:  900.0,
+			},
+		}
+		fiSvc.On("GetPortfolioPositions", mock.Anything, pID1).Return(fiPositions, nil).Once()
+		fiSvc.On("GetPortfolioPositions", mock.Anything, pID2).Return([]fixedincome.Position{}, nil).Once()
+
+		trPositions := []fixedincome.TreasuryPosition{
+			{
+				TreasuryType:   "SELIC 2029",
+				DaysToMaturity: 5,
+				IsMatured:      false,
+				NetValue:       500.0,
+				TotalInvested:  450.0,
+			},
+		}
+		fiSvc.On("GetTreasuryPositions", mock.Anything, pID1).Return(trPositions, nil).Once()
+		fiSvc.On("GetTreasuryPositions", mock.Anything, pID2).Return([]fixedincome.TreasuryPosition{}, nil).Once()
+
+		divs := []portfolio.CalculatedDividend{
+			{
+				Ticker:      "PETR4",
+				Type:        "DIVIDENDO",
+				Currency:    "BRL",
+				NetAmount:   100.0,
+				CumDate:     targetTime,
+				PaymentDate: targetTime,
+			},
+		}
+		pSvc.On("GetPortfolioDividends", mock.Anything, pID1, uID.String()).Return(divs, nil).Once()
+		pSvc.On("GetPortfolioDividends", mock.Anything, pID2, uID.String()).Return([]portfolio.CalculatedDividend{}, nil).Once()
+
+		notifier.On("SendDailyDigest",
+			int64(203),
+			"MultiUser",
+			"Principal",
+			"BRL",
+			4500.0, // 3000 (stock) + 1000 (fi) + 500 (tr)
+			100.0,  // daily change
+			mock.AnythingOfType("float64"),
+			mock.AnythingOfType("float64"),
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.MatchedBy(func(alerts []string) bool {
+				return len(alerts) >= 2 // CDB + Tesouro + CumDate
+			}),
+		).Return(nil).Once()
+
+		w := &DailyDigestWorker{
+			repo:         repo,
+			svc:          svc,
+			portfolioSvc: pSvc,
+			fiSvc:        fiSvc,
+			notifier:     notifier,
+			rdb:          rdb,
+			targetHour:   19,
+			targetMinute: 0,
+			pacingDelay:  time.Millisecond,
+			nowFunc:      func() time.Time { return targetTime },
+		}
+
+		w.ProcessDailyDigests(context.Background())
+
 		notifier.AssertExpectations(t)
 	})
 }

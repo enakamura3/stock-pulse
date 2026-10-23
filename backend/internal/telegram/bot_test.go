@@ -308,6 +308,32 @@ func TestBotRunner_SendDailyDigest(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, isBlockedByUser(err))
 	})
+
+	t.Run("Mock server success with extraAlerts", func(t *testing.T) {
+		var receivedBody string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			receivedBody = string(b)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok": true, "result": {"message_id": 13, "chat": {"id": 123}}}`))
+		}))
+		defer server.Close()
+
+		b, err := telebot.NewBot(telebot.Settings{
+			URL:     server.URL,
+			Token:   "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+			Offline: true,
+		})
+		assert.NoError(t, err)
+
+		runner := &BotRunner{bot: b}
+		err = runner.SendDailyDigest(123, "User", "Carteira", "BRL", 10000.0, 10.0, 0.10, 0.5, nil, nil, nil, nil, "Tesouro SELIC 2029 vencendo em 3 dia(s)", "Data Com hoje para PETR4 (DIVIDENDO)")
+		assert.NoError(t, err)
+		assert.Contains(t, receivedBody, "Avisos")
+		assert.Contains(t, receivedBody, "Vencimentos")
+		assert.Contains(t, receivedBody, "Tesouro SELIC 2029")
+	})
 }
 
 func TestBotRunner_LifecycleAndUsername(t *testing.T) {
