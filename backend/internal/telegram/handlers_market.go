@@ -77,10 +77,18 @@ func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
 
 	replyMenu := &telebot.ReplyMarkup{}
 	btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+ticker)
-	btnAnalise := replyMenu.Data("🔍 Análise Fundamentalista", "btn_analise_"+ticker)
-	btnNew := replyMenu.Data("🔍 Consultar Outro", "btn_cotacao")
+	btnAnalise := replyMenu.Data("🔍 Análise", "btn_analise_"+ticker)
+	btnOperar := replyMenu.Data("💵 Operar", "btn_op_quick_"+ticker)
+	btnAlerta := replyMenu.Data("🔔 Criar Alerta", "btn_alert_create_"+ticker)
+	btnWlAdd := replyMenu.Data("⭐ Favoritar", "btn_wl_add_"+ticker)
+	btnNew := replyMenu.Data("🔍 Outra Cotação", "btn_cotacao")
 	btnMenuBtn := replyMenu.Data("🏠 Menu", "btn_menu")
-	replyMenu.Inline(replyMenu.Row(btnRefresh, btnAnalise), replyMenu.Row(btnNew, btnMenuBtn))
+	replyMenu.Inline(
+		replyMenu.Row(btnRefresh, btnAnalise),
+		replyMenu.Row(btnOperar, btnAlerta),
+		replyMenu.Row(btnWlAdd, btnNew),
+		replyMenu.Row(btnMenuBtn),
+	)
 
 	if c.Callback() != nil {
 		err = c.Edit(msg, telebot.ModeMarkdown, replyMenu)
@@ -197,9 +205,17 @@ func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
 	menu := &telebot.ReplyMarkup{}
 	btnRefresh := menu.Data("🔄 Atualizar", "btn_analise_"+ticker)
 	btnQuote := menu.Data("📈 Ver Cotação", "btn_quote_"+ticker)
+	btnOperar := menu.Data("💵 Operar", "btn_op_quick_"+ticker)
+	btnAlerta := menu.Data("🔔 Criar Alerta", "btn_alert_create_"+ticker)
+	btnWlAdd := menu.Data("⭐ Favoritar", "btn_wl_add_"+ticker)
 	btnNew := menu.Data("🔍 Outra Análise", "btn_analise")
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
-	menu.Inline(menu.Row(btnRefresh, btnQuote), menu.Row(btnNew, btnMenu))
+	menu.Inline(
+		menu.Row(btnRefresh, btnQuote),
+		menu.Row(btnOperar, btnAlerta),
+		menu.Row(btnWlAdd, btnNew),
+		menu.Row(btnMenu),
+	)
 
 	if c.Callback() != nil {
 		err = c.Edit(msg, telebot.ModeMarkdown, menu)
