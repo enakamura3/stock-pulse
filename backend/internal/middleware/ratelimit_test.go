@@ -14,22 +14,51 @@ import (
 )
 
 func TestClientIP(t *testing.T) {
-	t.Run("X-Forwarded-For with multiple IPs", func(t *testing.T) {
+	// Restaura trusted proxies padrão após os testes
+	defer SetTrustedProxies(DefaultTrustedCIDRs)
+
+	t.Run("Untrusted RemoteAddr ignores forged X-Forwarded-For and X-Real-IP", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("X-Forwarded-For", " 203.0.113.195 , 70.41.3.18, 150.172.238.178 ")
+		req.RemoteAddr = "203.0.113.50:54321" // External untrusted IP
+		req.Header.Set("X-Forwarded-For", "198.51.100.2, 10.0.0.1")
+		req.Header.Set("X-Real-IP", "1.1.1.1")
+		assert.Equal(t, "203.0.113.50", ClientIP(req))
+	})
+
+	t.Run("Trusted RemoteAddr evaluates X-Forwarded-For right-to-left", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "127.0.0.1:54321" // Trusted loopback proxy
+		// Spoofed IP leftmost, real client IP, trusted proxy IP rightmost
+		req.Header.Set("X-Forwarded-For", "1.1.1.1, 203.0.113.195, 10.0.0.2")
 		assert.Equal(t, "203.0.113.195", ClientIP(req))
 	})
 
-	t.Run("X-Forwarded-For with single IP", func(t *testing.T) {
+	t.Run("Trusted RemoteAddr with single client IP in XFF", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "172.18.0.2:12345" // Trusted Docker network proxy
 		req.Header.Set("X-Forwarded-For", "198.51.100.2")
 		assert.Equal(t, "198.51.100.2", ClientIP(req))
 	})
 
-	t.Run("X-Real-IP when X-Forwarded-For empty", func(t *testing.T) {
+	t.Run("Trusted RemoteAddr falls back to X-Real-IP when XFF is empty", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("X-Real-IP", " 198.51.100.1 ")
+		req.RemoteAddr = "10.0.0.1:12345" // Trusted private proxy
+		req.Header.Set("X-Real-IP", "198.51.100.1")
 		assert.Equal(t, "198.51.100.1", ClientIP(req))
+	})
+
+	t.Run("Trusted RemoteAddr returns leftmost IP when all XFF are trusted proxies", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "10.0.0.1:12345"
+		req.Header.Set("X-Forwarded-For", "10.0.0.2, 10.0.0.3")
+		assert.Equal(t, "10.0.0.2", ClientIP(req))
+	})
+
+	t.Run("Trusted RemoteAddr skips invalid IP strings in XFF", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "127.0.0.1:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.99, invalid-ip, ")
+		assert.Equal(t, "203.0.113.99", ClientIP(req))
 	})
 
 	t.Run("RemoteAddr with host:port", func(t *testing.T) {
@@ -48,6 +77,22 @@ func TestClientIP(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		req.RemoteAddr = ""
 		assert.Equal(t, "", ClientIP(req))
+	})
+
+	t.Run("Custom SetTrustedProxies with single IPs and CIDRs", func(t *testing.T) {
+		SetTrustedProxies([]string{"192.0.2.1", "2001:db8::1", "198.51.100.0/24", "", "invalid-cidr"})
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "192.0.2.1:12345" // Now trusted by custom config
+		req.Header.Set("X-Forwarded-For", "203.0.113.88")
+		assert.Equal(t, "203.0.113.88", ClientIP(req))
+
+		// Check IPv6 single IP parsing
+		req6 := httptest.NewRequest("GET", "/", nil)
+		req6.RemoteAddr = "[2001:db8::1]:12345"
+		req6.Header.Set("X-Real-IP", "203.0.113.77")
+		assert.Equal(t, "203.0.113.77", ClientIP(req6))
+
+		assert.False(t, isTrustedIP(nil))
 	})
 }
 

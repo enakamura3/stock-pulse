@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
@@ -173,6 +174,20 @@ var defaultParams = &argon2Params{
 
 var randReader io.Reader = rand.Reader
 
+// argon2Semaphore limita a concorrência de derivação Argon2id a no máximo 8 hashes simultâneos (8 * 64 MB = ~512 MB).
+var argon2Semaphore = make(chan struct{}, 8)
+
+// loginEmailRateLimitScript executa incremento atômico e define TTL de 15 minutos para rate limiting por e-mail.
+var loginEmailRateLimitScript = redis.NewScript(`
+local current = redis.call('INCR', KEYS[1])
+local ttl = redis.call('TTL', KEYS[1])
+if ttl < 0 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+    ttl = tonumber(ARGV[1])
+end
+return {current, ttl}
+`)
+
 // hashPassword gera um hash seguro usando Argon2id no formato padrão.
 func hashPassword(password string, params *argon2Params) (string, error) {
 	salt := make([]byte, params.saltLength)
@@ -180,7 +195,9 @@ func hashPassword(password string, params *argon2Params) (string, error) {
 		return "", err
 	}
 
+	argon2Semaphore <- struct{}{}
 	hash := argon2.IDKey([]byte(password), salt, params.iterations, params.memory, params.parallelism, params.keyLength)
+	<-argon2Semaphore
 
 	b64Salt := base64.RawStdEncoding.EncodeToString(salt)
 	b64Hash := base64.RawStdEncoding.EncodeToString(hash)
@@ -217,7 +234,9 @@ func comparePasswordAndHash(password, encodedHash string) (bool, error) {
 
 	keyLength := uint32(len(decodedHash))
 
+	argon2Semaphore <- struct{}{}
 	comparisonHash := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, keyLength)
+	<-argon2Semaphore
 
 	if subtle.ConstantTimeCompare(decodedHash, comparisonHash) == 1 {
 		return true, nil
@@ -255,6 +274,22 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (*
 // Login valida o e-mail/senha e retorna o usuário logado e os tokens gerados.
 func (s *Service) Login(ctx context.Context, email, password string) (*User, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
+
+	var emailRateLimitKey string
+	if s.rdb != nil && email != "" {
+		hash := sha256.Sum256([]byte(email))
+		emailRateLimitKey = fmt.Sprintf("rate_limit:auth:login:email:%x", hash)
+
+		res, err := loginEmailRateLimitScript.Run(ctx, s.rdb, []string{emailRateLimitKey}, 15*60).Result()
+		if err == nil {
+			if vals, ok := res.([]interface{}); ok && len(vals) >= 1 {
+				if current, ok := vals[0].(int64); ok && current > 5 {
+					return nil, "", "", errors.New("muitas tentativas de login para este e-mail. Tente novamente mais tarde")
+				}
+			}
+		}
+	}
+
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, "", "", errors.New("e-mail ou senha incorretos")
@@ -263,6 +298,11 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 	match, err := comparePasswordAndHash(password, user.PasswordHash)
 	if err != nil || !match {
 		return nil, "", "", errors.New("e-mail ou senha incorretos")
+	}
+
+	// Login bem-sucedido: limpa o contador de tentativas do e-mail
+	if s.rdb != nil && emailRateLimitKey != "" {
+		_ = s.rdb.Del(ctx, emailRateLimitKey).Err()
 	}
 
 	accessToken, err := s.GenerateAccessToken(user)

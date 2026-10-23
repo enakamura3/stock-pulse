@@ -87,6 +87,10 @@ func main() {
 		log.Fatal("Variável de ambiente JWT_SECRET é obrigatória e não foi configurada.")
 	}
 
+	if config.Envs.TrustedProxies != "" {
+		customMiddleware.SetTrustedProxies(strings.Split(config.Envs.TrustedProxies, ","))
+	}
+
 	// Inicialização de Camadas de Autenticação
 	authRepo := auth.NewRepository(dbPool)
 	authService := auth.NewService(authRepo, rdb, jwtSecret)

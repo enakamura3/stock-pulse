@@ -7,11 +7,74 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/redis/go-redis/v9"
 )
+
+// DefaultTrustedCIDRs define as faixas de rede confiáveis padrão (loopback e redes privadas).
+var DefaultTrustedCIDRs = []string{
+	"127.0.0.1/32",
+	"::1/128",
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+	"fc00::/7",
+}
+
+var (
+	trustedProxiesLock sync.RWMutex
+	trustedProxyNets   []*net.IPNet
+)
+
+func init() {
+	SetTrustedProxies(DefaultTrustedCIDRs)
+}
+
+// SetTrustedProxies define os blocos CIDR confiáveis para resolução de IP via proxy.
+func SetTrustedProxies(cidrs []string) {
+	var parsed []*net.IPNet
+	for _, cidr := range cidrs {
+		cidr = strings.TrimSpace(cidr)
+		if cidr == "" {
+			continue
+		}
+		if !strings.Contains(cidr, "/") {
+			ip := net.ParseIP(cidr)
+			if ip != nil {
+				if ip.To4() != nil {
+					cidr += "/32"
+				} else {
+					cidr += "/128"
+				}
+			}
+		}
+		_, network, err := net.ParseCIDR(cidr)
+		if err == nil && network != nil {
+			parsed = append(parsed, network)
+		}
+	}
+	trustedProxiesLock.Lock()
+	trustedProxyNets = parsed
+	trustedProxiesLock.Unlock()
+}
+
+// isTrustedIP verifica se um IP pertence a uma das redes de proxy confiáveis.
+func isTrustedIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	trustedProxiesLock.RLock()
+	defer trustedProxiesLock.RUnlock()
+	for _, network := range trustedProxyNets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
 
 // rateLimitLuaScript incrementa a contagem de acessos de forma atômica e define o TTL caso não exista.
 var rateLimitLuaScript = redis.NewScript(`
@@ -37,30 +100,58 @@ type RateLimiterConfig struct {
 }
 
 // ClientIP extrai o IP real do cliente a partir dos cabeçalhos HTTP ou do RemoteAddr.
+// Só considera X-Forwarded-For e X-Real-IP se o RemoteAddr vier de um proxy confiável (TRUSTED_PROXIES).
+// Ao analisar o cabeçalho X-Forwarded-For, percorre a cadeia da direita para a esquerda,
+// retornando o primeiro endereço IP não confiável.
 func ClientIP(r *http.Request) string {
+	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil || remoteHost == "" {
+		remoteHost = strings.TrimSpace(r.RemoteAddr)
+	}
+
+	remoteIP := net.ParseIP(remoteHost)
+	if remoteIP == nil {
+		return remoteHost
+	}
+
+	// Se a conexão direta não vier de um proxy confiável, ignora headers forjados e usa RemoteAddr
+	if !isTrustedIP(remoteIP) {
+		return remoteIP.String()
+	}
+
+	// Conexão veio de proxy confiável: avalia X-Forwarded-For da direita para a esquerda
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
-		if len(parts) > 0 {
-			ip := strings.TrimSpace(parts[0])
-			if ip != "" {
-				return ip
+		for i := len(parts) - 1; i >= 0; i-- {
+			rawIP := strings.TrimSpace(parts[i])
+			if rawIP == "" {
+				continue
+			}
+			parsedIP := net.ParseIP(rawIP)
+			if parsedIP == nil {
+				continue
+			}
+			if !isTrustedIP(parsedIP) {
+				return parsedIP.String()
+			}
+		}
+		// Se todos forem confiáveis, retorna o mais à esquerda válido
+		for _, part := range parts {
+			rawIP := strings.TrimSpace(part)
+			if parsedIP := net.ParseIP(rawIP); parsedIP != nil {
+				return parsedIP.String()
 			}
 		}
 	}
 
-	if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
-		ip := strings.TrimSpace(xrip)
-		if ip != "" {
-			return ip
+	// Fallback para X-Real-IP caso X-Forwarded-For não esteja presente
+	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
+		if parsedIP := net.ParseIP(xrip); parsedIP != nil {
+			return parsedIP.String()
 		}
 	}
 
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil && host != "" {
-		return host
-	}
-
-	return strings.TrimSpace(r.RemoteAddr)
+	return remoteIP.String()
 }
 
 // RateLimit cria um middleware de limitação de requisições baseado em Redis.
@@ -174,3 +265,4 @@ func RateLimitTelegramLink(rdb redis.Cmdable) func(http.Handler) http.Handler {
 		KeyPrefix: "rate_limit:telegram:link",
 	})
 }
+

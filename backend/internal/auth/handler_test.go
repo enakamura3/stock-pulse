@@ -173,6 +173,17 @@ func TestHandler_Login(t *testing.T) {
 			},
 			expectedCode: http.StatusUnauthorized,
 		},
+		{
+			name: "Too Many Requests Rate Limited By Email",
+			payload: map[string]string{
+				"email":    "bruteforce@test.com",
+				"password": "wrong",
+			},
+			mockSetup: func(m *MockAuthService) {
+				m.On("Login", mock.Anything, "bruteforce@test.com", "wrong").Return(nil, "", "", errors.New("muitas tentativas de login para este e-mail. Tente novamente mais tarde"))
+			},
+			expectedCode: http.StatusTooManyRequests,
+		},
 	}
 
 	for _, tt := range tests {
