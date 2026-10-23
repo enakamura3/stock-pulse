@@ -37,6 +37,7 @@ type Service interface {
 	GetTreasuryMonthlyYields(ctx context.Context, portfolioID string) ([]MonthlyYield, error)
 	BulkAddTreasuryTransactions(ctx context.Context, portfolioID string, file multipart.File) (*BulkImportResult, error)
 	ExportTreasuryTransactions(ctx context.Context, portfolioID string) ([]byte, error)
+	GetAnbimaHolidays(ctx context.Context) (map[string]bool, error)
 }
 
 type service struct {
@@ -684,5 +685,9 @@ func (s *service) calculateAssetMonthlyYields(ctx context.Context, asset Asset) 
 	}
 
 	return yields, nil
+}
+
+func (s *service) GetAnbimaHolidays(ctx context.Context) (map[string]bool, error) {
+	return s.repo.GetAnbimaHolidays(ctx)
 }
 

@@ -281,19 +281,42 @@ type MockFixedIncomeSvc struct {
 }
 
 func (m *MockFixedIncomeSvc) GetPortfolioPositions(ctx context.Context, portfolioID string) ([]fixedincome.Position, error) {
-	args := m.Called(ctx, portfolioID)
-	if args.Get(0) != nil {
-		return args.Get(0).([]fixedincome.Position), args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetPortfolioPositions" {
+			args := m.Called(ctx, portfolioID)
+			if args.Get(0) != nil {
+				return args.Get(0).([]fixedincome.Position), args.Error(1)
+			}
+			return nil, args.Error(1)
+		}
 	}
-	return nil, args.Error(1)
+	return nil, nil
 }
 
 func (m *MockFixedIncomeSvc) GetTreasuryPositions(ctx context.Context, portfolioID string) ([]fixedincome.TreasuryPosition, error) {
-	args := m.Called(ctx, portfolioID)
-	if args.Get(0) != nil {
-		return args.Get(0).([]fixedincome.TreasuryPosition), args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetTreasuryPositions" {
+			args := m.Called(ctx, portfolioID)
+			if args.Get(0) != nil {
+				return args.Get(0).([]fixedincome.TreasuryPosition), args.Error(1)
+			}
+			return nil, args.Error(1)
+		}
 	}
-	return nil, args.Error(1)
+	return nil, nil
+}
+
+func (m *MockFixedIncomeSvc) GetAnbimaHolidays(ctx context.Context) (map[string]bool, error) {
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetAnbimaHolidays" {
+			args := m.Called(ctx)
+			if args.Get(0) != nil {
+				return args.Get(0).(map[string]bool), args.Error(1)
+			}
+			return nil, args.Error(1)
+		}
+	}
+	return map[string]bool{}, nil
 }
 
 type MockAlertSvc struct {

@@ -20,12 +20,75 @@ func (h *Handlers) HandleQuote(c telebot.Context) error {
 	}
 
 	args := c.Args()
-	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
-		ticker := strings.ToUpper(strings.TrimSpace(args[0]))
-		return h.renderQuote(c, ticker)
+	var tickers []string
+	for _, arg := range args {
+		clean := strings.ToUpper(strings.Trim(strings.TrimSpace(arg), ","))
+		if clean != "" {
+			tickers = append(tickers, clean)
+		}
+	}
+
+	if len(tickers) == 1 {
+		return h.renderQuote(c, tickers[0])
+	} else if len(tickers) > 1 {
+		return h.renderMultiQuote(c, tickers)
 	}
 
 	return h.HandleQuoteStart(c)
+}
+
+func (h *Handlers) renderMultiQuote(c telebot.Context, tickers []string) error {
+	if c.Callback() != nil {
+		_ = c.Respond()
+	}
+
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	if len(tickers) > 10 {
+		tickers = tickers[:10]
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := "📈 *Painel de Cotações*\n\n"
+
+	for _, t := range tickers {
+		quote, err := h.getQuoteWithFallback(ctx, t)
+		if err != nil || quote == nil {
+			msg += "• *" + escapeMarkdown(t) + "*: ⚠️ _Cotação indisponível_\n"
+			continue
+		}
+
+		curr := quote.Currency
+		if curr == "" {
+			curr = getTickerDefaultCurrency(t)
+		}
+
+		badge := "⚪ "
+		changeStr := p.Sprintf("%.2f%%", 0.0)
+		if quote.ChangePercent > 1e-6 {
+			badge = "🟢 +"
+			changeStr = p.Sprintf("+%.2f%%", quote.ChangePercent)
+		} else if quote.ChangePercent < -1e-6 {
+			badge = "🔴 "
+			changeStr = p.Sprintf("%.2f%%", quote.ChangePercent)
+		}
+
+		msg += "• *" + escapeMarkdown(t) + "*: " + curr + " " + formatFinancialPrice(p, quote.Price) + " (" + badge + changeStr + ")\n"
+	}
+
+	msg += "\n_💡 Dica: Use /cotacao TICKER para ver detalhes completos e múltiplos._"
+
+	replyMenu := &telebot.ReplyMarkup{}
+	btnCotacao := replyMenu.Data("🔍 Outra Cotação", "btn_cotacao")
+	btnWatchlist := replyMenu.Data("⭐ Favoritos", "btn_watchlist")
+	btnMenu := replyMenu.Data("🏠 Menu", "btn_menu")
+	replyMenu.Inline(
+		replyMenu.Row(btnCotacao, btnWatchlist),
+		replyMenu.Row(btnMenu),
+	)
+
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, replyMenu)
 }
 
 // getQuoteWithFallback busca a cotação do ativo e tenta adicionar .SA para ativos B3 caso a consulta inicial falhe.
