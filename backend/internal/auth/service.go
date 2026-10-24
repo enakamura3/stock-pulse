@@ -19,6 +19,12 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// Constantes de validação JWT (Issuer e Audience)
+const (
+	JWTIssuer   = "stock-pulse-api"
+	JWTAudience = "stock-pulse-client"
+)
+
 // UserRepository define as operações de banco de dados para a entidade de usuário.
 type UserRepository interface {
 	CreateUser(ctx context.Context, name, email, passwordHash string) (*User, error)
@@ -327,11 +333,14 @@ func (s *Service) GenerateAccessToken(user *User) (string, error) {
 		return "", errors.New("jwtSecret não configurado")
 	}
 
+	now := time.Now()
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
-		"exp":     time.Now().Add(s.accessTokenTTL).Unix(),
-		"iat":     time.Now().Unix(),
+		"iss":     JWTIssuer,
+		"aud":     JWTAudience,
+		"exp":     now.Add(s.accessTokenTTL).Unix(),
+		"iat":     now.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -465,6 +474,35 @@ func (s *Service) RevokeRefreshToken(ctx context.Context, token string) error {
 	return s.rdb.Del(ctx, key).Err()
 }
 
+// RevokeAllUserSessions revoga todos os refresh tokens ativos de um usuário no Redis.
+func (s *Service) RevokeAllUserSessions(ctx context.Context, userID string) error {
+	if s.rdb == nil || userID == "" {
+		return nil
+	}
+
+	activeTokensKey := fmt.Sprintf("user_active_tokens:%s", userID)
+	tokens, err := s.rdb.SMembers(ctx, activeTokensKey).Result()
+	if err != nil {
+		return err
+	}
+
+	if len(tokens) > 0 {
+		keysToDelete := make([]string, 0, len(tokens)*3)
+		for _, t := range tokens {
+			keysToDelete = append(keysToDelete,
+				fmt.Sprintf("refresh_token:%s", t),
+				fmt.Sprintf("rotated_token:%s", t),
+				fmt.Sprintf("used_refresh_token:%s", t),
+			)
+		}
+		if err := s.rdb.Del(ctx, keysToDelete...).Err(); err != nil {
+			return err
+		}
+	}
+
+	return s.rdb.Del(ctx, activeTokensKey).Err()
+}
+
 // GetUserByID retorna um usuário pelo ID.
 func (s *Service) GetUserByID(ctx context.Context, id string) (*User, error) {
 	return s.repo.GetUserByID(ctx, id)
@@ -488,7 +526,7 @@ func (s *Service) UpdateProfile(ctx context.Context, id, name, email string) (*U
 	return s.repo.UpdateUser(ctx, id, name, email)
 }
 
-// UpdatePassword valida a senha atual e define a nova senha.
+// UpdatePassword valida a senha atual, define a nova senha e revoga todas as sessões ativas do usuário.
 func (s *Service) UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error {
 	if len(newPassword) < 6 {
 		return errors.New("a nova senha deve ter no mínimo 6 caracteres")
@@ -509,10 +547,43 @@ func (s *Service) UpdatePassword(ctx context.Context, id, currentPassword, newPa
 		return fmt.Errorf("falha ao criptografar nova senha: %w", err)
 	}
 
-	return s.repo.UpdatePassword(ctx, id, hash)
+	if err := s.repo.UpdatePassword(ctx, id, hash); err != nil {
+		return err
+	}
+
+	if s.rdb != nil {
+		_ = s.RevokeAllUserSessions(ctx, id)
+		// Registra timestamp de revogação de credenciais (em segundos) para invalidar access tokens emitidos antes da troca
+		_ = s.rdb.Set(ctx, fmt.Sprintf("pwd_changed_at:%s", id), time.Now().Unix(), s.accessTokenTTL).Err()
+	}
+
+	return nil
 }
 
-// DeleteUser deleta o usuário do banco de dados.
-func (s *Service) DeleteUser(ctx context.Context, id string) error {
-	return s.repo.DeleteUser(ctx, id)
+// DeleteUser valida a senha atual, deleta o usuário do banco de dados e revoga todas as sessões e access tokens.
+func (s *Service) DeleteUser(ctx context.Context, id, currentPassword string) error {
+	if strings.TrimSpace(currentPassword) == "" {
+		return errors.New("a senha atual é obrigatória para excluir a conta")
+	}
+
+	user, err := s.repo.GetUserByIDWithHash(ctx, id)
+	if err != nil {
+		return errors.New("usuário não encontrado")
+	}
+
+	match, err := comparePasswordAndHash(currentPassword, user.PasswordHash)
+	if err != nil || !match {
+		return errors.New("senha atual incorreta")
+	}
+
+	if err := s.repo.DeleteUser(ctx, id); err != nil {
+		return err
+	}
+
+	if s.rdb != nil {
+		_ = s.RevokeAllUserSessions(ctx, id)
+		_ = s.rdb.Set(ctx, fmt.Sprintf("revoked_user:%s", id), "1", s.accessTokenTTL).Err()
+	}
+
+	return nil
 }

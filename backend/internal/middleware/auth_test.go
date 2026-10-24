@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/config"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,26 +23,67 @@ func TestAuthRequired(t *testing.T) {
 
 	validToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": "user123",
+		"iss":     auth.JWTIssuer,
+		"aud":     auth.JWTAudience,
+		"iat":     time.Now().Unix(),
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
 	validTokenStr, _ := validToken.SignedString(jwtSecret)
 
 	invalidAlgToken := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{
 		"user_id": "user123",
+		"iss":     auth.JWTIssuer,
+		"aud":     auth.JWTAudience,
+		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
 	invalidAlgTokenStr, _ := invalidAlgToken.SignedString(jwt.UnsafeAllowNoneSignatureType)
 
+	missingExpToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "user123",
+		"iss":     auth.JWTIssuer,
+		"aud":     auth.JWTAudience,
+	})
+	missingExpTokenStr, _ := missingExpToken.SignedString(jwtSecret)
+
+	wrongIssuerToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "user123",
+		"iss":     "other-issuer",
+		"aud":     auth.JWTAudience,
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	wrongIssuerTokenStr, _ := wrongIssuerToken.SignedString(jwtSecret)
+
+	wrongAudienceToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "user123",
+		"iss":     auth.JWTIssuer,
+		"aud":     "other-audience",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	wrongAudienceTokenStr, _ := wrongAudienceToken.SignedString(jwtSecret)
+
 	missingUserIdToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"some_claim": "value",
+		"iss":        auth.JWTIssuer,
+		"aud":        auth.JWTAudience,
+		"exp":        time.Now().Add(time.Hour).Unix(),
 	})
 	missingUserIdTokenStr, _ := missingUserIdToken.SignedString(jwtSecret)
 
 	emptyUserIdToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": "",
+		"iss":     auth.JWTIssuer,
+		"aud":     auth.JWTAudience,
+		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
 	emptyUserIdTokenStr, _ := emptyUserIdToken.SignedString(jwtSecret)
 
-	customClaimsToken := jwt.NewWithClaims(jwt.SigningMethodHS256, &customClaims{})
+	customClaimsToken := jwt.NewWithClaims(jwt.SigningMethodHS256, &customClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    auth.JWTIssuer,
+			Audience:  jwt.ClaimStrings{auth.JWTAudience},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	})
 	customClaimsTokenStr, _ := customClaimsToken.SignedString(jwtSecret)
 
 	tests := []struct {
@@ -60,6 +103,27 @@ func TestAuthRequired(t *testing.T) {
 			name:           "Invalid algorithm",
 			cookieName:     "access_token",
 			cookieValue:    invalidAlgTokenStr,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
+		},
+		{
+			name:           "Missing exp claim",
+			cookieName:     "access_token",
+			cookieValue:    missingExpTokenStr,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
+		},
+		{
+			name:           "Wrong issuer",
+			cookieName:     "access_token",
+			cookieValue:    wrongIssuerTokenStr,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
+		},
+		{
+			name:           "Wrong audience",
+			cookieName:     "access_token",
+			cookieValue:    wrongAudienceTokenStr,
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   `{"error":"Sessão inválida ou expirada. Refaça o login."}`,
 		},
@@ -129,6 +193,96 @@ func TestAuthRequired(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAuthRequired_RevocationAndPasswordChange(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	jwtSecret := []byte("secret")
+
+	now := time.Now().Unix()
+
+	tokenBeforePwdChange := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "user-rev",
+		"iss":     auth.JWTIssuer,
+		"aud":     auth.JWTAudience,
+		"iat":     now - 60,
+		"exp":     now + 3600,
+	})
+	tokenBeforeStr, _ := tokenBeforePwdChange.SignedString(jwtSecret)
+
+	tokenAfterPwdChange := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "user-rev",
+		"iss":     auth.JWTIssuer,
+		"aud":     auth.JWTAudience,
+		"iat":     now + 10,
+		"exp":     now + 3600,
+	})
+	tokenAfterStr, _ := tokenAfterPwdChange.SignedString(jwtSecret)
+
+	tokenWithoutIat := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "user-rev",
+		"iss":     auth.JWTIssuer,
+		"aud":     auth.JWTAudience,
+		"exp":     now + 3600,
+	})
+	tokenWithoutIatStr, _ := tokenWithoutIat.SignedString(jwtSecret)
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := AuthRequired(jwtSecret, rdb)
+
+	t.Run("Revoked user via DeleteUser denylist", func(t *testing.T) {
+		mr.Set("revoked_user:user-rev", "1")
+		defer mr.Del("revoked_user:user-rev")
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "access_token", Value: tokenAfterStr})
+		rr := httptest.NewRecorder()
+
+		mw(nextHandler).ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Equal(t, `{"error":"Sessão revogada. Faça login novamente."}`, rr.Body.String())
+	})
+
+	t.Run("Token issued before password change is rejected", func(t *testing.T) {
+		mr.Set("pwd_changed_at:user-rev", "9999999999")
+		defer mr.Del("pwd_changed_at:user-rev")
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "access_token", Value: tokenBeforeStr})
+		rr := httptest.NewRecorder()
+
+		mw(nextHandler).ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Equal(t, `{"error":"Sessão revogada após alteração de senha. Faça login novamente."}`, rr.Body.String())
+	})
+
+	t.Run("Token without iat when pwd_changed_at is set is rejected", func(t *testing.T) {
+		mr.Set("pwd_changed_at:user-rev", "1000")
+		defer mr.Del("pwd_changed_at:user-rev")
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "access_token", Value: tokenWithoutIatStr})
+		rr := httptest.NewRecorder()
+
+		mw(nextHandler).ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		assert.Equal(t, `{"error":"Sessão revogada após alteração de senha. Faça login novamente."}`, rr.Body.String())
+	})
+
+	t.Run("Token issued after password change is accepted", func(t *testing.T) {
+		mr.Set("pwd_changed_at:user-rev", "1000")
+		defer mr.Del("pwd_changed_at:user-rev")
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "access_token", Value: tokenAfterStr})
+		rr := httptest.NewRecorder()
+
+		mw(nextHandler).ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
 }
 
 func TestCORS(t *testing.T) {

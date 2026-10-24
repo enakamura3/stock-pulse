@@ -69,6 +69,9 @@ export default function SettingsPage() {
   const [savingAssetId, setSavingAssetId] = useState<string | null>(null);
   const [assetSearchFilter, setAssetSearchFilter] = useState('');
 
+  // Estados de exclusão de conta
+  const [deletePassword, setDeletePassword] = useState('');
+
   const getAdminHeaders = (keyToUse?: string) => {
     const key = keyToUse !== undefined ? keyToUse : adminKey;
     const headers: Record<string, string> = {};
@@ -374,6 +377,11 @@ export default function SettingsPage() {
   // Excluir Conta
   const handleDeleteAccount = async () => {
     if (!user) return;
+    if (!deletePassword.trim()) {
+      alert('Por favor, informe sua senha atual para confirmar a exclusão da conta.');
+      return;
+    }
+
     const doubleConfirm = prompt(
       '⚠️ ATENÇÃO: Esta ação é irreversível e excluirá permanentemente todos os seus dados, incluindo carteiras, transações e alertas. Para confirmar, digite seu e-mail abaixo:'
     );
@@ -388,6 +396,8 @@ export default function SettingsPage() {
     try {
       const res = await apiFetch('/user', {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: deletePassword }),
       });
 
       if (res.ok) {
@@ -881,9 +891,20 @@ export default function SettingsPage() {
                     A exclusão é irreversível e remove todos os seus dados da plataforma.
                   </span>
                 </div>
-                <button className="btn-danger font-mono" onClick={handleDeleteAccount} style={{ padding: '0.6rem 1.5rem' }}>
-                  Excluir Conta
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="password"
+                    aria-label="Senha atual para excluir conta"
+                    placeholder="Confirme sua senha atual"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    className="form-input font-mono"
+                    style={{ fontSize: '0.82rem', padding: '0.5rem 0.75rem', width: '210px' }}
+                  />
+                  <button className="btn-danger font-mono" onClick={handleDeleteAccount} style={{ padding: '0.6rem 1.5rem' }}>
+                    Excluir Conta
+                  </button>
+                </div>
               </div>
             </div>
           </section>

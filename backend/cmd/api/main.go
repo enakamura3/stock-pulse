@@ -245,12 +245,12 @@ func main() {
 			r.With(customMiddleware.RateLimitAuthLogin(rdb)).Post("/login", authHandler.Login)
 			r.Post("/logout", authHandler.Logout)
 			r.With(customMiddleware.RateLimitAuthRefresh(rdb)).Post("/refresh", authHandler.Refresh)
-			r.With(customMiddleware.AuthRequired([]byte(jwtSecret))).Get("/me", authHandler.Me)
+			r.With(customMiddleware.AuthRequired([]byte(jwtSecret), rdb)).Get("/me", authHandler.Me)
 		})
 
 		// Rotas Protegidas (Exige Sessão)
 		r.Group(func(r chi.Router) {
-			r.Use(customMiddleware.AuthRequired([]byte(jwtSecret)))
+			r.Use(customMiddleware.AuthRequired([]byte(jwtSecret), rdb))
 
 			// Gestão de Usuário
 			r.Route("/user", func(r chi.Router) {

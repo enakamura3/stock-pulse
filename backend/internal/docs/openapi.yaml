@@ -259,9 +259,24 @@ paths:
         - Usuário
       security:
         - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - current_password
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                  example: SenhaSegura123
       responses:
         '200':
           description: Conta e todos os dados financeiros excluídos permanentemente
+        '400':
+          description: Senha atual incorreta ou ausente
         '401':
           description: Não autorizado
 

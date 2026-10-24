@@ -6,16 +6,23 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
+	"github.com/redis/go-redis/v9"
 )
 
-// AuthRequired é o middleware real de validação de token JWT.
-func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
+// AuthRequired é o middleware real de validação de token JWT e verificação de revogação de sessão.
+func AuthRequired(jwtSecret []byte, rdb ...*redis.Client) func(http.Handler) http.Handler {
+	var redisClient *redis.Client
+	if len(rdb) > 0 {
+		redisClient = rdb[0]
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Busca pelo cookie access_token
@@ -25,14 +32,17 @@ func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Realiza o parse e a validação do JWT
-			token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
-				// Valida se o algoritmo de assinatura é o correto (HMAC SHA-256)
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("algoritmo de assinatura inesperado: %v", token.Header["alg"])
-				}
-				return jwtSecret, nil
-			})
+			// Realiza o parse e a validação estrita do JWT (HS256, exp, iss e aud obrigatórios)
+			token, err := jwt.Parse(
+				cookie.Value,
+				func(token *jwt.Token) (interface{}, error) {
+					return jwtSecret, nil
+				},
+				jwt.WithValidMethods([]string{"HS256"}),
+				jwt.WithExpirationRequired(),
+				jwt.WithIssuer(auth.JWTIssuer),
+				jwt.WithAudience(auth.JWTAudience),
+			)
 
 			if err != nil || !token.Valid {
 				httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão inválida ou expirada. Refaça o login.")
@@ -50,6 +60,25 @@ func AuthRequired(jwtSecret []byte) func(http.Handler) http.Handler {
 			if !ok || userID == "" {
 				httputils.RespondWithError(w, http.StatusUnauthorized, "ID de usuário inválido nas credenciais.")
 				return
+			}
+
+			// Verifica denylist de conta excluída e revogação pós-troca de senha no Redis
+			if redisClient != nil {
+				exists, err := redisClient.Exists(r.Context(), fmt.Sprintf("revoked_user:%s", userID)).Result()
+				if err == nil && exists > 0 {
+					httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão revogada. Faça login novamente.")
+					return
+				}
+
+				pwdChangedStr, err := redisClient.Get(r.Context(), fmt.Sprintf("pwd_changed_at:%s", userID)).Result()
+				if err == nil && pwdChangedStr != "" {
+					pwdChangedAt, parseErr := strconv.ParseInt(pwdChangedStr, 10, 64)
+					iatFloat, hasIat := claims["iat"].(float64)
+					if parseErr == nil && (!hasIat || int64(iatFloat) < pwdChangedAt) {
+						httputils.RespondWithError(w, http.StatusUnauthorized, "Sessão revogada após alteração de senha. Faça login novamente.")
+						return
+					}
+				}
 			}
 
 			// Injeta o UserID no contexto da requisição
