@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
@@ -11,13 +10,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace('/dashboard/portfolio');
+      window.location.href = '/dashboard/portfolio';
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

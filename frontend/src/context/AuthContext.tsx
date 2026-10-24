@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 
 export interface User {
@@ -27,7 +26,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
   // Busca perfil do usuário logado na inicialização para restaurar sessão ativa
   const fetchMe = async (): Promise<boolean> => {
@@ -69,13 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || 'Falha ao efetuar login');
       }
-      await fetchMe();
+      setUser(data);
       setIsLoading(false);
-      router.push('/dashboard/portfolio');
+      window.location.href = '/dashboard/portfolio';
     } catch (error: any) {
       setIsLoading(false);
       throw error;

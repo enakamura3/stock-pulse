@@ -147,13 +147,7 @@ describe('AuthContext', () => {
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Not Auth'));
 
-    // 1º: Mock do POST /auth/login (sucesso)
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ message: 'ok' })
-    });
-    // 2º: Mock do GET /auth/me (fetchMe após login)
+    // Mock do POST /auth/login (sucesso retornando objeto do usuário)
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -163,7 +157,8 @@ describe('AuthContext', () => {
     await userEvent.click(screen.getByTestId('btn-login'));
     
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/dashboard/portfolio');
+      expect(window.location.href).toBe('/dashboard/portfolio');
+      expect(screen.getByTestId('username')).toHaveTextContent('LoginUser');
     });
   });
 
@@ -190,7 +185,7 @@ describe('AuthContext', () => {
     });
   });
 
-  it('deve repassar o erro se a chamada de login retornar !res.ok', async () => {
+  it('deve repassar o erro se a chamada de login retornar !res.ok (incluindo 401 sem tentar refresh)', async () => {
     (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 400 });
     
     render(
@@ -201,11 +196,11 @@ describe('AuthContext', () => {
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Not Auth'));
 
-    // Reseta mock e configura retorno !res.ok com erro específico
+    // Reseta mock e configura retorno 401 com erro específico (não deve disparar /auth/refresh)
     vi.resetAllMocks();
     (global.fetch as any).mockResolvedValueOnce({
       ok: false,
-      status: 400,
+      status: 401,
       json: async () => ({ error: 'Senha incorreta' }),
     });
 
@@ -213,6 +208,7 @@ describe('AuthContext', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('error')).toHaveTextContent('Senha incorreta');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
     // Também testar com json sem error para cobrir fallback
@@ -256,20 +252,13 @@ describe('AuthContext', () => {
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ message: 'ok' })
-    });
-
-    // 3º: Mock do GET /auth/me (fetchMe após login)
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
       json: async () => ({ id: '1', name: 'Test', email: 'test@test.com', created_at: '', updated_at: '' })
     });
 
     await userEvent.click(screen.getByTestId('btn-register'));
     
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/dashboard/portfolio');
+      expect(window.location.href).toBe('/dashboard/portfolio');
     });
   });
 

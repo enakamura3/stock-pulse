@@ -1,14 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import LoginPage from './page';
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
-const replaceMock = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: replaceMock,
-  }),
-}));
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -17,6 +10,8 @@ vi.mock('@/context/AuthContext', () => ({
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete (window as any).location;
+    window.location = { href: '' } as any;
   });
 
   it('redirects to dashboard when already authenticated and not loading', () => {
@@ -27,7 +22,7 @@ describe('LoginPage', () => {
     });
 
     render(<LoginPage />);
-    expect(replaceMock).toHaveBeenCalledWith('/dashboard/portfolio');
+    expect(window.location.href).toBe('/dashboard/portfolio');
   });
 
   it('renders correctly and submits form', async () => {
@@ -79,6 +74,6 @@ describe('LoginPage', () => {
     });
 
     render(<LoginPage />);
-    expect(replaceMock).not.toHaveBeenCalled();
+    expect(window.location.href).toBe('');
   });
 });
