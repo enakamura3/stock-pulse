@@ -368,24 +368,36 @@ paths:
   /market/quotes/invalidate:
     post:
       summary: Invalidar chaves de cache de cotações no Redis
+      description: Invalida o cache de até 20 tickers por requisição. Usuários normais devem fornecer `tickers` obrigatoriamente. Acesso sujeito a rate limit de 5 requisições/minuto.
       tags:
         - Dados de Mercado
       security:
         - cookieAuth: []
+      parameters:
+        - in: header
+          name: X-Admin-Key
+          schema:
+            type: string
+          required: false
+          description: Chave administrativa opcional que permite invalidação global sem especificar tickers.
       requestBody:
         content:
           application/json:
             schema:
               type: object
               properties:
-                symbols:
+                tickers:
                   type: array
                   items:
                     type: string
-                  description: Lista opcional de tickers para invalidar. Se omitido, invalida todos os caches de cotação.
+                  description: Lista de tickers para invalidar (máximo 20). Obrigatório para usuários comuns.
       responses:
         '200':
           description: Cache de cotações invalidado com sucesso
+        '400':
+          description: Parâmetros inválidos (ex. tickers vazio ou mais de 20 tickers)
+        '429':
+          description: Muitas requisições. Rate limit excedido.
 
   /watchlists:
     get:

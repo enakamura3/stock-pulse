@@ -264,10 +264,10 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 	return fund, nil
 }
 
-// InvalidateQuoteCache remove do Redis as chaves de cotação e benchmarks para os símbolos informados.
-// Se symbols estiver vazio ou não fornecido, invalida todas as chaves "quote:*" e "benchmarks:summary:v1".
-func (s *Service) InvalidateQuoteCache(ctx context.Context, symbols []string) (int64, error) {
-	if len(symbols) == 0 {
+// InvalidateQuoteCache remove do Redis as chaves de cotação e benchmarks para os tickers informados.
+// Se tickers estiver vazio ou não fornecido, invalida todas as chaves "quote:*" e "benchmarks:summary:v1".
+func (s *Service) InvalidateQuoteCache(ctx context.Context, tickers []string) (int64, error) {
+	if len(tickers) == 0 {
 		var totalRemoved int64
 		// Remove resumo de benchmarks
 		if del, err := s.rdb.Del(ctx, "benchmarks:summary:v1").Result(); err == nil {
@@ -297,8 +297,8 @@ func (s *Service) InvalidateQuoteCache(ctx context.Context, symbols []string) (i
 	}
 
 	var keys []string
-	for _, sym := range symbols {
-		cleaned := strings.ToUpper(strings.TrimSpace(sym))
+	for _, t := range tickers {
+		cleaned := strings.ToUpper(strings.TrimSpace(t))
 		if cleaned != "" {
 			keys = append(keys, fmt.Sprintf("quote:%s", cleaned))
 		}

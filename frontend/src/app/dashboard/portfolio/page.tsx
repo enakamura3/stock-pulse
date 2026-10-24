@@ -421,7 +421,13 @@ function PortfolioContent() {
                 if (activePortfolioId) {
                   if (forceRealtime) {
                     try {
-                      await apiFetch('/market/quotes/invalidate', { method: 'POST' });
+                      const tickers = positions.map(p => p.ticker).filter(Boolean);
+                      if (tickers.length > 0) {
+                        await apiFetch('/market/quotes/invalidate', {
+                          method: 'POST',
+                          body: JSON.stringify({ tickers: tickers.slice(0, 20) }),
+                        });
+                      }
                     } catch {}
                   }
                   await loadPortfolioDetails(activePortfolioId);
