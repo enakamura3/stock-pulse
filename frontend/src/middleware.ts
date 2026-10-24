@@ -36,15 +36,20 @@ export async function middleware(request: NextRequest) {
     // Opcional: deletar o cookie inválido na resposta
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete('access_token');
+    response.headers.set('x-middleware-cache', 'no-cache');
     return response;
   }
 
   // Se o usuário já estiver autenticado e tentar acessar login/registro/home, redireciona para dashboard
   if (isAuthRoute && isValid) {
-    return NextResponse.redirect(new URL('/dashboard/portfolio', request.url));
+    const response = NextResponse.redirect(new URL('/dashboard/portfolio', request.url));
+    response.headers.set('x-middleware-cache', 'no-cache');
+    return response;
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set('x-middleware-cache', 'no-cache');
+  return response;
 }
 
 // Configura o matcher do Next.js para rodar o middleware apenas nas rotas mapeadas, otimizando performance

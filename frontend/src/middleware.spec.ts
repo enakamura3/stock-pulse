@@ -5,8 +5,8 @@ import { vi } from 'vitest';
 vi.mock('next/server', () => {
   return {
     NextResponse: {
-      redirect: vi.fn((url) => ({ status: 307, url: url.toString(), cookies: { delete: vi.fn() } })),
-      next: vi.fn(() => ({ status: 200 })),
+      redirect: vi.fn((url) => ({ status: 307, url: url.toString(), cookies: { delete: vi.fn() }, headers: { set: vi.fn() } })),
+      next: vi.fn(() => ({ status: 200, headers: { set: vi.fn() } })),
     },
   };
 });
