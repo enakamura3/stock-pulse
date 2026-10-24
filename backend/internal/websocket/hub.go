@@ -31,7 +31,7 @@ type Client struct {
 // WSMessage representa o formato de mensagem recebido do frontend.
 type WSMessage struct {
 	Action  string   `json:"action"` // "subscribe" ou "unsubscribe"
-	Symbols []string `json:"symbols"`
+	Tickers []string `json:"tickers"`
 }
 
 // NewClient inicializa um novo cliente WebSocket.
@@ -101,15 +101,15 @@ func (c *Client) ReadPump() {
 			c.subscribed = make(map[string]bool)
 			count := 0
 			limitExceeded := false
-			for _, sym := range wsMsg.Symbols {
-				if sym != "" {
+			for _, ticker := range wsMsg.Tickers {
+				if ticker != "" {
 					if count >= MaxSubscriptionsPerClient {
 						limitExceeded = true
 						break
 					}
-					c.subscribed[sym] = true
+					c.subscribed[ticker] = true
 					count++
-					slog.Info("Cliente assinou ticker via WebSocket", "user_id", c.UserID, "ticker", sym)
+					slog.Info("Cliente assinou ticker via WebSocket", "user_id", c.UserID, "ticker", ticker)
 				}
 			}
 			if limitExceeded {
@@ -125,9 +125,9 @@ func (c *Client) ReadPump() {
 				}
 			}
 		case "unsubscribe":
-			for _, sym := range wsMsg.Symbols {
-				delete(c.subscribed, sym)
-				slog.Info("Cliente cancelou assinatura do ticker via WebSocket", "user_id", c.UserID, "ticker", sym)
+			for _, ticker := range wsMsg.Tickers {
+				delete(c.subscribed, ticker)
+				slog.Info("Cliente cancelou assinatura do ticker via WebSocket", "user_id", c.UserID, "ticker", ticker)
 			}
 		}
 		c.mu.Unlock()
@@ -185,10 +185,10 @@ func (c *Client) WritePump() {
 }
 
 // IsSubscribed retorna se o cliente está assinado em um ticker específico de forma thread-safe.
-func (c *Client) IsSubscribed(symbol string) bool {
+func (c *Client) IsSubscribed(ticker string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.subscribed[symbol]
+	return c.subscribed[ticker]
 }
 
 // Hub coordena as conexões ativas e a orquestração do broadcast de cotações em tempo real.

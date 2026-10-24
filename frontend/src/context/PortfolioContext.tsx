@@ -129,7 +129,7 @@ interface PortfolioContextType {
   loadDividends: (id: string) => Promise<void>;
   loadTreasuryPositions: (id: string) => Promise<void>;
   setActivePortfolioId: (id: string) => void;
-  handleSelectAsset: (symbol: string) => Promise<void>;
+  handleSelectAsset: (ticker: string) => Promise<void>;
   handleCreatePortfolio: (e: React.FormEvent) => Promise<void>;
   handleDeletePortfolio: () => Promise<void>;
   handleSetDefaultPortfolio: () => Promise<void>;
@@ -391,12 +391,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(delayDebounce);
   }, [searchQuery, txTicker]);
 
-  const handleSelectAsset = async (symbol: string) => {
-    setTxTicker(symbol); setSearchQuery(symbol); setShowDropdown(false);
+  const handleSelectAsset = async (ticker: string) => {
+    setTxTicker(ticker); setSearchQuery(ticker); setShowDropdown(false);
     let quoteName = '';
     let currency = 'BRL';
     try {
-      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`, { cache: 'no-store' });
+      const res = await apiFetch(`/quotes/${encodeURIComponent(ticker)}`, { cache: 'no-store' });
       if (res.ok) {
         const quote = await res.json();
         quoteName = quote.name || '';
@@ -412,7 +412,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
     // Busca se o ativo já existe no banco (Opção A)
     try {
-      const metaRes = await apiFetch(`/assets/${encodeURIComponent(symbol)}`, { cache: 'no-store' });
+      const metaRes = await apiFetch(`/assets/${encodeURIComponent(ticker)}`, { cache: 'no-store' });
       if (metaRes.ok) {
         const meta = await metaRes.json();
         if (meta.asset_type) {
@@ -425,7 +425,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Fallback para heurística local com valores pré-estabelecidos
-    setTxAssetType(determineAssetTypeLocal(symbol, quoteName, currency));
+    setTxAssetType(determineAssetTypeLocal(ticker, quoteName, currency));
   };
 
   const handleLinkTelegram = async () => {

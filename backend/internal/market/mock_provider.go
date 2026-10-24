@@ -12,11 +12,11 @@ func NewMockProvider() *MockProvider {
 	return &MockProvider{}
 }
 
-func (m *MockProvider) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
-	switch symbol {
+func (m *MockProvider) GetQuote(ctx context.Context, ticker string) (*Quote, error) {
+	switch ticker {
 	case "^BVSP":
 		return &Quote{
-			Symbol:        "^BVSP",
+			Ticker:        "^BVSP",
 			Name:          "Ibovespa",
 			Price:         130000.00,
 			Change:        1300.00,
@@ -30,7 +30,7 @@ func (m *MockProvider) GetQuote(ctx context.Context, symbol string) (*Quote, err
 		}, nil
 	case "^GSPC":
 		return &Quote{
-			Symbol:        "^GSPC",
+			Ticker:        "^GSPC",
 			Name:          "S&P 500",
 			Price:         5500.00,
 			Change:        25.00,
@@ -44,7 +44,7 @@ func (m *MockProvider) GetQuote(ctx context.Context, symbol string) (*Quote, err
 		}, nil
 	case "BRL=X":
 		return &Quote{
-			Symbol:        "BRL=X",
+			Ticker:        "BRL=X",
 			Name:          "Dólar Comercial",
 			Price:         5.45,
 			Change:        -0.02,
@@ -58,7 +58,7 @@ func (m *MockProvider) GetQuote(ctx context.Context, symbol string) (*Quote, err
 		}, nil
 	case "IFIX.SA":
 		return &Quote{
-			Symbol:        "IFIX.SA",
+			Ticker:        "IFIX.SA",
 			Name:          "IFIX",
 			Price:         3350.00,
 			Change:        5.00,
@@ -74,8 +74,8 @@ func (m *MockProvider) GetQuote(ctx context.Context, symbol string) (*Quote, err
 
 	// Retorna cotação fixa para qualquer ticker
 	return &Quote{
-		Symbol:        symbol,
-		Name:          symbol + " Mocked Corp",
+		Ticker:        ticker,
+		Name:          ticker + " Mocked Corp",
 		Price:         50.00,
 		Change:        1.50,
 		ChangePercent: 3.09,
@@ -92,7 +92,7 @@ func (m *MockProvider) SearchAssets(ctx context.Context, query string) ([]Search
 	// Retorna resultado genérico
 	return []SearchResult{
 		{
-			Symbol:   "PETR4.SA",
+			Ticker:   "PETR4.SA",
 			Name:     "Petróleo Brasileiro S.A. - Petrobras",
 			Exchange: "SAO",
 			Type:     "EQUITY",
@@ -100,11 +100,11 @@ func (m *MockProvider) SearchAssets(ctx context.Context, query string) ([]Search
 	}, nil
 }
 
-func (m *MockProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
+func (m *MockProvider) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]HistoricalPrice, error) {
 	return []HistoricalPrice{}, nil
 }
 
-func (m *MockProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
+func (m *MockProvider) GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]HistoricalPrice, error) {
 	return []HistoricalPrice{}, nil
 }
 

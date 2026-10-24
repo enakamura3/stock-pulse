@@ -13,7 +13,7 @@ import (
 
 // Quote representa os dados consolidados da cotação em tempo real de um ativo.
 type Quote struct {
-	Symbol        string  `json:"symbol"`
+	Ticker        string  `json:"ticker"`
 	Name          string  `json:"name"`
 	Price         float64 `json:"price"`
 	Change        float64 `json:"change"`
@@ -28,7 +28,7 @@ type Quote struct {
 
 // SearchResult representa um resultado de busca autocomplete de ativo.
 type SearchResult struct {
-	Symbol   string `json:"symbol"`
+	Ticker   string `json:"ticker"`
 	Name     string `json:"name"`
 	Exchange string `json:"exchange"`
 	Type     string `json:"type"`
@@ -43,10 +43,10 @@ type HistoricalPrice struct {
 
 // QuoteProvider define o contrato para fornecer cotações, buscas de ativos e eventos corporativos.
 type QuoteProvider interface {
-	GetQuote(ctx context.Context, symbol string) (*Quote, error)
+	GetQuote(ctx context.Context, ticker string) (*Quote, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
-	GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error)
-	GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error)
+	GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]HistoricalPrice, error)
+	GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]HistoricalPrice, error)
 }
 
 // YahooFinanceProvider implementa QuoteProvider consumindo endpoints públicos do Yahoo Finance.
@@ -98,8 +98,8 @@ type searchResponse struct {
 }
 
 // GetQuote obtém a cotação intradiária em tempo real usando o endpoint de Chart.
-func (y *YahooFinanceProvider) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
-	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=1d", url.PathEscape(symbol))
+func (y *YahooFinanceProvider) GetQuote(ctx context.Context, ticker string) (*Quote, error) {
+	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=1d", url.PathEscape(ticker))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
@@ -160,7 +160,7 @@ func (y *YahooFinanceProvider) GetQuote(ctx context.Context, symbol string) (*Qu
 	}
 
 	quote := &Quote{
-		Symbol:        meta.Symbol,
+		Ticker:        meta.Symbol,
 		Name:          name,
 		Price:         meta.RegularMarketPrice,
 		Change:        change,
@@ -208,7 +208,7 @@ func (y *YahooFinanceProvider) SearchAssets(ctx context.Context, query string) (
 
 	var results []SearchResult
 	for _, q := range data.Quotes {
-		// Ignora registros vazios de símbolos ou sem tipo de ativo
+		// Ignora registros vazios de tickers ou sem tipo de ativo
 		if q.Symbol == "" || q.QuoteType == "" {
 			continue
 		}
@@ -222,7 +222,7 @@ func (y *YahooFinanceProvider) SearchAssets(ctx context.Context, query string) (
 		}
 
 		results = append(results, SearchResult{
-			Symbol:   q.Symbol,
+			Ticker:   q.Symbol,
 			Name:     name,
 			Exchange: q.Exchange,
 			Type:     q.QuoteType,
@@ -233,19 +233,19 @@ func (y *YahooFinanceProvider) SearchAssets(ctx context.Context, query string) (
 }
 
 // GetHistoricalPrices busca série histórica diária baseada em um range (ex: "10y", "5y", "1y").
-func (y *YahooFinanceProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+func (y *YahooFinanceProvider) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]HistoricalPrice, error) {
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
 	if rangePeriod == "" {
 		rangePeriod = "10y"
 	}
-	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=%s", url.PathEscape(symbol), url.QueryEscape(rangePeriod))
+	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&range=%s", url.PathEscape(ticker), url.QueryEscape(rangePeriod))
 	return y.fetchHistoricalPricesFromURL(ctx, apiURL)
 }
 
 // GetHistoricalPricesBetween busca série histórica diária entre dois timestamps Unix.
-func (y *YahooFinanceProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&period1=%d&period2=%d", url.PathEscape(symbol), period1, period2)
+func (y *YahooFinanceProvider) GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]HistoricalPrice, error) {
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	apiURL := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d&period1=%d&period2=%d", url.PathEscape(ticker), period1, period2)
 	return y.fetchHistoricalPricesFromURL(ctx, apiURL)
 }
 

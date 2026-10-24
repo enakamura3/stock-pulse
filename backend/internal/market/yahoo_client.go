@@ -39,9 +39,9 @@ type yahooDividendResponse struct {
 }
 
 // FetchDividends busca o histórico de dividendos via Yahoo Finance Chart API.
-// Endpoint: query2.finance.yahoo.com/v8/finance/chart/{symbol}?events=div&range=10y&interval=1d
-func (c *YahooClient) FetchDividends(ctx context.Context, symbol string) ([]YahooRawDividend, error) {
-	apiURL := fmt.Sprintf("https://query2.finance.yahoo.com/v8/finance/chart/%s?events=div&range=10y&interval=1d", url.PathEscape(symbol))
+// Endpoint: query2.finance.yahoo.com/v8/finance/chart/{ticker}?events=div&range=10y&interval=1d
+func (c *YahooClient) FetchDividends(ctx context.Context, ticker string) ([]YahooRawDividend, error) {
+	apiURL := fmt.Sprintf("https://query2.finance.yahoo.com/v8/finance/chart/%s?events=div&range=10y&interval=1d", url.PathEscape(ticker))
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return nil, err

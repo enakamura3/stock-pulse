@@ -149,14 +149,14 @@ export default function TransactionModal({
               >
                 {searchResults.map((item) => (
                   <div
-                    key={item.symbol}
-                    onClick={() => handleSelectAsset(item.symbol)}
+                    key={item.ticker}
+                    onClick={() => handleSelectAsset(item.ticker)}
                     className="flex-row justify-between items-center sidebar-link"
                     style={{ padding: '0.55rem 0.8rem', borderRadius: '6px', cursor: 'pointer' }}
                   >
                     <div>
                       <span className="font-bold text-accent" style={{ marginRight: '0.6rem' }}>
-                        {item.symbol}
+                        {item.ticker}
                       </span>
                       <span className="text-sm opacity-80">{item.name}</span>
                     </div>

@@ -7,28 +7,28 @@ import { MarketBenchmarks } from '../types';
 describe('MarketBenchmarksBar Component', () => {
   const mockBenchmarks: MarketBenchmarks = {
     ibov: {
-      symbol: '^BVSP',
+      ticker: '^BVSP',
       name: 'Ibovespa',
       value: 130500.5,
       change: 1200.5,
       change_percent: 0.93,
     },
     sp500: {
-      symbol: '^GSPC',
+      ticker: '^GSPC',
       name: 'S&P 500',
       value: 5500.25,
       change: -15.5,
       change_percent: -0.28,
     },
     usd_brl: {
-      symbol: 'BRL=X',
+      ticker: 'BRL=X',
       name: 'Dólar Comercial',
       value: 5.45,
       change: -0.02,
       change_percent: -0.37,
     },
     ifix: {
-      symbol: 'IFIX.SA',
+      ticker: 'IFIX.SA',
       name: 'IFIX',
       value: 3350.0,
       change: 5.0,
@@ -73,7 +73,7 @@ describe('MarketBenchmarksBar Component', () => {
   it('renders partial benchmarks when only some items are available', () => {
     const partialBenchmarks: MarketBenchmarks = {
       ibov: {
-        symbol: '^BVSP',
+        ticker: '^BVSP',
         name: 'Ibovespa',
         value: 130000,
         change: 0,
@@ -90,7 +90,7 @@ describe('MarketBenchmarksBar Component', () => {
   it('handles invalid or non-numeric benchmark values gracefully', () => {
     const invalidBenchmarks: MarketBenchmarks = {
       ibov: {
-        symbol: '^BVSP',
+        ticker: '^BVSP',
         name: 'Ibovespa',
         value: undefined as any,
         change: 0,

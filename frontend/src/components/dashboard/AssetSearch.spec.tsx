@@ -9,8 +9,8 @@ describe('AssetSearch Component', () => {
   const onSelectAsset = vi.fn();
 
   const mockResults: SearchResult[] = [
-    { symbol: 'PETR4', name: 'Petrobras PN', exchange: 'SAO', type: 'EQUITY' },
-    { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NMS', type: 'EQUITY' },
+    { ticker: 'PETR4', name: 'Petrobras PN', exchange: 'SAO', type: 'EQUITY' },
+    { ticker: 'AAPL', name: 'Apple Inc.', exchange: 'NMS', type: 'EQUITY' },
   ];
 
   afterEach(() => {

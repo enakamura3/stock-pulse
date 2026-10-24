@@ -141,7 +141,7 @@ func TestHandlers_Phase3_QuickAlertCreate(t *testing.T) {
 		mCtxSend.On("Respond", mock.Anything).Return(nil).Once()
 		mCtxSend.On("Callback").Return((*telebot.Callback)(nil))
 
-		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Symbol: "PETR4.SA"}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Ticker: "PETR4.SA"}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{
 			Ticker: "PETR4.SA",
 			Step:   "ALERT_EXPECT_COND",
@@ -159,7 +159,7 @@ func TestHandlers_Phase3_QuickAlertCreate(t *testing.T) {
 		mCtxCb.On("Respond", mock.Anything).Return(nil).Once()
 		mCtxCb.On("Callback").Return(&telebot.Callback{Data: "\fbtn_alert_create_VALE3"})
 
-		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Symbol: "VALE3"}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Ticker: "VALE3"}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{
 			Ticker: "VALE3",
 			Step:   "ALERT_EXPECT_COND",

@@ -249,7 +249,7 @@ describe('PortfolioContext', () => {
       if (url.includes('/assets/search')) {
         return Promise.resolve({
           ok: true,
-          json: async () => [{ symbol: 'AAPL', name: 'Apple Inc' }],
+          json: async () => [{ ticker: 'AAPL', name: 'Apple Inc' }],
         });
       }
       if (url === '/quotes/AAPL') {
@@ -297,7 +297,7 @@ describe('PortfolioContext', () => {
       await Promise.resolve();
     });
 
-    expect(context.searchResults).toEqual([{ symbol: 'AAPL', name: 'Apple Inc' }]);
+    expect(context.searchResults).toEqual([{ ticker: 'AAPL', name: 'Apple Inc' }]);
     expect(context.showDropdown).toBe(true);
 
     // Now select the asset

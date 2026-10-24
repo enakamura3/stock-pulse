@@ -50,27 +50,27 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 }
 
 // GetQuoteWithCacheStatus retorna os dados de cotação atual e um boolean indicando se o resultado veio do cache (Redis).
-func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	if symbol == "" {
+func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, ticker string) (*Quote, bool, error) {
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	if ticker == "" {
 		return nil, false, fmt.Errorf("símbolo do ativo inválido")
 	}
 
-	key := fmt.Sprintf("quote:%s", symbol)
+	key := fmt.Sprintf("quote:%s", ticker)
 
 	// Tenta buscar no Redis (Cache Hit)
 	val, err := s.rdb.Get(ctx, key).Result()
 	if err == nil && val != "" {
 		var cachedQuote Quote
 		if err := json.Unmarshal([]byte(val), &cachedQuote); err == nil {
-			slog.DebugContext(ctx, "cache hit para ativo", slog.String("symbol", symbol))
+			slog.DebugContext(ctx, "cache hit para ativo", slog.String("ticker", ticker))
 			return &cachedQuote, true, nil
 		}
 	}
 
 	// Se deu erro ou cache miss, busca do provedor externo
-	slog.InfoContext(ctx, "cache miss para ativo, consultando provedor", slog.String("symbol", symbol))
-	quote, err := s.provider.GetQuote(ctx, symbol)
+	slog.InfoContext(ctx, "cache miss para ativo, consultando provedor", slog.String("ticker", ticker))
+	quote, err := s.provider.GetQuote(ctx, ticker)
 	if err != nil {
 		return nil, false, err
 	}
@@ -80,9 +80,9 @@ func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*
 	if err == nil {
 		err = s.rdb.Set(ctx, key, quoteJSON, s.ttlQuotes).Err()
 		if err != nil {
-			slog.WarnContext(ctx, "erro ao salvar cache de cotação", slog.String("symbol", symbol), slog.Any("error", err))
+			slog.WarnContext(ctx, "erro ao salvar cache de cotação", slog.String("ticker", ticker), slog.Any("error", err))
 		} else {
-			slog.DebugContext(ctx, "novo cache salvo com sucesso", slog.String("symbol", symbol))
+			slog.DebugContext(ctx, "novo cache salvo com sucesso", slog.String("ticker", ticker))
 		}
 	}
 
@@ -90,14 +90,14 @@ func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*
 }
 
 // GetQuote faz o wrapper para manter retrocompatibilidade com interfaces existentes.
-func (s *Service) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
-	q, _, err := s.GetQuoteWithCacheStatus(ctx, symbol)
+func (s *Service) GetQuote(ctx context.Context, ticker string) (*Quote, error) {
+	q, _, err := s.GetQuoteWithCacheStatus(ctx, ticker)
 	return q, err
 }
 
 // GetDividends busca os proventos de um ativo e faz cache.
-func (s *Service) GetDividends(ctx context.Context, symbol string, assetType string) ([]DividendEvent, error) {
-	return s.dividendGateway.GetDividends(ctx, symbol, assetType)
+func (s *Service) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
+	return s.dividendGateway.GetDividends(ctx, ticker, assetType)
 }
 
 // getExchangeRatesMap fetches the 10y history of BRL=X and returns it as a map[string]float64 (date string "YYYY-MM-DD" -> rate).
@@ -216,13 +216,13 @@ func (s *Service) SearchAssets(ctx context.Context, query string) ([]SearchResul
 }
 
 // GetFundamentals busca os fundamentos de uma ação com cache vitalício (24h)
-func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamentals, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	if symbol == "" {
+func (s *Service) GetFundamentals(ctx context.Context, ticker string) (*Fundamentals, error) {
+	ticker = strings.ToUpper(strings.TrimSpace(ticker))
+	if ticker == "" {
 		return nil, fmt.Errorf("símbolo do ativo inválido")
 	}
 
-	key := fmt.Sprintf("fundamentals:v2:%s", symbol)
+	key := fmt.Sprintf("fundamentals:v2:%s", ticker)
 
 	// Tenta buscar no Redis (Cache Hit)
 	val, err := s.rdb.Get(ctx, key).Result()
@@ -234,16 +234,16 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 	}
 
 	// Se deu erro ou cache miss, faz scraping
-	slog.InfoContext(ctx, "cache miss fundamentos, executando scraper", slog.String("symbol", symbol))
-	fund, err := s.scraper.GetFundamentals(ctx, symbol)
+	slog.InfoContext(ctx, "cache miss fundamentos, executando scraper", slog.String("ticker", ticker))
+	fund, err := s.scraper.GetFundamentals(ctx, ticker)
 	if err != nil {
 		return nil, err
 	}
 
 	// Calcula Preço Teto de Bazin se soubermos a cotação.
 	// Para não criar deadlock ou chamadas lentas demais, faremos depois.
-	// Wait, we can get current price from s.GetQuote(ctx, symbol) to calc Bazin Yield Ceiling
-	quote, errQ := s.GetQuote(ctx, symbol)
+	// Wait, we can get current price from s.GetQuote(ctx, ticker) to calc Bazin Yield Ceiling
+	quote, errQ := s.GetQuote(ctx, ticker)
 	if errQ == nil && quote != nil && quote.Price > 0 {
 		// Bazin Value = (Current Price * (Dividend Yield / 100)) / 0.06
 		// Example: Price = 100. Yield = 10%. Dividend paid = 10. Bazin Value = 10 / 0.06 = 166.66
@@ -257,7 +257,7 @@ func (s *Service) GetFundamentals(ctx context.Context, symbol string) (*Fundamen
 	if err == nil {
 		err = s.rdb.Set(ctx, key, fundJSON, s.ttlFundamentals).Err()
 		if err != nil {
-			slog.WarnContext(ctx, "erro ao salvar cache de fundamentos", slog.String("symbol", symbol), slog.Any("error", err))
+			slog.WarnContext(ctx, "erro ao salvar cache de fundamentos", slog.String("ticker", ticker), slog.Any("error", err))
 		}
 	}
 
@@ -313,13 +313,13 @@ func (s *Service) InvalidateQuoteCache(ctx context.Context, tickers []string) (i
 }
 
 // GetHistoricalPrices busca série histórica diária do provedor de mercado.
-func (s *Service) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
-	return s.provider.GetHistoricalPrices(ctx, symbol, rangePeriod)
+func (s *Service) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]HistoricalPrice, error) {
+	return s.provider.GetHistoricalPrices(ctx, ticker, rangePeriod)
 }
 
 // GetHistoricalPricesBetween busca série histórica delimitada por timestamps Unix do provedor de mercado.
-func (s *Service) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
-	return s.provider.GetHistoricalPricesBetween(ctx, symbol, period1, period2)
+func (s *Service) GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]HistoricalPrice, error) {
+	return s.provider.GetHistoricalPricesBetween(ctx, ticker, period1, period2)
 }
 
 

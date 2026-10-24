@@ -159,8 +159,8 @@ type MockFundamentalsScraper struct {
 	mock.Mock
 }
 
-func (m *MockFundamentalsScraper) GetFundamentals(ctx context.Context, symbol string) (*Fundamentals, error) {
-	args := m.Called(ctx, symbol)
+func (m *MockFundamentalsScraper) GetFundamentals(ctx context.Context, ticker string) (*Fundamentals, error) {
+	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
 		return args.Get(0).(*Fundamentals), args.Error(1)
 	}
@@ -168,7 +168,7 @@ func (m *MockFundamentalsScraper) GetFundamentals(ctx context.Context, symbol st
 }
 
 func TestService_GetFundamentals(t *testing.T) {
-	t.Run("Invalid Symbol", func(t *testing.T) {
+	t.Run("Invalid Ticker", func(t *testing.T) {
 		s, _, _, _ := setupServiceTest()
 		_, err := s.GetFundamentals(context.Background(), "")
 		assert.Error(t, err)
@@ -189,7 +189,7 @@ func TestService_GetFundamentals(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
 		mockScraper := new(MockFundamentalsScraper)
 		mockScraper.On("GetFundamentals", mock.Anything, "PETR4.SA").Return(&Fundamentals{
-			Symbol:        "PETR4.SA",
+			Ticker:        "PETR4.SA",
 			DividendYield: 10.0,
 			EPS:           5.0,
 			BookValue:     30.0,
@@ -200,13 +200,13 @@ func TestService_GetFundamentals(t *testing.T) {
 		rmock.ExpectGet("fundamentals:v2:PETR4.SA").RedisNil()
 
 		rmock.ExpectGet("quote:PETR4.SA").RedisNil()
-		expectedQuote := &Quote{Symbol: "PETR4.SA", Price: 35.0}
+		expectedQuote := &Quote{Ticker: "PETR4.SA", Price: 35.0}
 		mp.On("GetQuote", mock.Anything, "PETR4.SA").Return(expectedQuote, nil)
 		qb, _ := json.Marshal(expectedQuote)
 		rmock.ExpectSet("quote:PETR4.SA", qb, 60*time.Second).SetVal("OK")
 
 		expectedFund := &Fundamentals{
-			Symbol:        "PETR4.SA",
+			Ticker:        "PETR4.SA",
 			DividendYield: 10.0,
 			EPS:           5.0,
 			BookValue:     30.0,

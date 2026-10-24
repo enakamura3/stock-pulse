@@ -76,7 +76,7 @@ function DashboardContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticker: activeQuote.symbol,
+          ticker: activeQuote.ticker,
           target_price: parseFloat(alertTargetPrice),
           condition: alertCondition,
         }),
@@ -166,14 +166,14 @@ function DashboardContent() {
             
             // 1. Atualiza e pisca o card central se for o ativo ativo
             setActiveQuote((current) => {
-              if (current && current.symbol.toUpperCase() === updatedQuote.symbol.toUpperCase()) {
+              if (current && current.ticker.toUpperCase() === updatedQuote.ticker.toUpperCase()) {
                 const direction = updatedQuote.price > current.price ? 'up' : updatedQuote.price < current.price ? 'down' : null;
                 if (direction) {
-                  setPriceFlashing((prev) => ({ ...prev, [updatedQuote.symbol]: direction }));
+                  setPriceFlashing((prev) => ({ ...prev, [updatedQuote.ticker]: direction }));
                   setTimeout(() => {
                     setPriceFlashing((prev) => {
                       const copy = { ...prev };
-                      delete copy[updatedQuote.symbol];
+                      delete copy[updatedQuote.ticker];
                       return copy;
                     });
                   }, 1000);
@@ -188,7 +188,7 @@ function DashboardContent() {
               return prevWLs.map((wl) => {
                 if (wl.items) {
                   const updatedItems = wl.items.map((item) => {
-                    if (item.ticker.toUpperCase() === updatedQuote.symbol.toUpperCase()) {
+                    if (item.ticker.toUpperCase() === updatedQuote.ticker.toUpperCase()) {
                       const direction = updatedQuote.price > (item.price || 0) ? 'up' : updatedQuote.price < (item.price || 0) ? 'down' : null;
                       if (direction) {
                         setPriceFlashing((prev) => ({ ...prev, [item.ticker]: direction }));
@@ -243,9 +243,9 @@ function DashboardContent() {
   // Sincroniza as assinaturas de ativos com a lista ativa atual
   useEffect(() => {
     if (ws && wsConnected && activeWL && activeWL.items && activeWL.items.length > 0) {
-      const symbols = activeWL.items.map((item) => item.ticker);
-      console.log('[WS] Atualizando assinaturas para:', symbols);
-      ws.send(JSON.stringify({ action: 'subscribe', symbols }));
+      const tickers = activeWL.items.map((item) => item.ticker);
+      console.log('[WS] Atualizando assinaturas para:', tickers);
+      ws.send(JSON.stringify({ action: 'subscribe', tickers }));
     }
   }, [ws, wsConnected, activeWL]);
 
@@ -277,7 +277,7 @@ function DashboardContent() {
   }, [searchQuery]);
 
   // 3. CARREGA/ATUALIZA COTAÇÃO INDIVIDUAL
-  const loadQuote = useCallback(async (symbol: string, isRefresh = false) => {
+  const loadQuote = useCallback(async (ticker: string, isRefresh = false) => {
     setIsLoadingQuote(true);
     setQuoteError(null);
     if (isRefresh) {
@@ -285,7 +285,7 @@ function DashboardContent() {
     }
     
     try {
-      const res = await apiFetch(`/quotes/${encodeURIComponent(symbol)}`);
+      const res = await apiFetch(`/quotes/${encodeURIComponent(ticker)}`);
       const cacheHeader = res.headers.get('X-Cache');
       const data = await res.json();
       if (res.ok) {
@@ -356,19 +356,19 @@ function DashboardContent() {
   };
 
   // 6. ADICIONA / REMOVE DOS FAVORITOS (ÍCONE DE ESTRELA)
-  const isAssetFavorited = (symbol: string) => {
-    return activeWL?.items?.some((item) => item.ticker.toUpperCase() === symbol.toUpperCase()) || false;
+  const isAssetFavorited = (ticker: string) => {
+    return activeWL?.items?.some((item) => item.ticker.toUpperCase() === ticker.toUpperCase()) || false;
   };
 
   const handleToggleFavorite = async () => {
     if (!activeQuote || !activeWatchlistId) return;
-    const symbol = activeQuote.symbol;
-    const favorited = isAssetFavorited(symbol);
+    const ticker = activeQuote.ticker;
+    const favorited = isAssetFavorited(ticker);
     setIsAddingToWatchlist(true);
 
     try {
       if (favorited) {
-        const res = await apiFetch(`/watchlists/${activeWatchlistId}/items/${encodeURIComponent(symbol)}`, {
+        const res = await apiFetch(`/watchlists/${activeWatchlistId}/items/${encodeURIComponent(ticker)}`, {
           method: 'DELETE',
         });
         if (res.ok) {
@@ -378,7 +378,7 @@ function DashboardContent() {
         const res = await apiFetch(`/watchlists/${activeWatchlistId}/items`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticker: symbol }),
+          body: JSON.stringify({ ticker }),
         });
         if (res.ok) {
           await loadWatchlistDetails(activeWatchlistId);
@@ -406,10 +406,10 @@ function DashboardContent() {
     }
   };
 
-  const handleSelectAsset = (symbol: string) => {
+  const handleSelectAsset = (ticker: string) => {
     setSearchQuery('');
     setShowDropdown(false);
-    loadQuote(symbol);
+    loadQuote(ticker);
   };
 
   // Formatadores
@@ -439,7 +439,7 @@ function DashboardContent() {
 
   if (!user) return null;
 
-  const activeFavorited = activeQuote ? isAssetFavorited(activeQuote.symbol) : false;
+  const activeFavorited = activeQuote ? isAssetFavorited(activeQuote.ticker) : false;
 
   return (
     <div className="app-layout">

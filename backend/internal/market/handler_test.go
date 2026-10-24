@@ -85,7 +85,7 @@ func TestHandler_GetQuote(t *testing.T) {
 
 	t.Run("Success Hit", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("GetQuoteWithCacheStatus", mock.Anything, "AAPL").Return(&Quote{Symbol: "AAPL", Price: 150.0}, true, nil)
+		s.On("GetQuoteWithCacheStatus", mock.Anything, "AAPL").Return(&Quote{Ticker: "AAPL", Price: 150.0}, true, nil)
 		req := reqWithParams(httptest.NewRequest("GET", "/quote/AAPL", nil), map[string]string{"ticker": "AAPL"})
 		rec := httptest.NewRecorder()
 		h.GetQuote(rec, req)
@@ -96,7 +96,7 @@ func TestHandler_GetQuote(t *testing.T) {
 
 	t.Run("Success Miss", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("GetQuoteWithCacheStatus", mock.Anything, "MSFT").Return(&Quote{Symbol: "MSFT", Price: 300.0}, false, nil)
+		s.On("GetQuoteWithCacheStatus", mock.Anything, "MSFT").Return(&Quote{Ticker: "MSFT", Price: 300.0}, false, nil)
 		req := reqWithParams(httptest.NewRequest("GET", "/quote/MSFT", nil), map[string]string{"ticker": "MSFT"})
 		rec := httptest.NewRecorder()
 		h.GetQuote(rec, req)
@@ -127,7 +127,7 @@ func TestHandler_Search(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("SearchAssets", mock.Anything, "AAPL").Return([]SearchResult{{Symbol: "AAPL", Name: "Apple Inc."}}, nil)
+		s.On("SearchAssets", mock.Anything, "AAPL").Return([]SearchResult{{Ticker: "AAPL", Name: "Apple Inc."}}, nil)
 		req := httptest.NewRequest("GET", "/search?q=AAPL", nil)
 		rec := httptest.NewRecorder()
 		h.Search(rec, req)
@@ -152,7 +152,7 @@ func TestHandler_GetBenchmarks(t *testing.T) {
 		h, s := setupHandlerTest()
 		mockBenchmarks := &MarketBenchmarks{
 			IBOV: &BenchmarkItem{
-				Symbol:        "^BVSP",
+				Ticker:        "^BVSP",
 				Name:          "Ibovespa",
 				Value:         130000.0,
 				Change:        1300.0,
@@ -160,7 +160,7 @@ func TestHandler_GetBenchmarks(t *testing.T) {
 				PreviousClose: 128700.0,
 			},
 			SP500: &BenchmarkItem{
-				Symbol:        "^GSPC",
+				Ticker:        "^GSPC",
 				Name:          "S&P 500",
 				Value:         5500.0,
 				Change:        25.0,

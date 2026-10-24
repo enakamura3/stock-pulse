@@ -135,7 +135,7 @@ describe('DashboardPage', () => {
           ok: true,
           headers: { get: (h: string) => (h === 'X-Cache' ? 'HIT' : null) },
           json: async () => ({
-            symbol: 'PETR4',
+            ticker: 'PETR4',
             name: 'Petrobras PN',
             price: 35.5,
             change: 1.2,
@@ -290,7 +290,7 @@ describe('DashboardPage', () => {
           ok: true,
           headers: { get: (h: string) => (h === 'X-Cache' ? 'MISS' : null) },
           json: async () => ({
-            symbol: 'VALE3',
+            ticker: 'VALE3',
             name: 'Vale ON',
             price: 60.0,
             change: -0.5,
@@ -363,8 +363,8 @@ describe('DashboardPage', () => {
         return Promise.resolve({
           ok: true,
           json: async () => [
-            { symbol: 'PETR4', name: 'Petrobras PN', type: 'Equity', exchange: 'BVMF' },
-            { symbol: 'PETR3', name: 'Petrobras ON', type: 'Equity', exchange: 'BVMF' },
+            { ticker: 'PETR4', name: 'Petrobras PN', type: 'Equity', exchange: 'BVMF' },
+            { ticker: 'PETR3', name: 'Petrobras ON', type: 'Equity', exchange: 'BVMF' },
           ],
         });
       }
@@ -373,7 +373,7 @@ describe('DashboardPage', () => {
           ok: true,
           headers: { get: () => 'HIT' },
           json: async () => ({
-            symbol: 'PETR4',
+            ticker: 'PETR4',
             name: 'Petrobras PN',
             price: 35.5,
             change: 1.2,
@@ -785,7 +785,7 @@ describe('DashboardPage', () => {
           data: JSON.stringify({
             type: 'quote',
             data: {
-              symbol: 'PETR4',
+              ticker: 'PETR4',
               name: 'Petrobras PN',
               price: 36.8, // was 35.5 -> UP
               change: 2.5,
@@ -809,7 +809,7 @@ describe('DashboardPage', () => {
           data: JSON.stringify({
             type: 'quote',
             data: {
-              symbol: 'PETR4',
+              ticker: 'PETR4',
               name: 'Petrobras PN',
               price: 34.0, // was 36.8 -> DOWN
               change: -0.3,
@@ -825,14 +825,14 @@ describe('DashboardPage', () => {
       vi.advanceTimersByTime(1000);
     });
 
-    // 3. Send WebSocket update for a different symbol in watchlist (VALE3 price UP)
+    // 3. Send WebSocket update for a different ticker in watchlist (VALE3 price UP)
     act(() => {
       if (wsInstance.onmessage) {
         wsInstance.onmessage({
           data: JSON.stringify({
             type: 'quote',
             data: {
-              symbol: 'VALE3',
+              ticker: 'VALE3',
               name: 'Vale ON',
               price: 62.0, // was 60.0 -> UP
               change: 1.5,
@@ -960,7 +960,7 @@ describe('DashboardPage', () => {
         return Promise.resolve({
           ok: true,
           headers: { get: () => 'HIT' },
-          json: async () => ({ symbol: 'PETR4', name: 'Petrobras', price: 35.0, change: 0, change_percent: 0, currency: 'BRL' }),
+          json: async () => ({ ticker: 'PETR4', name: 'Petrobras', price: 35.0, change: 0, change_percent: 0, currency: 'BRL' }),
         });
       }
       if (url === '/watchlists/wl-1') {
@@ -1027,7 +1027,7 @@ describe('DashboardPage', () => {
           data: JSON.stringify({
             type: 'quote',
             data: {
-              symbol: 'PETR4',
+              ticker: 'PETR4',
               price: 36.0,
             },
           }),

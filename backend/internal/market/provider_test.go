@@ -58,7 +58,7 @@ func TestProvider_GetQuote(t *testing.T) {
 
 		q, err := p.GetQuote(context.Background(), "AAPL")
 		assert.NoError(t, err)
-		assert.Equal(t, "AAPL", q.Symbol)
+		assert.Equal(t, "AAPL", q.Ticker)
 		assert.Equal(t, "Apple Inc.", q.Name)
 		assert.Equal(t, 150.0, q.Price)
 		assert.Equal(t, "USD", q.Currency)

@@ -68,8 +68,8 @@ type MarketService interface {
 	GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error)
 	GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error)
 	GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error)
-	GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error)
-	GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error)
+	GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]market.HistoricalPrice, error)
+	GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]market.HistoricalPrice, error)
 }
 
 // Service gerencia as regras de negócio de carteiras, transações e histórico.

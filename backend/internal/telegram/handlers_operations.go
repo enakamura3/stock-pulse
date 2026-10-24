@@ -795,8 +795,8 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
 		resolvedTicker := ticker
-		if quote != nil && quote.Symbol != "" {
-			resolvedTicker = quote.Symbol
+		if quote != nil && quote.Ticker != "" {
+			resolvedTicker = quote.Ticker
 		}
 
 		return h.handleSelectedTicker(c, resolvedTicker)
@@ -905,8 +905,8 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique se há erros de digitação e envie o código novamente:", menu)
 		}
 		resolvedTicker := ticker
-		if quote != nil && quote.Symbol != "" {
-			resolvedTicker = quote.Symbol
+		if quote != nil && quote.Ticker != "" {
+			resolvedTicker = quote.Ticker
 		}
 
 		state.Ticker = resolvedTicker
@@ -979,8 +979,8 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 
 		resolvedTicker := ticker
-		if quote != nil && quote.Symbol != "" {
-			resolvedTicker = quote.Symbol
+		if quote != nil && quote.Ticker != "" {
+			resolvedTicker = quote.Ticker
 		}
 
 		msg := formatQuoteMessage(resolvedTicker, quote)
@@ -1040,8 +1040,8 @@ func (h *Handlers) handleQuickAlertCreate(c telebot.Context, ticker string) erro
 
 	resolvedTicker := ticker
 	quote, err := h.getQuoteWithFallback(ctx, ticker)
-	if err == nil && quote != nil && quote.Symbol != "" {
-		resolvedTicker = quote.Symbol
+	if err == nil && quote != nil && quote.Ticker != "" {
+		resolvedTicker = quote.Ticker
 	}
 
 	err = h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{

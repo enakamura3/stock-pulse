@@ -21,7 +21,7 @@ interface Alert {
 }
 
 interface SearchResult {
-  symbol: string;
+  ticker: string;
   name: string;
   exchange: string;
   type: string;
@@ -99,7 +99,7 @@ export default function AlertsPage() {
   // SELEÇÃO DE ATIVO
   const handleSelectAsset = (asset: SearchResult) => {
     setSelectedAsset(asset);
-    setSearchQuery(asset.symbol);
+    setSearchQuery(asset.ticker);
     setShowDropdown(false);
     setFormError(null);
   };
@@ -121,7 +121,7 @@ export default function AlertsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticker: selectedAsset.symbol,
+          ticker: selectedAsset.ticker,
           target_price: parseFloat(targetPrice),
           condition: condition,
         }),
@@ -298,7 +298,7 @@ export default function AlertsPage() {
                   }}>
                     {searchResults.map((item) => (
                       <div
-                        key={item.symbol}
+                        key={item.ticker}
                         onClick={() => handleSelectAsset(item)}
                         style={{
                           display: 'flex',
@@ -314,7 +314,7 @@ export default function AlertsPage() {
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         <div>
-                          <span style={{ fontWeight: 700, color: 'var(--accent-color)', marginRight: '0.5rem' }}>{item.symbol}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--accent-color)', marginRight: '0.5rem' }}>{item.ticker}</span>
                           <span style={{ opacity: 0.85 }}>{item.name}</span>
                         </div>
                       </div>

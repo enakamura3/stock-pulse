@@ -5,7 +5,7 @@ import { Quote } from './types';
 
 describe('CreateAlertModal Component', () => {
   const mockQuote: Quote = {
-    symbol: 'PETR4',
+    ticker: 'PETR4',
     name: 'Petrobras PN',
     price: 35.5,
     change: 1.2,

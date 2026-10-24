@@ -17,8 +17,8 @@ type MockQuoteProviderForBenchmarks struct {
 	mock.Mock
 }
 
-func (m *MockQuoteProviderForBenchmarks) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
-	args := m.Called(ctx, symbol)
+func (m *MockQuoteProviderForBenchmarks) GetQuote(ctx context.Context, ticker string) (*Quote, error) {
+	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
 		return args.Get(0).(*Quote), args.Error(1)
 	}
@@ -33,16 +33,16 @@ func (m *MockQuoteProviderForBenchmarks) SearchAssets(ctx context.Context, query
 	return nil, args.Error(1)
 }
 
-func (m *MockQuoteProviderForBenchmarks) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, rangePeriod)
+func (m *MockQuoteProviderForBenchmarks) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, rangePeriod)
 	if args.Get(0) != nil {
 		return args.Get(0).([]HistoricalPrice), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockQuoteProviderForBenchmarks) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, period1, period2)
+func (m *MockQuoteProviderForBenchmarks) GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, period1, period2)
 	if args.Get(0) != nil {
 		return args.Get(0).([]HistoricalPrice), args.Error(1)
 	}
@@ -61,7 +61,7 @@ func TestService_GetBenchmarks(t *testing.T) {
 	t.Run("Cache Miss - Fetch from Provider and Cache", func(t *testing.T) {
 		mockProv := new(MockQuoteProviderForBenchmarks)
 		mockProv.On("GetQuote", mock.Anything, "^BVSP").Return(&Quote{
-			Symbol:        "^BVSP",
+			Ticker:        "^BVSP",
 			Name:          "Ibovespa",
 			Price:         130000.0,
 			Change:        1300.0,
@@ -69,7 +69,7 @@ func TestService_GetBenchmarks(t *testing.T) {
 			PreviousClose: 128700.0,
 		}, nil)
 		mockProv.On("GetQuote", mock.Anything, "^GSPC").Return(&Quote{
-			Symbol:        "^GSPC",
+			Ticker:        "^GSPC",
 			Name:          "S&P 500",
 			Price:         5500.0,
 			Change:        25.0,
@@ -77,7 +77,7 @@ func TestService_GetBenchmarks(t *testing.T) {
 			PreviousClose: 5475.0,
 		}, nil)
 		mockProv.On("GetQuote", mock.Anything, "BRL=X").Return(&Quote{
-			Symbol:        "BRL=X",
+			Ticker:        "BRL=X",
 			Name:          "", // Empty name to test fallback
 			Price:         5.45,
 			Change:        -0.02,
@@ -85,7 +85,7 @@ func TestService_GetBenchmarks(t *testing.T) {
 			PreviousClose: 5.47,
 		}, nil)
 		mockProv.On("GetQuote", mock.Anything, "IFIX.SA").Return(&Quote{
-			Symbol:        "IFIX.SA",
+			Ticker:        "IFIX.SA",
 			Name:          "IFIX",
 			Price:         3350.0,
 			Change:        5.0,
@@ -121,7 +121,7 @@ func TestService_GetBenchmarks(t *testing.T) {
 	t.Run("Cache Hit - Returns Cached Value", func(t *testing.T) {
 		cachedBenchmarks := MarketBenchmarks{
 			IBOV: &BenchmarkItem{
-				Symbol:        "^BVSP",
+				Ticker:        "^BVSP",
 				Name:          "Cached IBOV",
 				Value:         131000.0,
 				Change:        2000.0,
@@ -149,7 +149,7 @@ func TestService_GetBenchmarks(t *testing.T) {
 		mockProv := new(MockQuoteProviderForBenchmarks)
 		mockProv.On("GetQuote", mock.Anything, "^BVSP").Return(nil, errors.New("yahoo timeout"))
 		mockProv.On("GetQuote", mock.Anything, "^GSPC").Return(&Quote{
-			Symbol:        "^GSPC",
+			Ticker:        "^GSPC",
 			Name:          "S&P 500",
 			Price:         5500.0,
 			Change:        25.0,
@@ -157,7 +157,7 @@ func TestService_GetBenchmarks(t *testing.T) {
 		}, nil)
 		mockProv.On("GetQuote", mock.Anything, "BRL=X").Return(nil, errors.New("rate limit"))
 		mockProv.On("GetQuote", mock.Anything, "IFIX.SA").Return(&Quote{
-			Symbol:        "IFIX.SA",
+			Ticker:        "IFIX.SA",
 			Name:          "IFIX",
 			Price:         3350.0,
 			Change:        5.0,
