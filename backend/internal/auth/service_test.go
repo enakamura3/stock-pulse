@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -641,4 +643,63 @@ func TestRandReader_Failures(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "falha ao gerar novo refresh token")
 	})
+}
+
+func TestService_Login_EmailRateLimit_Success(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	repo := new(MockUserRepository)
+	s := NewService(repo, rdb, "secretsecretsecretsecretsecretsecret32")
+
+	hash, _ := hashPassword("correct_password", defaultParams)
+	user := &User{ID: "user-1", Email: "victim@example.com", PasswordHash: hash}
+	repo.On("GetUserByEmail", mock.Anything, "victim@example.com").Return(user, nil)
+
+	resUser, access, refresh, err := s.Login(context.Background(), "victim@example.com", "correct_password")
+	assert.NoError(t, err)
+	assert.NotNil(t, resUser)
+	assert.NotEmpty(t, access)
+	assert.NotEmpty(t, refresh)
+
+	// Rate limit key was cleared on success
+	emailHash := fmt.Sprintf("%x", sha256.Sum256([]byte("victim@example.com")))
+	exists, err := rdb.Exists(context.Background(), "rate_limit:auth:login:email:"+emailHash).Result()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), exists)
+}
+
+func TestService_Login_EmailRateLimit_Exceeded(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	repo := new(MockUserRepository)
+	s := NewService(repo, rdb, "secretsecretsecretsecretsecretsecret32")
+
+	email := "target@example.com"
+	emailHash := fmt.Sprintf("%x", sha256.Sum256([]byte(email)))
+	key := "rate_limit:auth:login:email:" + emailHash
+
+	// Simulate 5 attempts already recorded
+	_ = rdb.Set(context.Background(), key, "5", 15*time.Minute)
+
+	// 6th attempt should exceed the limit
+	_, _, _, err := s.Login(context.Background(), email, "any_password")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "muitas tentativas de login para este e-mail")
+}
+
+func TestArgon2Semaphore_Concurrency(t *testing.T) {
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			pwd := fmt.Sprintf("password-%d", id)
+			hash, err := hashPassword(pwd, defaultParams)
+			assert.NoError(t, err)
+			match, err := comparePasswordAndHash(pwd, hash)
+			assert.NoError(t, err)
+			assert.True(t, match)
+		}(i)
+	}
+	wg.Wait()
 }

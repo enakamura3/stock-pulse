@@ -17,6 +17,7 @@ type Environment struct {
 	BrapiToken            string
 	AdminAPIKey           string
 	Env                   string
+	TrustedProxies        string
 	JWTAccessTokenTTL     time.Duration
 	JWTRefreshTokenTTL    time.Duration
 	JWTRefreshGracePeriod time.Duration
@@ -40,6 +41,7 @@ func Load() error {
 		BrapiToken:         os.Getenv("BRAPI_TOKEN"),
 		AdminAPIKey:        os.Getenv("ADMIN_API_KEY"),
 		Env:                os.Getenv("ENV"),
+		TrustedProxies:     os.Getenv("TRUSTED_PROXIES"),
 
 		JWTAccessTokenTTL:     parseDuration(os.Getenv("JWT_ACCESS_TOKEN_TTL"), 15*time.Minute),
 		JWTRefreshTokenTTL:    parseDuration(os.Getenv("JWT_REFRESH_TOKEN_TTL"), 12*time.Hour),

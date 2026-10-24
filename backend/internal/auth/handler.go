@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/onigiri/stock-pulse/backend/internal/config"
@@ -100,6 +101,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	user, accessToken, refreshToken, err := h.service.Login(r.Context(), payload.Email, payload.Password)
 	if err != nil {
 		slog.Warn("Falha de autenticação", "email", payload.Email, "error", err.Error())
+		if strings.Contains(strings.ToLower(err.Error()), "muitas tentativas") {
+			httputils.RespondWithError(w, http.StatusTooManyRequests, err.Error())
+			return
+		}
 		httputils.RespondWithError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
