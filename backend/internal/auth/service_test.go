@@ -571,23 +571,113 @@ func TestService_UpdatePassword(t *testing.T) {
 		assert.EqualError(t, err, "senha atual incorreta")
 	})
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("Repo UpdatePassword error", func(t *testing.T) {
 		s, repo, _ := setupService()
+		hash, _ := hashPassword("oldpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		repo.On("UpdatePassword", mock.Anything, "1", mock.Anything).Return(errors.New("db err"))
+
+		err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
+		assert.EqualError(t, err, "db err")
+	})
+
+	t.Run("Success revokes all sessions and sets pwd_changed_at", func(t *testing.T) {
+		s, mr := setupMiniRedisService(t)
+		repo := s.repo.(*MockUserRepository)
+		ctx := context.Background()
+
+		// Create active session first
+		activeTok, err := s.GenerateRefreshToken(ctx, "1")
+		require.NoError(t, err)
+		assert.True(t, mr.Exists("refresh_token:"+activeTok))
+
 		hash, _ := hashPassword("oldpassword", defaultParams)
 		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
 		repo.On("UpdatePassword", mock.Anything, "1", mock.Anything).Return(nil)
 
-		err := s.UpdatePassword(context.Background(), "1", "oldpassword", "newpassword")
+		err = s.UpdatePassword(ctx, "1", "oldpassword", "newpassword")
 		assert.NoError(t, err)
+		assert.False(t, mr.Exists("refresh_token:"+activeTok))
+		assert.False(t, mr.Exists("user_active_tokens:1"))
+		assert.True(t, mr.Exists("pwd_changed_at:1"))
 	})
 }
 
 func TestService_DeleteUser(t *testing.T) {
-	s, repo, _ := setupService()
-	repo.On("DeleteUser", mock.Anything, "1").Return(nil)
+	t.Run("Empty password", func(t *testing.T) {
+		s, _, _ := setupService()
+		err := s.DeleteUser(context.Background(), "1", "   ")
+		assert.EqualError(t, err, "a senha atual é obrigatória para excluir a conta")
+	})
 
-	err := s.DeleteUser(context.Background(), "1")
-	assert.NoError(t, err)
+	t.Run("User not found", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(nil, errors.New("not found"))
+		err := s.DeleteUser(context.Background(), "1", "secret123")
+		assert.EqualError(t, err, "usuário não encontrado")
+	})
+
+	t.Run("Wrong current password", func(t *testing.T) {
+		s, repo, _ := setupService()
+		hash, _ := hashPassword("rightpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		err := s.DeleteUser(context.Background(), "1", "wrongpassword")
+		assert.EqualError(t, err, "senha atual incorreta")
+	})
+
+	t.Run("Repo DeleteUser error", func(t *testing.T) {
+		s, repo, _ := setupService()
+		hash, _ := hashPassword("rightpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		repo.On("DeleteUser", mock.Anything, "1").Return(errors.New("db err"))
+		err := s.DeleteUser(context.Background(), "1", "rightpassword")
+		assert.EqualError(t, err, "db err")
+	})
+
+	t.Run("Success revokes all sessions and sets revoked_user denylist", func(t *testing.T) {
+		s, mr := setupMiniRedisService(t)
+		repo := s.repo.(*MockUserRepository)
+		ctx := context.Background()
+
+		activeTok, err := s.GenerateRefreshToken(ctx, "1")
+		require.NoError(t, err)
+		assert.True(t, mr.Exists("refresh_token:"+activeTok))
+
+		hash, _ := hashPassword("rightpassword", defaultParams)
+		repo.On("GetUserByIDWithHash", mock.Anything, "1").Return(&User{ID: "1", PasswordHash: hash}, nil)
+		repo.On("DeleteUser", mock.Anything, "1").Return(nil)
+
+		err = s.DeleteUser(ctx, "1", "rightpassword")
+		assert.NoError(t, err)
+		assert.False(t, mr.Exists("refresh_token:"+activeTok))
+		assert.False(t, mr.Exists("user_active_tokens:1"))
+		assert.True(t, mr.Exists("revoked_user:1"))
+	})
+}
+
+func TestService_RevokeAllUserSessions_EdgeCases(t *testing.T) {
+	t.Run("Nil redis or empty userID", func(t *testing.T) {
+		s := NewService(new(MockUserRepository), nil, "secret")
+		assert.NoError(t, s.RevokeAllUserSessions(context.Background(), "1"))
+
+		s2, _, _ := setupService()
+		assert.NoError(t, s2.RevokeAllUserSessions(context.Background(), ""))
+	})
+
+	t.Run("SMembers error", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectSMembers("user_active_tokens:1").SetErr(errors.New("smembers err"))
+		err := s.RevokeAllUserSessions(context.Background(), "1")
+		assert.EqualError(t, err, "smembers err")
+	})
+
+	t.Run("Del tokens error", func(t *testing.T) {
+		s, _, rdbMock := setupService()
+		rdbMock.ExpectSMembers("user_active_tokens:1").SetVal([]string{"tok1"})
+		rdbMock.ExpectDel("refresh_token:tok1", "rotated_token:tok1", "used_refresh_token:tok1").SetErr(errors.New("del err"))
+		err := s.RevokeAllUserSessions(context.Background(), "1")
+		assert.EqualError(t, err, "del err")
+	})
 }
 
 type failingReader struct{}

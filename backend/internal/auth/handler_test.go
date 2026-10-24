@@ -65,6 +65,11 @@ func (m *MockAuthService) GenerateAccessToken(user *User) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockAuthService) GenerateRefreshToken(ctx context.Context, userID string) (string, error) {
+	args := m.Called(ctx, userID)
+	return args.String(0), args.Error(1)
+}
+
 func (m *MockAuthService) UpdateProfile(ctx context.Context, id, name, email string) (*User, error) {
 	args := m.Called(ctx, id, name, email)
 	if args.Get(0) != nil {
@@ -77,8 +82,8 @@ func (m *MockAuthService) UpdatePassword(ctx context.Context, id, currentPasswor
 	return m.Called(ctx, id, currentPassword, newPassword).Error(0)
 }
 
-func (m *MockAuthService) DeleteUser(ctx context.Context, id string) error {
-	return m.Called(ctx, id).Error(0)
+func (m *MockAuthService) DeleteUser(ctx context.Context, id, currentPassword string) error {
+	return m.Called(ctx, id, currentPassword).Error(0)
 }
 
 func TestHandler_Register(t *testing.T) {
@@ -503,7 +508,11 @@ func TestHandler_UpdatePassword(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		m := new(MockAuthService)
+		user := &User{ID: "1", Email: "test@test.com"}
 		m.On("UpdatePassword", mock.Anything, "1", "oldpass", "newpass").Return(nil)
+		m.On("GetUserByID", mock.Anything, "1").Return(user, nil)
+		m.On("GenerateAccessToken", user).Return("new_access_token", nil)
+		m.On("GenerateRefreshToken", mock.Anything, "1").Return("new_refresh_token", nil)
 		h := NewHandler(m)
 
 		payload := `{"current_password":"oldpass","new_password":"newpass"}`
@@ -515,6 +524,8 @@ func TestHandler_UpdatePassword(t *testing.T) {
 		h.UpdatePassword(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
+		cookies := rec.Result().Cookies()
+		assert.Len(t, cookies, 2)
 		m.AssertExpectations(t)
 	})
 }
@@ -529,11 +540,35 @@ func TestHandler_DeleteUser(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
+	t.Run("Invalid JSON Body", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodDelete, "/user", strings.NewReader("{invalid"))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		h.DeleteUser(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("Password Validation Error", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("DeleteUser", mock.Anything, "1", "wrong").Return(errors.New("senha atual incorreta"))
+		h := NewHandler(m)
+		req := httptest.NewRequest(http.MethodDelete, "/user", strings.NewReader(`{"current_password":"wrong"}`))
+		ctx := context.WithValue(req.Context(), UserIDKey, "1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		h.DeleteUser(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		m.AssertExpectations(t)
+	})
+
 	t.Run("Service Error", func(t *testing.T) {
 		m := new(MockAuthService)
-		m.On("DeleteUser", mock.Anything, "1").Return(errors.New("db error"))
+		m.On("DeleteUser", mock.Anything, "1", "secret123").Return(errors.New("db error"))
 		h := NewHandler(m)
-		req := httptest.NewRequest(http.MethodDelete, "/user", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/user", strings.NewReader(`{"current_password":"secret123"}`))
 		ctx := context.WithValue(req.Context(), UserIDKey, "1")
 		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
@@ -544,10 +579,10 @@ func TestHandler_DeleteUser(t *testing.T) {
 	t.Run("Success with Cookie Revocation", func(t *testing.T) {
 		m := new(MockAuthService)
 		m.On("RevokeRefreshToken", mock.Anything, "refresh_val").Return(nil)
-		m.On("DeleteUser", mock.Anything, "1").Return(nil)
+		m.On("DeleteUser", mock.Anything, "1", "secret123").Return(nil)
 		h := NewHandler(m)
 
-		req := httptest.NewRequest(http.MethodDelete, "/user", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/user", strings.NewReader(`{"current_password":"secret123"}`))
 		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "refresh_val"})
 		ctx := context.WithValue(req.Context(), UserIDKey, "1")
 		req = req.WithContext(ctx)

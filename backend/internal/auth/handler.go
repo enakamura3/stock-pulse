@@ -26,9 +26,10 @@ type AuthService interface {
 	RotateRefreshToken(ctx context.Context, oldToken string) (string, string, error)
 	GetUserByID(ctx context.Context, id string) (*User, error)
 	GenerateAccessToken(user *User) (string, error)
+	GenerateRefreshToken(ctx context.Context, userID string) (string, error)
 	UpdateProfile(ctx context.Context, id, name, email string) (*User, error)
 	UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error
-	DeleteUser(ctx context.Context, id string) error
+	DeleteUser(ctx context.Context, id, currentPassword string) error
 }
 
 // Handler expõe os métodos HTTP da API de Autenticação.
@@ -232,6 +233,10 @@ type updatePasswordPayload struct {
 	NewPassword     string `json:"new_password"`
 }
 
+type deleteUserPayload struct {
+	CurrentPassword string `json:"current_password"`
+}
+
 // UpdateProfile atualiza as informações do usuário.
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(UserIDKey).(string)
@@ -275,6 +280,16 @@ func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Emite uma nova sessão para o dispositivo atual após revogar todas as sessões anteriores
+	user, err := h.service.GetUserByID(r.Context(), userID)
+	if err == nil && user != nil {
+		accessToken, errAcc := h.service.GenerateAccessToken(user)
+		refreshToken, errRef := h.service.GenerateRefreshToken(r.Context(), userID)
+		if errAcc == nil && errRef == nil {
+			h.setTokenCookies(w, accessToken, refreshToken)
+		}
+	}
+
 	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Senha atualizada com sucesso"})
 }
 
@@ -286,13 +301,25 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var payload deleteUserPayload
+	if r.Body != nil {
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			httputils.RespondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+			return
+		}
+	}
+
 	cookie, err := r.Cookie("refresh_token")
 	if err == nil && cookie != nil {
 		_ = h.service.RevokeRefreshToken(r.Context(), cookie.Value)
 	}
 
-	err = h.service.DeleteUser(r.Context(), userID)
+	err = h.service.DeleteUser(r.Context(), userID, payload.CurrentPassword)
 	if err != nil {
+		if strings.Contains(err.Error(), "senha") || strings.Contains(err.Error(), "usuário não encontrado") {
+			httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		slog.Error("falha ao excluir conta de usuário", "user_id", userID, "error", err)
 		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao excluir conta de usuário")
 		return

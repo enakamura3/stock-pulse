@@ -749,7 +749,7 @@ describe('SettingsPage', () => {
     consoleError.mockRestore();
   });
 
-  it('handles account deletion (cancel, wrong email, server error, network crash, success)', async () => {
+  it('handles account deletion (missing password, cancel, wrong email, server error, network crash, success)', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
@@ -759,6 +759,14 @@ describe('SettingsPage', () => {
     );
 
     const deleteBtn = screen.getByRole('button', { name: 'Excluir Conta' });
+    const deletePwdInput = screen.getByPlaceholderText('Confirme sua senha atual');
+
+    // 0. Missing current password
+    fireEvent.click(deleteBtn);
+    expect(mockAlert).toHaveBeenCalledWith('Por favor, informe sua senha atual para confirmar a exclusão da conta.');
+    expect(apiFetch).not.toHaveBeenCalledWith('/user', expect.anything());
+
+    fireEvent.change(deletePwdInput, { target: { value: 'mySecretPass123' } });
 
     // 1. Cancel prompt
     mockPrompt.mockReturnValueOnce(null);
