@@ -264,7 +264,7 @@ func main() {
 			r.Get("/assets/search", marketHandler.Search)
 			r.Get("/assets/{ticker}", portfolioHandler.GetAssetMetadata)
 			r.Get("/market/benchmarks", marketHandler.GetBenchmarks)
-			r.Post("/market/quotes/invalidate", marketHandler.InvalidateCache)
+			r.With(customMiddleware.RateLimitMarketInvalidate(rdb)).Post("/market/quotes/invalidate", marketHandler.InvalidateCache)
 
 			// Favoritos / Watchlists
 			r.Get("/watchlists", watchlistHandler.GetWatchlists)

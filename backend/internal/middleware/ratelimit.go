@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/redis/go-redis/v9"
 )
@@ -263,6 +264,24 @@ func RateLimitTelegramLink(rdb redis.Cmdable) func(http.Handler) http.Handler {
 		Limit:     10,
 		Window:    time.Minute,
 		KeyPrefix: "rate_limit:telegram:link",
+	})
+}
+
+// UserIDKeyExtractor extrai o ID do usuário autenticado a partir do contexto HTTP. Se ausente, usa o ClientIP.
+func UserIDKeyExtractor(r *http.Request) string {
+	if uid, ok := r.Context().Value(auth.UserIDKey).(string); ok && uid != "" {
+		return uid
+	}
+	return ClientIP(r)
+}
+
+// RateLimitMarketInvalidate limita a invalidação de cache de cotações a 5 requisições por minuto por usuário autenticado (ou IP).
+func RateLimitMarketInvalidate(rdb redis.Cmdable) func(http.Handler) http.Handler {
+	return RateLimit(rdb, RateLimiterConfig{
+		Limit:        5,
+		Window:       time.Minute,
+		KeyPrefix:    "rate_limit:market:invalidate",
+		KeyExtractor: UserIDKeyExtractor,
 	})
 }
 

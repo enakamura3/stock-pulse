@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redismock/v9"
+	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 )
@@ -283,6 +285,7 @@ func TestRateLimit_Presets(t *testing.T) {
 		{"AuthRegister", RateLimitAuthRegister(rdb), "5"},
 		{"AuthRefresh", RateLimitAuthRefresh(rdb), "30"},
 		{"TelegramLink", RateLimitTelegramLink(rdb), "10"},
+		{"MarketInvalidate", RateLimitMarketInvalidate(rdb), "5"},
 	}
 
 	for _, p := range presets {
@@ -360,6 +363,25 @@ func TestRateLimit_ZeroOrNegativeTTL(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "60", w.Header().Get("X-RateLimit-Reset"))
+}
+
+func TestUserIDKeyExtractor(t *testing.T) {
+	t.Run("Extracts UserID from Context", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		ctx := context.WithValue(req.Context(), auth.UserIDKey, "user-abc-123")
+		req = req.WithContext(ctx)
+
+		id := UserIDKeyExtractor(req)
+		assert.Equal(t, "user-abc-123", id)
+	})
+
+	t.Run("Fallbacks to ClientIP when UserID is Missing", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "198.51.100.1:5678"
+
+		id := UserIDKeyExtractor(req)
+		assert.Equal(t, "198.51.100.1", id)
+	})
 }
 
 

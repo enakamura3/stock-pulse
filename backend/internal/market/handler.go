@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
 
@@ -97,7 +99,26 @@ func (h *Handler) InvalidateCache(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 	}
 
-	removed, err := h.service.InvalidateQuoteCache(r.Context(), req.Symbols)
+	var cleanedSymbols []string
+	for _, s := range req.Symbols {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			cleanedSymbols = append(cleanedSymbols, s)
+		}
+	}
+
+	isAdmin := config.Envs.AdminAPIKey != "" && r.Header.Get("X-Admin-Key") == config.Envs.AdminAPIKey
+	if len(cleanedSymbols) == 0 && !isAdmin {
+		httputils.RespondWithError(w, http.StatusBadRequest, "symbols é obrigatório e deve conter entre 1 e 20 ativos")
+		return
+	}
+
+	if len(cleanedSymbols) > 20 {
+		httputils.RespondWithError(w, http.StatusBadRequest, "máximo de 20 símbolos permitidos por requisição")
+		return
+	}
+
+	removed, err := h.service.InvalidateQuoteCache(r.Context(), cleanedSymbols)
 	if err != nil {
 		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao invalidar cache de cotações")
 		return

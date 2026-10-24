@@ -3,12 +3,14 @@ package market
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -200,7 +202,7 @@ func TestHandler_InvalidateCache(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("InvalidateQuoteCache", mock.Anything, []string{"PETR4.SA", "VALE3.SA"}).Return(int64(2), nil)
 
-		body := `{"symbols":["PETR4.SA", "VALE3.SA"]}`
+		body := `{"symbols":["PETR4.SA", " VALE3.SA ", ""]}`
 		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 		h.InvalidateCache(rec, req)
@@ -210,11 +212,16 @@ func TestHandler_InvalidateCache(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), `"removed":2`)
 	})
 
-	t.Run("Success with Empty Body", func(t *testing.T) {
+	t.Run("Success with Empty Body as Admin", func(t *testing.T) {
+		origKey := config.Envs.AdminAPIKey
+		config.Envs.AdminAPIKey = "secret-admin-key"
+		defer func() { config.Envs.AdminAPIKey = origKey }()
+
 		h, s := setupHandlerTest()
 		s.On("InvalidateQuoteCache", mock.Anything, []string(nil)).Return(int64(15), nil)
 
 		req := httptest.NewRequest("POST", "/market/quotes/invalidate", nil)
+		req.Header.Set("X-Admin-Key", "secret-admin-key")
 		rec := httptest.NewRecorder()
 		h.InvalidateCache(rec, req)
 
@@ -222,11 +229,45 @@ func TestHandler_InvalidateCache(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), `"removed":15`)
 	})
 
+	t.Run("Error when Symbols Empty and Non-Admin", func(t *testing.T) {
+		origKey := config.Envs.AdminAPIKey
+		config.Envs.AdminAPIKey = "secret-admin-key"
+		defer func() { config.Envs.AdminAPIKey = origKey }()
+
+		h, _ := setupHandlerTest()
+
+		// Sem corpo / symbols vazio
+		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(`{"symbols":["  "]}`))
+		rec := httptest.NewRecorder()
+		h.InvalidateCache(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "symbols é obrigatório e deve conter entre 1 e 20 ativos")
+	})
+
+	t.Run("Error when Symbols Exceeds 20", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+
+		var symbols []string
+		for i := 1; i <= 21; i++ {
+			symbols = append(symbols, fmt.Sprintf("SYM%d", i))
+		}
+		body := fmt.Sprintf(`{"symbols":["%s"]}`, strings.Join(symbols, `","`))
+
+		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		h.InvalidateCache(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "máximo de 20 símbolos permitidos por requisição")
+	})
+
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
-		s.On("InvalidateQuoteCache", mock.Anything, []string(nil)).Return(int64(0), errors.New("redis down"))
+		s.On("InvalidateQuoteCache", mock.Anything, []string{"PETR4"}).Return(int64(0), errors.New("redis down"))
 
-		req := httptest.NewRequest("POST", "/market/quotes/invalidate", nil)
+		body := `{"symbols":["PETR4"]}`
+		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 		h.InvalidateCache(rec, req)
 

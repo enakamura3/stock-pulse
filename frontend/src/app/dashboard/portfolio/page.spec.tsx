@@ -444,7 +444,10 @@ describe('PortfolioPage Contextual Filters', () => {
     fireEvent.click(realtimeBtn);
 
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('/market/quotes/invalidate', { method: 'POST' });
+      expect(apiFetch).toHaveBeenCalledWith('/market/quotes/invalidate', {
+        method: 'POST',
+        body: JSON.stringify({ symbols: ['PETR4'] }),
+      });
       expect(mockLoadPortfolioDetails).toHaveBeenCalledTimes(2);
     });
 
