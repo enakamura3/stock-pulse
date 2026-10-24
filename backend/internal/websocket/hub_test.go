@@ -34,7 +34,7 @@ func (m *MockMarketService) GetQuote(ctx context.Context, ticker string) (*marke
 func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	ms := new(MockMarketService)
 	// Return a dummy quote
-	ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL", Price: 150.0}, nil)
+	ms.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Ticker: "AAPL", Price: 150.0}, nil)
 
 	hub := NewHub(ms)
 
@@ -65,7 +65,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	// 1. Subscribe to AAPL
 	subMsg := WSMessage{
 		Action:  "subscribe",
-		Symbols: []string{"AAPL"},
+		Tickers: []string{"AAPL"},
 	}
 	err = ws.WriteJSON(subMsg)
 	assert.NoError(t, err)
@@ -86,7 +86,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 		var payload map[string]interface{}
 		if err := json.Unmarshal(p, &payload); err == nil && payload["type"] == "quote" {
 			data := payload["data"].(map[string]interface{})
-			assert.Equal(t, "AAPL", data["symbol"])
+			assert.Equal(t, "AAPL", data["ticker"])
 			assert.Equal(t, 150.0, data["price"])
 			break // Got our quote
 		}
@@ -95,7 +95,7 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	// 2. Unsubscribe from AAPL
 	unsubMsg := WSMessage{
 		Action:  "unsubscribe",
-		Symbols: []string{"AAPL"},
+		Tickers: []string{"AAPL"},
 	}
 	err = ws.WriteJSON(unsubMsg)
 	assert.NoError(t, err)
@@ -210,7 +210,7 @@ func TestHub_MaxSubscriptionsPerClient(t *testing.T) {
 
 	subMsg := WSMessage{
 		Action:  "subscribe",
-		Symbols: tickers,
+		Tickers: tickers,
 	}
 	err = ws.WriteJSON(subMsg)
 	assert.NoError(t, err)
@@ -336,7 +336,7 @@ func TestHub_BroadcastQuotes_EdgeCases(t *testing.T) {
 
 	subMsg := WSMessage{
 		Action:  "subscribe",
-		Symbols: []string{"BAD_TICKER"},
+		Tickers: []string{"BAD_TICKER"},
 	}
 	err = ws.WriteJSON(subMsg)
 	assert.NoError(t, err)
@@ -357,7 +357,7 @@ func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, ass
 
 func TestHub_AdditionalEdgeCases(t *testing.T) {
 	ms := new(MockMarketService)
-	ms.On("GetQuote", mock.Anything, mock.Anything).Return(&market.Quote{Symbol: "MOCK", Price: 100}, nil).Maybe()
+	ms.On("GetQuote", mock.Anything, mock.Anything).Return(&market.Quote{Ticker: "MOCK", Price: 100}, nil).Maybe()
 	hub := NewHub(ms).WithBroadcastInterval(20 * time.Millisecond).WithPingPeriod(20 * time.Millisecond)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -392,7 +392,7 @@ func TestHub_AdditionalEdgeCases(t *testing.T) {
 	hub.broadcastQuotes(ctx)
 
 	// 4. Subscribe to MOCK
-	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Symbols: []string{"MOCK"}})
+	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Tickers: []string{"MOCK"}})
 	time.Sleep(30 * time.Millisecond)
 
 	// 5. Test broadcastQuotes when client.Send is full (hits default in select)
@@ -417,11 +417,11 @@ func TestHub_AdditionalEdgeCases(t *testing.T) {
 		hub.broadcastQuotes(ctx)
 
 		// 6. Test limit exceeded when Send is full (hits default in limitExceeded select)
-		symbols := make([]string, 55)
+		tickers := make([]string, 55)
 		for i := 0; i < 55; i++ {
-			symbols[i] = fmt.Sprintf("SYM%d", i)
+			tickers[i] = fmt.Sprintf("SYM%d", i)
 		}
-		_ = ws.WriteJSON(WSMessage{Action: "subscribe", Symbols: symbols})
+		_ = ws.WriteJSON(WSMessage{Action: "subscribe", Tickers: tickers})
 		time.Sleep(30 * time.Millisecond)
 	}
 
@@ -465,7 +465,7 @@ func TestClient_WritePump_BatchedMessages(t *testing.T) {
 
 func TestHub_BroadcastQuotes_ChannelFull(t *testing.T) {
 	ms := new(MockMarketService)
-	ms.On("GetQuote", mock.Anything, "FULL").Return(&market.Quote{Symbol: "FULL", Price: 100}, nil)
+	ms.On("GetQuote", mock.Anything, "FULL").Return(&market.Quote{Ticker: "FULL", Price: 100}, nil)
 	hub := NewHub(ms)
 	client := &Client{
 		Hub:        hub,
@@ -495,7 +495,7 @@ func TestHub_ZeroDefaults(t *testing.T) {
 
 func TestHub_BroadcastQuotes_MarshalError(t *testing.T) {
 	ms := new(MockMarketService)
-	ms.On("GetQuote", mock.Anything, "NAN").Return(&market.Quote{Symbol: "NAN", Price: math.NaN()}, nil)
+	ms.On("GetQuote", mock.Anything, "NAN").Return(&market.Quote{Ticker: "NAN", Price: math.NaN()}, nil)
 	hub := NewHub(ms)
 	client := &Client{
 		Hub:        hub,
@@ -551,11 +551,11 @@ func TestClient_ReadPump_LimitExceeded_FullSend(t *testing.T) {
 	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	assert.NoError(t, err)
 
-	symbols := make([]string, 55)
+	tickers := make([]string, 55)
 	for i := 0; i < 55; i++ {
-		symbols[i] = fmt.Sprintf("SYM%d", i)
+		tickers[i] = fmt.Sprintf("SYM%d", i)
 	}
-	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Symbols: symbols})
+	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Tickers: tickers})
 	time.Sleep(30 * time.Millisecond)
 	_ = ws.Close()
 }

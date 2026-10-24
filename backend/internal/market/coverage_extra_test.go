@@ -398,7 +398,7 @@ func TestService_GetFundamentals_RedisSetError(t *testing.T) {
 
 	mockProv := &MockQuoteProvider{}
 	mockProv.On("GetQuote", mock.Anything, "PETR4").Return(&Quote{
-		Symbol: "PETR4",
+		Ticker: "PETR4",
 		Price:  30.0,
 	}, nil)
 

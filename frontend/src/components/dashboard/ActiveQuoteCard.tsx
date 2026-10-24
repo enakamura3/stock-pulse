@@ -11,7 +11,7 @@ interface ActiveQuoteCardProps {
   priceFlashing: Record<string, 'up' | 'down'>;
   onToggleFavorite: () => void;
   onOpenAlertModal: () => void;
-  onRefreshQuote: (symbol: string, isRefresh?: boolean) => void;
+  onRefreshQuote: (ticker: string, isRefresh?: boolean) => void;
   formatMoney: (val: number, currency: string) => string;
   formatPercentage: (val: number) => string;
 }
@@ -48,7 +48,7 @@ export default function ActiveQuoteCard({
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div>
                 <h2 className="font-mono" style={{ fontSize: '2rem', margin: 0, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {activeQuote.symbol}
+                  {activeQuote.ticker}
                   
                   {/* ÍCONE ESTRELA PARA FAVORITAR DENTRO DA WATCHLIST ATIVA */}
                   <button
@@ -89,7 +89,7 @@ export default function ActiveQuoteCard({
                 </button>
                 <button
                   className="btn-secondary"
-                  onClick={() => onRefreshQuote(activeQuote.symbol, true)}
+                  onClick={() => onRefreshQuote(activeQuote.ticker, true)}
                   style={{ padding: '0.35rem 0.85rem', fontSize: '0.78rem' }}
                 >
                   🔄 Atualizar
@@ -114,8 +114,8 @@ export default function ActiveQuoteCard({
               className="font-mono font-bold"
               style={{ 
                 fontSize: '2.5rem', 
-                color: priceFlashing[activeQuote.symbol] === 'up' ? 'var(--color-success)' : priceFlashing[activeQuote.symbol] === 'down' ? 'var(--color-danger)' : 'var(--text-primary)', 
-                textShadow: priceFlashing[activeQuote.symbol] === 'up' ? '0 0 12px rgba(var(--success-rgb), 0.5)' : priceFlashing[activeQuote.symbol] === 'down' ? '0 0 12px rgba(var(--danger-rgb), 0.5)' : 'none',
+                color: priceFlashing[activeQuote.ticker] === 'up' ? 'var(--color-success)' : priceFlashing[activeQuote.ticker] === 'down' ? 'var(--color-danger)' : 'var(--text-primary)', 
+                textShadow: priceFlashing[activeQuote.ticker] === 'up' ? '0 0 12px rgba(var(--success-rgb), 0.5)' : priceFlashing[activeQuote.ticker] === 'down' ? '0 0 12px rgba(var(--danger-rgb), 0.5)' : 'none',
                 transition: 'all 0.2s ease',
                 letterSpacing: '-0.02em',
                 fontVariantNumeric: 'tabular-nums',

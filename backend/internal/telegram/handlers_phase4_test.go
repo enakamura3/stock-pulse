@@ -28,7 +28,7 @@ func TestHandlers_Phase4_MultiQuote(t *testing.T) {
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
 
 		quote := &market.Quote{
-			Symbol:        "PETR4",
+			Ticker:        "PETR4",
 			Price:         34.50,
 			Change:        0.50,
 			ChangePercent: 1.47,
@@ -54,7 +54,7 @@ func TestHandlers_Phase4_MultiQuote(t *testing.T) {
 
 		// 1. Positive change
 		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{
-			Symbol:        "PETR4",
+			Ticker:        "PETR4",
 			Price:         35.0,
 			ChangePercent: 2.5,
 			Currency:      "R$",
@@ -62,7 +62,7 @@ func TestHandlers_Phase4_MultiQuote(t *testing.T) {
 
 		// 2. Negative change
 		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{
-			Symbol:        "VALE3",
+			Ticker:        "VALE3",
 			Price:         60.0,
 			ChangePercent: -1.8,
 			Currency:      "R$",
@@ -70,7 +70,7 @@ func TestHandlers_Phase4_MultiQuote(t *testing.T) {
 
 		// 3. Neutral change (0.0)
 		mSvc.On("GetQuote", mock.Anything, "ITUB4").Return(&market.Quote{
-			Symbol:        "ITUB4",
+			Ticker:        "ITUB4",
 			Price:         32.0,
 			ChangePercent: 0.0,
 			Currency:      "R$",
@@ -78,7 +78,7 @@ func TestHandlers_Phase4_MultiQuote(t *testing.T) {
 
 		// 4. Flat change with empty currency (fallback to default currency)
 		mSvc.On("GetQuote", mock.Anything, "FLAT").Return(&market.Quote{
-			Symbol:        "FLAT",
+			Ticker:        "FLAT",
 			Price:         10.0,
 			ChangePercent: 0.0,
 			Currency:      "",
@@ -89,7 +89,7 @@ func TestHandlers_Phase4_MultiQuote(t *testing.T) {
 
 		// 6. US ticker (AAPL)
 		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{
-			Symbol:        "AAPL",
+			Ticker:        "AAPL",
 			Price:         220.0,
 			ChangePercent: 0.8,
 			Currency:      "US$",
@@ -123,7 +123,7 @@ func TestHandlers_Phase4_MultiQuote(t *testing.T) {
 		for i := 1; i <= 10; i++ {
 			ticker := args[i-1]
 			mSvc.On("GetQuote", mock.Anything, ticker).Return(&market.Quote{
-				Symbol:        ticker,
+				Ticker:        ticker,
 				Price:         float64(i * 10),
 				ChangePercent: float64(i),
 				Currency:      "R$",

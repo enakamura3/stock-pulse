@@ -195,16 +195,16 @@ func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, ass
 	return args.Get(0).([]market.DividendEvent), args.Error(1)
 }
 
-func (m *MockMarketService) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, rangePeriod)
+func (m *MockMarketService) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, rangePeriod)
 	if args.Get(0) != nil {
 		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockMarketService) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, period1, period2)
+func (m *MockMarketService) GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, period1, period2)
 	if args.Get(0) != nil {
 		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
 	}
@@ -228,16 +228,16 @@ func (m *MockMarketProvider) SearchAssets(ctx context.Context, query string) ([]
 	return args.Get(0).([]market.SearchResult), args.Error(1)
 }
 
-func (m *MockMarketProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]market.HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, rangePeriod)
+func (m *MockMarketProvider) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, rangePeriod)
 	if args.Get(0) != nil {
 		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockMarketProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]market.HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, period1, period2)
+func (m *MockMarketProvider) GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]market.HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, period1, period2)
 	if args.Get(0) != nil {
 		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
 	}

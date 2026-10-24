@@ -15,18 +15,18 @@ func TestMockProvider(t *testing.T) {
 		quote, err := provider.GetQuote(ctx, "PETR4.SA")
 		assert.NoError(t, err)
 		assert.NotNil(t, quote)
-		assert.Equal(t, "PETR4.SA", quote.Symbol)
+		assert.Equal(t, "PETR4.SA", quote.Ticker)
 		assert.Equal(t, "PETR4.SA Mocked Corp", quote.Name)
 		assert.Equal(t, 50.00, quote.Price)
 	})
 
 	t.Run("GetQuote - special tickers", func(t *testing.T) {
 		tickers := []string{"^BVSP", "^GSPC", "BRL=X", "IFIX.SA"}
-		for _, sym := range tickers {
-			q, err := provider.GetQuote(ctx, sym)
+		for _, ticker := range tickers {
+			q, err := provider.GetQuote(ctx, ticker)
 			assert.NoError(t, err)
 			assert.NotNil(t, q)
-			assert.Equal(t, sym, q.Symbol)
+			assert.Equal(t, ticker, q.Ticker)
 		}
 	})
 
@@ -34,7 +34,7 @@ func TestMockProvider(t *testing.T) {
 		results, err := provider.SearchAssets(ctx, "PETR")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, results)
-		assert.Equal(t, "PETR4.SA", results[0].Symbol)
+		assert.Equal(t, "PETR4.SA", results[0].Ticker)
 	})
 
 	t.Run("HistoricalPrices", func(t *testing.T) {

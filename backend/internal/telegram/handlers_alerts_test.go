@@ -413,7 +413,7 @@ func TestHandlers_Alerts(t *testing.T) {
 		mCtxOk.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtxOk.On("Text").Return("PETR4")
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "ALERT_EXPECT_TICKER"}, nil).Once()
-		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Symbol: "PETR4"}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Ticker: "PETR4"}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "ALERT_EXPECT_COND", Ticker: "PETR4"}).Return(nil).Once()
 		mCtxOk.On("Send", mock.MatchedBy(func(msg string) bool {
 			return strings.Contains(msg, "Alerta para PETR4")

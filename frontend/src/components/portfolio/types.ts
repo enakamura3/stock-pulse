@@ -83,7 +83,7 @@ export interface CalculatedDividend {
 }
 
 export interface BenchmarkItem {
-  symbol: string;
+  ticker: string;
   name: string;
   value: number;
   change: number;
@@ -100,7 +100,7 @@ export interface MarketBenchmarks {
 }
 
 export interface SearchResult {
-  symbol: string;
+  ticker: string;
   name: string;
   exchange: string;
   type: string;

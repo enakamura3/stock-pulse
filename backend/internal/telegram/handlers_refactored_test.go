@@ -781,7 +781,7 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_QTY", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY"}, nil).Once()
-		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL", Price: 150.0}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Ticker: "AAPL", Price: 150.0}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10}).Return(nil).Once()
 		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
 
@@ -796,7 +796,7 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_TICKER", PortfolioID: "p1"}, nil).Times(2)
-		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL"}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Ticker: "AAPL"}, nil).Once()
 
 		// Expected inside handleSelectedTicker
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_TYPE", PortfolioID: "p1", Ticker: "AAPL"}).Return(nil).Once()
@@ -813,7 +813,7 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Text").Return("10,5")
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_QTY", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY"}, nil).Once()
-		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Symbol: "AAPL", Price: 150.0}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Ticker: "AAPL", Price: 150.0}, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_PRICE", PortfolioID: "p1", Ticker: "AAPL", Type: "BUY", Quantity: 10.5}).Return(nil).Once()
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
 			return strings.Contains(msg, "preço unitário")
@@ -1607,10 +1607,10 @@ func TestHandlePortfolioSummary_WithBenchmarks(t *testing.T) {
 		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
 
 		benchmarks := &market.MarketBenchmarks{
-			IBOV:   &market.BenchmarkItem{Symbol: "^BVSP", Name: "Ibovespa", ChangePercent: 1.25},
-			IFIX:   &market.BenchmarkItem{Symbol: "IFIX.SA", Name: "IFIX", ChangePercent: -0.45},
-			SP500:  &market.BenchmarkItem{Symbol: "^GSPC", Name: "S&P 500", ChangePercent: 0.0},
-			USDBRL: &market.BenchmarkItem{Symbol: "BRL=X", Name: "Dólar", ChangePercent: 0.85},
+			IBOV:   &market.BenchmarkItem{Ticker: "^BVSP", Name: "Ibovespa", ChangePercent: 1.25},
+			IFIX:   &market.BenchmarkItem{Ticker: "IFIX.SA", Name: "IFIX", ChangePercent: -0.45},
+			SP500:  &market.BenchmarkItem{Ticker: "^GSPC", Name: "S&P 500", ChangePercent: 0.0},
+			USDBRL: &market.BenchmarkItem{Ticker: "BRL=X", Name: "Dólar", ChangePercent: 0.85},
 		}
 		mSvc.On("GetBenchmarks", mock.Anything).Return(benchmarks, nil).Once()
 
@@ -2300,10 +2300,10 @@ func TestHandlers_DeepBranchCoverage(t *testing.T) {
 		fiSvc.On("GetTreasuryPositions", mock.Anything, "p1").Return([]fixedincome.TreasuryPosition{}, nil).Once()
 
 		benchmarks := &market.MarketBenchmarks{
-			IBOV:   &market.BenchmarkItem{Symbol: "^BVSP", Name: "Ibovespa", ChangePercent: -1.5},
-			IFIX:   &market.BenchmarkItem{Symbol: "IFIX.SA", Name: "IFIX", ChangePercent: 0.0},
-			SP500:  &market.BenchmarkItem{Symbol: "^GSPC", Name: "S&P 500", ChangePercent: -0.5},
-			USDBRL: &market.BenchmarkItem{Symbol: "BRL=X", Name: "Dólar", ChangePercent: 0.0},
+			IBOV:   &market.BenchmarkItem{Ticker: "^BVSP", Name: "Ibovespa", ChangePercent: -1.5},
+			IFIX:   &market.BenchmarkItem{Ticker: "IFIX.SA", Name: "IFIX", ChangePercent: 0.0},
+			SP500:  &market.BenchmarkItem{Ticker: "^GSPC", Name: "S&P 500", ChangePercent: -0.5},
+			USDBRL: &market.BenchmarkItem{Ticker: "BRL=X", Name: "Dólar", ChangePercent: 0.0},
 		}
 		mSvc.On("GetBenchmarks", mock.Anything).Return(benchmarks, nil).Once()
 		mCtx.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -2850,7 +2850,7 @@ func TestHandlers_UndoAndOperations(t *testing.T) {
 		// btn_analise_
 		mCtxAna := new(MockTelebotContext)
 		mCtxAna.On("Callback").Return(&telebot.Callback{Data: "btn_analise_VALE3"})
-		mSvc.On("GetFundamentals", mock.Anything, "VALE3").Return(&market.Fundamentals{Symbol: "VALE3"}, nil).Once()
+		mSvc.On("GetFundamentals", mock.Anything, "VALE3").Return(&market.Fundamentals{Ticker: "VALE3"}, nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Price: 60.0}, nil).Once()
 		mCtxAna.On("Edit", mock.MatchedBy(func(msg string) bool {
 			return strings.Contains(msg, "Análise Fundamentalista: VALE3")
@@ -2862,7 +2862,7 @@ func TestHandlers_UndoAndOperations(t *testing.T) {
 		// btn_quote_
 		mCtxQuote := new(MockTelebotContext)
 		mCtxQuote.On("Callback").Return(&telebot.Callback{Data: "btn_quote_VALE3"})
-		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Symbol: "VALE3", Price: 60.0}, nil).Once()
+		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{Ticker: "VALE3", Price: 60.0}, nil).Once()
 		mCtxQuote.On("Edit", mock.MatchedBy(func(msg string) bool {
 			return strings.Contains(msg, "VALE3")
 		}), mock.Anything, mock.Anything).Return(nil).Once()

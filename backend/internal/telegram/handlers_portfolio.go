@@ -251,15 +251,15 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 			if len(bmItems) > 0 {
 				msg += "\n📊 *Benchmarks do Dia*\n"
 				for _, item := range bmItems {
-					var symbol string
+					var emoji string
 					if item.changePercent > 1e-6 {
-						symbol = "🟢"
+						emoji = "🟢"
 					} else if item.changePercent < -1e-6 {
-						symbol = "🔴"
+						emoji = "🔴"
 					} else {
-						symbol = "⚪"
+						emoji = "⚪"
 					}
-					msg += p.Sprintf("• %s *%s:* %+.2f%%\n", symbol, item.name, item.changePercent)
+					msg += p.Sprintf("• %s *%s:* %+.2f%%\n", emoji, item.name, item.changePercent)
 				}
 			}
 		}
@@ -346,13 +346,13 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	msg := p.Sprintf("📋 *Ativos: %s*\n_Página %d de %d_\n\n", escapeMarkdown(portfolioName), page+1, totalPages)
 
 	for _, pos := range posByValue[start:end] {
-		var symbol string
+		var emoji string
 		if pos.DailyChangePercent > 1e-6 {
-			symbol = "🟢"
+			emoji = "🟢"
 		} else if pos.DailyChangePercent < -1e-6 {
-			symbol = "🔴"
+			emoji = "🔴"
 		} else {
-			symbol = "⚪"
+			emoji = "⚪"
 		}
 
 		totalReturn := 0.0
@@ -361,7 +361,7 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		}
 
 		msg += p.Sprintf("%s `%s`: Dia: %+.2f%% | L/P: %+.2f%%\n",
-			symbol, pos.Ticker, pos.DailyChangePercent, totalReturn)
+			emoji, pos.Ticker, pos.DailyChangePercent, totalReturn)
 		if pos.CurrentPrice > 1e-6 {
 			curr := getCurrencySymbol(pos.Currency)
 			if pos.OpenPrice > 1e-6 {

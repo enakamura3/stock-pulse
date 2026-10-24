@@ -14,7 +14,7 @@ import (
 )
 
 type Fundamentals struct {
-	Symbol        string
+	Ticker        string
 	EPS           float64
 	BookValue     float64
 	DividendYield float64
@@ -23,7 +23,7 @@ type Fundamentals struct {
 }
 
 type FundamentalsScraper interface {
-	GetFundamentals(ctx context.Context, symbol string) (*Fundamentals, error)
+	GetFundamentals(ctx context.Context, ticker string) (*Fundamentals, error)
 }
 
 type Scraper struct {
@@ -42,27 +42,27 @@ func NewScraper() *Scraper {
 	}
 }
 
-func (s *Scraper) GetFundamentals(ctx context.Context, symbol string) (*Fundamentals, error) {
-	if strings.HasSuffix(symbol, ".SA") {
-		cleanSymbol := strings.TrimSuffix(symbol, ".SA")
-		fund, err := s.ScrapeFundamentus(ctx, cleanSymbol)
+func (s *Scraper) GetFundamentals(ctx context.Context, ticker string) (*Fundamentals, error) {
+	if strings.HasSuffix(ticker, ".SA") {
+		cleanTicker := strings.TrimSuffix(ticker, ".SA")
+		fund, err := s.ScrapeFundamentus(ctx, cleanTicker)
 		if err != nil {
 			return nil, err
 		}
-		fund.Symbol = symbol
+		fund.Ticker = ticker
 		return fund, nil
 	}
 
-	fund, err := s.ScrapeFinviz(ctx, symbol)
+	fund, err := s.ScrapeFinviz(ctx, ticker)
 	if err != nil {
 		return nil, err
 	}
-	fund.Symbol = symbol
+	fund.Ticker = ticker
 	return fund, nil
 }
 
-func (s *Scraper) ScrapeFundamentus(ctx context.Context, symbol string) (*Fundamentals, error) {
-	url := fmt.Sprintf("%s/detalhes.php?papel=%s", s.fundamentusBaseURL, url.QueryEscape(symbol))
+func (s *Scraper) ScrapeFundamentus(ctx context.Context, ticker string) (*Fundamentals, error) {
+	url := fmt.Sprintf("%s/detalhes.php?papel=%s", s.fundamentusBaseURL, url.QueryEscape(ticker))
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
@@ -101,8 +101,8 @@ func (s *Scraper) ScrapeFundamentus(ctx context.Context, symbol string) (*Fundam
 	}), nil
 }
 
-func (s *Scraper) ScrapeFinviz(ctx context.Context, symbol string) (*Fundamentals, error) {
-	url := fmt.Sprintf("%s/quote.ashx?t=%s", s.finvizBaseURL, url.QueryEscape(symbol))
+func (s *Scraper) ScrapeFinviz(ctx context.Context, ticker string) (*Fundamentals, error) {
+	url := fmt.Sprintf("%s/quote.ashx?t=%s", s.finvizBaseURL, url.QueryEscape(ticker))
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 

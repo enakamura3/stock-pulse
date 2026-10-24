@@ -14,7 +14,7 @@ import (
 // MarketService define a interface que o Handler consome.
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*Quote, error)
-	GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error)
+	GetQuoteWithCacheStatus(ctx context.Context, ticker string) (*Quote, bool, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
 	GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error)
 	InvalidateQuoteCache(ctx context.Context, tickers []string) (int64, error)

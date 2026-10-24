@@ -35,16 +35,16 @@ func NewFundamentusClient() *FundamentusClient {
 // Tenta a URL de ações primeiro; se não retornar dados, tenta a URL de FIIs.
 // Retorna os dados crus e o layout detectado ("acao" ou "fii").
 func (c *FundamentusClient) FetchDividends(ctx context.Context, ticker string) ([]FundamentusRawDividend, string, error) {
-	symbol := strings.TrimSuffix(ticker, ".SA")
+	cleanTicker := strings.TrimSuffix(ticker, ".SA")
 
 	// Tenta como Ação primeiro
-	raw, err := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/proventos.php?papel=%s&tipo=2", url.QueryEscape(symbol)), "acao")
+	raw, err := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/proventos.php?papel=%s&tipo=2", url.QueryEscape(cleanTicker)), "acao")
 	if err == nil && len(raw) > 0 {
 		return raw, "acao", nil
 	}
 
 	// Se retornou vazio (ou deu erro na raspagem), tenta como FII
-	rawFii, errFii := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/fii_proventos.php?papel=%s&tipo=2", url.QueryEscape(symbol)), "fii")
+	rawFii, errFii := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/fii_proventos.php?papel=%s&tipo=2", url.QueryEscape(cleanTicker)), "fii")
 	if errFii == nil && len(rawFii) > 0 {
 		return rawFii, "fii", nil
 	}

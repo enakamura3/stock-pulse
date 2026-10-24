@@ -9,7 +9,7 @@ import (
 
 // BenchmarkItem representa um índice ou ativo de referência de mercado.
 type BenchmarkItem struct {
-	Symbol        string  `json:"symbol"`
+	Ticker        string  `json:"ticker"`
 	Name          string  `json:"name"`
 	Value         float64 `json:"value"`
 	Change        float64 `json:"change"`
@@ -50,7 +50,7 @@ func (s *Service) GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error) 
 
 	targets := []struct {
 		key    string
-		symbol string
+		ticker string
 		name   string
 	}{
 		{"IBOV", "^BVSP", "Ibovespa"},
@@ -61,18 +61,18 @@ func (s *Service) GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error) 
 
 	for _, t := range targets {
 		wg.Add(1)
-		go func(targetKey, symbol, fallbackName string) {
+		go func(targetKey, ticker, fallbackName string) {
 			defer wg.Done()
-			q, err := s.provider.GetQuote(ctx, symbol)
+			q, err := s.provider.GetQuote(ctx, ticker)
 			if err != nil || q == nil {
 				return
 			}
 			name := q.Name
-			if name == "" || name == symbol {
+			if name == "" || name == ticker {
 				name = fallbackName
 			}
 			item := &BenchmarkItem{
-				Symbol:        q.Symbol,
+				Ticker:        q.Ticker,
 				Name:          name,
 				Value:         q.Price,
 				Change:        q.Change,
@@ -91,7 +91,7 @@ func (s *Service) GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error) 
 				benchmarks.IFIX = item
 			}
 			mu.Unlock()
-		}(t.key, t.symbol, t.name)
+		}(t.key, t.ticker, t.name)
 	}
 
 	wg.Wait()

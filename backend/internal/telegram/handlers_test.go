@@ -239,10 +239,10 @@ func (m *MockMarketSvc) GetQuote(ctx context.Context, ticker string) (*market.Qu
 	return nil, errors.New("not found")
 }
 
-func (m *MockMarketSvc) GetFundamentals(ctx context.Context, symbol string) (*market.Fundamentals, error) {
+func (m *MockMarketSvc) GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error) {
 	for _, call := range m.ExpectedCalls {
-		if call.Method == "GetFundamentals" && len(call.Arguments) > 1 && call.Arguments[1] == symbol {
-			args := m.Called(ctx, symbol)
+		if call.Method == "GetFundamentals" && len(call.Arguments) > 1 && call.Arguments[1] == ticker {
+			args := m.Called(ctx, ticker)
 			if args.Get(0) != nil {
 				return args.Get(0).(*market.Fundamentals), args.Error(1)
 			}
@@ -252,7 +252,7 @@ func (m *MockMarketSvc) GetFundamentals(ctx context.Context, symbol string) (*ma
 	for _, call := range m.ExpectedCalls {
 		if call.Method == "GetFundamentals" && len(call.Arguments) > 1 {
 			if _, ok := call.Arguments[1].(mock.AnythingOfTypeArgument); ok || call.Arguments[1] == mock.Anything {
-				args := m.Called(ctx, symbol)
+				args := m.Called(ctx, ticker)
 				if args.Get(0) != nil {
 					return args.Get(0).(*market.Fundamentals), args.Error(1)
 				}

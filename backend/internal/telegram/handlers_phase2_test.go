@@ -136,7 +136,7 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 		// VALE3 direct fails, VALE3.SA succeeds
 		mSvc.On("GetQuote", mock.Anything, "VALE3").Return((*market.Quote)(nil), errors.New("not found")).Once()
 		mSvc.On("GetQuote", mock.Anything, "VALE3.SA").Return(&market.Quote{
-			Symbol: "VALE3.SA",
+			Ticker: "VALE3.SA",
 			Name:   "Vale",
 			Price:  65.50,
 		}, nil).Once()
@@ -157,11 +157,11 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 
 		mSvc.On("GetFundamentals", mock.Anything, "WEGE3").Return((*market.Fundamentals)(nil), errors.New("not found")).Once()
 		mSvc.On("GetFundamentals", mock.Anything, "WEGE3.SA").Return(&market.Fundamentals{
-			Symbol: "WEGE3.SA", EPS: 1.5, BookValue: 12.0,
+			Ticker: "WEGE3.SA", EPS: 1.5, BookValue: 12.0,
 		}, nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "WEGE3").Return((*market.Quote)(nil), errors.New("not found")).Once()
 		mSvc.On("GetQuote", mock.Anything, "WEGE3.SA").Return(&market.Quote{
-			Symbol: "WEGE3.SA", Price: 50.0,
+			Ticker: "WEGE3.SA", Price: 50.0,
 		}, nil).Once()
 
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
@@ -184,7 +184,7 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 
 		mSvc.On("GetQuote", mock.Anything, "ITUB4").Return((*market.Quote)(nil), errors.New("not found")).Once()
 		mSvc.On("GetQuote", mock.Anything, "ITUB4.SA").Return(&market.Quote{
-			Symbol: "ITUB4.SA",
+			Ticker: "ITUB4.SA",
 		}, nil).Once()
 
 		svc.On("SetConversationState", mock.Anything, int64(123), mock.MatchedBy(func(st ConversationState) bool {
@@ -210,7 +210,7 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 
 		mSvc.On("GetQuote", mock.Anything, "BBDC4").Return((*market.Quote)(nil), errors.New("not found")).Once()
 		mSvc.On("GetQuote", mock.Anything, "BBDC4.SA").Return(&market.Quote{
-			Symbol: "BBDC4.SA",
+			Ticker: "BBDC4.SA",
 		}, nil).Once()
 
 		svc.On("SetConversationState", mock.Anything, int64(123), mock.MatchedBy(func(st ConversationState) bool {

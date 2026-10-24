@@ -369,7 +369,7 @@ func formatQuoteMessage(ticker string, quote *market.Quote) string {
 	}
 
 	curr := getCurrencySymbol(quote.Currency)
-	title := quote.Symbol
+	title := quote.Ticker
 	if title == "" {
 		title = ticker
 	}

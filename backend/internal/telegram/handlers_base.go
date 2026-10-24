@@ -24,7 +24,7 @@ type PortfolioService interface {
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
 	GetBenchmarks(ctx context.Context) (*market.MarketBenchmarks, error)
-	GetFundamentals(ctx context.Context, symbol string) (*market.Fundamentals, error)
+	GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error)
 }
 
 type FixedIncomeService interface {

@@ -8,7 +8,7 @@ export interface MarketBenchmarksBarProps {
 
 function formatBenchmarkValue(item: BenchmarkItem): string {
   if (!item || typeof item.value !== 'number') return '-';
-  if (item.symbol === 'BRL=X') {
+  if (item.ticker === 'BRL=X') {
     return `R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   return `${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} pts`;

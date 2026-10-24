@@ -215,8 +215,8 @@ describe('TransactionModal', () => {
       <TransactionModalWrapper
         showDropdown={true}
         searchResults={[
-          { symbol: 'PETR4', name: 'Petrobras PN', exchange: 'B3' },
-          { symbol: 'VALE3', name: 'Vale ON', exchange: 'B3' },
+          { ticker: 'PETR4', name: 'Petrobras PN', exchange: 'B3' },
+          { ticker: 'VALE3', name: 'Vale ON', exchange: 'B3' },
         ]}
         handleSelectAsset={handleSelectAssetMock}
       />

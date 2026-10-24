@@ -12,7 +12,7 @@ interface WatchlistSidebarProps {
   onDeleteActiveWatchlist: () => void;
   onCreateWatchlist: (e: React.FormEvent) => void;
   onNewWatchlistNameChange: (name: string) => void;
-  onSelectAsset: (symbol: string) => void;
+  onSelectAsset: (ticker: string) => void;
   onRemoveFromSidebar: (e: React.MouseEvent, ticker: string) => void;
   formatMoney: (val: number, currency: string) => string;
   formatPercentage: (val: number) => string;

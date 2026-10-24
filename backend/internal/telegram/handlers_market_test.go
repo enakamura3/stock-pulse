@@ -18,7 +18,7 @@ func TestHandlers_Market(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Args").Return([]string{"vale3.sa"}).Once()
 		mSvc.On("GetQuote", mock.Anything, "VALE3.SA").Return(&market.Quote{
-			Symbol:        "VALE3.SA",
+			Ticker:        "VALE3.SA",
 			Name:          "Vale S.A.",
 			Price:         62.50,
 			Change:        1.25,
@@ -110,7 +110,7 @@ func TestHandlers_Market(t *testing.T) {
 
 	t.Run("formatQuoteMessage - negative change and zero/fallback fields", func(t *testing.T) {
 		quote := &market.Quote{
-			Symbol:        "", // fallback to ticker
+			Ticker:        "", // fallback to ticker
 			Name:          "Apple Inc.",
 			Price:         180.00,
 			Change:        -2.50,
@@ -128,7 +128,7 @@ func TestHandlers_Market(t *testing.T) {
 
 	t.Run("formatQuoteMessage - zero change", func(t *testing.T) {
 		quote := &market.Quote{
-			Symbol:        "NEUT3",
+			Ticker:        "NEUT3",
 			Name:          "Neutral Corp",
 			Price:         10.00,
 			Change:        0.0,
@@ -159,7 +159,7 @@ func TestHandlers_Market(t *testing.T) {
 		mCtxOk.On("Text").Return("petr4")
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "QUOTE_EXPECT_TICKER"}, nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{
-			Symbol:        "PETR4.SA",
+			Ticker:        "PETR4.SA",
 			Name:          "Petrobras",
 			Price:         38.20,
 			Change:        0.50,
@@ -182,7 +182,7 @@ func TestHandlers_Market(t *testing.T) {
 		mCtx1 := new(MockTelebotContext)
 		mCtx1.On("Callback").Return(&telebot.Callback{}).Twice()
 		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{
-			Symbol: "VALE3", Price: 60.0, Currency: "BRL",
+			Ticker: "VALE3", Price: 60.0, Currency: "BRL",
 		}, nil).Once()
 		mCtx1.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("telegram: message is not modified")).Once()
 		err := h.renderQuote(mCtx1, "VALE3")
@@ -192,7 +192,7 @@ func TestHandlers_Market(t *testing.T) {
 		mCtx2 := new(MockTelebotContext)
 		mCtx2.On("Callback").Return(&telebot.Callback{}).Twice()
 		mSvc.On("GetQuote", mock.Anything, "VALE3").Return(&market.Quote{
-			Symbol: "VALE3", Price: 60.0, Currency: "BRL",
+			Ticker: "VALE3", Price: 60.0, Currency: "BRL",
 		}, nil).Once()
 		mCtx2.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("fatal edit error")).Once()
 		err = h.renderQuote(mCtx2, "VALE3")
@@ -212,7 +212,7 @@ func TestHandlers_Market(t *testing.T) {
 		mCtxWithArgs := new(MockTelebotContext)
 		mCtxWithArgs.On("Args").Return([]string{"petr4"}).Once()
 		mSvc.On("GetFundamentals", mock.Anything, "PETR4").Return(&market.Fundamentals{
-			Symbol: "PETR4", EPS: 5.0, BookValue: 30.0, DividendYield: 8.5, GrahamValue: 40.0, BazinValue: 45.0,
+			Ticker: "PETR4", EPS: 5.0, BookValue: 30.0, DividendYield: 8.5, GrahamValue: 40.0, BazinValue: 45.0,
 		}, nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Price: 35.0, Currency: "BRL"}, nil).Once()
 		mCtxWithArgs.On("Send", mock.MatchedBy(func(msg string) bool {
@@ -291,7 +291,7 @@ func TestHandlers_Market(t *testing.T) {
 		mCtx3 := new(MockTelebotContext)
 		mCtx3.On("Callback").Return(&telebot.Callback{}).Twice()
 		mSvc.On("GetFundamentals", mock.Anything, "BBAS3").Return(&market.Fundamentals{
-			Symbol: "BBAS3", EPS: 6.0, BookValue: 40.0, DividendYield: 10.0, GrahamValue: 50.0, BazinValue: 45.0,
+			Ticker: "BBAS3", EPS: 6.0, BookValue: 40.0, DividendYield: 10.0, GrahamValue: 50.0, BazinValue: 45.0,
 		}, nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "BBAS3").Return((*market.Quote)(nil), errors.New("quote fail")).Once()
 		mCtx3.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("message is not modified")).Once()
@@ -302,7 +302,7 @@ func TestHandlers_Market(t *testing.T) {
 		mCtx4 := new(MockTelebotContext)
 		mCtx4.On("Callback").Return(&telebot.Callback{}).Twice()
 		mSvc.On("GetFundamentals", mock.Anything, "BBAS3").Return(&market.Fundamentals{
-			Symbol: "BBAS3", EPS: 6.0, BookValue: 40.0, DividendYield: 10.0, GrahamValue: 50.0, BazinValue: 45.0,
+			Ticker: "BBAS3", EPS: 6.0, BookValue: 40.0, DividendYield: 10.0, GrahamValue: 50.0, BazinValue: 45.0,
 		}, nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "BBAS3").Return(&market.Quote{Price: 28.0, Currency: "BRL"}, nil).Once()
 		mCtx4.On("Edit", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("other edit error")).Once()
@@ -313,7 +313,7 @@ func TestHandlers_Market(t *testing.T) {
 	t.Run("formatAnalysisMessage - valuation margins and edge cases", func(t *testing.T) {
 		// Negative margin (price > Graham & Bazin) and negative EPS
 		fundOver := &market.Fundamentals{
-			Symbol:        "OVER3",
+			Ticker:        "OVER3",
 			EPS:           -1.5,
 			BookValue:     10.0,
 			DividendYield: 2.0,
@@ -331,7 +331,7 @@ func TestHandlers_Market(t *testing.T) {
 
 		// All zero / N/D
 		fundZero := &market.Fundamentals{
-			Symbol: "ZERO3",
+			Ticker: "ZERO3",
 		}
 		msgZero := formatAnalysisMessage("ZERO3", fundZero, 0, "")
 		assert.NotContains(t, msgZero, "Preço Atual:")
@@ -348,7 +348,7 @@ func TestHandlers_Market(t *testing.T) {
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "ANALYSIS_EXPECT_TICKER"}, nil).Once()
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
 		mSvc.On("GetFundamentals", mock.Anything, "ITUB4").Return(&market.Fundamentals{
-			Symbol: "ITUB4", EPS: 3.5, BookValue: 20.0, DividendYield: 6.5, GrahamValue: 35.0, BazinValue: 32.0,
+			Ticker: "ITUB4", EPS: 3.5, BookValue: 20.0, DividendYield: 6.5, GrahamValue: 35.0, BazinValue: 32.0,
 		}, nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "ITUB4").Return(&market.Quote{Price: 30.0, Currency: "BRL"}, nil).Once()
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {

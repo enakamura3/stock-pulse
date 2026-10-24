@@ -93,7 +93,7 @@ describe('AlertsPage', () => {
         return Promise.resolve({
           ok: true,
           json: async () => [
-            { symbol: 'PETR4.SA', name: 'Petrobras', exchange: 'BVMF', type: 'Equity' },
+            { ticker: 'PETR4.SA', name: 'Petrobras', exchange: 'BVMF', type: 'Equity' },
           ],
         });
       }
@@ -192,7 +192,7 @@ describe('AlertsPage', () => {
     (apiFetch as any).mockImplementationOnce((url: string) => {
       return Promise.resolve({
         ok: true,
-        json: async () => [{ symbol: 'VALE3.SA', name: 'Vale', exchange: 'BVMF', type: 'Equity' }],
+        json: async () => [{ ticker: 'VALE3.SA', name: 'Vale', exchange: 'BVMF', type: 'Equity' }],
       });
     });
 

@@ -143,8 +143,8 @@ func TestGetFundamentals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if fundSA.Symbol != "PETR4.SA" {
-		t.Errorf("expected PETR4.SA, got %s", fundSA.Symbol)
+	if fundSA.Ticker != "PETR4.SA" {
+		t.Errorf("expected PETR4.SA, got %s", fundSA.Ticker)
 	}
 	if math.Abs(fundSA.GrahamValue-0) < 1e-6 {
 		t.Errorf("expected GrahamValue > 0, got %f", fundSA.GrahamValue)
@@ -161,8 +161,8 @@ func TestGetFundamentals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if fundUS.Symbol != "AAPL" {
-		t.Errorf("expected AAPL, got %s", fundUS.Symbol)
+	if fundUS.Ticker != "AAPL" {
+		t.Errorf("expected AAPL, got %s", fundUS.Ticker)
 	}
 	if math.Abs(fundUS.DividendYield-0.0) > 1e-6 {
 		t.Errorf("expected 0 for '-' yield, got %f", fundUS.DividendYield)

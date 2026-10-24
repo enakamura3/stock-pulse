@@ -11,7 +11,7 @@ describe('ActiveQuoteCard Component', () => {
   const onRefreshQuote = vi.fn();
 
   const baseQuote: Quote = {
-    symbol: 'PETR4',
+    ticker: 'PETR4',
     name: 'Petrobras PN',
     price: 38.5,
     change: 0.75,
@@ -135,7 +135,7 @@ describe('ActiveQuoteCard Component', () => {
   it('renders negative quote with cache miss and flashing down', () => {
     const negativeQuote: Quote = {
       ...baseQuote,
-      symbol: 'VALE3',
+      ticker: 'VALE3',
       name: 'Vale ON',
       change: -1.25,
       change_percent: -2.1,
@@ -167,7 +167,7 @@ describe('ActiveQuoteCard Component', () => {
     expect(starBtn).toBeDisabled();
   });
 
-  it('renders neutral price flashing styling when priceFlashing has no entry for symbol', () => {
+  it('renders neutral price flashing styling when priceFlashing has no entry for ticker', () => {
     render(
       <ActiveQuoteCard
         activeQuote={baseQuote}

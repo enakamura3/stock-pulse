@@ -63,7 +63,7 @@ export default function CreateAlertModal({
           🔔 Criar Alerta de Preço
         </h2>
         <p style={{ margin: '0 0 2rem 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-          Defina as regras para o ativo <strong>{activeQuote.symbol}</strong> ({activeQuote.name}).
+          Defina as regras para o ativo <strong>{activeQuote.ticker}</strong> ({activeQuote.name}).
         </p>
 
         {alertErrorMsg && (

@@ -8,7 +8,7 @@ interface AssetSearchProps {
   showDropdown: boolean;
   onSearchChange: (query: string) => void;
   onFocus: () => void;
-  onSelectAsset: (symbol: string) => void;
+  onSelectAsset: (ticker: string) => void;
 }
 
 export default function AssetSearch({
@@ -60,8 +60,8 @@ export default function AssetSearch({
         >
           {searchResults.map((item) => (
             <div
-              key={item.symbol}
-              onClick={() => onSelectAsset(item.symbol)}
+              key={item.ticker}
+              onClick={() => onSelectAsset(item.ticker)}
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -75,7 +75,7 @@ export default function AssetSearch({
             >
               <div>
                 <span className="font-mono" style={{ fontWeight: 700, color: 'var(--accent-color)', marginRight: '0.75rem', fontSize: '0.9rem' }}>
-                  {item.symbol}
+                  {item.ticker}
                 </span>
                 <span style={{ fontSize: '0.82rem', opacity: 0.85 }}>{item.name}</span>
               </div>

@@ -81,12 +81,12 @@ func (s *B3DividendSource) GetDividends(ctx context.Context, ticker string, asse
 }
 
 func (s *B3DividendSource) resolveTradingName(ctx context.Context, ticker string) (string, error) {
-	symbol := strings.TrimSuffix(strings.ToUpper(ticker), ".SA")
+	cleanTicker := strings.TrimSuffix(strings.ToUpper(ticker), ".SA")
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if name, ok := s.tickerNameCache[symbol]; ok {
+	if name, ok := s.tickerNameCache[cleanTicker]; ok {
 		return name, nil
 	}
 
@@ -102,14 +102,14 @@ func (s *B3DividendSource) resolveTradingName(ctx context.Context, ticker string
 	// Let's assume there's a Ticker field in B3RawCompany? Oh wait, B3RawCompany in the plan only had TradingName.
 	// If B3 doesn't return ticker, how do we map it?
 	// Usually B3 search companies endpoint takes an initial letter or something, but we just fetched all.
-	// Let's just return the symbol itself if we can't find a mapping, or use a dummy for now.
+	// Let's just return the ticker itself if we can't find a mapping, or use a dummy for now.
 	// The problem is B3Client's FetchCompanies returns TradingName. Without ticker, we can't map.
-	// For simplicity in this implementation, I will just use the symbol as trading name if B3 doesn't match perfectly.
+	// For simplicity in this implementation, I will just use the ticker as trading name if B3 doesn't match perfectly.
 	// Often in B3 APIs, searching by ticker is possible.
 
-	// I'll just return the symbol directly for now, assuming B3 accepts it or we can't map properly without Ticker in the struct.
+	// I'll just return the ticker directly for now, assuming B3 accepts it or we can't map properly without Ticker in the struct.
 	// B3's web API actually accepts `tradingName: "PETR4"` and returns Petrobras.
-	s.tickerNameCache[symbol] = symbol
+	s.tickerNameCache[cleanTicker] = cleanTicker
 
-	return symbol, nil
+	return cleanTicker, nil
 }

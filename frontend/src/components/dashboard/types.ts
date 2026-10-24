@@ -23,14 +23,14 @@ export interface Watchlist {
 }
 
 export interface SearchResult {
-  symbol: string;
+  ticker: string;
   name: string;
   exchange: string;
   type: string;
 }
 
 export interface Quote {
-  symbol: string;
+  ticker: string;
   name: string;
   price: number;
   change: number;

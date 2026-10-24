@@ -795,7 +795,7 @@ describe('DailyReport Component', () => {
   it('renders market benchmarks bar when benchmarks are provided as prop', () => {
     const mockBenchmarks = {
       ibov: {
-        symbol: '^BVSP',
+        ticker: '^BVSP',
         name: 'Ibovespa',
         value: 130000,
         change: 1000,
@@ -823,7 +823,7 @@ describe('DailyReport Component', () => {
           json: () =>
             Promise.resolve({
               ibov: {
-                symbol: '^BVSP',
+                ticker: '^BVSP',
                 name: 'Ibovespa',
                 value: 130000,
                 change: 500,

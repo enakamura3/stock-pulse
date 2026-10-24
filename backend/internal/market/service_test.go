@@ -18,8 +18,8 @@ type MockQuoteProvider struct {
 	mock.Mock
 }
 
-func (m *MockQuoteProvider) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
-	args := m.Called(ctx, symbol)
+func (m *MockQuoteProvider) GetQuote(ctx context.Context, ticker string) (*Quote, error) {
+	args := m.Called(ctx, ticker)
 	if args.Get(0) != nil {
 		return args.Get(0).(*Quote), args.Error(1)
 	}
@@ -42,16 +42,16 @@ func (m *MockQuoteProvider) GetDividends(ctx context.Context, ticker string, ass
 	return nil, args.Error(1)
 }
 
-func (m *MockQuoteProvider) GetHistoricalPrices(ctx context.Context, symbol string, rangePeriod string) ([]HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, rangePeriod)
+func (m *MockQuoteProvider) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, rangePeriod)
 	if args.Get(0) != nil {
 		return args.Get(0).([]HistoricalPrice), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockQuoteProvider) GetHistoricalPricesBetween(ctx context.Context, symbol string, period1, period2 int64) ([]HistoricalPrice, error) {
-	args := m.Called(ctx, symbol, period1, period2)
+func (m *MockQuoteProvider) GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]HistoricalPrice, error) {
+	args := m.Called(ctx, ticker, period1, period2)
 	if args.Get(0) != nil {
 		return args.Get(0).([]HistoricalPrice), args.Error(1)
 	}
@@ -71,7 +71,7 @@ func setupServiceTest() (*Service, *MockQuoteProvider, *redis.Client, redismock.
 }
 
 func TestService_GetQuote(t *testing.T) {
-	t.Run("Invalid Symbol", func(t *testing.T) {
+	t.Run("Invalid Ticker", func(t *testing.T) {
 		s, _, _, _ := setupServiceTest()
 		_, err := s.GetQuote(context.Background(), "   ")
 		assert.ErrorContains(t, err, "inválido")
@@ -79,7 +79,7 @@ func TestService_GetQuote(t *testing.T) {
 
 	t.Run("Cache Hit", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()
-		q := Quote{Symbol: "AAPL", Price: 150.0}
+		q := Quote{Ticker: "AAPL", Price: 150.0}
 		b, _ := json.Marshal(q)
 
 		rmock.ExpectGet("quote:AAPL").SetVal(string(b))
@@ -105,7 +105,7 @@ func TestService_GetQuote(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
 		rmock.ExpectGet("quote:AAPL").RedisNil()
 
-		q := &Quote{Symbol: "AAPL", Price: 150.0}
+		q := &Quote{Ticker: "AAPL", Price: 150.0}
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(q, nil)
 
 		b, _ := json.Marshal(q)
@@ -121,7 +121,7 @@ func TestService_GetQuote(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
 		rmock.ExpectGet("quote:AAPL").RedisNil()
 
-		q := &Quote{Symbol: "AAPL", Price: 150.0}
+		q := &Quote{Ticker: "AAPL", Price: 150.0}
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(q, nil)
 
 		b, _ := json.Marshal(q)
@@ -137,7 +137,7 @@ func TestService_GetQuote(t *testing.T) {
 		s, mp, _, rmock := setupServiceTest()
 		rmock.ExpectGet("quote:AAPL").SetVal("invalid json")
 
-		q := &Quote{Symbol: "AAPL", Price: 150.0}
+		q := &Quote{Ticker: "AAPL", Price: 150.0}
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(q, nil)
 
 		b, _ := json.Marshal(q)
@@ -160,17 +160,17 @@ func TestService_SearchAssets(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		s, mp, _, _ := setupServiceTest()
-		mp.On("SearchAssets", mock.Anything, "AAPL").Return([]SearchResult{{Symbol: "AAPL"}}, nil)
+		mp.On("SearchAssets", mock.Anything, "AAPL").Return([]SearchResult{{Ticker: "AAPL"}}, nil)
 
 		res, err := s.SearchAssets(context.Background(), "AAPL ")
 		assert.NoError(t, err)
 		assert.Len(t, res, 1)
-		assert.Equal(t, "AAPL", res[0].Symbol)
+		assert.Equal(t, "AAPL", res[0].Ticker)
 	})
 }
 
 func TestService_InvalidateQuoteCache(t *testing.T) {
-	t.Run("Specific Symbols Success", func(t *testing.T) {
+	t.Run("Specific Tickers Success", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()
 		rmock.ExpectDel("quote:PETR4.SA", "quote:VALE3.SA", "benchmarks:summary:v1").SetVal(2)
 
@@ -180,7 +180,7 @@ func TestService_InvalidateQuoteCache(t *testing.T) {
 		assert.NoError(t, rmock.ExpectationsWereMet())
 	})
 
-	t.Run("Specific Symbols Redis Error", func(t *testing.T) {
+	t.Run("Specific Tickers Redis Error", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()
 		rmock.ExpectDel("quote:PETR4.SA", "benchmarks:summary:v1").SetErr(errors.New("redis failure"))
 
@@ -189,7 +189,7 @@ func TestService_InvalidateQuoteCache(t *testing.T) {
 		assert.Equal(t, int64(0), removed)
 	})
 
-	t.Run("All Symbols / Empty Slice Scan", func(t *testing.T) {
+	t.Run("All Tickers / Empty Slice Scan", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()
 		rmock.ExpectDel("benchmarks:summary:v1").SetVal(1)
 		rmock.ExpectScan(0, "quote:*", 100).SetVal([]string{"quote:PETR4.SA", "quote:VALE3.SA"}, 0)
@@ -201,7 +201,7 @@ func TestService_InvalidateQuoteCache(t *testing.T) {
 		assert.NoError(t, rmock.ExpectationsWereMet())
 	})
 
-	t.Run("All Symbols Scan Error", func(t *testing.T) {
+	t.Run("All Tickers Scan Error", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()
 		rmock.ExpectDel("benchmarks:summary:v1").SetVal(1)
 		rmock.ExpectScan(0, "quote:*", 100).SetErr(errors.New("scan error"))
