@@ -192,17 +192,17 @@ func TestHandler_GetBenchmarks(t *testing.T) {
 	})
 }
 
-func (m *MockMarketService) InvalidateQuoteCache(ctx context.Context, symbols []string) (int64, error) {
-	args := m.Called(ctx, symbols)
+func (m *MockMarketService) InvalidateQuoteCache(ctx context.Context, tickers []string) (int64, error) {
+	args := m.Called(ctx, tickers)
 	return args.Get(0).(int64), args.Error(1)
 }
 
 func TestHandler_InvalidateCache(t *testing.T) {
-	t.Run("Success with Specific Symbols", func(t *testing.T) {
+	t.Run("Success with Specific Tickers", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("InvalidateQuoteCache", mock.Anything, []string{"PETR4.SA", "VALE3.SA"}).Return(int64(2), nil)
 
-		body := `{"symbols":["PETR4.SA", " VALE3.SA ", ""]}`
+		body := `{"tickers":["PETR4.SA", " VALE3.SA ", ""]}`
 		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 		h.InvalidateCache(rec, req)
@@ -229,44 +229,44 @@ func TestHandler_InvalidateCache(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), `"removed":15`)
 	})
 
-	t.Run("Error when Symbols Empty and Non-Admin", func(t *testing.T) {
+	t.Run("Error when Tickers Empty and Non-Admin", func(t *testing.T) {
 		origKey := config.Envs.AdminAPIKey
 		config.Envs.AdminAPIKey = "secret-admin-key"
 		defer func() { config.Envs.AdminAPIKey = origKey }()
 
 		h, _ := setupHandlerTest()
 
-		// Sem corpo / symbols vazio
-		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(`{"symbols":["  "]}`))
+		// Sem corpo / tickers vazio
+		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(`{"tickers":["  "]}`))
 		rec := httptest.NewRecorder()
 		h.InvalidateCache(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "symbols é obrigatório e deve conter entre 1 e 20 ativos")
+		assert.Contains(t, rec.Body.String(), "tickers é obrigatório e deve conter entre 1 e 20 ativos")
 	})
 
-	t.Run("Error when Symbols Exceeds 20", func(t *testing.T) {
+	t.Run("Error when Tickers Exceeds 20", func(t *testing.T) {
 		h, _ := setupHandlerTest()
 
-		var symbols []string
+		var tickers []string
 		for i := 1; i <= 21; i++ {
-			symbols = append(symbols, fmt.Sprintf("SYM%d", i))
+			tickers = append(tickers, fmt.Sprintf("SYM%d", i))
 		}
-		body := fmt.Sprintf(`{"symbols":["%s"]}`, strings.Join(symbols, `","`))
+		body := fmt.Sprintf(`{"tickers":["%s"]}`, strings.Join(tickers, `","`))
 
 		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 		h.InvalidateCache(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "máximo de 20 símbolos permitidos por requisição")
+		assert.Contains(t, rec.Body.String(), "máximo de 20 tickers permitidos por requisição")
 	})
 
 	t.Run("Service Error", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("InvalidateQuoteCache", mock.Anything, []string{"PETR4"}).Return(int64(0), errors.New("redis down"))
 
-		body := `{"symbols":["PETR4"]}`
+		body := `{"tickers":["PETR4"]}`
 		req := httptest.NewRequest("POST", "/market/quotes/invalidate", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 		h.InvalidateCache(rec, req)

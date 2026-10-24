@@ -446,7 +446,7 @@ describe('PortfolioPage Contextual Filters', () => {
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith('/market/quotes/invalidate', {
         method: 'POST',
-        body: JSON.stringify({ symbols: ['PETR4'] }),
+        body: JSON.stringify({ tickers: ['PETR4'] }),
       });
       expect(mockLoadPortfolioDetails).toHaveBeenCalledTimes(2);
     });

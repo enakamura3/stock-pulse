@@ -17,7 +17,7 @@ type MarketService interface {
 	GetQuoteWithCacheStatus(ctx context.Context, symbol string) (*Quote, bool, error)
 	SearchAssets(ctx context.Context, query string) ([]SearchResult, error)
 	GetBenchmarks(ctx context.Context) (*MarketBenchmarks, error)
-	InvalidateQuoteCache(ctx context.Context, symbols []string) (int64, error)
+	InvalidateQuoteCache(ctx context.Context, tickers []string) (int64, error)
 }
 
 // Handler expõe os endpoints HTTP para busca e cotação.
@@ -83,7 +83,7 @@ func (h *Handler) GetBenchmarks(w http.ResponseWriter, r *http.Request) {
 
 // InvalidateCacheRequest representa a requisição para invalidar o cache de cotações.
 type InvalidateCacheRequest struct {
-	Symbols []string `json:"symbols"`
+	Tickers []string `json:"tickers"`
 }
 
 // InvalidateCacheResponse representa a resposta da invalidação de cache.
@@ -99,26 +99,26 @@ func (h *Handler) InvalidateCache(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 	}
 
-	var cleanedSymbols []string
-	for _, s := range req.Symbols {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			cleanedSymbols = append(cleanedSymbols, s)
+	var cleanedTickers []string
+	for _, t := range req.Tickers {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			cleanedTickers = append(cleanedTickers, t)
 		}
 	}
 
 	isAdmin := config.Envs.AdminAPIKey != "" && r.Header.Get("X-Admin-Key") == config.Envs.AdminAPIKey
-	if len(cleanedSymbols) == 0 && !isAdmin {
-		httputils.RespondWithError(w, http.StatusBadRequest, "symbols é obrigatório e deve conter entre 1 e 20 ativos")
+	if len(cleanedTickers) == 0 && !isAdmin {
+		httputils.RespondWithError(w, http.StatusBadRequest, "tickers é obrigatório e deve conter entre 1 e 20 ativos")
 		return
 	}
 
-	if len(cleanedSymbols) > 20 {
-		httputils.RespondWithError(w, http.StatusBadRequest, "máximo de 20 símbolos permitidos por requisição")
+	if len(cleanedTickers) > 20 {
+		httputils.RespondWithError(w, http.StatusBadRequest, "máximo de 20 tickers permitidos por requisição")
 		return
 	}
 
-	removed, err := h.service.InvalidateQuoteCache(r.Context(), cleanedSymbols)
+	removed, err := h.service.InvalidateQuoteCache(r.Context(), cleanedTickers)
 	if err != nil {
 		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao invalidar cache de cotações")
 		return

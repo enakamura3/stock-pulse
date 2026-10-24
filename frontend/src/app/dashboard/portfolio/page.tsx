@@ -425,7 +425,7 @@ function PortfolioContent() {
                       if (tickers.length > 0) {
                         await apiFetch('/market/quotes/invalidate', {
                           method: 'POST',
-                          body: JSON.stringify({ symbols: tickers.slice(0, 20) }),
+                          body: JSON.stringify({ tickers: tickers.slice(0, 20) }),
                         });
                       }
                     } catch {}

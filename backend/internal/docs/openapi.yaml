@@ -368,7 +368,7 @@ paths:
   /market/quotes/invalidate:
     post:
       summary: Invalidar chaves de cache de cotações no Redis
-      description: Invalida o cache de até 20 símbolos por requisição. Usuários normais devem fornecer `symbols` obrigatoriamente. Acesso sujeito a rate limit de 5 requisições/minuto.
+      description: Invalida o cache de até 20 tickers por requisição. Usuários normais devem fornecer `tickers` obrigatoriamente. Acesso sujeito a rate limit de 5 requisições/minuto.
       tags:
         - Dados de Mercado
       security:
@@ -379,14 +379,14 @@ paths:
           schema:
             type: string
           required: false
-          description: Chave administrativa opcional que permite invalidação global sem especificar símbolos.
+          description: Chave administrativa opcional que permite invalidação global sem especificar tickers.
       requestBody:
         content:
           application/json:
             schema:
               type: object
               properties:
-                symbols:
+                tickers:
                   type: array
                   items:
                     type: string
@@ -395,7 +395,7 @@ paths:
         '200':
           description: Cache de cotações invalidado com sucesso
         '400':
-          description: Parâmetros inválidos (ex. symbols vazio ou mais de 20 tickers)
+          description: Parâmetros inválidos (ex. tickers vazio ou mais de 20 tickers)
         '429':
           description: Muitas requisições. Rate limit excedido.
 
