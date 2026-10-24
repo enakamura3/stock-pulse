@@ -431,36 +431,31 @@ func TestHub_AdditionalEdgeCases(t *testing.T) {
 }
 
 func TestClient_WritePump_BatchedMessages(t *testing.T) {
-	ms := new(MockMarketService)
-	hub := NewHub(ms)
-	handler := NewHandler(hub)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(context.WithValue(r.Context(), auth.UserIDKey, "batch_user"))
-		handler.ServeWS(w, r)
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		client := NewClient(NewHub(nil), conn, "batch_user")
+		// Enfileira 3 mensagens antes de iniciar WritePump para garantir deterministicamente len(c.Send) > 0
+		client.Send <- []byte("msg1")
+		client.Send <- []byte("msg2")
+		client.Send <- []byte("msg3")
+		close(client.Send)
+		client.WritePump()
 	}))
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-	ws, _, err := websocket.DefaultDialer.Dial(wsURL, http.Header{"Origin": []string{"http://localhost:3000"}})
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	assert.NoError(t, err)
 	defer ws.Close()
 
-	time.Sleep(20 * time.Millisecond)
-	hub.mu.RLock()
-	var testClient *Client
-	for c := range hub.clients {
-		testClient = c
-		break
-	}
-	hub.mu.RUnlock()
-
-	if testClient != nil {
-		testClient.Send <- []byte("msg1")
-		testClient.Send <- []byte("msg2")
-		testClient.Send <- []byte("msg3")
-	}
-
-	time.Sleep(50 * time.Millisecond)
+	_ = ws.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_, p, err := ws.ReadMessage()
+	assert.NoError(t, err)
+	assert.Equal(t, "msg1\nmsg2\nmsg3", string(p))
 }
 
 func TestHub_BroadcastQuotes_ChannelFull(t *testing.T) {
