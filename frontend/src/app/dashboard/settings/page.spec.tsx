@@ -545,7 +545,7 @@ describe('SettingsPage', () => {
       await Promise.resolve();
     });
 
-    expect(mockOpen).toHaveBeenCalledWith('https://t.me/CustomBot?start=auth-token-123', '_blank');
+    expect(mockOpen).toHaveBeenCalledWith('https://t.me/CustomBot?start=auth-token-123', '_blank', 'noopener,noreferrer');
 
     // Run 1 interval tick
     await act(async () => {

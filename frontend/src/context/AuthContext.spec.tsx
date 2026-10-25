@@ -9,12 +9,16 @@ global.fetch = vi.fn();
 
 // Mock do useRouter do Next.js
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
+let mockCurrentPath = '';
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
-    replace: vi.fn(),
+    replace: mockReplace,
     prefetch: vi.fn(),
-  })
+  }),
+  usePathname: () => mockCurrentPath,
 }));
 
 // Componente de Teste Consumidor
@@ -49,9 +53,10 @@ const TestComponent = () => {
 describe('AuthContext', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mockCurrentPath = '';
     // Previne que window.location altere durante testes (evita erros do jsdom)
     delete (window as any).location;
-    window.location = { href: '' } as any;
+    window.location = { href: '', pathname: '' } as any;
   });
 
   it('deve falhar e exibir loading falso se /auth/me falhar (Sem Sessão Inicial)', async () => {
@@ -356,5 +361,54 @@ describe('AuthContext', () => {
     });
     
     errorSpy.mockRestore();
+  });
+
+  it('deve redirecionar para /login se não autenticado em rota /dashboard via usePathname', async () => {
+    mockCurrentPath = '/dashboard/portfolio';
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 401 });
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 401 });
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  it('deve redirecionar para /login se não autenticado em rota /dashboard via window.location.pathname quando usePathname for vazio', async () => {
+    mockCurrentPath = '';
+    window.location.pathname = '/dashboard/alerts';
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 400 });
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  it('não deve redirecionar para /login se não autenticado mas em rota pública como / ou /login', async () => {
+    mockCurrentPath = '/login';
+    window.location.pathname = '/login';
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 400 });
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('Not Auth');
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });
