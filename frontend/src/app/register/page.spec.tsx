@@ -44,13 +44,19 @@ describe('RegisterPage', () => {
 
     fireEvent.change(nameInput, { target: { value: 'Test' } });
     fireEvent.change(emailInput, { target: { value: 'test@test.com' } });
-    fireEvent.change(passwordInput, { target: { value: '123' } });
+    fireEvent.change(passwordInput, { target: { value: '1234567' } });
     
     // Use submit on the form or just click since fields are filled
     fireEvent.click(submitBtn);
 
     expect(registerMock).not.toHaveBeenCalled();
-    expect(await screen.findByText('A senha deve conter pelo menos 6 caracteres.')).toBeInTheDocument();
+    expect(await screen.findByText('A senha deve conter pelo menos 8 caracteres.')).toBeInTheDocument();
+
+    // Test exceeding 128 chars
+    fireEvent.change(passwordInput, { target: { value: 'a'.repeat(129) } });
+    fireEvent.click(submitBtn);
+    expect(registerMock).not.toHaveBeenCalled();
+    expect(await screen.findByText('A senha deve conter no máximo 128 caracteres.')).toBeInTheDocument();
   });
 
   it('handles register error', async () => {

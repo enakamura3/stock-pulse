@@ -61,6 +61,8 @@ paths:
                 password:
                   type: string
                   format: password
+                  minLength: 8
+                  maxLength: 128
                   example: SenhaSegura123
                 name:
                   type: string
@@ -106,6 +108,8 @@ paths:
                 password:
                   type: string
                   format: password
+                  minLength: 8
+                  maxLength: 128
                   example: SenhaSegura123
       responses:
         '200':
@@ -243,6 +247,8 @@ paths:
                 new_password:
                   type: string
                   format: password
+                  minLength: 8
+                  maxLength: 128
                   example: NovaSenhaForte456
       responses:
         '200':

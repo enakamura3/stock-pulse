@@ -534,7 +534,8 @@ export default function SettingsPage() {
                   <input 
                     type="password" 
                     className="form-input font-mono" 
-                    placeholder="Mínimo 6 caracteres" 
+                    placeholder="Mínimo 8 caracteres" 
+                    maxLength={128}
                     value={newPassword} 
                     onChange={(e) => setNewPassword(e.target.value)} 
                     required 

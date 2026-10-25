@@ -19,10 +19,12 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// Constantes de validação JWT (Issuer e Audience)
+// Constantes de validação JWT (Issuer e Audience) e política de senha
 const (
-	JWTIssuer   = "stock-pulse-api"
-	JWTAudience = "stock-pulse-client"
+	JWTIssuer         = "stock-pulse-api"
+	JWTAudience       = "stock-pulse-client"
+	MinPasswordLength = 8
+	MaxPasswordLength = 128
 )
 
 // UserRepository define as operações de banco de dados para a entidade de usuário.
@@ -183,6 +185,10 @@ var randReader io.Reader = rand.Reader
 // argon2Semaphore limita a concorrência de derivação Argon2id a no máximo 8 hashes simultâneos (8 * 64 MB = ~512 MB).
 var argon2Semaphore = make(chan struct{}, 8)
 
+// dummyPasswordHash é um hash Argon2id válido pré-computado com os mesmos parâmetros (m=65536,t=1,p=4)
+// usado quando um e-mail não existe no Login, equalizando o tempo de resposta e prevenindo enumeração por timing.
+const dummyPasswordHash = "$argon2id$v=19$m=65536,t=1,p=4$MDEyMzQ1Njc4OWFiY2RlZg$MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
+
 // loginEmailRateLimitScript executa incremento atômico e define TTL de 15 minutos para rate limiting por e-mail.
 var loginEmailRateLimitScript = redis.NewScript(`
 local current = redis.call('INCR', KEYS[1])
@@ -259,8 +265,11 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (*
 	if email == "" || name == "" {
 		return nil, errors.New("todos os campos são obrigatórios")
 	}
-	if len(password) < 6 {
-		return nil, errors.New("a senha deve ter no mínimo 6 caracteres")
+	if len(password) < MinPasswordLength {
+		return nil, errors.New("a senha deve ter no mínimo 8 caracteres")
+	}
+	if len(password) > MaxPasswordLength {
+		return nil, errors.New("a senha deve ter no máximo 128 caracteres")
 	}
 
 	// Verifica duplicidade no banco
@@ -298,6 +307,8 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
+		// Executa derivação Argon2id contra dummyPasswordHash para igualar o tempo de resposta e mitigar timing attack
+		_, _ = comparePasswordAndHash(password, dummyPasswordHash)
 		return nil, "", "", errors.New("e-mail ou senha incorretos")
 	}
 
@@ -528,8 +539,11 @@ func (s *Service) UpdateProfile(ctx context.Context, id, name, email string) (*U
 
 // UpdatePassword valida a senha atual, define a nova senha e revoga todas as sessões ativas do usuário.
 func (s *Service) UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error {
-	if len(newPassword) < 6 {
-		return errors.New("a nova senha deve ter no mínimo 6 caracteres")
+	if len(newPassword) < MinPasswordLength {
+		return errors.New("a nova senha deve ter no mínimo 8 caracteres")
+	}
+	if len(newPassword) > MaxPasswordLength {
+		return errors.New("a nova senha deve ter no máximo 128 caracteres")
 	}
 
 	user, err := s.repo.GetUserByIDWithHash(ctx, id)

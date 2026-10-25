@@ -88,8 +88,18 @@ func TestService_Register(t *testing.T) {
 
 	t.Run("Short password", func(t *testing.T) {
 		s, _, _ := setupService()
-		_, err := s.Register(context.Background(), "test", "test@test.com", "123")
-		assert.EqualError(t, err, "a senha deve ter no mínimo 6 caracteres")
+		_, err := s.Register(context.Background(), "test", "test@test.com", "1234567")
+		assert.EqualError(t, err, "a senha deve ter no mínimo 8 caracteres")
+	})
+
+	t.Run("Password exceeds max length", func(t *testing.T) {
+		s, _, _ := setupService()
+		longPwd := make([]byte, 129)
+		for i := range longPwd {
+			longPwd[i] = 'a'
+		}
+		_, err := s.Register(context.Background(), "test", "test@test.com", string(longPwd))
+		assert.EqualError(t, err, "a senha deve ter no máximo 128 caracteres")
 	})
 
 	t.Run("Email already registered", func(t *testing.T) {
@@ -552,8 +562,18 @@ func TestService_UpdateProfile(t *testing.T) {
 func TestService_UpdatePassword(t *testing.T) {
 	t.Run("Short new password", func(t *testing.T) {
 		s, _, _ := setupService()
-		err := s.UpdatePassword(context.Background(), "1", "old", "123")
-		assert.EqualError(t, err, "a nova senha deve ter no mínimo 6 caracteres")
+		err := s.UpdatePassword(context.Background(), "1", "old", "1234567")
+		assert.EqualError(t, err, "a nova senha deve ter no mínimo 8 caracteres")
+	})
+
+	t.Run("New password exceeds max length", func(t *testing.T) {
+		s, _, _ := setupService()
+		longPwd := make([]byte, 129)
+		for i := range longPwd {
+			longPwd[i] = 'a'
+		}
+		err := s.UpdatePassword(context.Background(), "1", "old", string(longPwd))
+		assert.EqualError(t, err, "a nova senha deve ter no máximo 128 caracteres")
 	})
 
 	t.Run("User not found", func(t *testing.T) {
