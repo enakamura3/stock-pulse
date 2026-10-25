@@ -7,6 +7,8 @@ global.fetch = vi.fn();
 describe('apiFetch Wrapper', () => {
   beforeEach(() => {
     (global.fetch as any).mockClear();
+    delete (window as any).location;
+    window.location = { href: '', pathname: '' } as any;
   });
 
   it('deve injetar credentials e Content-Type: application/json corretamente', async () => {
@@ -86,7 +88,7 @@ describe('apiFetch Wrapper', () => {
     expect((global.fetch as any).mock.calls[1][1].method).toBe('POST');
   });
 
-  it('deve lançar erro se o refresh também falhar (sessão expirada)', async () => {
+  it('deve lançar erro se o refresh também falhar (sessão expirada) e redirecionar para /login', async () => {
     // 1ª chamada: 401
     (global.fetch as any).mockResolvedValueOnce({
       ok: false,
@@ -100,6 +102,37 @@ describe('apiFetch Wrapper', () => {
 
     await expect(apiFetch('/protected')).rejects.toThrow('Sessão expirada');
     expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(window.location.href).toBe('/login');
+  });
+
+  it('não deve redirecionar para /login se o refresh falhar em /auth/me', async () => {
+    // 1ª chamada: 401 em /auth/me
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+    });
+    // 2ª chamada: refresh falha
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+    });
+
+    await expect(apiFetch('/auth/me')).rejects.toThrow('Sessão expirada');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(window.location.href).toBe('');
+  });
+
+  it('não deve tentar refresh para rotas de auth (/auth/login, /auth/register, /auth/refresh, /auth/logout) e deve retornar a Response', async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'Credenciais inválidas' }),
+    });
+
+    const res = await apiFetch('/auth/login', { method: 'POST' });
+    expect(res.status).toBe(401);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(window.location.href).toBe('');
   });
 
   it('deve construir URL absoluta a partir de path relativo', async () => {

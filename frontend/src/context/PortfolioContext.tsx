@@ -434,7 +434,11 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         const botUsername = data.bot_username || 'StockPulseBot';
-        window.open(`https://t.me/${botUsername}?start=${data.token}`, '_blank');
+        window.open(
+          `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(data.token)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
       } else {
         alert('Erro ao gerar link do Telegram.');
       }

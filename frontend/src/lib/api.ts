@@ -3,6 +3,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
+function isAuthActionRoute(path: string, url: string): boolean {
+  const routes = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
+  return routes.some((route) => path.includes(route) || url.includes(route));
+}
+
+function isAuthMeRoute(path: string, url: string): boolean {
+  return path.includes('/auth/me') || url.includes('/auth/me');
+}
+
 /**
  * apiFetch é um wrapper sobre o fetch() nativo.
  * Ele automaticamente injeta credentials para cookies e intercepta erros HTTP (incluindo 401).
@@ -25,20 +34,17 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
 
   let res = await fetch(url, config);
 
-  // Interceptação global de 401 Unauthorized (exceto nas próprias rotas de ação de autenticação)
-  const isAuthActionRoute =
-    path.startsWith('/auth/login') ||
-    path.startsWith('/auth/register') ||
-    path.startsWith('/auth/refresh') ||
-    path.startsWith('/auth/logout');
-
-  if (res.status === 401 && !isAuthActionRoute) {
+  // Interceptação global de 401 Unauthorized (exceto nas rotas de ação de autenticação)
+  if (res.status === 401 && !isAuthActionRoute(path, url)) {
     const refreshSuccess = await attemptRefresh();
     if (refreshSuccess) {
       // Re-tenta a requisição original se o refresh deu certo
       res = await fetch(url, config);
     } else {
-      // Se refresh falhou, derruba a sessão localmente e redireciona (opcional)
+      // Se refresh falhou, redireciona para login (exceto em /auth/me) e derruba a sessão localmente
+      if (!isAuthMeRoute(path, url) && typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
       throw new Error('Sessão expirada');
     }
   }

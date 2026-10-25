@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 
 export interface User {
@@ -26,6 +27,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Busca perfil do usuário logado na inicialização para restaurar sessão ativa
   const fetchMe = async (): Promise<boolean> => {
@@ -59,6 +62,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     initAuth();
   }, []);
+
+  // Redireciona para /login se não autenticado em rotas protegidas do dashboard
+  useEffect(() => {
+    if (!isLoading && !user) {
+      const currentPath = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+      if (currentPath.startsWith('/dashboard')) {
+        router.replace('/login');
+      }
+    }
+  }, [isLoading, user, pathname, router]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);

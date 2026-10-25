@@ -328,7 +328,11 @@ export default function SettingsPage() {
       if (res.ok) {
         const data = await res.json();
         const botUsername = data.bot_username || 'StockPulseBot';
-        window.open(`https://t.me/${botUsername}?start=${data.token}`, '_blank');
+        window.open(
+          `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(data.token)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
         
         // Polling rápido para atualizar o status do telegram
         let attempts = 0;

@@ -387,7 +387,7 @@ describe('PortfolioContext', () => {
       await context.handleLinkTelegram();
     });
 
-    expect(window.open).toHaveBeenCalledWith('https://t.me/StockBot?start=token123', '_blank');
+    expect(window.open).toHaveBeenCalledWith('https://t.me/StockBot?start=token123', '_blank', 'noopener,noreferrer');
 
     // Failure branch
     (apiFetch as any).mockResolvedValueOnce({ ok: false });
