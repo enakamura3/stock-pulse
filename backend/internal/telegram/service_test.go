@@ -16,6 +16,12 @@ type MockRepository struct {
 	mock.Mock
 }
 
+type errReader struct{}
+
+func (e *errReader) Read(p []byte) (n int, err error) {
+	return 0, assert.AnError
+}
+
 func (m *MockRepository) LinkAccount(ctx context.Context, userID uuid.UUID, chatID int64) error {
 	return m.Called(ctx, userID, chatID).Error(0)
 }
@@ -49,17 +55,29 @@ func setupServiceTest(t *testing.T) (*service, *MockRepository, *miniredis.Minir
 }
 
 func TestService_GenerateLinkToken(t *testing.T) {
-	svc, _, mr, _ := setupServiceTest(t)
+	t.Run("success", func(t *testing.T) {
+		svc, _, mr, _ := setupServiceTest(t)
 
-	uID := uuid.New()
-	token, err := svc.GenerateLinkToken(context.Background(), uID)
+		uID := uuid.New()
+		token, err := svc.GenerateLinkToken(context.Background(), uID)
 
-	assert.NoError(t, err)
-	assert.NotEmpty(t, token)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, token)
 
-	val, err := mr.Get("telegram_link:" + token)
-	assert.NoError(t, err)
-	assert.Equal(t, uID.String(), val)
+		val, err := mr.Get("telegram_link:" + token)
+		assert.NoError(t, err)
+		assert.Equal(t, uID.String(), val)
+	})
+
+	t.Run("rand read error", func(t *testing.T) {
+		svc, _, _, _ := setupServiceTest(t)
+		oldReader := randReader
+		defer func() { randReader = oldReader }()
+		randReader = &errReader{}
+
+		_, err := svc.GenerateLinkToken(context.Background(), uuid.New())
+		assert.ErrorContains(t, err, "failed to generate secure random token")
+	})
 }
 
 func TestService_LinkAccountWithToken(t *testing.T) {
@@ -91,7 +109,7 @@ func TestService_LinkAccountWithToken(t *testing.T) {
 		assert.ErrorContains(t, err, "invalid user id")
 	})
 
-	t.Run("db error", func(t *testing.T) {
+	t.Run("db error restores token in redis", func(t *testing.T) {
 		svc, repo, mr, _ := setupServiceTest(t)
 		uID := uuid.New()
 		mr.Set("telegram_link:mytoken3", uID.String())
@@ -100,6 +118,29 @@ func TestService_LinkAccountWithToken(t *testing.T) {
 
 		err := svc.LinkAccountWithToken(context.Background(), "mytoken3", 12345)
 		assert.ErrorContains(t, err, "failed to link account in db")
+
+		// Token must be restored in Redis for resilience
+		exists := mr.Exists("telegram_link:mytoken3")
+		assert.True(t, exists)
+		val, err := mr.Get("telegram_link:mytoken3")
+		assert.NoError(t, err)
+		assert.Equal(t, uID.String(), val)
+	})
+
+	t.Run("atomic consumption prevents double use", func(t *testing.T) {
+		svc, repo, mr, _ := setupServiceTest(t)
+		uID := uuid.New()
+		mr.Set("telegram_link:atomictok", uID.String())
+
+		repo.On("LinkAccount", mock.Anything, uID, int64(12345)).Return(nil).Once()
+
+		// 1ª chamada consome com sucesso
+		err := svc.LinkAccountWithToken(context.Background(), "atomictok", 12345)
+		assert.NoError(t, err)
+
+		// 2ª chamada concorrente/repetida falha imediatamente porque a chave foi deletada atomicamente
+		err2 := svc.LinkAccountWithToken(context.Background(), "atomictok", 67890)
+		assert.ErrorContains(t, err2, "token inválido ou expirado")
 	})
 }
 
@@ -189,7 +230,7 @@ func TestService_RedisErrors(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to get active portfolio")
 
 	err = svc.LinkAccountWithToken(context.Background(), "token", 111)
-	assert.ErrorContains(t, err, "failed to get token")
+	assert.ErrorContains(t, err, "failed to get and delete token from redis")
 }
 
 func TestService_EdgeCases(t *testing.T) {
