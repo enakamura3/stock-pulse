@@ -440,7 +440,7 @@ describe('SettingsPage', () => {
     );
 
     const currentPwdInput = screen.getByPlaceholderText('••••••••');
-    const newPwdInput = screen.getByPlaceholderText('Mínimo 6 caracteres');
+    const newPwdInput = screen.getByPlaceholderText('Mínimo 8 caracteres');
     const confirmPwdInput = screen.getByPlaceholderText('Repita a nova senha');
     const changePwdBtn = screen.getByRole('button', { name: 'Alterar Senha' });
 

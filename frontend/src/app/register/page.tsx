@@ -16,8 +16,13 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError('A senha deve conter pelo menos 6 caracteres.');
+    if (password.length < 8) {
+      setError('A senha deve conter pelo menos 8 caracteres.');
+      return;
+    }
+
+    if (password.length > 128) {
+      setError('A senha deve conter no máximo 128 caracteres.');
       return;
     }
 
@@ -76,7 +81,8 @@ export default function RegisterPage() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo de 6 caracteres"
+              placeholder="Mínimo de 8 caracteres"
+              maxLength={128}
               required
               disabled={isSubmitting}
             />
