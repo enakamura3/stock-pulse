@@ -6,11 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
+
+var randReader io.Reader = rand.Reader
 
 type ConversationState struct {
 	Step        string  `json:"step"`
@@ -49,7 +52,9 @@ func NewService(repo Repository, rdb *redis.Client) Service {
 
 func (s *service) GenerateLinkToken(ctx context.Context, userID uuid.UUID) (string, error) {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	if _, err := io.ReadFull(randReader, bytes); err != nil {
+		return "", fmt.Errorf("failed to generate secure random token: %w", err)
+	}
 	token := hex.EncodeToString(bytes)
 
 	err := s.redis.Set(ctx, "telegram_link:"+token, userID.String(), 10*time.Minute).Err()
@@ -61,12 +66,13 @@ func (s *service) GenerateLinkToken(ctx context.Context, userID uuid.UUID) (stri
 }
 
 func (s *service) LinkAccountWithToken(ctx context.Context, token string, chatID int64) error {
-	userIDStr, err := s.redis.Get(ctx, "telegram_link:"+token).Result()
+	key := "telegram_link:" + token
+	userIDStr, err := s.redis.GetDel(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return fmt.Errorf("token inválido ou expirado")
 		}
-		return fmt.Errorf("failed to get token from redis: %w", err)
+		return fmt.Errorf("failed to get and delete token from redis: %w", err)
 	}
 
 	userID, err := uuid.Parse(userIDStr)
@@ -76,11 +82,10 @@ func (s *service) LinkAccountWithToken(ctx context.Context, token string, chatID
 
 	err = s.repo.LinkAccount(ctx, userID, chatID)
 	if err != nil {
+		// Se falhar no banco, restaura o token no Redis para que o usuário não perca a tentativa
+		_ = s.redis.Set(ctx, key, userIDStr, 10*time.Minute).Err()
 		return fmt.Errorf("failed to link account in db: %w", err)
 	}
-
-	// Invalida o token após uso com sucesso
-	s.redis.Del(ctx, "telegram_link:"+token)
 
 	return nil
 }
