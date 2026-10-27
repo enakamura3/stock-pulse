@@ -54,7 +54,7 @@ services:
     ports: !reset []
 
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:0.3
     container_name: stock-pulse-docker-proxy
     restart: unless-stopped
     environment:

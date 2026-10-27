@@ -9,6 +9,7 @@ import (
 type Environment struct {
 	DBURL                 string
 	RedisURL              string
+	RedisPassword         string
 	JWTSecret             string
 	FrontendURL           string
 	TelegramBotToken      string
@@ -33,6 +34,7 @@ func Load() error {
 	Envs = Environment{
 		DBURL:              os.Getenv("DB_URL"),
 		RedisURL:           os.Getenv("REDIS_URL"),
+		RedisPassword:      os.Getenv("REDIS_PASSWORD"),
 		JWTSecret:          os.Getenv("JWT_SECRET"),
 		FrontendURL:        os.Getenv("FRONTEND_URL"),
 		TelegramBotToken:   os.Getenv("TELEGRAM_BOT_TOKEN"),
