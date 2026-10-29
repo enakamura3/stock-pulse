@@ -4,12 +4,17 @@ set -e
 echo "🔧 Criando o banco de testes (stockpulse_test) dentro do container do Postgres já existente..."
 source .env 2>/dev/null || true
 PG_USER=${POSTGRES_USER:-root}
+PG_PASS=${POSTGRES_PASSWORD:-secretpassword}
+E2E_JWT_SECRET=${JWT_SECRET:-super_secret_test_key_1234567890123456}
 
 # Cria a base de dados ignorando o erro se ela já existir
 docker exec stock-pulse-db psql -U $PG_USER -d postgres -c "CREATE DATABASE stockpulse_test;" || echo "Banco de testes já existe, prosseguindo..."
 
 echo "🚀 Trocando a conexão do Backend e rodando as migrações no banco de testes..."
-docker compose --env-file .env.e2e up -d
+DB_URL="postgres://${PG_USER}:${PG_PASS}@db:5432/stockpulse_test?sslmode=disable" \
+JWT_SECRET="${E2E_JWT_SECRET}" \
+MOCK_EXTERNAL_APIS="true" \
+docker compose up -d backend migrate
 
 echo "⏳ Aguardando os serviços reiniciarem e recompilarem (pode levar alguns segundos)..."
 until curl -s http://localhost:8080/healthz > /dev/null; do

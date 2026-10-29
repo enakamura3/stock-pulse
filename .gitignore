@@ -1,6 +1,7 @@
 # Ambiente
 .env
 .env.local
+.env.e2e
 
 # Node / Next.js (Frontend)
 node_modules/

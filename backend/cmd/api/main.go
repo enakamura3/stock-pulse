@@ -72,7 +72,8 @@ func main() {
 		redisURL = "localhost:6379" // Fallback local de dev
 	}
 	rdb := redis.NewClient(&redis.Options{
-		Addr: redisURL,
+		Addr:     redisURL,
+		Password: config.Envs.RedisPassword,
 	})
 	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer redisCancel()
