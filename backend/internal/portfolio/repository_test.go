@@ -215,7 +215,7 @@ func TestRepository_GetTransactionsByPortfolioID(t *testing.T) {
 		"id", "portfolio_id", "asset_id", "type", "quantity", "unit_price", "total_cost", "fee", "exchange_rate", "executed_at", "created_at",
 		"ticker", "name", "asset_type", "currency",
 	}).
-		AddRow("tx1", "p1", "a1", "BUY", 10.0, 150.0, 1500.0, 0.0, 1.0, now, now, "AAPL", "Apple", "EQUITY_US", "USD")
+		AddRow("tx1", "p1", "a1", "BUY", 10.0, 150.0, 1500.0, 0.0, 1.0, now, now, "AAPL", "Apple", "STOCK_US", "USD")
 
 	mock.ExpectQuery(`SELECT t.id`).
 		WithArgs("p1", "u1").
@@ -273,10 +273,10 @@ func TestRepository_CreateAsset(t *testing.T) {
 
 	rows := pgxmock.NewRows([]string{"id"}).AddRow("a1")
 	mock.ExpectQuery(`INSERT INTO asset`).
-		WithArgs("AAPL", "Apple", "EQUITY_US", "USD").
+		WithArgs("AAPL", "Apple", "STOCK_US", "USD").
 		WillReturnRows(rows)
 
-	id, err := repo.CreateAsset(context.Background(), "AAPL", "Apple", "EQUITY_US", "USD")
+	id, err := repo.CreateAsset(context.Background(), "AAPL", "Apple", "STOCK_US", "USD")
 	assert.NoError(t, err)
 	assert.Equal(t, "a1", id)
 }
@@ -404,7 +404,7 @@ func TestRepository_Errors(t *testing.T) {
 	assert.Error(t, err)
 
 	mock.ExpectQuery(`INSERT INTO asset`).WillReturnError(errors.New("err"))
-	_, err = repo.CreateAsset(context.Background(), "AAPL", "Apple", "EQUITY_US", "USD")
+	_, err = repo.CreateAsset(context.Background(), "AAPL", "Apple", "STOCK_US", "USD")
 	assert.Error(t, err)
 
 	mock.ExpectQuery(`SELECT id, ticker, currency FROM asset`).WillReturnError(errors.New("err"))

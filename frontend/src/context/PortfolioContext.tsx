@@ -415,8 +415,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       const metaRes = await apiFetch(`/assets/${encodeURIComponent(ticker)}`, { cache: 'no-store' });
       if (metaRes.ok) {
         const meta = await metaRes.json();
-        if (meta.asset_type) {
-          setTxAssetType(meta.asset_type);
+        const validTypes = ['STOCK_BR', 'FII', 'FIAGRO', 'ETF_BR', 'BDR', 'STOCK_US', 'ETF_US', 'CRYPTO'];
+        if (meta.asset_type && validTypes.includes(meta.asset_type.toUpperCase())) {
+          setTxAssetType(meta.asset_type.toUpperCase());
           return;
         }
       }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
@@ -138,12 +139,7 @@ func (s *Service) AddAssetToWatchlist(ctx context.Context, watchlistID, userID, 
 		}
 
 		// Passo 3: Cria o ativo localmente salvando Ticker, Nome, Tipo e Moeda
-		assetType := "EQUITY" // Padrão genérico se desconhecido
-		if quote.Currency == "USD" && !strings.Contains(ticker, ".") {
-			assetType = "EQUITY_US"
-		} else if strings.Contains(ticker, "-") {
-			assetType = "CRYPTO"
-		}
+		assetType := calculator.DetermineAssetType(ticker, quote.Name, quote.Currency)
 
 		assetID, err = s.repo.CreateAsset(ctx, ticker, quote.Name, assetType, quote.Currency)
 		if err != nil {

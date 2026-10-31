@@ -171,24 +171,24 @@ func TestService_CreateAlert(t *testing.T) {
 		mp.AssertExpectations(t)
 	})
 
-	t.Run("Asset Created - US Equity", func(t *testing.T) {
+	t.Run("Asset Created - US Stock", func(t *testing.T) {
 		svc, repo, mp := setupServiceTest()
 
 		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Name: "Apple", Currency: "USD"}, nil)
-		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "EQUITY_US", "USD").Return("a1", nil)
+		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "STOCK_US", "USD").Return("a1", nil)
 		repo.On("CreateAlert", mock.Anything, mock.Anything).Return(nil)
 
 		_, err := svc.CreateAlert(context.Background(), "u1", "AAPL", 150.0, "ABOVE")
 		assert.NoError(t, err)
 	})
 
-	t.Run("Asset Created - General Equity", func(t *testing.T) {
+	t.Run("Asset Created - BR Stock", func(t *testing.T) {
 		svc, repo, mp := setupServiceTest()
 
 		repo.On("GetAssetByTicker", mock.Anything, "PETR4.SA").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "PETR4.SA").Return(&market.Quote{Name: "Petrobras", Currency: "BRL"}, nil)
-		repo.On("CreateAsset", mock.Anything, "PETR4.SA", "Petrobras", "EQUITY", "BRL").Return("a1", nil)
+		repo.On("CreateAsset", mock.Anything, "PETR4.SA", "Petrobras", "STOCK_BR", "BRL").Return("a1", nil)
 		repo.On("CreateAlert", mock.Anything, mock.Anything).Return(nil)
 
 		_, err := svc.CreateAlert(context.Background(), "u1", "PETR4.SA", 30.0, "ABOVE")
@@ -200,7 +200,7 @@ func TestService_CreateAlert(t *testing.T) {
 
 		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", pgx.ErrNoRows)
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Name: "Apple", Currency: "USD"}, nil)
-		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "EQUITY_US", "USD").Return("", errors.New("db err"))
+		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "STOCK_US", "USD").Return("", errors.New("db err"))
 
 		_, err := svc.CreateAlert(context.Background(), "u1", "AAPL", 150.0, "ABOVE")
 		assert.ErrorContains(t, err, "banco de dados")
