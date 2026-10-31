@@ -397,7 +397,7 @@ func TestService_GetPortfolioDetails(t *testing.T) {
 }
 
 func TestService_GetCurrencyRate(t *testing.T) {
-	s, _, ms, _ := setupServiceTest()
+	s, repo, ms, _ := setupServiceTest()
 	assert.Equal(t, 1.0, s.getCurrencyRate(context.Background(), "USD", "USD"))
 
 	ms.On("GetQuote", mock.Anything, "USDEUR=X").Return(&market.Quote{Price: 0.85}, nil)
@@ -407,6 +407,13 @@ func TestService_GetCurrencyRate(t *testing.T) {
 	assert.Equal(t, 1.0, s.getCurrencyRate(context.Background(), "CAD", "BRL"))
 
 	ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(nil, errors.New("err"))
+
+	// Quote falha, repo retorna cotação do banco
+	repo.On("GetExchangeRateByDate", mock.Anything, "USDBRL=X", mock.Anything).Return(5.65, nil).Once()
+	assert.Equal(t, 5.65, s.getCurrencyRate(context.Background(), "USD", "BRL"))
+
+	// Quote falha e repo falha -> fallback 5.20
+	repo.On("GetExchangeRateByDate", mock.Anything, "USDBRL=X", mock.Anything).Return(0.0, errors.New("db err")).Once()
 	assert.Equal(t, 5.20, s.getCurrencyRate(context.Background(), "USD", "BRL")) // fallback
 }
 

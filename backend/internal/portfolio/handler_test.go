@@ -344,6 +344,36 @@ func TestHandler_AddTransaction(t *testing.T) {
 		h.AddTransaction(rec, req)
 		assert.Equal(t, http.StatusCreated, rec.Code)
 	})
+
+	t.Run("Invalid ExecutedAt", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "invalid-date"}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Data de execução inválida")
+	})
+
+	t.Run("Future ExecutedAt", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "2099-01-01"}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Data de execução não pode ser futura")
+	})
+
+	t.Run("RFC3339 ExecutedAt", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("AddTransaction", mock.Anything, "u1", mock.Anything).Return(&Transaction{ID: "tx-rfc"}, nil)
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "2024-01-15T12:00:00Z"}`
+		req := reqWithUserAndParams(httptest.NewRequest("POST", "/portfolios/p1/transactions", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1"})
+		rec := httptest.NewRecorder()
+		h.AddTransaction(rec, req)
+		assert.Equal(t, http.StatusCreated, rec.Code)
+	})
 }
 
 func TestHandler_GetTransactions(t *testing.T) {
@@ -597,11 +627,31 @@ func TestHandler_UpdateTransaction(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("UpdateTransaction", mock.Anything, "u1", "p1", "tx1", mock.Anything).Return(nil)
-		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "invalid-date"}`
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "2024-01-15"}`
 		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
 		rec := httptest.NewRecorder()
 		h.UpdateTransaction(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Invalid ExecutedAt", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "invalid-date"}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Data de execução inválida")
+	})
+
+	t.Run("Future ExecutedAt", func(t *testing.T) {
+		h, _ := setupHandlerTest()
+		body := `{"ticker": "AAPL", "type": "BUY", "quantity": 10, "unit_price": 150, "executed_at": "2099-01-01"}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Data de execução não pode ser futura")
 	})
 
 	t.Run("Invalid Asset Type", func(t *testing.T) {

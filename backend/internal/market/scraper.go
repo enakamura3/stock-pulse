@@ -11,6 +11,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
+)
+
+var (
+	fundamentusLpaRe    = regexp.MustCompile(`(?is)<span[^>]*>LPA</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
+	fundamentusVpaRe    = regexp.MustCompile(`(?is)<span[^>]*>VPA</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
+	fundamentusVpCotaRe = regexp.MustCompile(`(?is)<span[^>]*>VP/Cota</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
+	fundamentusDivRe    = regexp.MustCompile(`(?is)<span[^>]*>Div\. Yield</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
+
+	finvizEpsRe = regexp.MustCompile(`(?is)EPS \(ttm\)</div></td>.*?<b>([^<]+)</b>`)
+	finvizBvRe  = regexp.MustCompile(`(?is)Book/sh</div></td>.*?<b>([^<]+)</b>`)
+	finvizDivRe = regexp.MustCompile(`(?is)Dividend %</div></td>.*?<b>([^<]+)</b>`)
 )
 
 type Fundamentals struct {
@@ -82,17 +95,12 @@ func (s *Scraper) ScrapeFundamentus(ctx context.Context, ticker string) (*Fundam
 	}
 	html := string(body)
 
-	lpaRe := regexp.MustCompile(`(?is)<span[^>]*>LPA</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
-	vpaRe := regexp.MustCompile(`(?is)<span[^>]*>VPA</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
-	vpCotaRe := regexp.MustCompile(`(?is)<span[^>]*>VP/Cota</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
-	divRe := regexp.MustCompile(`(?is)<span[^>]*>Div\. Yield</span>.*?<td[^>]*><span[^>]*>([^<]+)</span>`)
-
-	eps := parseBrFloat(extractRegex(lpaRe, html))
-	bv := parseBrFloat(extractRegex(vpaRe, html))
-	if bv == 0 {
-		bv = parseBrFloat(extractRegex(vpCotaRe, html))
+	eps := parseBrFloat(extractRegex(fundamentusLpaRe, html))
+	bv := parseBrFloat(extractRegex(fundamentusVpaRe, html))
+	if calculator.FloatIsZero(bv) {
+		bv = parseBrFloat(extractRegex(fundamentusVpCotaRe, html))
 	}
-	dy := parseBrFloat(extractRegex(divRe, html))
+	dy := parseBrFloat(extractRegex(fundamentusDivRe, html))
 
 	return s.calculateFormulas(&Fundamentals{
 		EPS:           eps,
@@ -122,13 +130,9 @@ func (s *Scraper) ScrapeFinviz(ctx context.Context, ticker string) (*Fundamental
 	}
 	html := string(body)
 
-	epsRe := regexp.MustCompile(`(?is)EPS \(ttm\)</div></td>.*?<b>([^<]+)</b>`)
-	bvRe := regexp.MustCompile(`(?is)Book/sh</div></td>.*?<b>([^<]+)</b>`)
-	divRe := regexp.MustCompile(`(?is)Dividend %</div></td>.*?<b>([^<]+)</b>`)
-
-	eps := parseUsFloat(extractRegex(epsRe, html))
-	bv := parseUsFloat(extractRegex(bvRe, html))
-	dy := parseUsFloat(extractRegex(divRe, html))
+	eps := parseUsFloat(extractRegex(finvizEpsRe, html))
+	bv := parseUsFloat(extractRegex(finvizBvRe, html))
+	dy := parseUsFloat(extractRegex(finvizDivRe, html))
 
 	return s.calculateFormulas(&Fundamentals{
 		EPS:           eps,

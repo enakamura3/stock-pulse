@@ -87,7 +87,7 @@ func TestServiceCoverage_GetPortfolioDividends_FallbackError(t *testing.T) {
 	}, nil)
 	ms.On("GetHistoricalExchangeRate", mock.Anything, mock.Anything).Return(0.0, errors.New("err"))
 	ms.On("GetQuote", mock.Anything, "USDBRL=X").Return(nil, errors.New("quote err")).Maybe()
-	repo.On("GetExchangeRateByDate", mock.Anything, "USDBRL", mock.Anything).Return(0.0, errors.New("err"))
+	repo.On("GetExchangeRateByDate", mock.Anything, mock.Anything, mock.Anything).Return(0.0, errors.New("err")).Maybe()
 
 	_, _ = s.GetPortfolioDividends(context.Background(), "p1", "u1")
 }
@@ -706,6 +706,9 @@ func TestServiceCoverage_ExtraEdgeCases(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4").Return(&AssetMetadata{ID: "petr-id", Currency: "BRL", AssetType: "STOCK_BR"}, nil).Once()
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{AssetID: "petr-id", Ticker: "PETR4", Type: "BUY", Quantity: 20, ExecutedAt: time.Now().Add(-24 * time.Hour), CreatedAt: time.Now().Add(-24 * time.Hour)},
+		}, nil).Once()
 		repo.On("GetDailyPrices", mock.Anything, "petr-id", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil).Maybe()
 		repo.On("GetOldestPriceDate", mock.Anything, "petr-id").Return(time.Time{}, nil).Maybe()
 		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
@@ -730,6 +733,9 @@ func TestServiceCoverage_ExtraEdgeCases(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
 		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4").Return(&AssetMetadata{ID: "petr-id", Currency: "BRL", AssetType: "STOCK_BR"}, nil).Once()
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{AssetID: "petr-id", Ticker: "PETR4", Type: "BUY", Quantity: 20, ExecutedAt: time.Now().Add(-24 * time.Hour), CreatedAt: time.Now().Add(-24 * time.Hour)},
+		}, nil).Once()
 		repo.On("GetOldestPriceDate", mock.Anything, "petr-id").Return(time.Time{}, nil).Maybe()
 		repo.On("UpdateTransaction", mock.Anything, mock.MatchedBy(func(tx Transaction) bool {
 			return tx.Type == "SELL" && tx.TotalCost == (10*30)-5
@@ -744,6 +750,80 @@ func TestServiceCoverage_ExtraEdgeCases(t *testing.T) {
 			ExecutedAt: time.Now(),
 		}
 		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", tx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("AddTransaction Sell Oversell Rejected", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4").Return(&AssetMetadata{ID: "petr-id", Currency: "BRL", AssetType: "STOCK_BR"}, nil).Once()
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{AssetID: "petr-id", Ticker: "PETR4", Type: "BUY", Quantity: 5, ExecutedAt: time.Now().Add(-24 * time.Hour), CreatedAt: time.Now().Add(-24 * time.Hour)},
+		}, nil).Once()
+
+		tx := &Transaction{
+			PortfolioID: "p1",
+			Ticker:      "PETR4",
+			Type:        "SELL",
+			Quantity:    10,
+			UnitPrice:   30,
+			ExecutedAt:  time.Now(),
+		}
+		_, err := s.AddTransaction(context.Background(), "u1", tx)
+		assert.ErrorContains(t, err, "saldo insuficiente")
+	})
+
+	t.Run("UpdateTransaction Sell Oversell Rejected", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil).Once()
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "PETR4").Return(&AssetMetadata{ID: "petr-id", Currency: "BRL", AssetType: "STOCK_BR"}, nil).Once()
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "tx1", AssetID: "petr-id", Ticker: "PETR4", Type: "SELL", Quantity: 5, ExecutedAt: time.Now().Add(-12 * time.Hour)},
+			{AssetID: "petr-id", Ticker: "PETR4", Type: "BUY", Quantity: 10, ExecutedAt: time.Now().Add(-24 * time.Hour)},
+		}, nil).Once()
+
+		tx := &Transaction{
+			Ticker:     "PETR4",
+			Type:       "SELL",
+			Quantity:   15, // available is 10 (excluding tx1)
+			UnitPrice:  30,
+			ExecutedAt: time.Now(),
+		}
+		err := s.UpdateTransaction(context.Background(), "u1", "p1", "tx1", tx)
+		assert.ErrorContains(t, err, "saldo insuficiente")
+	})
+
+	t.Run("validateSellQuantity branches", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+
+		// Zero quantity error
+		err := s.validateSellQuantity(context.Background(), "u1", "p1", "a1", "TICK", "", 0, time.Now())
+		assert.ErrorContains(t, err, "maior que zero")
+
+		// Repo error
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(nil, errors.New("db fail")).Once()
+		err = s.validateSellQuantity(context.Background(), "u1", "p1", "a1", "TICK", "", 5, time.Now())
+		assert.ErrorContains(t, err, "db fail")
+
+		// Success with SPLIT, REVERSE_SPLIT, BONUS
+		past := time.Now().Add(-48 * time.Hour)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{AssetID: "a1", Type: "BUY", Quantity: 10, ExecutedAt: past.Add(1 * time.Hour), CreatedAt: past.Add(1 * time.Hour)},
+			{AssetID: "a1", Type: "SPLIT", Quantity: 2, ExecutedAt: past.Add(2 * time.Hour), CreatedAt: past.Add(2 * time.Hour)}, // 20
+			{AssetID: "a1", Type: "BONUS", Quantity: 5, ExecutedAt: past.Add(3 * time.Hour), CreatedAt: past.Add(3 * time.Hour)}, // 25
+			{AssetID: "a1", Type: "REVERSE_SPLIT", Quantity: 2, ExecutedAt: past.Add(4 * time.Hour), CreatedAt: past.Add(4 * time.Hour)}, // 12
+		}, nil).Once()
+		err = s.validateSellQuantity(context.Background(), "u1", "p1", "a1", "TICK", "", 12, time.Now())
+		assert.NoError(t, err)
+
+		// Success with same ExecutedAt tiebreaker, ticker match, and zero split/reverse split
+		fixedDate := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{Ticker: "TICK", Type: "BUY", Quantity: 10, ExecutedAt: fixedDate, CreatedAt: fixedDate.Add(1 * time.Minute)},
+			{Ticker: "TICK", Type: "SPLIT", Quantity: 0, ExecutedAt: fixedDate, CreatedAt: fixedDate.Add(2 * time.Minute)},
+			{Ticker: "TICK", Type: "REVERSE_SPLIT", Quantity: 0, ExecutedAt: fixedDate, CreatedAt: fixedDate.Add(3 * time.Minute)},
+		}, nil).Once()
+		err = s.validateSellQuantity(context.Background(), "u1", "p1", "different-id", "TICK", "", 5, fixedDate)
 		assert.NoError(t, err)
 	})
 }

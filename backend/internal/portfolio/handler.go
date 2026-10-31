@@ -3,6 +3,7 @@ package portfolio
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
@@ -215,6 +216,24 @@ func (h *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	httputils.RespondWithJSON(w, http.StatusOK, txs)
 }
 
+func parseExecutedAt(dateStr string) (time.Time, error) {
+	trimmed := strings.TrimSpace(dateStr)
+	if trimmed == "" {
+		return time.Now().UTC(), nil
+	}
+	execTime, err := time.Parse("2006-01-02", trimmed)
+	if err != nil {
+		execTime, err = time.Parse(time.RFC3339, trimmed)
+		if err != nil {
+			return time.Time{}, errors.New("Data de execução inválida")
+		}
+	}
+	if execTime.After(time.Now().Add(24 * time.Hour)) {
+		return time.Time{}, errors.New("Data de execução não pode ser futura")
+	}
+	return execTime.UTC(), nil
+}
+
 // AddTransaction registra uma nova operação de compra/venda.
 func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserIDKey).(string)
@@ -266,13 +285,11 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		fee = 0
 	}
 
-	// Trata parsing de datas históricas com fallback seguro
-	execTime, err := time.Parse("2006-01-02", payload.ExecutedAt)
+	// Valida e processa data de execução
+	execTime, err := parseExecutedAt(payload.ExecutedAt)
 	if err != nil {
-		execTime, err = time.Parse(time.RFC3339, payload.ExecutedAt)
-		if err != nil {
-			execTime = time.Now()
-		}
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	// A taxa de câmbio agora pode ser 0 ou nula para que o service a busque automaticamente
@@ -415,12 +432,10 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		fee = 0
 	}
 
-	execTime, err := time.Parse("2006-01-02", payload.ExecutedAt)
+	execTime, err := parseExecutedAt(payload.ExecutedAt)
 	if err != nil {
-		execTime, err = time.Parse(time.RFC3339, payload.ExecutedAt)
-		if err != nil {
-			execTime = time.Now()
-		}
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	rate := payload.ExchangeRate
