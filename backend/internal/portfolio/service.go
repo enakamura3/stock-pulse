@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -220,7 +221,7 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 	var mu sync.Mutex
 
 	for _, pos := range posMap {
-		if pos.Quantity > 0 {
+		if pos.Quantity > calculator.FinancialEpsilon {
 			wg.Add(1)
 			go func(pos *Position) {
 				defer wg.Done()
@@ -321,6 +322,9 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	tx.ExchangeRate = s.resolveTransactionExchangeRate(ctx, currency, p.BaseCurrency, tx.ExecutedAt, tx.ExchangeRate)
 
 	if tx.Type == "SELL" {
+		if err := s.validateSellQuantity(ctx, userID, tx.PortfolioID, tx.AssetID, tx.Ticker, "", tx.Quantity, tx.ExecutedAt); err != nil {
+			return nil, err
+		}
 		tx.TotalCost = (tx.Quantity * tx.UnitPrice) - tx.Fee
 	} else {
 		tx.TotalCost = (tx.Quantity * tx.UnitPrice) + tx.Fee
@@ -447,6 +451,11 @@ func (s *Service) getCurrencyRate(ctx context.Context, fromCurrency, toCurrency 
 		if err == nil && quote.Price > 0 {
 			return quote.Price
 		}
+		if s.repo != nil {
+			if rate, err := s.repo.GetExchangeRateByDate(ctx, "USDBRL=X", time.Now()); err == nil && rate > calculator.FinancialEpsilon {
+				return rate
+			}
+		}
 		return 5.20 // Fallback seguro e condizente com a média histórica recente
 	}
 	return 1.0
@@ -509,6 +518,9 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 	tx.ID = txID
 	tx.PortfolioID = portfolioID
 	if tx.Type == "SELL" {
+		if err := s.validateSellQuantity(ctx, userID, portfolioID, tx.AssetID, tx.Ticker, txID, tx.Quantity, tx.ExecutedAt); err != nil {
+			return err
+		}
 		tx.TotalCost = (tx.Quantity * tx.UnitPrice) - tx.Fee
 	} else {
 		tx.TotalCost = (tx.Quantity * tx.UnitPrice) + tx.Fee
@@ -644,5 +656,69 @@ func (s *Service) ListAssetsAdmin(ctx context.Context) ([]AssetMetadata, error) 
 // UpdateAssetTypeAdmin atualiza a categoria global de um ativo pelo ID (uso administrativo).
 func (s *Service) UpdateAssetTypeAdmin(ctx context.Context, assetID, assetType string) error {
 	return s.repo.UpdateAssetType(ctx, assetID, assetType)
+}
+
+// validateSellQuantity verifica se há saldo suficiente do ativo no portfólio para realizar a venda.
+// Na atualização (UpdateTransaction), excludeTxID permite desconsiderar a transação original do cálculo.
+func (s *Service) validateSellQuantity(ctx context.Context, userID, portfolioID, assetID, ticker, excludeTxID string, sellQty float64, executedAt time.Time) error {
+	if sellQty <= calculator.FinancialEpsilon {
+		return errors.New("quantidade de venda deve ser maior que zero")
+	}
+
+	txs, err := s.repo.GetTransactionsByPortfolioID(ctx, portfolioID, userID)
+	if err != nil {
+		return fmt.Errorf("erro ao consultar transações da carteira: %w", err)
+	}
+
+	var relevantTxs []Transaction
+	upperTicker := strings.ToUpper(strings.TrimSpace(ticker))
+	for _, t := range txs {
+		match := (assetID != "" && t.AssetID == assetID) || (upperTicker != "" && strings.ToUpper(strings.TrimSpace(t.Ticker)) == upperTicker)
+		if match {
+			if excludeTxID != "" && t.ID == excludeTxID {
+				continue
+			}
+			relevantTxs = append(relevantTxs, t)
+		}
+	}
+
+	simulatedTx := Transaction{
+		Type:       "SELL",
+		Quantity:   sellQty,
+		ExecutedAt: executedAt,
+		CreatedAt:  time.Now(),
+	}
+	relevantTxs = append(relevantTxs, simulatedTx)
+
+	sort.Slice(relevantTxs, func(i, j int) bool {
+		if relevantTxs[i].ExecutedAt.Equal(relevantTxs[j].ExecutedAt) {
+			return relevantTxs[i].CreatedAt.Before(relevantTxs[j].CreatedAt)
+		}
+		return relevantTxs[i].ExecutedAt.Before(relevantTxs[j].ExecutedAt)
+	})
+
+	runningQty := 0.0
+	for _, t := range relevantTxs {
+		switch t.Type {
+		case "BUY", "BONUS":
+			runningQty += t.Quantity
+		case "SPLIT":
+			if t.Quantity > calculator.FinancialEpsilon {
+				runningQty *= t.Quantity
+			}
+		case "REVERSE_SPLIT":
+			if t.Quantity > calculator.FinancialEpsilon {
+				runningQty = math.Floor(runningQty / t.Quantity)
+			}
+		case "SELL":
+			runningQty -= t.Quantity
+		}
+
+		if runningQty < -calculator.FinancialEpsilon {
+			return errors.New("saldo insuficiente do ativo para realizar a venda")
+		}
+	}
+
+	return nil
 }
 

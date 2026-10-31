@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 )
 
 func countTreasuryBusinessDays(start, end time.Time, holidays map[string]bool) int {
@@ -242,7 +243,7 @@ func (s *service) CreateTreasuryTransaction(ctx context.Context, portfolioID str
 			}
 
 			for _, l := range lots {
-				if remainingToRedeem <= 0 {
+				if remainingToRedeem <= calculator.FinancialEpsilon {
 					break
 				}
 				depleteQty := l.RemainingQuantity
@@ -633,7 +634,7 @@ func (s *service) rebuildTreasuryFIFO(ctx context.Context, tx pgx.Tx, portfolioI
 		var totalGross, totalIOF, totalIR, totalB3, totalNet float64
 
 		for _, l := range lots {
-			if remainingToRedeem <= 0 {
+			if remainingToRedeem <= calculator.FinancialEpsilon {
 				break
 			}
 			depleteQty := l.RemainingQuantity
