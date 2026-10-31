@@ -334,10 +334,10 @@ func TestRepository_CreateAsset(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectQuery("INSERT INTO asset").
-		WithArgs("AAPL", "Apple", "EQUITY_US", "USD").
+		WithArgs("AAPL", "Apple", "STOCK_US", "USD").
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("a1"))
 
-	id, err := repo.CreateAsset(context.Background(), "AAPL", "Apple", "EQUITY_US", "USD")
+	id, err := repo.CreateAsset(context.Background(), "AAPL", "Apple", "STOCK_US", "USD")
 	assert.NoError(t, err)
 	assert.Equal(t, "a1", id)
 

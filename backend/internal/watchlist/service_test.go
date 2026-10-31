@@ -263,7 +263,7 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)
 		repo.On("GetAssetByTicker", mock.Anything, "AAPL").Return("", errors.New("not found"))
 		mp.On("GetQuote", mock.Anything, "AAPL").Return(&market.Quote{Name: "Apple", Currency: "USD"}, nil)
-		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "EQUITY_US", "USD").Return("", errors.New("db error"))
+		repo.On("CreateAsset", mock.Anything, "AAPL", "Apple", "STOCK_US", "USD").Return("", errors.New("db error"))
 
 		_, err := s.AddAssetToWatchlist(context.Background(), "w1", "u1", "AAPL")
 		assert.ErrorContains(t, err, "erro ao registrar novo")
@@ -274,7 +274,7 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)
 		repo.On("GetAssetByTicker", mock.Anything, "BTC-USD").Return("", errors.New("not found"))
 		mp.On("GetQuote", mock.Anything, "BTC-USD").Return(&market.Quote{Name: "Bitcoin", Currency: "USD"}, nil)
-		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "EQUITY_US", "USD").Return("a2", nil)
+		repo.On("CreateAsset", mock.Anything, "BTC-USD", "Bitcoin", "CRYPTO", "USD").Return("a2", nil)
 		repo.On("AddWatchlistItem", mock.Anything, "w1", "a2").Return(&Item{ID: "i2"}, nil)
 
 		item, err := s.AddAssetToWatchlist(context.Background(), "w1", "u1", "BTC-USD")
@@ -287,7 +287,7 @@ func TestService_AddAssetToWatchlist(t *testing.T) {
 		repo.On("GetWatchlistByID", mock.Anything, "w1", "u1").Return(&Watchlist{}, nil)
 		repo.On("GetAssetByTicker", mock.Anything, "PETR4.SA").Return("", errors.New("not found"))
 		mp.On("GetQuote", mock.Anything, "PETR4.SA").Return(&market.Quote{Name: "Petrobras", Currency: "BRL"}, nil)
-		repo.On("CreateAsset", mock.Anything, "PETR4.SA", "Petrobras", "EQUITY", "BRL").Return("a3", nil)
+		repo.On("CreateAsset", mock.Anything, "PETR4.SA", "Petrobras", "STOCK_BR", "BRL").Return("a3", nil)
 		repo.On("AddWatchlistItem", mock.Anything, "w1", "a3").Return(&Item{ID: "i3"}, nil)
 
 		item, err := s.AddAssetToWatchlist(context.Background(), "w1", "u1", "PETR4.SA")
