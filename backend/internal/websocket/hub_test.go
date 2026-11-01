@@ -71,7 +71,16 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Wait for subscription to process and force broadcast
-	time.Sleep(50 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		hub.mu.RLock()
+		defer hub.mu.RUnlock()
+		for c := range hub.clients {
+			if c.IsSubscribed("AAPL") {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 10*time.Millisecond)
 	go hub.broadcastQuotes(context.Background())
 
 	// Read message (could be a ping or quote)
@@ -100,7 +109,16 @@ func TestHub_ClientLifecycleAndSubscription(t *testing.T) {
 	err = ws.WriteJSON(unsubMsg)
 	assert.NoError(t, err)
 
-	time.Sleep(50 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		hub.mu.RLock()
+		defer hub.mu.RUnlock()
+		for c := range hub.clients {
+			if !c.IsSubscribed("AAPL") {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 10*time.Millisecond)
 
 	// Test handler unauthorized
 	req := httptest.NewRequest("GET", "/ws", nil)
@@ -148,7 +166,9 @@ func TestHub_MaxConnectionsPerUser(t *testing.T) {
 	}
 
 	// Aguarda processamento do registro no Hub
-	time.Sleep(50 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		return hub.ActiveConnectionsCount("user_limit_test") == MaxConnectionsPerUser
+	}, 2*time.Second, 10*time.Millisecond)
 	assert.Equal(t, MaxConnectionsPerUser, hub.ActiveConnectionsCount("user_limit_test"))
 
 	// A 6ª conexão deve ser rejeitada com HTTP 429
@@ -163,7 +183,9 @@ func TestHub_MaxConnectionsPerUser(t *testing.T) {
 
 	// Fecha uma conexão e verifica que uma nova é permitida
 	_ = conns[0].Close()
-	time.Sleep(50 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		return hub.ActiveConnectionsCount("user_limit_test") < MaxConnectionsPerUser
+	}, 2*time.Second, 10*time.Millisecond)
 
 	wsNew, respNew, errNew := websocket.DefaultDialer.Dial(wsURL, header)
 	assert.NoError(t, errNew)
@@ -341,7 +363,16 @@ func TestHub_BroadcastQuotes_EdgeCases(t *testing.T) {
 	err = ws.WriteJSON(subMsg)
 	assert.NoError(t, err)
 
-	time.Sleep(50 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		hub.mu.RLock()
+		defer hub.mu.RUnlock()
+		for c := range hub.clients {
+			if c.IsSubscribed("BAD_TICKER") {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 10*time.Millisecond)
 
 	// Força broadcast com ticker que dá erro
 	hub.broadcastQuotes(ctx)
@@ -386,14 +417,25 @@ func TestHub_AdditionalEdgeCases(t *testing.T) {
 	err = ws.WriteMessage(websocket.PongMessage, []byte("pong"))
 	assert.NoError(t, err)
 
-	time.Sleep(60 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		return hub.ActiveConnectionsCount("user_edge_test") == 1
+	}, 2*time.Second, 10*time.Millisecond)
 
 	// 3. Test client without subscriptions (len(uniqueTickers) == 0 in broadcastQuotes)
 	hub.broadcastQuotes(ctx)
 
 	// 4. Subscribe to MOCK
 	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Tickers: []string{"MOCK"}})
-	time.Sleep(30 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		hub.mu.RLock()
+		defer hub.mu.RUnlock()
+		for c := range hub.clients {
+			if c.IsSubscribed("MOCK") {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 10*time.Millisecond)
 
 	// 5. Test broadcastQuotes when client.Send is full (hits default in select)
 	hub.mu.RLock()
@@ -415,22 +457,17 @@ func TestHub_AdditionalEdgeCases(t *testing.T) {
 
 		// Now broadcastQuotes hits default: slog.Warn
 		hub.broadcastQuotes(ctx)
-
-		// 6. Test limit exceeded when Send is full (hits default in limitExceeded select)
-		tickers := make([]string, 55)
-		for i := 0; i < 55; i++ {
-			tickers[i] = fmt.Sprintf("SYM%d", i)
-		}
-		_ = ws.WriteJSON(WSMessage{Action: "subscribe", Tickers: tickers})
-		time.Sleep(30 * time.Millisecond)
 	}
 
-	// 7. Send normal close to exercise IsUnexpectedCloseError in ReadPump
+	// 6. Send normal close to exercise IsUnexpectedCloseError in ReadPump
 	_ = ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "normal-close"))
-	time.Sleep(30 * time.Millisecond)
+	assert.Eventually(t, func() bool {
+		return hub.ActiveConnectionsCount("user_edge_test") == 0
+	}, 2*time.Second, 10*time.Millisecond)
 }
 
 func TestClient_WritePump_BatchedMessages(t *testing.T) {
+	done := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -444,6 +481,7 @@ func TestClient_WritePump_BatchedMessages(t *testing.T) {
 		client.Send <- []byte("msg3")
 		close(client.Send)
 		client.WritePump()
+		close(done)
 	}))
 	defer server.Close()
 
@@ -456,6 +494,7 @@ func TestClient_WritePump_BatchedMessages(t *testing.T) {
 	_, p, err := ws.ReadMessage()
 	assert.NoError(t, err)
 	assert.Equal(t, "msg1\nmsg2\nmsg3", string(p))
+	<-done
 }
 
 func TestHub_BroadcastQuotes_ChannelFull(t *testing.T) {
@@ -503,6 +542,7 @@ func TestHub_BroadcastQuotes_MarshalError(t *testing.T) {
 }
 
 func TestClient_WritePump_ZeroPeriod(t *testing.T) {
+	done := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -515,6 +555,7 @@ func TestClient_WritePump_ZeroPeriod(t *testing.T) {
 		}
 		close(client.Send)
 		client.WritePump()
+		close(done)
 	}))
 	defer server.Close()
 
@@ -523,9 +564,11 @@ func TestClient_WritePump_ZeroPeriod(t *testing.T) {
 	if err == nil {
 		_ = ws.Close()
 	}
+	<-done
 }
 
 func TestClient_ReadPump_LimitExceeded_FullSend(t *testing.T) {
+	done := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -539,6 +582,7 @@ func TestClient_ReadPump_LimitExceeded_FullSend(t *testing.T) {
 			client.Send <- []byte("fill")
 		}
 		client.ReadPump()
+		close(done)
 	}))
 	defer server.Close()
 
@@ -551,11 +595,14 @@ func TestClient_ReadPump_LimitExceeded_FullSend(t *testing.T) {
 		tickers[i] = fmt.Sprintf("SYM%d", i)
 	}
 	_ = ws.WriteJSON(WSMessage{Action: "subscribe", Tickers: tickers})
-	time.Sleep(30 * time.Millisecond)
+	_ = ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "done"))
+	<-done
 	_ = ws.Close()
 }
 
 func TestClient_WritePump_PingWriteError(t *testing.T) {
+	closed := make(chan struct{})
+	done := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -565,11 +612,11 @@ func TestClient_WritePump_PingWriteError(t *testing.T) {
 		client := &Client{
 			Conn:       conn,
 			Send:       make(chan []byte, 10),
-			pingPeriod: 10 * time.Millisecond,
+			pingPeriod: 5 * time.Millisecond,
 		}
-		// Wait for remote client to close socket
-		time.Sleep(30 * time.Millisecond)
+		<-closed
 		client.WritePump()
+		close(done)
 	}))
 	defer server.Close()
 
@@ -577,10 +624,12 @@ func TestClient_WritePump_PingWriteError(t *testing.T) {
 	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	assert.NoError(t, err)
 	_ = ws.Close()
-	time.Sleep(60 * time.Millisecond)
+	close(closed)
+	<-done
 }
 
 func TestClient_WritePump_NextWriterError(t *testing.T) {
+	done := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -591,10 +640,12 @@ func TestClient_WritePump_NextWriterError(t *testing.T) {
 			Conn: conn,
 			Send: make(chan []byte, 1),
 		}
-		// Close underlying conn first
+		// Close underlying conn and trigger write failure to prime writeErr on the connection
 		_ = conn.Close()
+		_ = conn.WriteMessage(websocket.PingMessage, nil)
 		client.Send <- []byte("after close")
 		client.WritePump()
+		close(done)
 	}))
 	defer server.Close()
 
@@ -603,4 +654,33 @@ func TestClient_WritePump_NextWriterError(t *testing.T) {
 	if err == nil {
 		_ = ws.Close()
 	}
+	<-done
+}
+
+func TestClient_WritePump_CloseWriterError(t *testing.T) {
+	done := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		client := &Client{
+			Conn: conn,
+			Send: make(chan []byte, 1),
+		}
+		// Close underlying conn directly so NextWriter succeeds but w.Close fails on flush
+		_ = conn.Close()
+		client.Send <- []byte("msg to flush")
+		client.WritePump()
+		close(done)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err == nil {
+		_ = ws.Close()
+	}
+	<-done
 }
