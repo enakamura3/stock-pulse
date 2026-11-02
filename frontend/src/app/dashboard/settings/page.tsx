@@ -55,12 +55,20 @@ export default function SettingsPage() {
     status: string;
     interval: string;
   }
+  interface AdminUserInfo {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    created_at: string;
+    updated_at: string;
+  }
+
   const [workers, setWorkers] = useState<WorkerInfo[]>([]);
   const [isLoadingWorkers, setIsLoadingWorkers] = useState(true);
   const [workersError, setWorkersError] = useState<string | null>(null);
   const [triggeringWorker, setTriggeringWorker] = useState<string | null>(null);
   const [workerSuccess, setWorkerSuccess] = useState<string | null>(null);
-  const [adminKey, setAdminKey] = useState<string>('');
 
   // Estados do Catálogo de Ativos (Admin)
   const [adminAssets, setAdminAssets] = useState<AdminAssetInfo[]>([]);
@@ -70,17 +78,16 @@ export default function SettingsPage() {
   const [savingAssetId, setSavingAssetId] = useState<string | null>(null);
   const [assetSearchFilter, setAssetSearchFilter] = useState('');
 
+  // Estados de Gerenciamento de Usuários (Admin)
+  const [adminUsers, setAdminUsers] = useState<AdminUserInfo[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [usersSuccess, setUsersSuccess] = useState<string | null>(null);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [userSearchFilter, setUserSearchFilter] = useState('');
+
   // Estados de exclusão de conta
   const [deletePassword, setDeletePassword] = useState('');
-
-  const getAdminHeaders = (keyToUse?: string) => {
-    const key = keyToUse !== undefined ? keyToUse : adminKey;
-    const headers: Record<string, string> = {};
-    if (key.trim()) {
-      headers['X-Admin-Key'] = key.trim();
-    }
-    return headers;
-  };
 
   // Inicialização dos campos do perfil
   useEffect(() => {
@@ -109,12 +116,11 @@ export default function SettingsPage() {
     }
   };
 
-  const loadWorkers = async (keyToUse?: string) => {
+  const loadWorkers = async () => {
     setIsLoadingWorkers(true);
     setWorkersError(null);
     try {
-      const headers = getAdminHeaders(keyToUse);
-      const res = await apiFetch(`/workers`, { headers });
+      const res = await apiFetch(`/workers`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -135,12 +141,11 @@ export default function SettingsPage() {
     }
   };
 
-  const loadAdminAssets = async (keyToUse?: string) => {
+  const loadAdminAssets = async () => {
     setIsLoadingAssets(true);
     setAssetsError(null);
     try {
-      const headers = getAdminHeaders(keyToUse);
-      const res = await apiFetch(`/admin/assets`, { headers });
+      const res = await apiFetch(`/admin/assets`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -160,18 +165,63 @@ export default function SettingsPage() {
     }
   };
 
+  const loadAdminUsers = async () => {
+    setIsLoadingUsers(true);
+    setUsersError(null);
+    try {
+      const res = await apiFetch(`/admin/users`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setAdminUsers(data);
+        } else {
+          setAdminUsers([]);
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setUsersError(data.error || data.message || 'Não foi possível carregar a lista de usuários.');
+      }
+    } catch (err) {
+      console.error(err);
+      setUsersError('Erro de conexão ao carregar usuários.');
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const handleUpdateUserRole = async (targetId: string, targetName: string, newRole: string) => {
+    setUpdatingUserId(targetId);
+    setUsersError(null);
+    setUsersSuccess(null);
+    try {
+      const res = await apiFetch(`/admin/users/${targetId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role: newRole }),
+      });
+      if (res.ok) {
+        setAdminUsers((prev) =>
+          prev.map((u) => (u.id === targetId ? { ...u, role: newRole } : u))
+        );
+        setUsersSuccess(`Papel de "${targetName}" atualizado para ${newRole}!`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setUsersError(data.error || data.message || `Não foi possível atualizar o papel de "${targetName}".`);
+      }
+    } catch (err) {
+      console.error(err);
+      setUsersError(`Erro de rede ao atualizar o papel de "${targetName}".`);
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
   const handleUpdateAssetType = async (assetId: string, ticker: string, newType: string) => {
     setSavingAssetId(assetId);
     setAssetsError(null);
     setAssetsSuccess(null);
     try {
-      const headers = {
-        ...getAdminHeaders(),
-        'Content-Type': 'application/json',
-      };
       const res = await apiFetch(`/admin/assets/${assetId}`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify({ asset_type: newType }),
       });
       if (res.ok) {
@@ -196,10 +246,8 @@ export default function SettingsPage() {
     setWorkerSuccess(null);
     setWorkersError(null);
     try {
-      const headers = getAdminHeaders();
       const res = await apiFetch(`/workers/${name}/trigger`, {
         method: 'POST',
-        headers,
       });
       if (res.ok) {
         setWorkerSuccess(`Worker "${name}" disparado com sucesso!`);
@@ -238,6 +286,7 @@ export default function SettingsPage() {
     if (isAdmin) {
       loadWorkers();
       loadAdminAssets();
+      loadAdminUsers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
@@ -632,7 +681,7 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Seções exclusivas para Administradores (Workers & Catálogo Global) */}
+          {/* Seções exclusivas para Administradores (Workers, Usuários & Catálogo Global) */}
           {isAdmin && (
             <>
               {/* Seção 4: Controle de Workers */}
@@ -665,40 +714,6 @@ export default function SettingsPage() {
                     >
                       {isLoadingWorkers ? 'Atualizando...' : '🔄 Atualizar'}
                     </button>
-                  </div>
-                  
-                  {/* Chave de Administração para Workers (Segura: Em Memória Apenas) */}
-                  <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <label htmlFor="adminKeyInput" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                        Chave de Administração (opcional / override):
-                      </label>
-                      <div style={{ display: 'flex', gap: '8px', flex: '1 1 280px' }}>
-                        <input
-                          id="adminKeyInput"
-                          type="password"
-                          placeholder="Autenticado via sessão (ADMIN). Preencha apenas para override M2M."
-                          value={adminKey}
-                          onChange={(e) => setAdminKey(e.target.value)}
-                          className="form-input font-mono"
-                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem', flex: 1 }}
-                        />
-                        <button
-                          type="button"
-                          className="btn-secondary font-mono"
-                          onClick={() => {
-                            loadWorkers(adminKey);
-                            loadAdminAssets(adminKey);
-                          }}
-                          style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
-                        >
-                          Conectar
-                        </button>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      🔒 Autenticado automaticamente via sessão de Administrador ({user?.email}) — nenhuma chave manual necessária.
-                    </span>
                   </div>
 
               {workersError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{workersError}</div>}
@@ -781,6 +796,129 @@ export default function SettingsPage() {
               )}
             </div>
           </section>
+
+              {/* Seção 5: Gerenciamento de Usuários (Admin) */}
+              <section className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>
+                <div className="terminal-bar">
+                  <div className="flex-row items-center gap-xs font-mono">
+                    <span className="text-accent" style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>▸</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>settings/users.rbac</span>
+                  </div>
+                  <div className="flex-row items-center gap-xs">
+                    <span className="badge badge-success font-mono" style={{ fontSize: '0.65rem' }}>
+                      [ ADMIN ]
+                    </span>
+                    <span className="badge badge-neutral font-mono" style={{ fontSize: '0.65rem' }}>
+                      [ {adminUsers.length} USUÁRIOS ]
+                    </span>
+                  </div>
+                </div>
+                <div style={{ padding: '1.25rem' }}>
+                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 1rem 0', margin: 0, borderBottom: '1px solid var(--panel-border)', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <h2 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', margin: 0 }}>
+                      <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+                      <span>👥 Gerenciamento de Usuários (RBAC)</span>
+                    </h2>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        placeholder="Filtrar por nome ou e-mail..."
+                        value={userSearchFilter}
+                        onChange={(e) => setUserSearchFilter(e.target.value)}
+                        className="form-input font-mono"
+                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', width: '220px' }}
+                      />
+                      <button 
+                        type="button"
+                        className="btn-secondary font-mono" 
+                        onClick={() => loadAdminUsers()} 
+                        disabled={isLoadingUsers} 
+                        style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        {isLoadingUsers ? 'Atualizando...' : '🔄 Atualizar'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {usersError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{usersError}</div>}
+                  {usersSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.9rem', padding: '0.5rem 0', fontWeight: 600, marginBottom: '1rem', fontFamily: 'var(--font-mono)' }}>{usersSuccess}</div>}
+
+                  {isLoadingUsers && adminUsers.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center' }}>
+                      <span className="loading-spinner" style={{ borderTopColor: 'var(--accent-color)' }}></span>
+                      <span style={{ marginLeft: '10px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>Carregando usuários...</span>
+                    </div>
+                  ) : (
+                    <div className="table-container" style={{ WebkitOverflowScrolling: 'touch', border: '1px solid var(--panel-border)', borderRadius: '2px', maxHeight: '420px', overflowY: 'auto' }}>
+                      <table className="data-table" style={{ tableLayout: 'auto' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ width: '32px', textAlign: 'center', padding: '0.75rem 0.4rem' }}>#</th>
+                            <th style={{ padding: '0.75rem 0.5rem' }}>Nome</th>
+                            <th style={{ padding: '0.75rem 0.5rem' }}>E-mail</th>
+                            <th style={{ padding: '0.75rem 0.5rem' }}>Papel Atual</th>
+                            <th style={{ padding: '0.75rem 0.5rem' }}>Cadastro</th>
+                            <th style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {adminUsers
+                            .filter((u) => {
+                              const q = userSearchFilter.trim().toLowerCase();
+                              return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+                            })
+                            .map((u, idx) => {
+                              const isSelf = u.id === user.id;
+                              return (
+                                <tr key={u.id}>
+                                  <td className="table-line-num">{String(idx + 1).padStart(2, '0')}</td>
+                                  <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                                    {u.name} {isSelf && <span style={{ color: 'var(--color-success)', fontSize: '0.75rem', fontWeight: 'normal' }}>(Você)</span>}
+                                  </td>
+                                  <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>{u.email}</td>
+                                  <td style={{ padding: '0.75rem 0.5rem' }}>
+                                    <span className={`badge font-mono ${u.role === 'ADMIN' ? 'badge-success' : 'badge-neutral'}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
+                                      {u.role}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>
+                                    {formatDate(u.created_at)}
+                                  </td>
+                                  <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
+                                    {isSelf ? (
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Sessão Atual</span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className={u.role === 'ADMIN' ? 'btn-secondary font-mono' : 'primary-button font-mono'}
+                                        disabled={updatingUserId === u.id}
+                                        onClick={() => handleUpdateUserRole(u.id, u.name, u.role === 'ADMIN' ? 'USER' : 'ADMIN')}
+                                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                                      >
+                                        {updatingUserId === u.id
+                                          ? 'Salvando...'
+                                          : u.role === 'ADMIN'
+                                          ? 'Rebaixar para USER'
+                                          : 'Promover para ADMIN'}
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          {adminUsers.length === 0 && (
+                            <tr>
+                              <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem', fontFamily: 'var(--font-mono)' }}>
+                                Nenhum usuário cadastrado.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </section>
 
           {/* Seção 5: Catálogo Global de Ativos (Admin) */}
           <section className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>

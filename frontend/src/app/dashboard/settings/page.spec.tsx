@@ -67,6 +67,29 @@ describe('SettingsPage', () => {
           ],
         });
       }
+      if (url === '/admin/users') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 'test',
+              name: 'Test User',
+              email: 'test@example.com',
+              role: 'ADMIN',
+              created_at: '2026-08-01T12:00:00Z',
+              updated_at: '2026-08-01T12:00:00Z',
+            },
+            {
+              id: 'user-2',
+              name: 'Bob User',
+              email: 'bob@example.com',
+              role: 'USER',
+              created_at: '2026-08-02T12:00:00Z',
+              updated_at: '2026-08-02T12:00:00Z',
+            },
+          ],
+        });
+      }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
   });
@@ -278,8 +301,8 @@ describe('SettingsPage', () => {
     consoleError.mockRestore();
   });
 
-  it('handles admin key input in-memory (never persisted in localStorage) and reload with key', async () => {
-    localStorage.setItem('admin_api_key', 'stale-key-in-storage');
+  it('loads admin users list, filters by name/email, and updates user role', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
       <ThemeProvider>
@@ -287,41 +310,166 @@ describe('SettingsPage', () => {
       </ThemeProvider>
     );
 
-    const keyInput = screen.getByLabelText(/Chave de Administração/i) as HTMLInputElement;
-    // Initial value is empty in-memory state, NOT read from localStorage
-    expect(keyInput.value).toBe('');
-
-    // Change key input
-    fireEvent.change(keyInput, { target: { value: 'new-secret-key' } });
-    expect(keyInput.value).toBe('new-secret-key');
-    // Must NOT persist to localStorage (protects against XSS key harvesting)
-    expect(localStorage.getItem('admin_api_key')).toBe('stale-key-in-storage');
-
-    // Click Conectar
-    const connectBtn = screen.getByRole('button', { name: 'Conectar' });
-    await act(async () => {
-      fireEvent.click(connectBtn);
+    await waitFor(() => {
+      expect(screen.getByText('Bob User')).toBeInTheDocument();
+      expect(screen.getByText('bob@example.com')).toBeInTheDocument();
     });
 
-    expect(apiFetch).toHaveBeenCalledWith(
-      '/workers',
-      expect.objectContaining({
-        headers: expect.objectContaining({ 'X-Admin-Key': 'new-secret-key' }),
-      })
-    );
+    // Test User is self -> shows (Você) and "Sessão Atual"
+    expect(screen.getByText('(Você)')).toBeInTheDocument();
+    expect(screen.getByText('Sessão Atual')).toBeInTheDocument();
 
-    // Click Atualizar
-    const refreshBtn = screen.getByRole('button', { name: /Atualizar/ });
-    await act(async () => {
-      fireEvent.click(refreshBtn);
+    // Bob User has button "Promover para ADMIN"
+    const promoteBtn = screen.getByRole('button', { name: 'Promover para ADMIN' });
+    expect(promoteBtn).toBeInTheDocument();
+
+    // Filter by search
+    const searchInput = screen.getByPlaceholderText(/Filtrar por nome ou e-mail/i);
+    fireEvent.change(searchInput, { target: { value: 'Bob' } });
+    expect(screen.queryByText('test@example.com')).not.toBeInTheDocument();
+    expect(screen.getByText('Bob User')).toBeInTheDocument();
+    fireEvent.change(searchInput, { target: { value: '' } });
+
+    // Success update role
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/admin/users/user-2/role' && opts?.method === 'PATCH') {
+        return Promise.resolve({ ok: true, json: async () => ({}) });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
     });
 
-    expect(apiFetch).toHaveBeenCalledWith(
-      '/workers',
-      expect.objectContaining({
-        headers: expect.objectContaining({ 'X-Admin-Key': 'new-secret-key' }),
-      })
+    await act(async () => {
+      fireEvent.click(promoteBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Papel de "Bob User" atualizado para ADMIN!')).toBeInTheDocument();
+    });
+
+    // Error handling on role update
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/admin/users/user-2/role' && opts?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => ({ error: 'Erro ao alterar papel' }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    const demoteBtn = screen.getByRole('button', { name: 'Rebaixar para USER' });
+    await act(async () => {
+      fireEvent.click(demoteBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Erro ao alterar papel')).toBeInTheDocument();
+    });
+
+    // Fallback message when JSON parse fails on PATCH error
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/admin/users/user-2/role' && opts?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => { throw new Error('bad json'); },
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await act(async () => {
+      fireEvent.click(demoteBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Não foi possível atualizar o papel de "Bob User".')).toBeInTheDocument();
+    });
+
+    // Network error on PATCH
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/admin/users/user-2/role' && opts?.method === 'PATCH') {
+        return Promise.reject(new Error('network fail'));
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await act(async () => {
+      fireEvent.click(demoteBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Erro de rede ao atualizar o papel de "Bob User".')).toBeInTheDocument();
+    });
+
+    consoleError.mockRestore();
+  });
+
+  it('handles admin users load errors (server error, json parse error, network error)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // 1. Server error with message
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/admin/users') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => ({ error: 'Falha ao buscar usuários' }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    const { unmount } = render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
     );
+
+    await waitFor(() => {
+      expect(screen.getByText('Falha ao buscar usuários')).toBeInTheDocument();
+    });
+    unmount();
+
+    // 2. Server error with JSON parse failure (fallback message)
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/admin/users') {
+        return Promise.resolve({
+          ok: false,
+          json: async () => { throw new Error('bad json'); },
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    const { unmount: unmount2 } = render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Não foi possível carregar a lista de usuários.')).toBeInTheDocument();
+    });
+    unmount2();
+
+    // 3. Network error
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/admin/users') {
+        return Promise.reject(new Error('net err'));
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Erro de conexão ao carregar usuários.')).toBeInTheDocument();
+    });
+
+    consoleError.mockRestore();
   });
 
 

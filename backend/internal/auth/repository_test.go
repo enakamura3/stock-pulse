@@ -319,3 +319,71 @@ func TestRepository_DeleteUser_Error(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "erro ao excluir usuário: db error")
 }
+
+func TestRepository_ListUsers(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		now := time.Now()
+		rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+			AddRow("1", "Admin", "admin@test.com", "ADMIN", now, now).
+			AddRow("2", "User", "user@test.com", "USER", now, now)
+
+		mock.ExpectQuery(`SELECT id, name, email, role, created_at, updated_at FROM "user" ORDER BY created_at ASC`).
+			WillReturnRows(rows)
+
+		users, err := repo.ListUsers(context.Background())
+		assert.NoError(t, err)
+		assert.Len(t, users, 2)
+		assert.Equal(t, "ADMIN", users[0].Role)
+		assert.Equal(t, "USER", users[1].Role)
+	})
+
+	t.Run("Query Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`SELECT id, name, email, role, created_at, updated_at FROM "user" ORDER BY created_at ASC`).
+			WillReturnError(errors.New("query failed"))
+
+		users, err := repo.ListUsers(context.Background())
+		assert.Nil(t, users)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "erro ao listar usuários")
+	})
+
+	t.Run("Scan Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+			AddRow("1", "Admin", "admin@test.com", "ADMIN", "invalid-time", time.Now())
+
+		mock.ExpectQuery(`SELECT id, name, email, role, created_at, updated_at FROM "user" ORDER BY created_at ASC`).
+			WillReturnRows(rows)
+
+		users, err := repo.ListUsers(context.Background())
+		assert.Nil(t, users)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "erro ao ler usuário")
+	})
+
+	t.Run("Rows Err", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		now := time.Now()
+		rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+			AddRow("1", "Admin", "admin@test.com", "ADMIN", now, now).
+			CloseError(errors.New("iteration failed"))
+
+		mock.ExpectQuery(`SELECT id, name, email, role, created_at, updated_at FROM "user" ORDER BY created_at ASC`).
+			WillReturnRows(rows)
+
+		users, err := repo.ListUsers(context.Background())
+		assert.Nil(t, users)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "erro após iterar usuários")
+	})
+}

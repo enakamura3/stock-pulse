@@ -323,6 +323,13 @@ func main() {
 			r.Get("/", portfolioHandler.ListAssetsAdmin)
 			r.Patch("/{id}", portfolioHandler.UpdateAssetTypeAdmin)
 		})
+
+		// Gestão de Usuários (Protegido por ADMIN_API_KEY ou Sessão ADMIN)
+		r.Route("/admin/users", func(r chi.Router) {
+			r.Use(customMiddleware.RequireAdmin(config.Envs.AdminAPIKey, []byte(config.Envs.JWTSecret), rdb))
+			r.Get("/", authHandler.ListUsersAdmin)
+			r.Patch("/{id}/role", authHandler.UpdateUserRoleAdmin)
+		})
 	})
 
 	// Configuração do Servidor HTTP

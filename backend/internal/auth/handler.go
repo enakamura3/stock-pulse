@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 )
@@ -39,6 +40,8 @@ type AuthService interface {
 	UpdateProfile(ctx context.Context, id, name, email string) (*User, error)
 	UpdatePassword(ctx context.Context, id, currentPassword, newPassword string) error
 	DeleteUser(ctx context.Context, id, currentPassword string) error
+	ListUsers(ctx context.Context) ([]*User, error)
+	UpdateUserRole(ctx context.Context, callerID, targetID, newRole string) error
 }
 
 // Handler expõe os métodos HTTP da API de Autenticação.
@@ -336,4 +339,55 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	h.clearTokenCookies(w)
 	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Conta excluída com sucesso"})
+}
+
+// ListUsersAdmin retorna a lista de todos os usuários para administração.
+func (h *Handler) ListUsersAdmin(w http.ResponseWriter, r *http.Request) {
+	users, err := h.service.ListUsers(r.Context())
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Falha ao listar usuários")
+		return
+	}
+	httputils.RespondWithJSON(w, http.StatusOK, users)
+}
+
+type updateUserRolePayload struct {
+	Role string `json:"role"`
+}
+
+// UpdateUserRoleAdmin atualiza o papel (role) de um usuário alvo.
+func (h *Handler) UpdateUserRoleAdmin(w http.ResponseWriter, r *http.Request) {
+	targetID := chi.URLParam(r, "id")
+	if strings.TrimSpace(targetID) == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID do usuário é obrigatório")
+		return
+	}
+
+	var payload updateUserRolePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Corpo da requisição inválido")
+		return
+	}
+
+	var callerID string
+	if val := r.Context().Value(UserIDKey); val != nil {
+		if id, ok := val.(string); ok {
+			callerID = id
+		}
+	}
+
+	if err := h.service.UpdateUserRole(r.Context(), callerID, targetID, payload.Role); err != nil {
+		if strings.Contains(err.Error(), "não encontrado") {
+			httputils.RespondWithError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		if strings.Contains(err.Error(), "papel inválido") || strings.Contains(err.Error(), "não é possível revogar") {
+			httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Falha ao atualizar papel do usuário")
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Papel do usuário atualizado com sucesso"})
 }

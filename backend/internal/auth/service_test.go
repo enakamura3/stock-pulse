@@ -77,6 +77,14 @@ func (m *MockUserRepository) DeleteUser(ctx context.Context, id string) error {
 	return m.Called(ctx, id).Error(0)
 }
 
+func (m *MockUserRepository) ListUsers(ctx context.Context) ([]*User, error) {
+	args := m.Called(ctx)
+	if args.Get(0) != nil {
+		return args.Get(0).([]*User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func setupService() (*Service, *MockUserRepository, redismock.ClientMock) {
 	repoMock := new(MockUserRepository)
 	db, mockRedis := redismock.NewClientMock()
@@ -876,4 +884,77 @@ func TestArgon2Semaphore_Concurrency(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+func TestService_ListUsers(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		s, repo, _ := setupService()
+		expected := []*User{
+			{ID: "1", Name: "Admin", Role: RoleAdmin},
+			{ID: "2", Name: "User", Role: RoleUser},
+		}
+		repo.On("ListUsers", mock.Anything).Return(expected, nil)
+
+		users, err := s.ListUsers(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, expected, users)
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("ListUsers", mock.Anything).Return(([]*User)(nil), errors.New("db error"))
+
+		users, err := s.ListUsers(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, users)
+	})
+}
+
+func TestService_UpdateUserRole(t *testing.T) {
+	t.Run("Invalid role", func(t *testing.T) {
+		s, _, _ := setupService()
+		err := s.UpdateUserRole(context.Background(), "admin-1", "user-2", "INVALID")
+		assert.EqualError(t, err, "papel inválido, deve ser USER ou ADMIN")
+	})
+
+	t.Run("Self demotion prevented", func(t *testing.T) {
+		s, _, _ := setupService()
+		err := s.UpdateUserRole(context.Background(), "admin-1", "admin-1", "USER")
+		assert.EqualError(t, err, "não é possível revogar o próprio privilégio de administrador")
+	})
+
+	t.Run("User not found", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByID", mock.Anything, "non-existent").Return(nil, errors.New("not found"))
+
+		err := s.UpdateUserRole(context.Background(), "admin-1", "non-existent", "ADMIN")
+		assert.EqualError(t, err, "usuário não encontrado")
+	})
+
+	t.Run("Repo error", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByID", mock.Anything, "user-2").Return(&User{ID: "user-2"}, nil)
+		repo.On("UpdateUserRole", mock.Anything, "user-2", RoleAdmin).Return(errors.New("db error"))
+
+		err := s.UpdateUserRole(context.Background(), "admin-1", "user-2", "ADMIN")
+		assert.EqualError(t, err, "db error")
+	})
+
+	t.Run("Success promote user", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByID", mock.Anything, "user-2").Return(&User{ID: "user-2"}, nil)
+		repo.On("UpdateUserRole", mock.Anything, "user-2", RoleAdmin).Return(nil)
+
+		err := s.UpdateUserRole(context.Background(), "admin-1", "user-2", "admin")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Success demote other admin", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByID", mock.Anything, "admin-2").Return(&User{ID: "admin-2", Role: RoleAdmin}, nil)
+		repo.On("UpdateUserRole", mock.Anything, "admin-2", RoleUser).Return(nil)
+
+		err := s.UpdateUserRole(context.Background(), "admin-1", "admin-2", "USER")
+		assert.NoError(t, err)
+	})
 }
