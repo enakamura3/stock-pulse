@@ -35,7 +35,8 @@ func TestLoad_Success(t *testing.T) {
 	assert.Equal(t, "admin-secret-key-12345", Envs.AdminAPIKey)
 	assert.Equal(t, "10.0.0.0/8,172.16.0.0/12", Envs.TrustedProxies)
 	assert.Equal(t, 10*time.Minute, Envs.RedisTTLQuotes)
-	assert.Equal(t, 24*time.Hour, Envs.RedisTTLFundamentals)
+	assert.Equal(t, 1*time.Hour, Envs.RedisTTLFundamentals)
+	assert.Equal(t, 1*time.Hour, Envs.RedisTTLDividends)
 	assert.Equal(t, 15*time.Minute, Envs.JWTAccessTokenTTL)
 	assert.Equal(t, 12*time.Hour, Envs.JWTRefreshTokenTTL)
 }

@@ -49,9 +49,9 @@ func Load() error {
 		JWTRefreshTokenTTL:    parseDuration(os.Getenv("JWT_REFRESH_TOKEN_TTL"), 12*time.Hour),
 		JWTRefreshGracePeriod: parseDuration(os.Getenv("JWT_REFRESH_GRACE_PERIOD"), 30*time.Second),
 		RedisTTLQuotes:        parseDuration(os.Getenv("REDIS_TTL_QUOTES"), 5*time.Minute),
-		RedisTTLFundamentals:  parseDuration(os.Getenv("REDIS_TTL_FUNDAMENTALS"), 24*time.Hour),
+		RedisTTLFundamentals:  parseDuration(os.Getenv("REDIS_TTL_FUNDAMENTALS"), 1*time.Hour),
 		RedisTTLExchangeRates: parseDuration(os.Getenv("REDIS_TTL_EXCHANGE_RATES"), 1*time.Hour),
-		RedisTTLDividends:     parseDuration(os.Getenv("REDIS_TTL_DIVIDENDS"), 12*time.Hour),
+		RedisTTLDividends:     parseDuration(os.Getenv("REDIS_TTL_DIVIDENDS"), 1*time.Hour),
 	}
 
 	if Envs.DBURL == "" {
