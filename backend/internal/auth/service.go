@@ -37,6 +37,7 @@ type UserRepository interface {
 	UpdateUserRole(ctx context.Context, id, role string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
 	DeleteUser(ctx context.Context, id string) error
+	ListUsers(ctx context.Context) ([]*User, error)
 }
 
 // Service implementa a lógica de negócio de autenticação.
@@ -621,4 +622,29 @@ func (s *Service) DeleteUser(ctx context.Context, id, currentPassword string) er
 	}
 
 	return nil
+}
+
+// ListUsers retorna todos os usuários cadastrados no sistema.
+func (s *Service) ListUsers(ctx context.Context) ([]*User, error) {
+	return s.repo.ListUsers(ctx)
+}
+
+// UpdateUserRole atualiza o papel (role) de um usuário alvo.
+// Impede que um administrador revogue o seu próprio privilégio de administrador.
+func (s *Service) UpdateUserRole(ctx context.Context, callerID, targetID, newRole string) error {
+	newRole = strings.ToUpper(strings.TrimSpace(newRole))
+	if newRole != RoleUser && newRole != RoleAdmin {
+		return errors.New("papel inválido, deve ser USER ou ADMIN")
+	}
+
+	if callerID != "" && callerID == targetID && newRole != RoleAdmin {
+		return errors.New("não é possível revogar o próprio privilégio de administrador")
+	}
+
+	_, err := s.repo.GetUserByID(ctx, targetID)
+	if err != nil {
+		return errors.New("usuário não encontrado")
+	}
+
+	return s.repo.UpdateUserRole(ctx, targetID, newRole)
 }

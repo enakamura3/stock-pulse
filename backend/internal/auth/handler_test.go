@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/httputils"
 	"github.com/stretchr/testify/assert"
@@ -84,6 +85,18 @@ func (m *MockAuthService) UpdatePassword(ctx context.Context, id, currentPasswor
 
 func (m *MockAuthService) DeleteUser(ctx context.Context, id, currentPassword string) error {
 	return m.Called(ctx, id, currentPassword).Error(0)
+}
+
+func (m *MockAuthService) ListUsers(ctx context.Context) ([]*User, error) {
+	args := m.Called(ctx)
+	if args.Get(0) != nil {
+		return args.Get(0).([]*User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockAuthService) UpdateUserRole(ctx context.Context, callerID, targetID, newRole string) error {
+	return m.Called(ctx, callerID, targetID, newRole).Error(0)
 }
 
 func TestHandler_Register(t *testing.T) {
@@ -616,4 +629,168 @@ func TestHandler_NewHandler_CustomTTL(t *testing.T) {
 
 	assert.Equal(t, 30*time.Minute, h.accessTokenTTL)
 	assert.Equal(t, 24*time.Hour, h.refreshTokenTTL)
+}
+
+func TestHandler_ListUsersAdmin(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		m := new(MockAuthService)
+		expected := []*User{
+			{ID: "1", Name: "Admin", Role: RoleAdmin},
+			{ID: "2", Name: "User", Role: RoleUser},
+		}
+		m.On("ListUsers", mock.Anything).Return(expected, nil)
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
+		rec := httptest.NewRecorder()
+
+		h.ListUsersAdmin(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		var actual []*User
+		err := json.NewDecoder(rec.Body).Decode(&actual)
+		assert.NoError(t, err)
+		assert.Len(t, actual, 2)
+		m.AssertExpectations(t)
+	})
+
+	t.Run("Service Error", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("ListUsers", mock.Anything).Return(([]*User)(nil), errors.New("db error"))
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
+		rec := httptest.NewRecorder()
+
+		h.ListUsersAdmin(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Falha ao listar usuários")
+		m.AssertExpectations(t)
+	})
+}
+
+func TestHandler_UpdateUserRoleAdmin(t *testing.T) {
+	t.Run("Missing ID", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodPatch, "/admin/users//role", strings.NewReader(`{"role":"ADMIN"}`))
+		rec := httptest.NewRecorder()
+
+		h.UpdateUserRoleAdmin(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "ID do usuário é obrigatório")
+	})
+
+	t.Run("Invalid Payload", func(t *testing.T) {
+		m := new(MockAuthService)
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodPatch, "/admin/users/1/role", strings.NewReader(`invalid-json`))
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "1")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		rec := httptest.NewRecorder()
+
+		h.UpdateUserRoleAdmin(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Corpo da requisição inválido")
+	})
+
+	t.Run("User not found", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdateUserRole", mock.Anything, "", "1", "ADMIN").Return(errors.New("usuário não encontrado"))
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodPatch, "/admin/users/1/role", strings.NewReader(`{"role":"ADMIN"}`))
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "1")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		rec := httptest.NewRecorder()
+
+		h.UpdateUserRoleAdmin(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "usuário não encontrado")
+		m.AssertExpectations(t)
+	})
+
+	t.Run("Invalid role", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdateUserRole", mock.Anything, "", "1", "INVALID").Return(errors.New("papel inválido, deve ser USER ou ADMIN"))
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodPatch, "/admin/users/1/role", strings.NewReader(`{"role":"INVALID"}`))
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "1")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		rec := httptest.NewRecorder()
+
+		h.UpdateUserRoleAdmin(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "papel inválido")
+		m.AssertExpectations(t)
+	})
+
+	t.Run("Self demotion rejected", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdateUserRole", mock.Anything, "adm-1", "adm-1", "USER").Return(errors.New("não é possível revogar o próprio privilégio de administrador"))
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodPatch, "/admin/users/adm-1/role", strings.NewReader(`{"role":"USER"}`))
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "adm-1")
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+		ctx = context.WithValue(ctx, UserIDKey, "adm-1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		h.UpdateUserRoleAdmin(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "não é possível revogar")
+		m.AssertExpectations(t)
+	})
+
+	t.Run("Service generic error", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdateUserRole", mock.Anything, "", "1", "ADMIN").Return(errors.New("database connection broken"))
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodPatch, "/admin/users/1/role", strings.NewReader(`{"role":"ADMIN"}`))
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "1")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		rec := httptest.NewRecorder()
+
+		h.UpdateUserRoleAdmin(rec, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Falha ao atualizar papel do usuário")
+		m.AssertExpectations(t)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		m := new(MockAuthService)
+		m.On("UpdateUserRole", mock.Anything, "adm-1", "2", "ADMIN").Return(nil)
+		h := NewHandler(m)
+
+		req := httptest.NewRequest(http.MethodPatch, "/admin/users/2/role", strings.NewReader(`{"role":"ADMIN"}`))
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "2")
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+		ctx = context.WithValue(ctx, UserIDKey, "adm-1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		h.UpdateUserRoleAdmin(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Papel do usuário atualizado com sucesso")
+		m.AssertExpectations(t)
+	})
 }

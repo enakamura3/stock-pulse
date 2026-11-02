@@ -196,3 +196,37 @@ func (r *Repository) DeleteUser(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+// ListUsers retorna todos os usuários cadastrados no sistema ordenados por data de criação.
+func (r *Repository) ListUsers(ctx context.Context) ([]*User, error) {
+	query := `
+		SELECT id, name, email, role, created_at, updated_at
+		FROM "user"
+		ORDER BY created_at ASC
+	`
+	rows, err := database.GetDB(ctx, r.db).Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao listar usuários: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]*User, 0)
+	for rows.Next() {
+		user := &User{}
+		if err := rows.Scan(
+			&user.ID,
+			&user.Name,
+			&user.Email,
+			&user.Role,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("erro ao ler usuário: %w", err)
+		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("erro após iterar usuários: %w", err)
+	}
+	return users, nil
+}
