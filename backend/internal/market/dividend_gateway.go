@@ -30,6 +30,7 @@ func NewDividendGateway(
 	fundamentus DividendSource,
 	stockAnalysis DividendSource,
 	yahoo DividendSource,
+	investidor10 DividendSource,
 	rdb *redis.Client,
 	ttl time.Duration,
 ) *DividendGateway {
@@ -48,8 +49,9 @@ func NewDividendGateway(
 			{source: stockAnalysis, role: "secondary"},
 		},
 		"ETF_BR": {
-			{source: b3, role: "primary"},
+			{source: investidor10, role: "primary"},
 			{source: stockAnalysis, role: "secondary"},
+			{source: b3, role: "fallback"},
 		},
 		"BDR": {
 			{source: stockAnalysis, role: "primary"},
