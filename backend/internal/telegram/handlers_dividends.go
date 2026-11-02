@@ -753,7 +753,7 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 
 			key := itemKey{
 				day:      day,
-				ticker:   d.Ticker,
+				ticker:   cleanTickerForDisplay(d.Ticker),
 				dType:    dType,
 				currency: curr,
 			}

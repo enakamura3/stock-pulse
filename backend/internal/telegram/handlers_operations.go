@@ -67,7 +67,7 @@ func (h *Handlers) HandleOperationBack(c telebot.Context) error {
 			condMenu.Row(btnBack, btnCancelOp),
 		)
 
-		text := fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(state.Ticker))
+		text := fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(cleanTickerForDisplay(state.Ticker)))
 		if c.Callback() != nil {
 			return c.Edit(text, telebot.ModeMarkdown, condMenu)
 		}
@@ -112,13 +112,14 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 
 	var assetBtns []telebot.Btn
 	for _, pos := range positions {
-		label := pos.Ticker
-		if pos.Name != "" && pos.Name != pos.Ticker {
+		tickerClean := cleanTickerForDisplay(pos.Ticker)
+		label := tickerClean
+		if pos.Name != "" && pos.Name != pos.Ticker && pos.Name != tickerClean {
 			shortName := pos.Name
 			if len(shortName) > 12 {
 				shortName = shortName[:10] + ".."
 			}
-			label = fmt.Sprintf("%s (%s)", pos.Ticker, shortName)
+			label = fmt.Sprintf("%s (%s)", tickerClean, shortName)
 		}
 		btn := menu.Data(label, "btn_ticker_"+pos.Ticker)
 		assetBtns = append(assetBtns, btn)
@@ -255,7 +256,7 @@ func (h *Handlers) handleQuickOperation(c telebot.Context, ticker string) error 
 		menu.Row(btnBack, btnCancel),
 	)
 
-	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(ticker))
+	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(cleanTickerForDisplay(ticker)))
 	return h.sendOrEdit(c, text, telebot.ModeMarkdown, menu)
 }
 
@@ -284,7 +285,7 @@ func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error 
 		menu.Row(btnBack, btnCancel),
 	)
 
-	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(ticker))
+	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(cleanTickerForDisplay(ticker)))
 	if c.Callback() != nil {
 		return c.Edit(text, telebot.ModeMarkdown, menu)
 	}
@@ -306,7 +307,7 @@ func (h *Handlers) HandleNewAsset(c telebot.Context) error {
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 	menu.Inline(menu.Row(btnBack, btnCancel))
 
-	return c.Edit("Qual o código do ativo? (ex: AAPL, PETR4.SA)", menu)
+	return c.Edit("Qual o código do ativo? (ex: AAPL, PETR4)", menu)
 }
 
 func (h *Handlers) HandleSetTypeBuy(c telebot.Context) error {
@@ -344,7 +345,7 @@ func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 		pos, _ := h.getCustodyPosition(ctx, state.PortfolioID, userIDStr, state.Ticker)
 		if pos == nil || pos.Quantity <= 1e-6 {
 			menu.Inline(menu.Row(btnBack, btnCancel))
-			return c.Edit(fmt.Sprintf("⚠️ *Você não possui %s em custódia* nesta carteira para realizar uma venda.\n\nEscolha outro ativo ou selecione Compra.", escapeMarkdown(state.Ticker)), telebot.ModeMarkdown, menu)
+			return c.Edit(fmt.Sprintf("⚠️ *Você não possui %s em custódia* nesta carteira para realizar uma venda.\n\nEscolha outro ativo ou selecione Compra.", escapeMarkdown(cleanTickerForDisplay(state.Ticker))), telebot.ModeMarkdown, menu)
 		}
 
 		p := message.NewPrinter(language.BrazilianPortuguese)
@@ -394,7 +395,7 @@ func (h *Handlers) HandleQtyAll(c telebot.Context) error {
 
 	pos, err := h.getCustodyPosition(ctx, state.PortfolioID, userIDStr, state.Ticker)
 	if err != nil || pos == nil || pos.Quantity <= 1e-6 {
-		return c.Edit(fmt.Sprintf("⚠️ Você não possui custódia de %s para vender.", escapeMarkdown(state.Ticker)))
+		return c.Edit(fmt.Sprintf("⚠️ Você não possui custódia de %s para vender.", escapeMarkdown(cleanTickerForDisplay(state.Ticker))))
 	}
 
 	state.Quantity = pos.Quantity
@@ -421,7 +422,7 @@ func (h *Handlers) HandleQtyHalf(c telebot.Context) error {
 
 	pos, err := h.getCustodyPosition(ctx, state.PortfolioID, userIDStr, state.Ticker)
 	if err != nil || pos == nil || pos.Quantity <= 1e-6 {
-		return c.Edit(fmt.Sprintf("⚠️ Você não possui custódia de %s para vender.", escapeMarkdown(state.Ticker)))
+		return c.Edit(fmt.Sprintf("⚠️ Você não possui custódia de %s para vender.", escapeMarkdown(cleanTickerForDisplay(state.Ticker))))
 	}
 
 	state.Quantity = pos.Quantity / 2.0
@@ -463,7 +464,7 @@ func (h *Handlers) handleSelectedQty(c telebot.Context, qtyStr string) error {
 			btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 			menu.Inline(menu.Row(btnBack, btnCancel))
 			p := message.NewPrinter(language.BrazilianPortuguese)
-			return c.Edit(p.Sprintf("⚠️ *Quantidade indisponível para venda!*\n\nVocê possui apenas *%.4f* cotas de *%s* em custódia.\nPor favor, informe uma quantidade menor ou igual:", custodyQty, escapeMarkdown(state.Ticker)), telebot.ModeMarkdown, menu)
+			return c.Edit(p.Sprintf("⚠️ *Quantidade indisponível para venda!*\n\nVocê possui apenas *%.4f* cotas de *%s* em custódia.\nPor favor, informe uma quantidade menor ou igual:", custodyQty, escapeMarkdown(cleanTickerForDisplay(state.Ticker))), telebot.ModeMarkdown, menu)
 		}
 	}
 
@@ -670,7 +671,7 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço Unitário: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f",
-		state.Ticker, tipoStr, state.Quantity, currSymbol, state.UnitPrice, currSymbol, fee, executedAt.Format("02/01/2006"), currSymbol, totalCost)
+		cleanTickerForDisplay(state.Ticker), tipoStr, state.Quantity, currSymbol, state.UnitPrice, currSymbol, fee, executedAt.Format("02/01/2006"), currSymbol, totalCost)
 
 	successMenu := &telebot.ReplyMarkup{}
 	var rows []telebot.Row
@@ -723,7 +724,7 @@ func (h *Handlers) HandleUndoLastOperation(c telebot.Context) error {
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("⚠️ *Confirmar cancelamento da última operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f\n\nDeseja realmente excluir esta operação?",
-		portName, lastTx.Ticker, tipoStr, lastTx.Quantity, currSymbol, lastTx.UnitPrice, currSymbol, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), currSymbol, lastTx.TotalCost)
+		portName, cleanTickerForDisplay(lastTx.Ticker), tipoStr, lastTx.Quantity, currSymbol, lastTx.UnitPrice, currSymbol, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), currSymbol, lastTx.TotalCost)
 
 	menu := &telebot.ReplyMarkup{}
 	btnConfirm := menu.Data("🗑️ Sim, Desfazer", "btn_tx_del_"+lastTx.ID)
@@ -820,7 +821,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			}
 			if pos == nil || (qty-pos.Quantity) > 1e-6 {
 				p := message.NewPrinter(language.BrazilianPortuguese)
-				return c.Send(p.Sprintf("⚠️ *Quantidade indisponível para venda!*\n\nVocê possui apenas *%.4f* cotas de *%s* em custódia.\nPor favor, informe uma quantidade menor ou igual:", custodyQty, escapeMarkdown(state.Ticker)), telebot.ModeMarkdown, menu)
+				return c.Send(p.Sprintf("⚠️ *Quantidade indisponível para venda!*\n\nVocê possui apenas *%.4f* cotas de *%s* em custódia.\nPor favor, informe uma quantidade menor ou igual:", custodyQty, escapeMarkdown(cleanTickerForDisplay(state.Ticker))), telebot.ModeMarkdown, menu)
 			}
 		}
 
@@ -923,7 +924,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			condMenu.Row(btnBack, btnCancelOp),
 		)
 
-		return c.Send(fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(resolvedTicker)), telebot.ModeMarkdown, condMenu)
+		return c.Send(fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(cleanTickerForDisplay(resolvedTicker))), telebot.ModeMarkdown, condMenu)
 
 	case "ALERT_EXPECT_PRICE":
 		text = strings.ReplaceAll(text, ",", ".")
@@ -960,7 +961,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 		p := message.NewPrinter(language.BrazilianPortuguese)
 		successMsg := p.Sprintf("✅ *Alerta Criado com Sucesso!*\n\n• Ativo: `%s`\n• Condição: Quando estiver %s %s %.2f",
-			createdAlert.Ticker, condStr, getCurrencySymbol(curr), createdAlert.TargetPrice)
+			cleanTickerForDisplay(createdAlert.Ticker), condStr, getCurrencySymbol(curr), createdAlert.TargetPrice)
 
 		successMenu := &telebot.ReplyMarkup{}
 		btnAlertsList := successMenu.Data("🔔 Meus Alertas", "btn_alerts")
@@ -1062,7 +1063,7 @@ func (h *Handlers) handleQuickAlertCreate(c telebot.Context, ticker string) erro
 		condMenu.Row(btnBack, btnCancelOp),
 	)
 
-	text := fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(resolvedTicker))
+	text := fmt.Sprintf("🔔 *Alerta para %s*\n\nDisparar quando a cotação estiver:", escapeMarkdown(cleanTickerForDisplay(resolvedTicker)))
 	if c.Callback() != nil {
 		return c.Edit(text, telebot.ModeMarkdown, condMenu)
 	}
@@ -1098,7 +1099,7 @@ func (h *Handlers) handleQuickWatchlistAdd(c telebot.Context, ticker string) err
 	}
 
 	if err != nil {
-		return c.Send(fmt.Sprintf("⚠️ Não foi possível adicionar *%s* aos Favoritos: %s", escapeMarkdown(resolvedTicker), err.Error()), telebot.ModeMarkdown)
+		return c.Send(fmt.Sprintf("⚠️ Não foi possível adicionar *%s* aos Favoritos: %s", escapeMarkdown(cleanTickerForDisplay(resolvedTicker)), err.Error()), telebot.ModeMarkdown)
 	}
 
 	menu := &telebot.ReplyMarkup{}
@@ -1106,6 +1107,6 @@ func (h *Handlers) handleQuickWatchlistAdd(c telebot.Context, ticker string) err
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
 	menu.Inline(menu.Row(btnWatchlist, btnMenu))
 
-	msg := fmt.Sprintf("⭐ Ativo *`%s`* adicionado aos seus Favoritos com sucesso!", escapeMarkdown(resolvedTicker))
+	msg := fmt.Sprintf("⭐ Ativo *`%s`* adicionado aos seus Favoritos com sucesso!", escapeMarkdown(cleanTickerForDisplay(resolvedTicker)))
 	return c.Send(msg, telebot.ModeMarkdown, menu)
 }

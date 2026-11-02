@@ -355,20 +355,46 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 			emoji = "⚪"
 		}
 
-		totalReturn := 0.0
-		if pos.TotalCost > 1e-6 {
-			totalReturn = ((pos.CurrentValue - pos.TotalCost) / pos.TotalCost) * 100
+		curr := getCurrencySymbol(pos.Currency)
+		tickerClean := cleanTickerForDisplay(pos.Ticker)
+
+		avgPrice := pos.AveragePrice
+		if avgPrice <= 1e-6 && pos.Quantity > 1e-6 && pos.TotalCost > 1e-6 {
+			avgPrice = pos.TotalCost / pos.Quantity
 		}
 
-		msg += p.Sprintf("%s `%s`: Dia: %+.2f%% | L/P: %+.2f%%\n",
-			emoji, pos.Ticker, pos.DailyChangePercent, totalReturn)
-		if pos.CurrentPrice > 1e-6 {
-			curr := getCurrencySymbol(pos.Currency)
-			if pos.OpenPrice > 1e-6 {
-				msg += p.Sprintf("   Abert. %s %s → Atual %s %s\n", curr, formatFinancialPrice(p, pos.OpenPrice), curr, formatFinancialPrice(p, pos.CurrentPrice))
-			} else {
-				msg += p.Sprintf("   Atual %s %s\n", curr, formatFinancialPrice(p, pos.CurrentPrice))
+		totalReturn := 0.0
+		profitLoss := pos.CurrentValue - pos.TotalCost
+		if pos.TotalCost > 1e-6 {
+			totalReturn = (profitLoss / pos.TotalCost) * 100
+		}
+
+		if pos.Quantity > 1e-6 && pos.CurrentValue > 1e-6 {
+			msg += p.Sprintf("%s `%s` • %s cotas • %s %s\n",
+				emoji, tickerClean, formatQuantity(pos.Quantity), curr, formatFinancialPrice(p, pos.CurrentValue))
+		} else {
+			msg += p.Sprintf("%s `%s`\n", emoji, tickerClean)
+		}
+
+		if avgPrice > 1e-6 && pos.CurrentPrice > 1e-6 {
+			msg += p.Sprintf("   PM: %s %s → Atual: %s %s\n",
+				curr, formatFinancialPrice(p, avgPrice), curr, formatFinancialPrice(p, pos.CurrentPrice))
+		} else if avgPrice > 1e-6 {
+			msg += p.Sprintf("   PM: %s %s\n", curr, formatFinancialPrice(p, avgPrice))
+		} else if pos.CurrentPrice > 1e-6 {
+			msg += p.Sprintf("   Atual: %s %s\n", curr, formatFinancialPrice(p, pos.CurrentPrice))
+		}
+
+		if pos.TotalCost > 1e-6 && pos.CurrentValue > 1e-6 {
+			plSign := ""
+			if profitLoss > 1e-6 {
+				plSign = "+"
 			}
+			msg += p.Sprintf("   Dia: %+.2f%% | L/P: %+.2f%% (%s%s %s)\n",
+				pos.DailyChangePercent, totalReturn, plSign, curr, formatFinancialPrice(p, profitLoss))
+		} else {
+			msg += p.Sprintf("   Dia: %+.2f%% | L/P: %+.2f%%\n",
+				pos.DailyChangePercent, totalReturn)
 		}
 	}
 
@@ -509,7 +535,7 @@ func formatPositionMover(p *message.Printer, pos portfolio.Position, isRiser boo
 	if isRiser {
 		sign = "+"
 	}
-	line := p.Sprintf("• `%s`: "+sign+"%.2f%%\n", pos.Ticker, pos.DailyChangePercent)
+	line := p.Sprintf("• `%s`: "+sign+"%.2f%%\n", cleanTickerForDisplay(pos.Ticker), pos.DailyChangePercent)
 	if pos.CurrentPrice > 1e-6 {
 		curr := getCurrencySymbol(pos.Currency)
 		if pos.OpenPrice > 1e-6 {

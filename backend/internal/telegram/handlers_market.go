@@ -55,7 +55,7 @@ func (h *Handlers) renderMultiQuote(c telebot.Context, tickers []string) error {
 	for _, t := range tickers {
 		quote, err := h.getQuoteWithFallback(ctx, t)
 		if err != nil || quote == nil {
-			msg += "• *" + escapeMarkdown(t) + "*: ⚠️ _Cotação indisponível_\n"
+			msg += "• *" + escapeMarkdown(cleanTickerForDisplay(t)) + "*: ⚠️ _Cotação indisponível_\n"
 			continue
 		}
 
@@ -74,7 +74,7 @@ func (h *Handlers) renderMultiQuote(c telebot.Context, tickers []string) error {
 			changeStr = p.Sprintf("%.2f%%", quote.ChangePercent)
 		}
 
-		msg += "• *" + escapeMarkdown(t) + "*: " + curr + " " + formatFinancialPrice(p, quote.Price) + " (" + badge + changeStr + ")\n"
+		msg += "• *" + escapeMarkdown(cleanTickerForDisplay(t)) + "*: " + curr + " " + formatFinancialPrice(p, quote.Price) + " (" + badge + changeStr + ")\n"
 	}
 
 	msg += "\n_💡 Dica: Use /cotacao TICKER para ver detalhes completos e múltiplos._"
@@ -183,7 +183,7 @@ func (h *Handlers) HandleQuoteStart(c telebot.Context) error {
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 	menu.Inline(menu.Row(btnCancel))
 
-	msg := "📈 *Cotação Rápida*\n\nDigite o código do ativo:\n_(ex: VALE3.SA, AAPL, BTC-USD)_"
+	msg := "📈 *Cotação Rápida*\n\nDigite o código do ativo:\n_(ex: VALE3, AAPL, BTC-USD)_"
 	if c.Callback() != nil {
 		return c.Edit(msg, telebot.ModeMarkdown, menu)
 	}
@@ -228,7 +228,7 @@ func (h *Handlers) HandleAnalysisStart(c telebot.Context) error {
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 	menu.Inline(menu.Row(btnCancel))
 
-	msg := "🔍 *Análise Fundamentalista*\n\nDigite o código do ativo que deseja analisar:\n_(ex: PETR4, VALE3.SA, AAPL)_"
+	msg := "🔍 *Análise Fundamentalista*\n\nDigite o código do ativo que deseja analisar:\n_(ex: PETR4, VALE3, AAPL)_"
 	if c.Callback() != nil {
 		return c.Edit(msg, telebot.ModeMarkdown, menu)
 	}
@@ -294,7 +294,7 @@ func formatAnalysisMessage(ticker string, fund *market.Fundamentals, price float
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	curr := getCurrencySymbol(currency)
 
-	msg := p.Sprintf("🔍 *Análise Fundamentalista: %s*\n", escapeMarkdown(ticker))
+	msg := p.Sprintf("🔍 *Análise Fundamentalista: %s*\n", escapeMarkdown(cleanTickerForDisplay(ticker)))
 	if price > 1e-6 {
 		msg += p.Sprintf("💵 Preço Atual: *%s %s*\n\n", curr, formatFinancialPrice(p, price))
 	} else {
@@ -375,7 +375,7 @@ func formatQuoteMessage(ticker string, quote *market.Quote) string {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📈 *%s*\n_%s_\n\n", escapeMarkdown(title), escapeMarkdown(quote.Name))
+	msg := p.Sprintf("📈 *%s*\n_%s_\n\n", escapeMarkdown(cleanTickerForDisplay(title)), escapeMarkdown(quote.Name))
 	msg += p.Sprintf("💵 *Preço:* %s %s\n", curr, formatFinancialPrice(p, quote.Price))
 	msg += p.Sprintf("%s *Variação:* %s%s (%s%.2f%%)\n",
 		changeEmoji, changeSign, formatFinancialPrice(p, quote.Change), changeSign, quote.ChangePercent)

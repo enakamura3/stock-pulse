@@ -33,7 +33,8 @@ func TestHandlers_Market(t *testing.T) {
 		var sentMsg string
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
 			sentMsg = msg
-			return strings.Contains(msg, "VALE3.SA") &&
+			return strings.Contains(msg, "VALE3") &&
+				!strings.Contains(msg, "VALE3.SA") &&
 				strings.Contains(msg, "Vale S.A.") &&
 				strings.Contains(msg, "Preço:") &&
 				strings.Contains(msg, "R$ 62,50") &&
@@ -42,7 +43,7 @@ func TestHandlers_Market(t *testing.T) {
 
 		err := h.HandleQuote(mCtx)
 		assert.NoError(t, err)
-		assert.Contains(t, sentMsg, "VALE3.SA")
+		assert.Contains(t, sentMsg, "VALE3")
 	})
 
 	t.Run("HandleQuote - with args quote error", func(t *testing.T) {
@@ -168,7 +169,8 @@ func TestHandlers_Market(t *testing.T) {
 		}, nil).Once()
 		svc.On("ClearConversationState", mock.Anything, int64(123)).Return(nil).Once()
 		mCtxOk.On("Send", mock.MatchedBy(func(msg string) bool {
-			return strings.Contains(msg, "PETR4.SA") &&
+			return strings.Contains(msg, "PETR4") &&
+				!strings.Contains(msg, "PETR4.SA") &&
 				strings.Contains(msg, "Petrobras") &&
 				strings.Contains(msg, "R$ 38,20")
 		}), mock.Anything).Return(nil).Once()

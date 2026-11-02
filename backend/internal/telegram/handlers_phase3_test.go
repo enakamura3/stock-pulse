@@ -147,7 +147,7 @@ func TestHandlers_Phase3_QuickAlertCreate(t *testing.T) {
 			Step:   "ALERT_EXPECT_COND",
 		}).Return(nil).Once()
 		mCtxSend.On("Send", mock.MatchedBy(func(msg string) bool {
-			return strings.Contains(msg, "Alerta para PETR4.SA")
+			return strings.Contains(msg, "Alerta para PETR4") && !strings.Contains(msg, "PETR4.SA")
 		}), mock.Anything).Return(nil).Once()
 
 		err := h.handleQuickAlertCreate(mCtxSend, "PETR4")
@@ -237,7 +237,7 @@ func TestHandlers_Phase3_QuickWatchlistAdd(t *testing.T) {
 		wlSvc.On("AddAssetToWatchlist", mock.Anything, "wl-1", "00000000-0000-0000-0000-000000000000", "PETR4").Return(nil, errors.New("not found")).Once()
 		wlSvc.On("AddAssetToWatchlist", mock.Anything, "wl-1", "00000000-0000-0000-0000-000000000000", "PETR4.SA").Return(&watchlist.Item{Ticker: "PETR4.SA"}, nil).Once()
 		mCtxOk.On("Send", mock.MatchedBy(func(msg string) bool {
-			return strings.Contains(msg, "PETR4.SA") && strings.Contains(msg, "adicionado aos seus Favoritos")
+			return strings.Contains(msg, "PETR4") && !strings.Contains(msg, "PETR4.SA") && strings.Contains(msg, "adicionado aos seus Favoritos")
 		}), mock.Anything).Return(nil).Once()
 
 		err = h.HandleDynamicCallback(mCtxOk)

@@ -289,7 +289,7 @@ func (w *DailyDigestWorker) ProcessDailyDigests(ctx context.Context) {
 						upcomingDividends = append(upcomingDividends, d)
 					}
 					if !d.CumDate.IsZero() && d.CumDate.Format("2006-01-02") == todayStr {
-						extraAlerts = append(extraAlerts, fmt.Sprintf("Data Com hoje para %s (%s)", d.Ticker, d.Type))
+						extraAlerts = append(extraAlerts, fmt.Sprintf("Data Com hoje para %s (%s)", cleanTickerForDisplay(d.Ticker), d.Type))
 					}
 				}
 			}
