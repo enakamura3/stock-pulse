@@ -47,7 +47,10 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	}
 
 	if len(positions) == 0 && len(treasuryPositions) == 0 {
-		return h.sendOrEdit(c, "🏛️ Você ainda não possui ativos de Renda Fixa ou Tesouro Direto cadastrados.")
+		menu := &telebot.ReplyMarkup{}
+		btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
+		menu.Inline(menu.Row(btnBack))
+		return h.sendOrEdit(c, "🏛️ Você ainda não possui ativos de Renda Fixa ou Tesouro Direto cadastrados.", menu)
 	}
 
 	var totalBruto, totalLiquido, totalCusto float64
@@ -80,8 +83,14 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 			taxa = p.Sprintf("%.2f%% a.a.", pos.Asset.Rate)
 		}
 
-		line := p.Sprintf("• `%s %s` - %s\n  Líquido: R$ %.2f (+%.2f%%)%s",
-			pos.Asset.Institution, pos.Asset.Type, taxa, pos.NetValue, pos.NetReturnPercent, status)
+		vencStr := ""
+		if !pos.Asset.MaturityDate.IsZero() {
+			vencStr = p.Sprintf(" • Venc.: %s", pos.Asset.MaturityDate.Format("02/01/2006"))
+		}
+
+		line := p.Sprintf("• `%s %s` - %s%s\n  Aplicado: R$ %s → Líquido: R$ %s (%+.2f%%)%s",
+			pos.Asset.Institution, pos.Asset.Type, taxa, vencStr,
+			formatFinancialPrice(p, pos.TotalInvested), formatFinancialPrice(p, pos.NetValue), pos.NetReturnPercent, status)
 		items = append(items, line)
 	}
 
@@ -94,12 +103,18 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 		}
 
 		netReturnPct := 0.0
-		if pos.TotalInvested > 0 {
+		if pos.TotalInvested > 1e-6 {
 			netReturnPct = ((pos.NetValue - pos.TotalInvested) / pos.TotalInvested) * 100
 		}
 
-		line := p.Sprintf("• `Tesouro %s` (%.4f un.)\n  Líquido: R$ %.2f (%+.2f%%)%s",
-			pos.TreasuryType, pos.Quantity, pos.NetValue, netReturnPct, status)
+		vencStr := ""
+		if !pos.MaturityDate.IsZero() {
+			vencStr = p.Sprintf(" • Venc.: %s", pos.MaturityDate.Format("02/01/2006"))
+		}
+
+		line := p.Sprintf("• `Tesouro %s` (%s un.)%s\n  Aplicado: R$ %s → Líquido: R$ %s (%+.2f%%)%s",
+			pos.TreasuryType, formatQuantity(pos.Quantity), vencStr,
+			formatFinancialPrice(p, pos.TotalInvested), formatFinancialPrice(p, pos.NetValue), netReturnPct, status)
 		items = append(items, line)
 	}
 
@@ -118,15 +133,16 @@ func (h *Handlers) HandleFixedIncome(c telebot.Context) error {
 	}
 
 	msg := p.Sprintf("🏛️ *Renda Fixa & Tesouro: %s*\n\n", escapeMarkdown(portfolioName))
-	msg += p.Sprintf("💰 Valor Líquido: *R$ %.2f*\n", totalLiquido)
-	msg += p.Sprintf("📈 Valor Bruto: R$ %.2f\n", totalBruto)
+	msg += p.Sprintf("💰 Valor Líquido: *R$ %s*\n", formatFinancialPrice(p, totalLiquido))
+	msg += p.Sprintf("💵 Total Aplicado: R$ %s\n", formatFinancialPrice(p, totalCusto))
+	msg += p.Sprintf("📈 Valor Bruto: R$ %s\n", formatFinancialPrice(p, totalBruto))
 
 	lucro := totalLiquido - totalCusto
 	lucroPct := 0.0
-	if totalCusto > 0 {
+	if totalCusto > 1e-6 {
 		lucroPct = (lucro / totalCusto) * 100
 	}
-	msg += p.Sprintf("⚖️ Lucro Líquido: R$ %.2f (%.2f%%)\n\n", lucro, lucroPct)
+	msg += p.Sprintf("⚖️ Lucro Líquido: R$ %s (%.2f%%)\n\n", formatFinancialPrice(p, lucro), lucroPct)
 
 	if totalPages > 1 {
 		msg += p.Sprintf("*Minhas Posições* (Página %d de %d):\n", page+1, totalPages)

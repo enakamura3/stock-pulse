@@ -79,8 +79,13 @@ func (m *MockTelebotContext) Chat() *telebot.Chat {
 }
 
 func (m *MockTelebotContext) Args() []string {
-	args := m.Called()
-	return args.Get(0).([]string)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Args" && call.Repeatability >= 0 {
+			args := m.Called()
+			return args.Get(0).([]string)
+		}
+	}
+	return nil
 }
 
 func (m *MockTelebotContext) Respond(resp ...*telebot.CallbackResponse) error {
@@ -167,23 +172,33 @@ type MockPortfolioService struct {
 }
 
 func (m *MockPortfolioService) GetPortfolios(ctx context.Context, userID string) ([]portfolio.Portfolio, error) {
-	args := m.Called(ctx, userID)
-	if args.Get(0) != nil {
-		return args.Get(0).([]portfolio.Portfolio), args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetPortfolios" && call.Repeatability > -1 {
+			args := m.Called(ctx, userID)
+			if args.Get(0) != nil {
+				return args.Get(0).([]portfolio.Portfolio), args.Error(1)
+			}
+			return nil, args.Error(1)
+		}
 	}
-	return nil, args.Error(1)
+	return nil, nil
 }
 func (m *MockPortfolioService) GetPortfolioDetails(ctx context.Context, portfolioID, userID string) (*portfolio.Portfolio, []portfolio.Position, error) {
-	args := m.Called(ctx, portfolioID, userID)
-	var p *portfolio.Portfolio
-	if args.Get(0) != nil {
-		p = args.Get(0).(*portfolio.Portfolio)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetPortfolioDetails" && call.Repeatability > -1 {
+			args := m.Called(ctx, portfolioID, userID)
+			var p *portfolio.Portfolio
+			if args.Get(0) != nil {
+				p = args.Get(0).(*portfolio.Portfolio)
+			}
+			var pos []portfolio.Position
+			if args.Get(1) != nil {
+				pos = args.Get(1).([]portfolio.Position)
+			}
+			return p, pos, args.Error(2)
+		}
 	}
-	var pos []portfolio.Position
-	if args.Get(1) != nil {
-		pos = args.Get(1).([]portfolio.Position)
-	}
-	return p, pos, args.Error(2)
+	return nil, nil, nil
 }
 func (m *MockPortfolioService) AddTransaction(ctx context.Context, userID string, tx *portfolio.Transaction) (*portfolio.Transaction, error) {
 	args := m.Called(ctx, userID, tx)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -110,8 +111,17 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	menu := &telebot.ReplyMarkup{}
 	var rows []telebot.Row
 
+	displayPositions := make([]portfolio.Position, len(positions))
+	copy(displayPositions, positions)
+	if len(displayPositions) > 12 {
+		sort.Slice(displayPositions, func(i, j int) bool {
+			return displayPositions[i].CurrentValue > displayPositions[j].CurrentValue
+		})
+		displayPositions = displayPositions[:12]
+	}
+
 	var assetBtns []telebot.Btn
-	for _, pos := range positions {
+	for _, pos := range displayPositions {
 		tickerClean := cleanTickerForDisplay(pos.Ticker)
 		label := tickerClean
 		if pos.Name != "" && pos.Name != pos.Ticker && pos.Name != tickerClean {
@@ -209,6 +219,11 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 	if strings.HasPrefix(data, "btn_alert_cond_") {
 		condition := strings.TrimPrefix(data, "btn_alert_cond_")
 		return h.handleAlertCondition(c, strings.ToUpper(condition))
+	}
+
+	if strings.HasPrefix(data, "btn_alert_price_") {
+		priceStr := strings.TrimPrefix(data, "btn_alert_price_")
+		return h.handleSelectedAlertPrice(c, priceStr)
 	}
 
 	if strings.HasPrefix(data, "btn_wl_add_") {
@@ -673,6 +688,17 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 	successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço Unitário: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f",
 		cleanTickerForDisplay(state.Ticker), tipoStr, state.Quantity, currSymbol, state.UnitPrice, currSymbol, fee, executedAt.Format("02/01/2006"), currSymbol, totalCost)
 
+	if pos, _ := h.getCustodyPosition(ctx, state.PortfolioID, userIDStr, state.Ticker); pos != nil && pos.Quantity > 1e-6 {
+		avgPrice := pos.AveragePrice
+		if avgPrice <= 1e-6 && pos.TotalCost > 1e-6 {
+			avgPrice = pos.TotalCost / pos.Quantity
+		}
+		if avgPrice > 1e-6 {
+			successMsg += p.Sprintf("\n\n📊 *Posição Atualizada:* %s cotas (PM: %s %s)",
+				formatQuantity(pos.Quantity), currSymbol, formatFinancialPrice(p, avgPrice))
+		}
+	}
+
 	successMenu := &telebot.ReplyMarkup{}
 	var rows []telebot.Row
 	if savedTx != nil && savedTx.ID != "" {
@@ -971,6 +997,21 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		return c.Send(successMsg, telebot.ModeMarkdown, successMenu)
 
 	case "QUOTE_EXPECT_TICKER":
+		fields := strings.FieldsFunc(text, func(r rune) bool {
+			return r == ' ' || r == ',' || r == ';'
+		})
+		if len(fields) > 1 {
+			var tickers []string
+			for _, f := range fields {
+				clean := strings.ToUpper(strings.TrimSpace(f))
+				if clean != "" {
+					tickers = append(tickers, clean)
+				}
+			}
+			_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+			return h.renderMultiQuote(c, tickers)
+		}
+
 		ticker := strings.ToUpper(text)
 		quote, err := h.getQuoteWithFallback(ctx, ticker)
 		if err != nil {
@@ -985,11 +1026,14 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		}
 
 		msg := formatQuoteMessage(resolvedTicker, quote)
+		if pos := h.findActiveCustodyPosition(ctx, c, resolvedTicker); pos != nil {
+			msg += formatCustodyQuoteSummary(pos, quote.Price, quote.Currency)
+		}
 
 		replyMenu := &telebot.ReplyMarkup{}
 		btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+resolvedTicker)
 		btnAnalise := replyMenu.Data("🔍 Análise", "btn_analise_"+resolvedTicker)
-		btnOperar := replyMenu.Data("💵 Operar", "btn_ticker_"+resolvedTicker)
+		btnOperar := replyMenu.Data("💵 Operar", "btn_op_quick_"+resolvedTicker)
 		btnAlerta := replyMenu.Data("🔔 Criar Alerta", "btn_alert_create_"+resolvedTicker)
 		btnWlAdd := replyMenu.Data("⭐ Favoritar", "btn_wl_add_"+resolvedTicker)
 		btnNew := replyMenu.Data("🔍 Outra Cotação", "btn_cotacao")

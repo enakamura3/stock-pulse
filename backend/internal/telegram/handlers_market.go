@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/onigiri/stock-pulse/backend/internal/market"
+	"github.com/onigiri/stock-pulse/backend/internal/portfolio"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"gopkg.in/telebot.v3"
@@ -137,6 +138,9 @@ func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
 	}
 
 	msg := formatQuoteMessage(ticker, quote)
+	if pos := h.findActiveCustodyPosition(ctx, c, ticker); pos != nil {
+		msg += formatCustodyQuoteSummary(pos, quote.Price, quote.Currency)
+	}
 
 	replyMenu := &telebot.ReplyMarkup{}
 	btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+ticker)
@@ -264,6 +268,9 @@ func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
 	}
 
 	msg := formatAnalysisMessage(ticker, fund, currentPrice, curr)
+	if pos := h.findActiveCustodyPosition(ctx, c, ticker); pos != nil {
+		msg += formatCustodyAnalysisSummary(pos, fund, currentPrice, curr)
+	}
 
 	menu := &telebot.ReplyMarkup{}
 	btnRefresh := menu.Data("🔄 Atualizar", "btn_analise_"+ticker)
@@ -390,4 +397,66 @@ func formatQuoteMessage(ticker string, quote *market.Quote) string {
 		msg += p.Sprintf("📦 *Volume:* %d\n", quote.Volume)
 	}
 	return msg
+}
+
+func (h *Handlers) findActiveCustodyPosition(ctx context.Context, c telebot.Context, ticker string) *portfolio.Position {
+	if h.portfolioSvc == nil || c == nil {
+		return nil
+	}
+	val := c.Get("user_id")
+	userIDStr, ok := val.(string)
+	if !ok || userIDStr == "" {
+		return nil
+	}
+	var chatID int64
+	if c.Chat() != nil {
+		chatID = c.Chat().ID
+	}
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return nil
+	}
+	portfolioID, _ := h.resolveActivePortfolio(ctx, chatID, portfolios)
+	pos, _ := h.getCustodyPosition(ctx, portfolioID, userIDStr, ticker)
+	return pos
+}
+
+func formatCustodyQuoteSummary(pos *portfolio.Position, currentPrice float64, currency string) string {
+	if pos == nil || pos.Quantity <= 1e-6 {
+		return ""
+	}
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	curr := getCurrencySymbol(currency)
+	avgPrice := pos.AveragePrice
+	if avgPrice <= 1e-6 && pos.TotalCost > 1e-6 {
+		avgPrice = pos.TotalCost / pos.Quantity
+	}
+	if avgPrice > 1e-6 && currentPrice > 1e-6 {
+		retPct := ((currentPrice - avgPrice) / avgPrice) * 100
+		return p.Sprintf("\n💼 *Na sua carteira:* %s cotas | PM: %s %s (%+.2f%%)\n",
+			formatQuantity(pos.Quantity), curr, formatFinancialPrice(p, avgPrice), retPct)
+	}
+	return p.Sprintf("\n💼 *Na sua carteira:* %s cotas\n", formatQuantity(pos.Quantity))
+}
+
+func formatCustodyAnalysisSummary(pos *portfolio.Position, fund *market.Fundamentals, currentPrice float64, currency string) string {
+	if pos == nil || pos.Quantity <= 1e-6 {
+		return ""
+	}
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	curr := getCurrencySymbol(currency)
+	avgPrice := pos.AveragePrice
+	if avgPrice <= 1e-6 && pos.TotalCost > 1e-6 {
+		avgPrice = pos.TotalCost / pos.Quantity
+	}
+	if avgPrice <= 1e-6 {
+		return ""
+	}
+	line := p.Sprintf("\n💼 *Sua Posição:* %s cotas (PM: %s %s)\n",
+		formatQuantity(pos.Quantity), curr, formatFinancialPrice(p, avgPrice))
+	if fund != nil && fund.DividendYield > 1e-6 && currentPrice > 1e-6 {
+		yoc := fund.DividendYield * (currentPrice / avgPrice)
+		line += p.Sprintf("• Yield on Cost (YoC): *%.2f%%*\n", yoc)
+	}
+	return line
 }
