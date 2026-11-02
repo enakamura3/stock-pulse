@@ -17,6 +17,7 @@ type Environment struct {
 	AlertCheckInterval    string
 	BrapiToken            string
 	AdminAPIKey           string
+	AdminEmail            string
 	Env                   string
 	TrustedProxies        string
 	JWTAccessTokenTTL     time.Duration
@@ -42,6 +43,7 @@ func Load() error {
 		AlertCheckInterval: os.Getenv("ALERT_CHECK_INTERVAL"),
 		BrapiToken:         os.Getenv("BRAPI_TOKEN"),
 		AdminAPIKey:        os.Getenv("ADMIN_API_KEY"),
+		AdminEmail:         os.Getenv("ADMIN_EMAIL"),
 		Env:                os.Getenv("ENV"),
 		TrustedProxies:     os.Getenv("TRUSTED_PROXIES"),
 

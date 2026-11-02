@@ -81,8 +81,14 @@ func AuthRequired(jwtSecret []byte, rdb ...*redis.Client) func(http.Handler) htt
 				}
 			}
 
-			// Injeta o UserID no contexto da requisição
+			// Injeta o UserID e UserRole no contexto da requisição
+			role, _ := claims["role"].(string)
+			if role == "" {
+				role = auth.RoleUser
+			}
+
 			ctx := context.WithValue(r.Context(), auth.UserIDKey, userID)
+			ctx = context.WithValue(ctx, auth.UserRoleKey, role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
