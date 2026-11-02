@@ -24,6 +24,7 @@ interface AdminAssetInfo {
 
 export default function SettingsPage() {
   const { user, logout, fetchMe, isLoading: authLoading } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   // Estados do perfil
   const [profileName, setProfileName] = useState('');
@@ -234,10 +235,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadTelegramStatus();
-    loadWorkers();
-    loadAdminAssets();
+    if (isAdmin) {
+      loadWorkers();
+      loadAdminAssets();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAdmin]);
 
   if (authLoading) {
     return (
@@ -440,6 +443,9 @@ export default function SettingsPage() {
               </h1>
             </div>
             <div className="flex-row items-center gap-sm">
+              <span className={`badge font-mono text-xs hide-mobile ${isAdmin ? 'badge-success' : 'badge-neutral'}`}>
+                [ ROLE: {user.role || 'USER'} ]
+              </span>
               <span className="badge badge-neutral font-mono text-xs hide-mobile">
                 [ USER_ID: {user.id ? user.id.slice(0, 8) : 'ACTIVE'} ]
               </span>
@@ -626,66 +632,74 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Seção 4: Controle de Workers */}
-          <section className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>
-            <div className="terminal-bar">
-              <div className="flex-row items-center gap-xs font-mono">
-                <span className="text-accent" style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>▸</span>
-                <span style={{ color: 'var(--text-secondary)' }}>settings/workers.daemons</span>
-              </div>
-              <span className="badge badge-neutral font-mono" style={{ fontSize: '0.65rem' }}>
-                [ {workers.length} WORKERS ]
-              </span>
-            </div>
-            <div style={{ padding: '1.25rem' }}>
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 1rem 0', margin: 0, borderBottom: '1px solid var(--panel-border)', marginBottom: '1.25rem' }}>
-                <h2 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', margin: 0 }}>
-                  <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
-                  <span>⚙️ Controle de Workers</span>
-                </h2>
-                <button 
-                  className="btn-secondary font-mono" 
-                  onClick={() => loadWorkers()} 
-                  disabled={isLoadingWorkers} 
-                  style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
-                >
-                  {isLoadingWorkers ? 'Atualizando...' : '🔄 Atualizar'}
-                </button>
-              </div>
-              
-              {/* Chave de Administração para Workers (Segura: Em Memória Apenas) */}
-              <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <label htmlFor="adminKeyInput" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                    Chave de Administração (X-Admin-Key):
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px', flex: '1 1 280px' }}>
-                    <input
-                      id="adminKeyInput"
-                      type="password"
-                      placeholder="Insira a ADMIN_API_KEY para autenticar"
-                      value={adminKey}
-                      onChange={(e) => setAdminKey(e.target.value)}
-                      className="form-input font-mono"
-                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem', flex: 1 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn-secondary font-mono"
-                      onClick={() => {
-                        loadWorkers(adminKey);
-                        loadAdminAssets(adminKey);
-                      }}
-                      style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
-                    >
-                      Conectar
-                    </button>
+          {/* Seções exclusivas para Administradores (Workers & Catálogo Global) */}
+          {isAdmin && (
+            <>
+              {/* Seção 4: Controle de Workers */}
+              <section className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>
+                <div className="terminal-bar">
+                  <div className="flex-row items-center gap-xs font-mono">
+                    <span className="text-accent" style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>▸</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>settings/workers.daemons</span>
+                  </div>
+                  <div className="flex-row items-center gap-xs">
+                    <span className="badge badge-success font-mono" style={{ fontSize: '0.65rem' }}>
+                      [ ADMIN ]
+                    </span>
+                    <span className="badge badge-neutral font-mono" style={{ fontSize: '0.65rem' }}>
+                      [ {workers.length} WORKERS ]
+                    </span>
                   </div>
                 </div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  🔒 Chave segura em memória (sessão ativa) — nunca persistida no navegador ou no bundle.
-                </span>
-              </div>
+                <div style={{ padding: '1.25rem' }}>
+                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 1rem 0', margin: 0, borderBottom: '1px solid var(--panel-border)', marginBottom: '1.25rem' }}>
+                    <h2 className="card-title font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', margin: 0 }}>
+                      <span className="text-muted" style={{ opacity: 0.5 }}>{'//'}</span>
+                      <span>⚙️ Controle de Workers</span>
+                    </h2>
+                    <button 
+                      className="btn-secondary font-mono" 
+                      onClick={() => loadWorkers()} 
+                      disabled={isLoadingWorkers} 
+                      style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                    >
+                      {isLoadingWorkers ? 'Atualizando...' : '🔄 Atualizar'}
+                    </button>
+                  </div>
+                  
+                  {/* Chave de Administração para Workers (Segura: Em Memória Apenas) */}
+                  <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label htmlFor="adminKeyInput" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        Chave de Administração (opcional / override):
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px', flex: '1 1 280px' }}>
+                        <input
+                          id="adminKeyInput"
+                          type="password"
+                          placeholder="Autenticado via sessão (ADMIN). Preencha apenas para override M2M."
+                          value={adminKey}
+                          onChange={(e) => setAdminKey(e.target.value)}
+                          className="form-input font-mono"
+                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.75rem', flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          className="btn-secondary font-mono"
+                          onClick={() => {
+                            loadWorkers(adminKey);
+                            loadAdminAssets(adminKey);
+                          }}
+                          style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+                        >
+                          Conectar
+                        </button>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      🔒 Autenticado automaticamente via sessão de Administrador ({user?.email}) — nenhuma chave manual necessária.
+                    </span>
+                  </div>
 
               {workersError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{workersError}</div>}
               {workerSuccess && <div style={{ color: 'var(--color-success)', fontSize: '0.9rem', padding: '0.5rem 0', fontWeight: 600, marginBottom: '1rem', fontFamily: 'var(--font-mono)' }}>{workerSuccess}</div>}
@@ -873,6 +887,8 @@ export default function SettingsPage() {
               )}
             </div>
           </section>
+            </>
+          )}
 
           {/* Seção 6: Zona de Perigo */}
           <section className="card flex-col gap-0" style={{ width: '100%', padding: 0, overflow: 'hidden', borderColor: 'rgba(var(--danger-rgb), 0.3)', background: 'var(--color-danger-bg)' }}>

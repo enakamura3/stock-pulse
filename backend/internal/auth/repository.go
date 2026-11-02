@@ -14,6 +14,7 @@ type User struct {
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"`
 	Name         string    `json:"name"`
+	Role         string    `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -28,18 +29,27 @@ func NewRepository(db database.DBTX) *Repository {
 	return &Repository{db: db}
 }
 
-// CreateUser insere um novo registro de usuário na tabela.
+// CreateUser insere um novo registro de usuário na tabela com papel padrão USER.
 func (r *Repository) CreateUser(ctx context.Context, name, email, passwordHash string) (*User, error) {
+	return r.CreateUserWithRole(ctx, name, email, passwordHash, RoleUser)
+}
+
+// CreateUserWithRole insere um novo registro de usuário com um papel explícito.
+func (r *Repository) CreateUserWithRole(ctx context.Context, name, email, passwordHash, role string) (*User, error) {
+	if role == "" {
+		role = RoleUser
+	}
 	query := `
-		INSERT INTO "user" (name, email, password_hash, created_at, updated_at)
-		VALUES ($1, $2, $3, NOW(), NOW())
-		RETURNING id, name, email, created_at, updated_at
+		INSERT INTO "user" (name, email, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, NOW(), NOW())
+		RETURNING id, name, email, role, created_at, updated_at
 	`
 	user := &User{}
-	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, name, email, passwordHash).Scan(
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, name, email, passwordHash, role).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
+		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -52,7 +62,7 @@ func (r *Repository) CreateUser(ctx context.Context, name, email, passwordHash s
 // GetUserByEmail busca um usuário pelo e-mail e retorna incluindo o hash de senha para validação de login.
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	query := `
-		SELECT id, name, email, password_hash, created_at, updated_at
+		SELECT id, name, email, role, password_hash, created_at, updated_at
 		FROM "user"
 		WHERE email = $1
 	`
@@ -61,6 +71,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, e
 		&user.ID,
 		&user.Name,
 		&user.Email,
+		&user.Role,
 		&user.PasswordHash,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -74,7 +85,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, e
 // GetUserByID busca os dados públicos do usuário pelo ID (usado na rota /me).
 func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) {
 	query := `
-		SELECT id, name, email, created_at, updated_at
+		SELECT id, name, email, role, created_at, updated_at
 		FROM "user"
 		WHERE id = $1
 	`
@@ -83,6 +94,7 @@ func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 		&user.ID,
 		&user.Name,
 		&user.Email,
+		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -95,7 +107,7 @@ func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 // GetUserByIDWithHash busca o usuário completo pelo ID, incluindo o hash da senha.
 func (r *Repository) GetUserByIDWithHash(ctx context.Context, id string) (*User, error) {
 	query := `
-		SELECT id, name, email, password_hash, created_at, updated_at
+		SELECT id, name, email, role, password_hash, created_at, updated_at
 		FROM "user"
 		WHERE id = $1
 	`
@@ -104,6 +116,7 @@ func (r *Repository) GetUserByIDWithHash(ctx context.Context, id string) (*User,
 		&user.ID,
 		&user.Name,
 		&user.Email,
+		&user.Role,
 		&user.PasswordHash,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -120,13 +133,14 @@ func (r *Repository) UpdateUser(ctx context.Context, id, name, email string) (*U
 		UPDATE "user"
 		SET name = $2, email = $3, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, name, email, created_at, updated_at
+		RETURNING id, name, email, role, created_at, updated_at
 	`
 	user := &User{}
 	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, name, email).Scan(
 		&user.ID,
 		&user.Name,
 		&user.Email,
+		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -134,6 +148,22 @@ func (r *Repository) UpdateUser(ctx context.Context, id, name, email string) (*U
 		return nil, fmt.Errorf("erro ao atualizar usuário: %w", err)
 	}
 	return user, nil
+}
+
+// UpdateUserRole atualiza o papel (role) do usuário.
+func (r *Repository) UpdateUserRole(ctx context.Context, id, role string) error {
+	query := `
+		UPDATE "user"
+		SET role = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id
+	`
+	var returnedID string
+	err := database.GetDB(ctx, r.db).QueryRow(ctx, query, id, role).Scan(&returnedID)
+	if err != nil {
+		return fmt.Errorf("erro ao atualizar papel do usuário: %w", err)
+	}
+	return nil
 }
 
 // UpdatePassword atualiza o hash da senha do usuário.

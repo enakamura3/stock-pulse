@@ -15,6 +15,7 @@ func TestLoad_Success(t *testing.T) {
 	os.Setenv("REDIS_PASSWORD", "redis-secret-pass")
 	os.Setenv("REDIS_TTL_QUOTES", "10m")
 	os.Setenv("ADMIN_API_KEY", "admin-secret-key-12345")
+	os.Setenv("ADMIN_EMAIL", "admin@stockpulse.local")
 	os.Setenv("TRUSTED_PROXIES", "10.0.0.0/8,172.16.0.0/12")
 	defer func() {
 		os.Unsetenv("DB_URL")
@@ -23,6 +24,7 @@ func TestLoad_Success(t *testing.T) {
 		os.Unsetenv("REDIS_PASSWORD")
 		os.Unsetenv("REDIS_TTL_QUOTES")
 		os.Unsetenv("ADMIN_API_KEY")
+		os.Unsetenv("ADMIN_EMAIL")
 		os.Unsetenv("TRUSTED_PROXIES")
 	}()
 
@@ -33,6 +35,7 @@ func TestLoad_Success(t *testing.T) {
 	assert.Equal(t, "http://localhost:3000", Envs.FrontendURL)
 	assert.Equal(t, "redis-secret-pass", Envs.RedisPassword)
 	assert.Equal(t, "admin-secret-key-12345", Envs.AdminAPIKey)
+	assert.Equal(t, "admin@stockpulse.local", Envs.AdminEmail)
 	assert.Equal(t, "10.0.0.0/8,172.16.0.0/12", Envs.TrustedProxies)
 	assert.Equal(t, 10*time.Minute, Envs.RedisTTLQuotes)
 	assert.Equal(t, 1*time.Hour, Envs.RedisTTLFundamentals)

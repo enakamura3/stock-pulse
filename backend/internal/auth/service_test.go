@@ -64,6 +64,11 @@ func (m *MockUserRepository) UpdateUser(ctx context.Context, id, name, email str
 	return nil, args.Error(1)
 }
 
+func (m *MockUserRepository) UpdateUserRole(ctx context.Context, id, role string) error {
+	args := m.Called(ctx, id, role)
+	return args.Error(0)
+}
+
 func (m *MockUserRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
 	return m.Called(ctx, id, passwordHash).Error(0)
 }
@@ -119,6 +124,32 @@ func TestService_Register(t *testing.T) {
 		assert.Equal(t, "1", user.ID)
 		repo.AssertExpectations(t)
 	})
+
+	t.Run("Success with AdminEmail", func(t *testing.T) {
+		config.Envs.AdminEmail = "admin@test.com"
+		defer func() { config.Envs.AdminEmail = "" }()
+
+		s, repo, _ := setupService()
+		repo.On("GetUserByEmail", mock.Anything, "admin@test.com").Return(nil, errors.New("not found"))
+		repo.On("CreateUser", mock.Anything, "Admin", "admin@test.com", mock.AnythingOfType("string")).Return(&User{ID: "adm-1", Email: "admin@test.com", Role: RoleUser}, nil)
+		repo.On("UpdateUserRole", mock.Anything, "adm-1", RoleAdmin).Return(nil)
+
+		user, err := s.Register(context.Background(), "Admin", "admin@test.com", "password")
+		assert.NoError(t, err)
+		assert.Equal(t, "adm-1", user.ID)
+		assert.Equal(t, RoleAdmin, user.Role)
+	})
+
+	t.Run("CreateUser error", func(t *testing.T) {
+		s, repo, _ := setupService()
+		repo.On("GetUserByEmail", mock.Anything, "test@test.com").Return(nil, errors.New("not found"))
+		repo.On("CreateUser", mock.Anything, "Test", "test@test.com", mock.AnythingOfType("string")).Return(nil, errors.New("db error"))
+
+		user, err := s.Register(context.Background(), "Test", "test@test.com", "password")
+		assert.EqualError(t, err, "db error")
+		assert.Nil(t, user)
+		repo.AssertExpectations(t)
+	})
 }
 
 func TestService_Login(t *testing.T) {
@@ -153,6 +184,27 @@ func TestService_Login(t *testing.T) {
 		if resUser != nil {
 			assert.Equal(t, "1", resUser.ID)
 		}
+		assert.NotEmpty(t, access)
+		assert.NotEmpty(t, refresh)
+	})
+
+	t.Run("Success with AdminEmail upgrade", func(t *testing.T) {
+		config.Envs.AdminEmail = "admin@test.com"
+		defer func() { config.Envs.AdminEmail = "" }()
+
+		s, repo, rdbMock := setupService()
+		hash, _ := hashPassword("password", defaultParams)
+		user := &User{ID: "adm-1", Email: "admin@test.com", Role: RoleUser, PasswordHash: hash}
+		repo.On("GetUserByEmail", mock.Anything, "admin@test.com").Return(user, nil)
+		repo.On("UpdateUserRole", mock.Anything, "adm-1", RoleAdmin).Return(nil)
+
+		rdbMock.Regexp().ExpectSet("^refresh_token:.*", "adm-1", 12*time.Hour).SetVal("OK")
+		rdbMock.Regexp().ExpectSAdd("^user_active_tokens:adm-1$", ".*").SetVal(1)
+		rdbMock.ExpectExpire("user_active_tokens:adm-1", 12*time.Hour).SetVal(true)
+
+		resUser, access, refresh, err := s.Login(context.Background(), "admin@test.com", "password")
+		assert.NoError(t, err)
+		assert.Equal(t, RoleAdmin, resUser.Role)
 		assert.NotEmpty(t, access)
 		assert.NotEmpty(t, refresh)
 	})
@@ -476,6 +528,18 @@ func TestService_GenerateAccessToken(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "user-123", claims["user_id"])
 		assert.Equal(t, "user@test.com", claims["email"])
+		assert.Equal(t, RoleUser, claims["role"])
+
+		// Test with explicit ADMIN role
+		adminUser := &User{ID: "admin-1", Email: "admin@test.com", Role: RoleAdmin}
+		adminTokenStr, err := s.GenerateAccessToken(adminUser)
+		assert.NoError(t, err)
+		adminToken, err := jwt.Parse(adminTokenStr, func(token *jwt.Token) (interface{}, error) {
+			return s.jwtSecret, nil
+		})
+		assert.NoError(t, err)
+		adminClaims := adminToken.Claims.(jwt.MapClaims)
+		assert.Equal(t, RoleAdmin, adminClaims["role"])
 
 		expFloat, ok := claims["exp"].(float64)
 		assert.True(t, ok)

@@ -31,7 +31,7 @@ describe('SettingsPage', () => {
     localStorage.clear();
 
     (useAuth as any).mockReturnValue({
-      user: { id: 'test', name: 'Test User', email: 'test@example.com', token: 'token' },
+      user: { id: 'test', name: 'Test User', email: 'test@example.com', token: 'token', role: 'ADMIN' },
       logout: mockLogout,
       fetchMe: mockFetchMe,
       isLoading: false,
@@ -103,6 +103,24 @@ describe('SettingsPage', () => {
     );
 
     expect(container.firstChild).toBeNull();
+  });
+
+  it('does not render admin sections when user role is USER', () => {
+    (useAuth as any).mockReturnValue({
+      user: { id: 'test', name: 'Regular User', email: 'user@example.com', token: 'token', role: 'USER' },
+      logout: mockLogout,
+      fetchMe: mockFetchMe,
+      isLoading: false,
+    });
+
+    render(
+      <ThemeProvider>
+        <SettingsPage />
+      </ThemeProvider>
+    );
+
+    expect(screen.queryByText(/Controle de Workers/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Catálogo de Ativos/i)).not.toBeInTheDocument();
   });
 
   it('renders settings layout, loads initial data, and sorts workers by name', async () => {

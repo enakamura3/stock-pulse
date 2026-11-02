@@ -34,6 +34,7 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, id string) (*User, error)
 	GetUserByIDWithHash(ctx context.Context, id string) (*User, error)
 	UpdateUser(ctx context.Context, id, name, email string) (*User, error)
+	UpdateUserRole(ctx context.Context, id, role string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
 	DeleteUser(ctx context.Context, id string) error
 }
@@ -283,7 +284,15 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (*
 		return nil, fmt.Errorf("falha ao criptografar senha: %w", err)
 	}
 
-	return s.repo.CreateUser(ctx, name, email, hash)
+	createdUser, err := s.repo.CreateUser(ctx, name, email, hash)
+	if err != nil {
+		return nil, err
+	}
+	if config.Envs.AdminEmail != "" && strings.EqualFold(email, config.Envs.AdminEmail) && createdUser.Role != RoleAdmin {
+		_ = s.repo.UpdateUserRole(ctx, createdUser.ID, RoleAdmin)
+		createdUser.Role = RoleAdmin
+	}
+	return createdUser, nil
 }
 
 // Login valida o e-mail/senha e retorna o usuário logado e os tokens gerados.
@@ -322,6 +331,12 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 		_ = s.rdb.Del(ctx, emailRateLimitKey).Err()
 	}
 
+	// Se configurado ADMIN_EMAIL e for o usuário logado, garante privilégios de RoleAdmin
+	if config.Envs.AdminEmail != "" && strings.EqualFold(user.Email, config.Envs.AdminEmail) && user.Role != RoleAdmin {
+		_ = s.repo.UpdateUserRole(ctx, user.ID, RoleAdmin)
+		user.Role = RoleAdmin
+	}
+
 	accessToken, err := s.GenerateAccessToken(user)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("falha ao gerar access token: %w", err)
@@ -335,7 +350,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*User, str
 	return user, accessToken, refreshToken, nil
 }
 
-// GenerateAccessToken gera um JWT Access Token assinado com a validade configurada.
+// GenerateAccessToken gera um JWT Access Token assinado com a validade configurada e claims de papel.
 func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	if user == nil {
 		return "", errors.New("usuário não fornecido")
@@ -345,9 +360,15 @@ func (s *Service) GenerateAccessToken(user *User) (string, error) {
 	}
 
 	now := time.Now()
+	role := user.Role
+	if role == "" {
+		role = RoleUser
+	}
+
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
+		"role":    role,
 		"iss":     JWTIssuer,
 		"aud":     JWTAudience,
 		"exp":     now.Add(s.accessTokenTTL).Unix(),

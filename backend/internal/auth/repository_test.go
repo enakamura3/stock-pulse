@@ -24,21 +24,58 @@ func TestRepository_CreateUser(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "name", "email", "created_at", "updated_at"}).
-		AddRow("1", "Test", "test@test.com", now, now)
+	rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+		AddRow("1", "Test", "test@test.com", "USER", now, now)
 
 	mock.ExpectQuery(`INSERT INTO "user"`).
-		WithArgs("Test", "test@test.com", "hash").
+		WithArgs("Test", "test@test.com", "hash", "USER").
 		WillReturnRows(rows)
 
 	user, err := repo.CreateUser(context.Background(), "Test", "test@test.com", "hash")
 	assert.NoError(t, err)
 	assert.Equal(t, "1", user.ID)
 	assert.Equal(t, "Test", user.Name)
+	assert.Equal(t, "USER", user.Role)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("expectations failed: %v", err)
 	}
+}
+
+func TestRepository_CreateUserWithRole(t *testing.T) {
+	t.Run("Explicit role", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		now := time.Now()
+		rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+			AddRow("1", "Admin", "admin@test.com", "ADMIN", now, now)
+
+		mock.ExpectQuery(`INSERT INTO "user"`).
+			WithArgs("Admin", "admin@test.com", "hash", "ADMIN").
+			WillReturnRows(rows)
+
+		user, err := repo.CreateUserWithRole(context.Background(), "Admin", "admin@test.com", "hash", "ADMIN")
+		assert.NoError(t, err)
+		assert.Equal(t, "ADMIN", user.Role)
+	})
+
+	t.Run("Default empty role to USER", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		now := time.Now()
+		rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+			AddRow("1", "Test", "test@test.com", "USER", now, now)
+
+		mock.ExpectQuery(`INSERT INTO "user"`).
+			WithArgs("Test", "test@test.com", "hash", "USER").
+			WillReturnRows(rows)
+
+		user, err := repo.CreateUserWithRole(context.Background(), "Test", "test@test.com", "hash", "")
+		assert.NoError(t, err)
+		assert.Equal(t, "USER", user.Role)
+	})
 }
 
 func TestRepository_CreateUser_Error(t *testing.T) {
@@ -46,7 +83,7 @@ func TestRepository_CreateUser_Error(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectQuery(`INSERT INTO "user"`).
-		WithArgs("Test", "test@test.com", "hash").
+		WithArgs("Test", "test@test.com", "hash", "USER").
 		WillReturnError(errors.New("db error"))
 
 	_, err := repo.CreateUser(context.Background(), "Test", "test@test.com", "hash")
@@ -58,16 +95,17 @@ func TestRepository_GetUserByEmail(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "name", "email", "password_hash", "created_at", "updated_at"}).
-		AddRow("1", "Test", "test@test.com", "hash", now, now)
+	rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "password_hash", "created_at", "updated_at"}).
+		AddRow("1", "Test", "test@test.com", "USER", "hash", now, now)
 
-	mock.ExpectQuery(`SELECT id, name, email, password_hash, created_at, updated_at FROM "user"`).
+	mock.ExpectQuery(`SELECT id, name, email, role, password_hash, created_at, updated_at FROM "user"`).
 		WithArgs("test@test.com").
 		WillReturnRows(rows)
 
 	user, err := repo.GetUserByEmail(context.Background(), "test@test.com")
 	assert.NoError(t, err)
 	assert.Equal(t, "1", user.ID)
+	assert.Equal(t, "USER", user.Role)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("expectations failed: %v", err)
@@ -78,7 +116,7 @@ func TestRepository_GetUserByEmail_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT id, name, email, password_hash, created_at, updated_at FROM "user"`).
+	mock.ExpectQuery(`SELECT id, name, email, role, password_hash, created_at, updated_at FROM "user"`).
 		WithArgs("notfound@test.com").
 		WillReturnError(errors.New("not found"))
 
@@ -91,16 +129,17 @@ func TestRepository_GetUserByID(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "name", "email", "created_at", "updated_at"}).
-		AddRow("1", "Test", "test@test.com", now, now)
+	rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+		AddRow("1", "Test", "test@test.com", "ADMIN", now, now)
 
-	mock.ExpectQuery(`SELECT id, name, email, created_at, updated_at FROM "user"`).
+	mock.ExpectQuery(`SELECT id, name, email, role, created_at, updated_at FROM "user"`).
 		WithArgs("1").
 		WillReturnRows(rows)
 
 	user, err := repo.GetUserByID(context.Background(), "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "1", user.ID)
+	assert.Equal(t, "ADMIN", user.Role)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("expectations failed: %v", err)
@@ -111,7 +150,7 @@ func TestRepository_GetUserByID_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT id, name, email, created_at, updated_at FROM "user"`).
+	mock.ExpectQuery(`SELECT id, name, email, role, created_at, updated_at FROM "user"`).
 		WithArgs("999").
 		WillReturnError(errors.New("not found"))
 
@@ -124,10 +163,10 @@ func TestRepository_GetUserByIDWithHash(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "name", "email", "password_hash", "created_at", "updated_at"}).
-		AddRow("1", "Test", "test@test.com", "hash", now, now)
+	rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "password_hash", "created_at", "updated_at"}).
+		AddRow("1", "Test", "test@test.com", "USER", "hash", now, now)
 
-	mock.ExpectQuery(`SELECT id, name, email, password_hash, created_at, updated_at FROM "user"`).
+	mock.ExpectQuery(`SELECT id, name, email, role, password_hash, created_at, updated_at FROM "user"`).
 		WithArgs("1").
 		WillReturnRows(rows)
 
@@ -135,6 +174,7 @@ func TestRepository_GetUserByIDWithHash(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "1", user.ID)
 	assert.Equal(t, "hash", user.PasswordHash)
+	assert.Equal(t, "USER", user.Role)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("expectations failed: %v", err)
@@ -146,8 +186,8 @@ func TestRepository_UpdateUser(t *testing.T) {
 	defer mock.Close()
 
 	now := time.Now()
-	rows := pgxmock.NewRows([]string{"id", "name", "email", "created_at", "updated_at"}).
-		AddRow("1", "NewName", "new@test.com", now, now)
+	rows := pgxmock.NewRows([]string{"id", "name", "email", "role", "created_at", "updated_at"}).
+		AddRow("1", "NewName", "new@test.com", "USER", now, now)
 
 	mock.ExpectQuery(`UPDATE "user" SET name = \$2, email = \$3, updated_at = NOW\(\)`).
 		WithArgs("1", "NewName", "new@test.com").
@@ -157,10 +197,40 @@ func TestRepository_UpdateUser(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "NewName", user.Name)
 	assert.Equal(t, "new@test.com", user.Email)
+	assert.Equal(t, "USER", user.Role)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("expectations failed: %v", err)
 	}
+}
+
+func TestRepository_UpdateUserRole(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		rows := pgxmock.NewRows([]string{"id"}).AddRow("1")
+
+		mock.ExpectQuery(`UPDATE "user" SET role = \$2, updated_at = NOW\(\)`).
+			WithArgs("1", "ADMIN").
+			WillReturnRows(rows)
+
+		err := repo.UpdateUserRole(context.Background(), "1", "ADMIN")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		mock, repo := setupRepoTest(t)
+		defer mock.Close()
+
+		mock.ExpectQuery(`UPDATE "user" SET role = \$2, updated_at = NOW\(\)`).
+			WithArgs("1", "ADMIN").
+			WillReturnError(errors.New("db error"))
+
+		err := repo.UpdateUserRole(context.Background(), "1", "ADMIN")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "erro ao atualizar papel do usuário: db error")
+	})
 }
 
 func TestRepository_UpdatePassword(t *testing.T) {
@@ -203,7 +273,7 @@ func TestRepository_GetUserByIDWithHash_Error(t *testing.T) {
 	mock, repo := setupRepoTest(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT id, name, email, password_hash, created_at, updated_at FROM "user"`).
+	mock.ExpectQuery(`SELECT id, name, email, role, password_hash, created_at, updated_at FROM "user"`).
 		WithArgs("1").
 		WillReturnError(errors.New("db error"))
 
@@ -249,4 +319,3 @@ func TestRepository_DeleteUser_Error(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "erro ao excluir usuário: db error")
 }
-

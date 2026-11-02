@@ -14,8 +14,17 @@ import (
 
 type contextKey string
 
-// UserIDKey é a chave usada para armazenar e resgatar o ID do usuário autenticado no contexto HTTP.
-const UserIDKey contextKey = "user_id"
+// Chaves usadas para armazenar e resgatar o ID e o papel (role) do usuário autenticado no contexto HTTP.
+const (
+	UserIDKey   contextKey = "user_id"
+	UserRoleKey contextKey = "user_role"
+)
+
+// Constantes de papéis de usuário (RBAC)
+const (
+	RoleUser  = "USER"
+	RoleAdmin = "ADMIN"
+)
 
 // AuthService define os casos de uso de autenticação que o Handler pode consumir.
 type AuthService interface {

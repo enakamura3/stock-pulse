@@ -311,15 +311,15 @@ func main() {
 			})
 		})
 
-		// Workers / System Management (Protegido por ADMIN_API_KEY)
+		// Workers / System Management (Protegido por ADMIN_API_KEY ou Sessão ADMIN)
 		r.Route("/workers", func(r chi.Router) {
-			r.Use(customMiddleware.RequireAdminKey(config.Envs.AdminAPIKey))
+			r.Use(customMiddleware.RequireAdmin(config.Envs.AdminAPIKey, []byte(config.Envs.JWTSecret), rdb))
 			workerHandler.RegisterRoutes(r)
 		})
 
-		// Catálogo Global de Ativos (Protegido por ADMIN_API_KEY)
+		// Catálogo Global de Ativos (Protegido por ADMIN_API_KEY ou Sessão ADMIN)
 		r.Route("/admin/assets", func(r chi.Router) {
-			r.Use(customMiddleware.RequireAdminKey(config.Envs.AdminAPIKey))
+			r.Use(customMiddleware.RequireAdmin(config.Envs.AdminAPIKey, []byte(config.Envs.JWTSecret), rdb))
 			r.Get("/", portfolioHandler.ListAssetsAdmin)
 			r.Patch("/{id}", portfolioHandler.UpdateAssetTypeAdmin)
 		})
