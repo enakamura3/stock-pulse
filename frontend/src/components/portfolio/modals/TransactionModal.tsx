@@ -40,6 +40,8 @@ export default function TransactionModal({
   editingTxId,
   setEditingTxId,
   txTicker,
+  txAssetType,
+  setTxAssetType,
   searchQuery,
   setSearchQuery,
   isSearching,
@@ -74,6 +76,13 @@ export default function TransactionModal({
 
   const currencySymbol = selectedAssetCurrency === 'USD' ? '$' : 'R$';
 
+  const handleClose = () => {
+    setShowTxModal(false);
+    setEditingTxId(null);
+    setSearchQuery('');
+    if (setTxAssetType) setTxAssetType('');
+  };
+
   return (
     <div className="modal-overlay">
       <div className="modal-content" style={{ maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -90,10 +99,7 @@ export default function TransactionModal({
             {editingTxId ? '✏️ Editar Transação' : '➕ Nova Transação'}
           </h2>
           <button
-            onClick={() => {
-              setShowTxModal(false);
-              setEditingTxId(null);
-            }}
+            onClick={handleClose}
             className="btn-close"
           >
             ✕
@@ -401,7 +407,7 @@ export default function TransactionModal({
           <div className="flex-row gap-md mt-sm">
             <button
               type="button"
-              onClick={() => setShowTxModal(false)}
+              onClick={handleClose}
               className="btn-secondary w-full"
               style={{ padding: '0.75rem' }}
             >

@@ -208,8 +208,8 @@ func NewHub(marketSvc MarketProvider) *Hub {
 	return &Hub{
 		clients:           make(map[*Client]bool),
 		userConns:         make(map[string]int),
-		register:          make(chan *Client),
-		unregister:        make(chan *Client),
+		register:          make(chan *Client, 256),
+		unregister:        make(chan *Client, 256),
 		marketSvc:         marketSvc,
 		broadcastInterval: 5 * time.Second,
 		pingPeriod:        54 * time.Second,

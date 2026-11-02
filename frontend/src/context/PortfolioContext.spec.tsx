@@ -946,6 +946,17 @@ describe('PortfolioContext', () => {
     });
     expect(context.txAssetType).toBe('STOCK_BR');
 
+    // Test when /assets returns an invalid/legacy asset_type (e.g. EQUITY)
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url.includes('/quotes/')) return Promise.resolve({ ok: true, json: async () => ({ name: 'Petrobras', currency: 'BRL' }) });
+      if (url.includes('/assets/')) return Promise.resolve({ ok: true, json: async () => ({ asset_type: 'EQUITY' }) });
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+    await act(async () => {
+      await context.handleSelectAsset('PETR4.SA');
+    });
+    expect(context.txAssetType).toBe('STOCK_BR');
+
     // Error handling on loads
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     (apiFetch as any).mockRejectedValue(new Error('Fetch failed'));

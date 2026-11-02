@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 )
 
@@ -66,12 +67,7 @@ func (s *Service) CreateAlert(ctx context.Context, userID, ticker string, target
 		}
 
 		// 3. Cadastra o ativo de forma inteligente no banco local
-		assetType := "EQUITY"
-		if strings.Contains(ticker, "-") {
-			assetType = "CRYPTO"
-		} else if quote.Currency == "USD" && !strings.Contains(ticker, ".") {
-			assetType = "EQUITY_US"
-		}
+		assetType := calculator.DetermineAssetType(ticker, quote.Name, quote.Currency)
 
 		assetID, err = s.repo.CreateAsset(ctx, ticker, quote.Name, assetType, quote.Currency)
 		if err != nil {
