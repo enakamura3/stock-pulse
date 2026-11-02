@@ -44,7 +44,7 @@ func TestService_GetDividends(t *testing.T) {
 		mockB3.On("GetDividends", mock.Anything, "PETR4.SA", "STOCK_BR").Return(evs, nil)
 		mockFund.On("GetDividends", mock.Anything, "PETR4.SA", "STOCK_BR").Return(evs, nil)
 
-		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, rdb, 12*time.Hour)
+		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, nil, rdb, 12*time.Hour)
 
 		res, err := s.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
 		assert.NoError(t, err)
@@ -64,7 +64,7 @@ func TestService_GetDividends(t *testing.T) {
 		evs := []DividendEvent{{Date: time.Now(), Amount: 0.25, Type: "Dividendo"}}
 		mockSA.On("GetDividends", mock.Anything, "AAPL", "STOCK_US").Return(evs, nil)
 
-		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, rdb, 12*time.Hour)
+		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, nil, rdb, 12*time.Hour)
 
 		res, err := s.GetDividends(context.Background(), "AAPL", "STOCK_US")
 		assert.NoError(t, err)

@@ -30,18 +30,20 @@ func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
 	fundamentusClient := NewFundamentusClient()
 	stockAnalysisClient := NewStockAnalysisClient()
 	yahooClient := NewYahooClient()
+	investidor10Client := NewInvestidor10Client()
 
 	b3Source := NewB3DividendSource(b3Client)
 	fundamentusSource := NewFundamentusDividendSource(fundamentusClient)
 	stockAnalysisSource := NewStockAnalysisDividendSource(stockAnalysisClient)
 	yahooSource := NewYahooDividendSource(yahooClient)
+	investidor10Source := NewInvestidor10DividendSource(investidor10Client)
 
 	ttlDividends := config.Envs.RedisTTLDividends
 
 	return &Service{
 		provider:         provider,
 		scraper:          NewScraper(),
-		dividendGateway:  NewDividendGateway(b3Source, fundamentusSource, stockAnalysisSource, yahooSource, rdb, ttlDividends),
+		dividendGateway:  NewDividendGateway(b3Source, fundamentusSource, stockAnalysisSource, yahooSource, investidor10Source, rdb, ttlDividends),
 		rdb:              rdb,
 		ttlQuotes:        config.Envs.RedisTTLQuotes,
 		ttlFundamentals:  config.Envs.RedisTTLFundamentals,
