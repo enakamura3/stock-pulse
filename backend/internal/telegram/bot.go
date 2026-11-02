@@ -112,7 +112,7 @@ func (r *BotRunner) SendAlertMessage(chatID int64, userName, ticker, assetName s
 	}
 
 	escapedUserName := escapeMarkdown(userName)
-	escapedTicker := escapeMarkdown(ticker)
+	escapedTicker := escapeMarkdown(cleanTickerForDisplay(ticker))
 	escapedAssetName := escapeMarkdown(assetName)
 
 	msg := "🚨 *ALERTA DE PREÇO DISPARADO* 🚨\n\n"
@@ -156,7 +156,7 @@ func (r *BotRunner) SendDividendPaymentAlert(chatID int64, userName, portfolioNa
 		}
 		totalCredited += it.NetAmount
 
-		escapedTicker := escapeMarkdown(it.Ticker)
+		escapedTicker := escapeMarkdown(cleanTickerForDisplay(it.Ticker))
 		escapedType := escapeMarkdown(it.Type)
 		perShareStr := formatFinancialPrice(p, it.PerShareAmount)
 		totalItemStr := formatFinancialPrice(p, it.NetAmount)
@@ -255,7 +255,7 @@ func (r *BotRunner) SendDailyDigest(
 	if len(todayDividends) > 0 {
 		msg += "💰 *Proventos creditados hoje:*\n"
 		for _, d := range todayDividends {
-			msg += "  • *" + escapeMarkdown(d.Ticker) + "* (" + escapeMarkdown(d.Type) + "): " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
+			msg += "  • *" + escapeMarkdown(cleanTickerForDisplay(d.Ticker)) + "* (" + escapeMarkdown(d.Type) + "): " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
 		}
 		msg += "\n"
 	}
@@ -264,7 +264,7 @@ func (r *BotRunner) SendDailyDigest(
 	if len(upcomingDividends) > 0 {
 		msg += "📅 *Próximos Proventos (7 dias):*\n"
 		for _, d := range upcomingDividends {
-			msg += "  • *" + escapeMarkdown(d.Ticker) + "*: " + d.PaymentDate.Format("02/01") + " — " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
+			msg += "  • *" + escapeMarkdown(cleanTickerForDisplay(d.Ticker)) + "*: " + d.PaymentDate.Format("02/01") + " — " + d.Currency + " " + formatFinancialPrice(p, d.NetAmount) + "\n"
 		}
 		msg += "\n"
 	}
@@ -302,7 +302,7 @@ func formatDailyMover(p *message.Printer, m DailyMover, defaultCurrency string, 
 	if isGainer {
 		sign = "+"
 	}
-	line := "  • *" + escapeMarkdown(m.Ticker) + "*: " + p.Sprintf(sign+"%.2f%%", m.DailyChangePercent) + "\n"
+	line := "  • *" + escapeMarkdown(cleanTickerForDisplay(m.Ticker)) + "*: " + p.Sprintf(sign+"%.2f%%", m.DailyChangePercent) + "\n"
 	if m.CurrentPrice > 1e-6 {
 		curr := m.Currency
 		if curr == "" {

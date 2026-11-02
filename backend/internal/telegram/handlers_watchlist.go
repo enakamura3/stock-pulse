@@ -112,11 +112,12 @@ func (h *Handlers) renderWatchlist(c telebot.Context, page int) error {
 		if curr == "" {
 			curr = "BRL"
 		}
+		tickerClean := cleanTickerForDisplay(item.Ticker)
 		msg += p.Sprintf("%s `%s` — %s %s (%+.2f%%)\n",
-			emoji, item.Ticker, getCurrencySymbol(curr), formatFinancialPrice(nil, item.Price), item.ChangePercent)
+			emoji, tickerClean, getCurrencySymbol(curr), formatFinancialPrice(nil, item.Price), item.ChangePercent)
 
-		btnQuote := menu.Data("📈 "+item.Ticker, "btn_quote_"+item.Ticker)
-		btnDel := menu.Data("🗑️ "+item.Ticker, fmt.Sprintf("btn_wl_del_%s:%d", item.Ticker, page))
+		btnQuote := menu.Data("📈 "+tickerClean, "btn_quote_"+item.Ticker)
+		btnDel := menu.Data("🗑️ "+tickerClean, fmt.Sprintf("btn_wl_del_%s:%d", item.Ticker, page))
 		rows = append(rows, menu.Row(btnQuote, btnDel))
 	}
 	msg += p.Sprintf("\n_Total: %d ativo(s)_", len(wl.Items))
@@ -169,7 +170,7 @@ func (h *Handlers) HandleWatchlistAdd(c telebot.Context) error {
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 	menu.Inline(menu.Row(btnCancel))
 
-	msg := "⭐ *Adicionar aos Favoritos*\n\nDigite o código do ativo que deseja favoritar:\n_(ex: PETR4, VALE3.SA, AAPL, BTC-USD)_"
+	msg := "⭐ *Adicionar aos Favoritos*\n\nDigite o código do ativo que deseja favoritar:\n_(ex: PETR4, VALE3, AAPL, BTC-USD)_"
 	if c.Callback() != nil {
 		return c.Edit(msg, telebot.ModeMarkdown, menu)
 	}
@@ -217,7 +218,7 @@ func (h *Handlers) handleWatchlistAddTicker(c telebot.Context, text string) erro
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
 	menu.Inline(menu.Row(btnWatchlist, btnMenu))
 
-	msg := fmt.Sprintf("✅ Ativo *`%s`* adicionado aos seus Favoritos com sucesso!", escapeMarkdown(resolvedTicker))
+	msg := fmt.Sprintf("✅ Ativo *`%s`* adicionado aos seus Favoritos com sucesso!", escapeMarkdown(cleanTickerForDisplay(resolvedTicker)))
 	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
 

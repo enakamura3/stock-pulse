@@ -142,7 +142,7 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 		}, nil).Once()
 
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
-			return strings.Contains(msg, "VALE3.SA")
+			return strings.Contains(msg, "VALE3") && !strings.Contains(msg, "VALE3.SA")
 		}), mock.Anything).Return(nil).Once()
 
 		err := h.HandleQuote(mCtx)
@@ -192,7 +192,7 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 		})).Return(nil).Once()
 
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
-			return strings.Contains(msg, "ITUB4.SA")
+			return strings.Contains(msg, "ITUB4") && !strings.Contains(msg, "ITUB4.SA")
 		}), mock.Anything).Return(nil).Once()
 
 		err := h.HandleText(mCtx)
@@ -218,7 +218,7 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 		})).Return(nil).Once()
 
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
-			return strings.Contains(msg, "Alerta para BBDC4.SA")
+			return strings.Contains(msg, "Alerta para BBDC4") && !strings.Contains(msg, "BBDC4.SA")
 		}), mock.Anything).Return(nil).Once()
 
 		err := h.HandleText(mCtx)
@@ -237,7 +237,7 @@ func TestHandlers_Phase2_B3TickerFallback(t *testing.T) {
 		wSvc.On("AddAssetToWatchlist", mock.Anything, "w1", "00000000-0000-0000-0000-000000000000", "PETR4.SA").Return(&watchlist.Item{Ticker: "PETR4.SA"}, nil).Once()
 
 		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
-			return strings.Contains(msg, "PETR4.SA") && strings.Contains(msg, "adicionado aos seus Favoritos")
+			return strings.Contains(msg, "PETR4") && !strings.Contains(msg, "PETR4.SA") && strings.Contains(msg, "adicionado aos seus Favoritos")
 		}), mock.Anything).Return(nil).Once()
 
 		err := h.handleWatchlistAddTicker(mCtx, "petr4")

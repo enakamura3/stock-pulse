@@ -125,7 +125,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 			tipoStr = "🔴 Venda"
 		}
 
-		msg += p.Sprintf("%s | `%s`\n", tipoStr, tx.Ticker)
+		msg += p.Sprintf("%s | `%s`\n", tipoStr, cleanTickerForDisplay(tx.Ticker))
 		msg += p.Sprintf("Data: %s\n", tx.ExecutedAt.Format("2006-01-02"))
 		if tx.Fee > 1e-6 {
 			msg += p.Sprintf("Qtd: %.4f | Preço: R$ %.2f | Total: R$ %.2f (Taxas: R$ %.2f)\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee)
@@ -140,7 +140,7 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	// Atalhos para exclusão pontual de operações exibidas na página
 	var delBtns []telebot.Btn
 	for _, tx := range filtered[start:end] {
-		btnDel := menu.Data(fmt.Sprintf("🗑️ %s (%s)", tx.Ticker, tx.ExecutedAt.Format("02/01")), "btn_tx_del_"+tx.ID)
+		btnDel := menu.Data(fmt.Sprintf("🗑️ %s (%s)", cleanTickerForDisplay(tx.Ticker), tx.ExecutedAt.Format("02/01")), "btn_tx_del_"+tx.ID)
 		delBtns = append(delBtns, btnDel)
 	}
 	for i := 0; i < len(delBtns); i += 2 {

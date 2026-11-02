@@ -94,7 +94,7 @@ func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 			}
 
 			msg += p.Sprintf("%s `%s` — %s %s %.2f%s\n",
-				emoji, a.Ticker, condStr, getCurrencySymbol(curr), a.TargetPrice, statusLabel)
+				emoji, cleanTickerForDisplay(a.Ticker), condStr, getCurrencySymbol(curr), a.TargetPrice, statusLabel)
 		}
 		msg += p.Sprintf("\n_Total: %d alerta(s)_", len(alerts))
 
@@ -103,12 +103,13 @@ func (h *Handlers) renderAlerts(c telebot.Context, page int) error {
 
 		for i := start; i < end; i++ {
 			a := alerts[i]
-			toggleLabel := "⏸️ Pausar " + a.Ticker
+			tickerClean := cleanTickerForDisplay(a.Ticker)
+			toggleLabel := "⏸️ Pausar " + tickerClean
 			if a.Status == "DISABLED" || a.Status == "TRIGGERED" {
-				toggleLabel = "▶️ Ativar " + a.Ticker
+				toggleLabel = "▶️ Ativar " + tickerClean
 			}
 			btnToggle := menu.Data(toggleLabel, fmt.Sprintf("btn_alert_toggle_%s:%d", a.ID, page))
-			btnDel := menu.Data("🗑️ "+a.Ticker, fmt.Sprintf("btn_alert_del_%s:%d", a.ID, page))
+			btnDel := menu.Data("🗑️ "+tickerClean, fmt.Sprintf("btn_alert_del_%s:%d", a.ID, page))
 			rows = append(rows, menu.Row(btnToggle, btnDel))
 		}
 
@@ -158,7 +159,7 @@ func (h *Handlers) HandleAlertCreate(c telebot.Context) error {
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 	menu.Inline(menu.Row(btnCancel))
 
-	return c.Edit("🔔 *Criar Alerta de Preço*\n\nDigite o código do ativo:\n_(ex: PETR4, VALE3.SA, AAPL, BTC-USD)_", telebot.ModeMarkdown, menu)
+	return c.Edit("🔔 *Criar Alerta de Preço*\n\nDigite o código do ativo:\n_(ex: PETR4, VALE3, AAPL, BTC-USD)_", telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleAlertConditionAbove(c telebot.Context) error {
@@ -194,7 +195,7 @@ func (h *Handlers) handleAlertCondition(c telebot.Context, condition string) err
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 	menu.Inline(menu.Row(btnBack, btnCancel))
 
-	return c.Edit(fmt.Sprintf("🔔 *Alerta para %s* (%s)\n\nQual o preço alvo do alerta? (ex: 35.50)", escapeMarkdown(state.Ticker), condLabel), telebot.ModeMarkdown, menu)
+	return c.Edit(fmt.Sprintf("🔔 *Alerta para %s* (%s)\n\nQual o preço alvo do alerta? (ex: 35.50)", escapeMarkdown(cleanTickerForDisplay(state.Ticker)), condLabel), telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) handleAlertToggle(c telebot.Context, payload string) error {

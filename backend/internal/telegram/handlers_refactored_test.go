@@ -740,7 +740,7 @@ func TestHandlers_Operations(t *testing.T) {
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
 
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(&ConversationState{Step: "EXPECT_TICKER", PortfolioID: "p1"}, nil).Once()
-		mCtx.On("Edit", "Qual o código do ativo? (ex: AAPL, PETR4.SA)", mock.Anything).Return(nil)
+		mCtx.On("Edit", "Qual o código do ativo? (ex: AAPL, PETR4)", mock.Anything).Return(nil)
 
 		err := h.HandleNewAsset(mCtx)
 		assert.NoError(t, err)
@@ -1648,9 +1648,10 @@ func TestHandleAssetList(t *testing.T) {
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 
 		positions := []portfolio.Position{
-			{Ticker: "PETR4", Quantity: 100, CurrentPrice: 30, OpenPrice: 29.5, Currency: "BRL", CurrentValue: 3000, TotalCost: 2500, DailyChangePercent: 2.5},
-			{Ticker: "VALE3", Quantity: 50, CurrentPrice: 60, OpenPrice: 61, Currency: "BRL", CurrentValue: 3000, TotalCost: 3200, DailyChangePercent: -1.2},
-			{Ticker: "WEGE3", Quantity: 10, CurrentPrice: 40, Currency: "BRL", CurrentValue: 400, TotalCost: 400, DailyChangePercent: 0.0},
+			{Ticker: "PETR4.SA", Quantity: 100, AveragePrice: 25, CurrentPrice: 30, OpenPrice: 29.5, Currency: "BRL", CurrentValue: 3000, TotalCost: 2500, DailyChangePercent: 2.5},
+			{Ticker: "VALE3.SA", Quantity: 50, CurrentPrice: 60, OpenPrice: 61, Currency: "BRL", CurrentValue: 3000, TotalCost: 3200, DailyChangePercent: -1.2},
+			{Ticker: "WEGE3.SA", Quantity: 10, AveragePrice: 40, CurrentPrice: 0, Currency: "BRL", CurrentValue: 400, TotalCost: 400, DailyChangePercent: 0.0},
+			{Ticker: "ITUB4.SA", Quantity: 0, AveragePrice: 0, CurrentPrice: 32, Currency: "BRL", CurrentValue: 320, TotalCost: 0, DailyChangePercent: 0.0},
 		}
 		portSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolios[0], positions, nil).Once()
 
@@ -1665,11 +1666,15 @@ func TestHandleAssetList(t *testing.T) {
 		err := h.HandleAssetList(mCtx)
 		assert.NoError(t, err)
 		assert.Contains(t, sentMsg, "Página 1 de 1")
-		assert.Contains(t, sentMsg, "`PETR4`: Dia: +2,50% | L/P: +20,00%")
-		assert.NotContains(t, sentMsg, "R$ 3.000,00")
-		assert.Contains(t, sentMsg, "Abert. R$ 29,50 → Atual R$ 30,00")
-		assert.Contains(t, sentMsg, "Abert. R$ 61,00 → Atual R$ 60,00")
-		assert.Contains(t, sentMsg, "Atual R$ 40,00")
+		assert.NotContains(t, sentMsg, ".SA")
+		assert.Contains(t, sentMsg, "🟢 `PETR4` • 100 cotas • R$ 3.000,00")
+		assert.Contains(t, sentMsg, "PM: R$ 25,00 → Atual: R$ 30,00")
+		assert.Contains(t, sentMsg, "Dia: +2,50% | L/P: +20,00% (+R$ 500,00)")
+		assert.Contains(t, sentMsg, "🔴 `VALE3` • 50 cotas • R$ 3.000,00")
+		assert.Contains(t, sentMsg, "PM: R$ 64,00 → Atual: R$ 60,00")
+		assert.Contains(t, sentMsg, "Dia: -1,20% | L/P: -6,25% (R$ -200,00)")
+		assert.Contains(t, sentMsg, "PM: R$ 40,00\n")
+		assert.Contains(t, sentMsg, "Atual: R$ 32,00\n")
 	})
 
 	t.Run("empty positions", func(t *testing.T) {
