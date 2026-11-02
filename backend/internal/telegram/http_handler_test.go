@@ -51,8 +51,13 @@ func (m *MockService) SetActivePortfolio(ctx context.Context, chatID int64, port
 	return m.Called(ctx, chatID, portfolioID).Error(0)
 }
 func (m *MockService) GetActivePortfolio(ctx context.Context, chatID int64) (string, error) {
-	args := m.Called(ctx, chatID)
-	return args.String(0), args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetActivePortfolio" && call.Repeatability >= 0 {
+			args := m.Called(ctx, chatID)
+			return args.String(0), args.Error(1)
+		}
+	}
+	return "", nil
 }
 func (m *MockService) GetChatIDByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
 	args := m.Called(ctx, userID)

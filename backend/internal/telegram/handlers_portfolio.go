@@ -276,10 +276,20 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 
 func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	defer c.Respond()
-	pageStr := c.Data()
+	rawData := c.Data()
 	page := 0
-	if pageStr != "" {
-		fmt.Sscanf(pageStr, "%d", &page)
+	sortBy := "VAL"
+	if rawData != "" {
+		parts := strings.SplitN(rawData, ":", 2)
+		if len(parts) == 2 {
+			fmt.Sscanf(parts[0], "%d", &page)
+			sortBy = strings.ToUpper(parts[1])
+		} else {
+			fmt.Sscanf(rawData, "%d", &page)
+		}
+	}
+	if sortBy != "VAL" && sortBy != "RET" && sortBy != "AZ" {
+		sortBy = "VAL"
 	}
 
 	userIDStr, err := h.getUserID(c)
@@ -319,12 +329,28 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	posByValue := make([]portfolio.Position, len(positions))
 	copy(posByValue, positions)
 	sort.Slice(posByValue, func(i, j int) bool {
-		return posByValue[i].CurrentValue > posByValue[j].CurrentValue
+		switch sortBy {
+		case "RET":
+			retI, retJ := 0.0, 0.0
+			if posByValue[i].TotalCost > 1e-6 {
+				retI = ((posByValue[i].CurrentValue - posByValue[i].TotalCost) / posByValue[i].TotalCost) * 100
+			}
+			if posByValue[j].TotalCost > 1e-6 {
+				retJ = ((posByValue[j].CurrentValue - posByValue[j].TotalCost) / posByValue[j].TotalCost) * 100
+			}
+			return retI > retJ
+		case "AZ":
+			return cleanTickerForDisplay(posByValue[i].Ticker) < cleanTickerForDisplay(posByValue[j].Ticker)
+		default:
+			return posByValue[i].CurrentValue > posByValue[j].CurrentValue
+		}
 	})
 
 	totalPortValue := 0.0
+	totalPortCost := 0.0
 	for _, pos := range positions {
 		totalPortValue += pos.CurrentValue
+		totalPortCost += pos.TotalCost
 	}
 
 	pageSize := 10
@@ -343,7 +369,11 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📋 *Ativos: %s*\n_Página %d de %d_\n\n", escapeMarkdown(portfolioName), page+1, totalPages)
+	msg := p.Sprintf("📋 *Ativos: %s*\n", escapeMarkdown(portfolioName))
+	if totalPortValue > 1e-6 {
+		msg += p.Sprintf("💰 Patrimônio em Ativos: *R$ %s* (Custo: R$ %s)\n", formatFinancialPrice(p, totalPortValue), formatFinancialPrice(p, totalPortCost))
+	}
+	msg += p.Sprintf("_Página %d de %d_\n\n", page+1, totalPages)
 
 	for _, pos := range posByValue[start:end] {
 		var emoji string
@@ -370,8 +400,12 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		}
 
 		if pos.Quantity > 1e-6 && pos.CurrentValue > 1e-6 {
-			msg += p.Sprintf("%s `%s` • %s cotas • %s %s\n",
-				emoji, tickerClean, formatQuantity(pos.Quantity), curr, formatFinancialPrice(p, pos.CurrentValue))
+			weightStr := ""
+			if totalPortValue > 1e-6 {
+				weightStr = p.Sprintf(" (%.1f%%)", (pos.CurrentValue/totalPortValue)*100)
+			}
+			msg += p.Sprintf("%s `%s` • %s cotas • %s %s%s\n",
+				emoji, tickerClean, formatQuantity(pos.Quantity), curr, formatFinancialPrice(p, pos.CurrentValue), weightStr)
 		} else {
 			msg += p.Sprintf("%s `%s`\n", emoji, tickerClean)
 		}
@@ -399,21 +433,28 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	var rows []telebot.Row
+
+	btnSortVal := menu.Data(fmt.Sprintf("%s Valor", map[bool]string{true: "▪️", false: "💰"}[sortBy == "VAL"]), "btn_ativos", "0:VAL")
+	btnSortRet := menu.Data(fmt.Sprintf("%s Lucro%%", map[bool]string{true: "▪️", false: "📈"}[sortBy == "RET"]), "btn_ativos", "0:RET")
+	btnSortAZ := menu.Data(fmt.Sprintf("%s A-Z", map[bool]string{true: "▪️", false: "🔤"}[sortBy == "AZ"]), "btn_ativos", "0:AZ")
+	rows = append(rows, menu.Row(btnSortVal, btnSortRet, btnSortAZ))
+
 	var navBtns []telebot.Btn
 	if start > 0 {
-		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_ativos", fmt.Sprintf("%d", page-1)))
+		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_ativos", fmt.Sprintf("%d:%s", page-1, sortBy)))
 	}
 	if end < len(posByValue) {
-		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_ativos", fmt.Sprintf("%d", page+1)))
+		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_ativos", fmt.Sprintf("%d:%s", page+1, sortBy)))
 	}
-
-	var rows []telebot.Row
 	if len(navBtns) > 0 {
 		rows = append(rows, menu.Row(navBtns...))
 	}
+
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_ativos", fmt.Sprintf("%d:%s", page, sortBy))
 	btnOp := menu.Data("💵 Lançar Operação", "btn_operacao")
 	btnCotacao := menu.Data("📈 Cotação", "btn_cotacao")
-	rows = append(rows, menu.Row(btnOp, btnCotacao))
+	rows = append(rows, menu.Row(btnRefresh, btnOp, btnCotacao))
 
 	btnBack := menu.Data("⬅️ Voltar ao Resumo", "btn_resumo")
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")

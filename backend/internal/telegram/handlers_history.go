@@ -46,15 +46,22 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 		return h.sendOrEdit(c, "📜 Nenhuma operação encontrada na sua carteira.", menu)
 	}
 
-	// Parse callback data: "PAGE:FILTER" (ex: "0:ALL", "1:BUY", "0:SELL")
+	// Parse callback data: "PAGE:FILTER[:TICKER]" (ex: "0:ALL", "1:BUY", "0:ALL:PETR4")
 	rawData := c.Data()
 	page := 0
 	filter := "ALL"
+	tickerFilter := ""
+	if args := c.Args(); len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+		tickerFilter = cleanTickerForDisplay(strings.TrimSpace(args[0]))
+	}
 	if rawData != "" {
-		parts := strings.SplitN(rawData, ":", 2)
-		if len(parts) == 2 {
+		parts := strings.SplitN(rawData, ":", 3)
+		if len(parts) >= 2 {
 			fmt.Sscanf(parts[0], "%d", &page)
 			filter = strings.ToUpper(parts[1])
+			if len(parts) == 3 {
+				tickerFilter = cleanTickerForDisplay(strings.TrimSpace(parts[2]))
+			}
 		} else {
 			// backward compat: apenas número sem filtro
 			fmt.Sscanf(rawData, "%d", &page)
@@ -67,6 +74,9 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	// Aplicar filtro
 	var filtered []portfolio.Transaction
 	for _, tx := range txs {
+		if tickerFilter != "" && cleanTickerForDisplay(tx.Ticker) != tickerFilter {
+			continue
+		}
 		if filter == "ALL" || tx.Type == filter {
 			filtered = append(filtered, tx)
 		}
@@ -100,24 +110,32 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 		filterLabel = "Vendas"
 	}
 
+	buildFilterData := func(p int, f string) string {
+		if tickerFilter != "" {
+			return fmt.Sprintf("%d:%s:%s", p, f, tickerFilter)
+		}
+		return fmt.Sprintf("%d:%s", p, f)
+	}
+
 	menu := &telebot.ReplyMarkup{}
-	btnAll := menu.Data(fmt.Sprintf("%s Todas", map[bool]string{true: "▪️", false: "📋"}[filter == "ALL"]), "btn_history", "0:ALL")
-	btnBuy := menu.Data(fmt.Sprintf("%s Compras", map[bool]string{true: "▪️", false: "🟢"}[filter == "BUY"]), "btn_history", "0:BUY")
-	btnSell := menu.Data(fmt.Sprintf("%s Vendas", map[bool]string{true: "▪️", false: "🔴"}[filter == "SELL"]), "btn_history", "0:SELL")
+	btnAll := menu.Data(fmt.Sprintf("%s Todas", map[bool]string{true: "▪️", false: "📋"}[filter == "ALL"]), "btn_history", buildFilterData(0, "ALL"))
+	btnBuy := menu.Data(fmt.Sprintf("%s Compras", map[bool]string{true: "▪️", false: "🟢"}[filter == "BUY"]), "btn_history", buildFilterData(0, "BUY"))
+	btnSell := menu.Data(fmt.Sprintf("%s Vendas", map[bool]string{true: "▪️", false: "🔴"}[filter == "SELL"]), "btn_history", buildFilterData(0, "SELL"))
 
 	if len(filtered) == 0 {
 		msg := fmt.Sprintf("📜 *Histórico: %s*\n_%s %s — Nenhuma operação encontrada._", escapeMarkdown(portfolioName), filterEmoji, filterLabel)
 		btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 		menu.Inline(menu.Row(btnAll, btnBuy, btnSell), menu.Row(btnBack))
-		err = c.Edit(msg, telebot.ModeMarkdown, menu)
-		if err != nil && strings.Contains(err.Error(), "message is not modified") {
-			return nil
-		}
+		err = h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 		return err
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📜 *Histórico: %s*\n_%s %s — Página %d de %d_\n\n", escapeMarkdown(portfolioName), filterEmoji, filterLabel, page+1, totalPages)
+	msg := p.Sprintf("📜 *Histórico: %s*\n", escapeMarkdown(portfolioName))
+	if tickerFilter != "" {
+		msg += p.Sprintf("🔎 Ativo filtrado: *`%s`*\n", escapeMarkdown(tickerFilter))
+	}
+	msg += p.Sprintf("_%s %s — Página %d de %d_\n\n", filterEmoji, filterLabel, page+1, totalPages)
 
 	for _, tx := range filtered[start:end] {
 		tipoStr := "🟢 Compra"
@@ -125,12 +143,18 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 			tipoStr = "🔴 Venda"
 		}
 
-		msg += p.Sprintf("%s | `%s`\n", tipoStr, cleanTickerForDisplay(tx.Ticker))
-		msg += p.Sprintf("Data: %s\n", tx.ExecutedAt.Format("2006-01-02"))
+		curr := getTickerDefaultCurrency(tx.Ticker)
+		if tx.Currency != "" {
+			curr = getCurrencySymbol(tx.Currency)
+		}
+
+		msg += p.Sprintf("%s | `%s` • %s\n", tipoStr, cleanTickerForDisplay(tx.Ticker), tx.ExecutedAt.Format("02/01/2006"))
 		if tx.Fee > 1e-6 {
-			msg += p.Sprintf("Qtd: %.4f | Preço: R$ %.2f | Total: R$ %.2f (Taxas: R$ %.2f)\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost, tx.Fee)
+			msg += p.Sprintf("Qtd: %s | Preço: %s %s | Total: %s %s (Taxas: %s %s)\n\n",
+				formatQuantity(tx.Quantity), curr, formatFinancialPrice(p, tx.UnitPrice), curr, formatFinancialPrice(p, tx.TotalCost), curr, formatFinancialPrice(p, tx.Fee))
 		} else {
-			msg += p.Sprintf("Qtd: %.4f | Preço: R$ %.2f | Total: R$ %.2f\n\n", tx.Quantity, tx.UnitPrice, tx.TotalCost)
+			msg += p.Sprintf("Qtd: %s | Preço: %s %s | Total: %s %s\n\n",
+				formatQuantity(tx.Quantity), curr, formatFinancialPrice(p, tx.UnitPrice), curr, formatFinancialPrice(p, tx.TotalCost))
 		}
 	}
 
@@ -153,10 +177,10 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 
 	var navBtns []telebot.Btn
 	if start > 0 {
-		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_history", fmt.Sprintf("%d:%s", page-1, filter)))
+		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_history", buildFilterData(page-1, filter)))
 	}
 	if end < len(filtered) {
-		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_history", fmt.Sprintf("%d:%s", page+1, filter)))
+		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_history", buildFilterData(page+1, filter)))
 	}
 	if len(navBtns) > 0 {
 		rows = append(rows, menu.Row(navBtns...))

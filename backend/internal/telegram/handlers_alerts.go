@@ -190,12 +190,100 @@ func (h *Handlers) handleAlertCondition(c telebot.Context, condition string) err
 		condLabel = "ABAIXO DE"
 	}
 
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	currSymbol := getTickerDefaultCurrency(state.Ticker)
+	msg := fmt.Sprintf("🔔 *Alerta para %s* (%s)\n", escapeMarkdown(cleanTickerForDisplay(state.Ticker)), condLabel)
+
 	menu := &telebot.ReplyMarkup{}
+	var rows []telebot.Row
+
+	if h.marketSvc != nil {
+		if quote, errQ := h.getQuoteWithFallback(ctx, state.Ticker); errQ == nil && quote != nil && quote.Price > 1e-6 {
+			if quote.Currency != "" {
+				currSymbol = getCurrencySymbol(quote.Currency)
+			}
+			msg += p.Sprintf("💵 Preço Atual: *%s %s*\n", currSymbol, formatFinancialPrice(p, quote.Price))
+
+			if condition == "BELOW" {
+				p5 := quote.Price * 0.95
+				p10 := quote.Price * 0.90
+				btn5 := menu.Data(p.Sprintf("📉 -5%% (%s %.2f)", currSymbol, p5), fmt.Sprintf("btn_alert_price_%.2f", p5))
+				btn10 := menu.Data(p.Sprintf("📉 -10%% (%s %.2f)", currSymbol, p10), fmt.Sprintf("btn_alert_price_%.2f", p10))
+				rows = append(rows, menu.Row(btn5, btn10))
+			} else {
+				p5 := quote.Price * 1.05
+				p10 := quote.Price * 1.10
+				btn5 := menu.Data(p.Sprintf("📈 +5%% (%s %.2f)", currSymbol, p5), fmt.Sprintf("btn_alert_price_%.2f", p5))
+				btn10 := menu.Data(p.Sprintf("📈 +10%% (%s %.2f)", currSymbol, p10), fmt.Sprintf("btn_alert_price_%.2f", p10))
+				rows = append(rows, menu.Row(btn5, btn10))
+			}
+		}
+	}
+
+	if pos := h.findActiveCustodyPosition(ctx, c, state.Ticker); pos != nil && pos.AveragePrice > 1e-6 {
+		msg += p.Sprintf("💼 Seu PM: *%s %s*\n", currSymbol, formatFinancialPrice(p, pos.AveragePrice))
+		btnPM := menu.Data(p.Sprintf("🎯 Meu PM (%s %.2f)", currSymbol, pos.AveragePrice), fmt.Sprintf("btn_alert_price_%.2f", pos.AveragePrice))
+		rows = append(rows, menu.Row(btnPM))
+	}
+
+	msg += "\nQual o preço alvo do alerta? (ex: 35.50)"
+
 	btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	menu.Inline(menu.Row(btnBack, btnCancel))
+	rows = append(rows, menu.Row(btnBack, btnCancel))
+	menu.Inline(rows...)
 
-	return c.Edit(fmt.Sprintf("🔔 *Alerta para %s* (%s)\n\nQual o preço alvo do alerta? (ex: 35.50)", escapeMarkdown(cleanTickerForDisplay(state.Ticker)), condLabel), telebot.ModeMarkdown, menu)
+	return c.Edit(msg, telebot.ModeMarkdown, menu)
+}
+
+func (h *Handlers) handleSelectedAlertPrice(c telebot.Context, priceStr string) error {
+	defer c.Respond()
+
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
+	if err != nil || state == nil || state.Step != "ALERT_EXPECT_PRICE" {
+		return c.Edit("⚠️ Nenhuma criação de alerta em andamento.")
+	}
+
+	var price float64
+	if _, err := fmt.Sscanf(priceStr, "%f", &price); err != nil || price <= 1e-6 {
+		return c.Edit("⚠️ Preço inválido.")
+	}
+
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	createdAlert, err := h.alertSvc.CreateAlert(ctx, userIDStr, state.Ticker, price, state.Type)
+	if err != nil {
+		slog.Error("Erro ao criar alerta via callback telegram", "error", err)
+		return c.Edit("❌ Ocorreu um erro ao salvar o alerta. Tente novamente mais tarde.")
+	}
+
+	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+
+	condStr := "acima de"
+	if createdAlert.Condition == "BELOW" {
+		condStr = "abaixo de"
+	}
+	curr := createdAlert.Currency
+	if curr == "" {
+		curr = "BRL"
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	successMsg := p.Sprintf("✅ *Alerta Criado com Sucesso!*\n\n• Ativo: `%s`\n• Condição: Quando estiver %s %s %.2f",
+		cleanTickerForDisplay(createdAlert.Ticker), condStr, getCurrencySymbol(curr), createdAlert.TargetPrice)
+
+	successMenu := &telebot.ReplyMarkup{}
+	btnAlertsList := successMenu.Data("🔔 Meus Alertas", "btn_alerts")
+	btnMenuBack := successMenu.Data("🏠 Menu", "btn_menu")
+	successMenu.Inline(successMenu.Row(btnAlertsList, btnMenuBack))
+
+	return c.Edit(successMsg, telebot.ModeMarkdown, successMenu)
 }
 
 func (h *Handlers) handleAlertToggle(c telebot.Context, payload string) error {
