@@ -14,14 +14,18 @@ Todo worker de sincronização de dados (como o `DividendWorker`) deve implement
 - A chave de unicidade de um provento na tabela é a combinação exata: `(asset_id, cum_date, type, gross_amount)`.
 - Ao integrar com qualquer fonte de dados (ex: scraper Fundamentus), mapear a data de referência/aprovação do provento para `cum_date`.
 
-## 4. Fuzzy Matching de Proventos (Regra de Negócio)
-Ao sincronizar proventos da fonte externa, antes de inserir um novo registro:
-1. Busque proventos existentes no banco com o mesmo `asset_id` e `cum_date`.
-2. Filtre pelo mesmo `type`.
-3. Se houver um provento existente cuja diferença absoluta de `gross_amount` seja **≤ R$ 0,05**, considere como o mesmo provento (trata-se de um ajuste de centavos da fonte).
-4. Se a diferença for **zero** (< 1e-6) e a `payment_date` também for idêntica, faça **skip** (não atualize).
-5. Se a diferença for ≤ 0,05 mas não for zero, **atualize** o registro existente com o novo valor.
-6. Se a diferença for > 0,05, considere como um **provento diferente** e insira um novo registro.
+## 4. Resolução e Fuzzy Matching de Proventos (`internal/dividend`)
+Toda a coleta, normalização, deduplicação, validação e resolução (Fuzzy Match) de proventos é centralizada exclusivamente no pacote `backend/internal/dividend`, seguindo o pipeline:
+1. **Normalize**: Traduz tipos para `"Dividendo"`, `"JCP"`, `"Rendimento"` ou `"Amortização"` e datas para `00:00:00 UTC`.
+2. **Deduplicate**: Remove registros duplicados dentro da lista entregue pela fonte externa.
+3. **Validate**: Exige `cum_date` preenchida, `payment_date` preenchida e `amount > 1e-6` (proventos sem `payment_date` são descartados).
+4. **Resolve (Fuzzy Match contra o banco)**:
+   - Busca proventos existentes com o mesmo `asset_id` e `cum_date` (e mesmo `type`, ou conciliando `"Dividendo"` genérico com específico quando possuem mesma `payment_date`).
+   - Diferença **≤ R$ 0,05**: considera como o mesmo provento.
+   - Diferença **< 1e-6**, mesma `payment_date` e mesmo `type`: faz **skip** (não atualiza).
+   - Diferença **≤ 0,05** (ou atualização de `payment_date`/`type`): **atualiza** o registro existente.
+   - Diferença **> 0,05** (ou sem par): **insere** um novo registro.
+   - A leitura em `portfolio/dividend_service.go` e no Frontend (`DividendsHistory.tsx`) **não** deve reexecutar deduplicação de proventos reais.
 
 ## 5. Bot do Telegram: Resolver carteira ativa corretamente
 - A carteira ativa de um usuário no Telegram é armazenada e controlada de forma independente no **Redis** (chave `telegram_active_portfolio:<chatID>`).

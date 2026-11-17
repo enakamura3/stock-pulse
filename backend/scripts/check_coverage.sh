@@ -22,8 +22,8 @@ echo "$test_output" | awk '
   }
 }
 END {
-  if (count < 16) {
-    print "❌ Expected 16 packages, only verified " count
+  if (count < 17) {
+    print "❌ Expected 17 packages, only verified " count
     exit 1
   }
   if (fail) {

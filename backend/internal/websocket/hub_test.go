@@ -378,14 +378,6 @@ func TestHub_BroadcastQuotes_EdgeCases(t *testing.T) {
 	hub.broadcastQuotes(ctx)
 }
 
-func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
-	args := m.Called(ctx, ticker)
-	if args.Get(0) != nil {
-		return args.Get(0).([]market.DividendEvent), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
 func TestHub_AdditionalEdgeCases(t *testing.T) {
 	ms := new(MockMarketService)
 	ms.On("GetQuote", mock.Anything, mock.Anything).Return(&market.Quote{Ticker: "MOCK", Price: 100}, nil).Maybe()

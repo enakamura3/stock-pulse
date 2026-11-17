@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math"
 	"time"
 
-	"github.com/onigiri/stock-pulse/backend/internal/calculator"
+	"github.com/onigiri/stock-pulse/backend/internal/dividend"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -73,17 +72,17 @@ func (d *RedisDividendDeduplicator) MarkDividendNotified(ctx context.Context, ke
 }
 
 type DividendWorker struct {
-	repo          PortfolioRepository
-	marketService MarketService
-	calc          DividendCalculator
-	notifier      DividendTelegramNotifier
-	dedup         DividendDeduplicator
+	repo             PortfolioRepository
+	dividendProvider DividendProvider
+	calc             DividendCalculator
+	notifier         DividendTelegramNotifier
+	dedup            DividendDeduplicator
 }
 
-func NewDividendWorker(repo PortfolioRepository, ms MarketService) *DividendWorker {
+func NewDividendWorker(repo PortfolioRepository, dp DividendProvider) *DividendWorker {
 	return &DividendWorker{
-		repo:          repo,
-		marketService: ms,
+		repo:             repo,
+		dividendProvider: dp,
 	}
 }
 
@@ -95,20 +94,6 @@ func (w *DividendWorker) WithNotifier(calc DividendCalculator, notifier Dividend
 		w.dedup = dedup[0]
 	}
 	return w
-}
-
-func sameCalendarDate(a, b time.Time) bool {
-	if a.IsZero() || b.IsZero() {
-		return a.IsZero() && b.IsZero()
-	}
-	return a.Format("2006-01-02") == b.Format("2006-01-02")
-}
-
-func resolveDividendEventType(existingType, incomingType string) string {
-	if existingType != "Dividendo" && incomingType == "Dividendo" {
-		return existingType
-	}
-	return incomingType
 }
 
 func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
@@ -126,7 +111,7 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 		}
 
 		assetCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		events, err := w.marketService.GetDividends(assetCtx, asset.Ticker, asset.AssetType)
+		events, err := w.dividendProvider.GetDividends(assetCtx, asset.Ticker, asset.AssetType)
 		if err != nil {
 			slog.WarnContext(assetCtx, "erro ao buscar dividendos para ativo", slog.String("ticker", asset.Ticker), slog.Any("error", err))
 			cancel()
@@ -142,85 +127,54 @@ func (w *DividendWorker) SyncAllDividends(ctx context.Context) {
 				continue
 			}
 
-			var bestMatch *AssetEvent
-			var minDiff float64 = -1
-
-			for j := range existingEvents {
-				existing := &existingEvents[j]
-				if matchedIDs[existing.ID] || existing.Type != ev.Type {
-					continue
-				}
-
-				diff := math.Abs(existing.GrossAmount - ev.Amount)
-				if diff <= calculator.FuzzyMatchGrossAmountThreshold {
-					if minDiff == -1 || diff < minDiff {
-						minDiff = diff
-						bestMatch = existing
-					}
+			var available []AssetEvent
+			for _, ex := range existingEvents {
+				if !matchedIDs[ex.ID] {
+					available = append(available, ex)
 				}
 			}
 
-			// Conciliação entre tipo genérico ("Dividendo") e específico ("JCP", etc.)
-			// quando possuem mesma Data Com, mesma Data de Pagamento e valor compatível.
-			if bestMatch == nil {
-				for j := range existingEvents {
-					existing := &existingEvents[j]
-					if matchedIDs[existing.ID] {
-						continue
-					}
-					if (existing.Type == "Dividendo" || ev.Type == "Dividendo") &&
-						sameCalendarDate(existing.PaymentDate, ev.PaymentDate) {
-						diff := math.Abs(existing.GrossAmount - ev.Amount)
-						if diff <= calculator.FuzzyMatchGrossAmountThreshold {
-							if minDiff == -1 || diff < minDiff {
-								minDiff = diff
-								bestMatch = existing
-							}
-						}
+			plan := dividend.Resolve(asset.ID, []dividend.Event{ev}, available)
+
+			if plan.Skips > 0 {
+				for _, ex := range available {
+					if dividend.SameCalendarDate(ex.CumDate, ev.Date) {
+						matchedIDs[ex.ID] = true
+						break
 					}
 				}
+				successCount++
+				continue
 			}
 
-			if bestMatch != nil {
-				matchedIDs[bestMatch.ID] = true
-				resolvedType := resolveDividendEventType(bestMatch.Type, ev.Type)
-				if minDiff < calculator.FinancialEpsilon &&
-					sameCalendarDate(bestMatch.PaymentDate, ev.PaymentDate) &&
-					bestMatch.Type == resolvedType {
-					successCount++
-					continue
-				}
-
-				// Update existing
-				err = w.repo.UpdateAssetEventValueByID(assetCtx, bestMatch.ID, resolvedType, ev.Amount, ev.Amount, ev.PaymentDate)
+			if len(plan.Updates) > 0 {
+				upd := plan.Updates[0]
+				matchedIDs[upd.ID] = true
+				err = w.repo.UpdateAssetEventValueByID(assetCtx, upd.ID, upd.Type, upd.GrossAmount, upd.NetAmount, upd.PaymentDate)
 				if err != nil {
 					slog.ErrorContext(assetCtx, "erro ao atualizar dividendo (Fuzzy Match)",
 						slog.Int("current", i+1),
 						slog.Int("total", len(events)),
-						slog.String("id", bestMatch.ID),
+						slog.String("id", upd.ID),
 						slog.String("ticker", asset.Ticker),
 						slog.Any("error", err),
 					)
 				} else {
 					successCount++
 				}
-			} else {
-				// Insert new
-				err = w.repo.UpsertAssetEvent(assetCtx, AssetEvent{
-					AssetID:     asset.ID,
-					Type:        ev.Type,
-					GrossAmount: ev.Amount,
-					NetAmount:   ev.Amount, // We store gross in both places, taxes are applied per-portfolio later
-					CumDate:     ev.Date,
-					PaymentDate: ev.PaymentDate,
-				})
+				continue
+			}
+
+			if len(plan.Inserts) > 0 {
+				ins := plan.Inserts[0]
+				err = w.repo.UpsertAssetEvent(assetCtx, ins)
 				if err != nil {
 					slog.ErrorContext(assetCtx, "erro ao salvar novo dividendo",
 						slog.Int("current", i+1),
 						slog.Int("total", len(events)),
-						slog.String("cum_date", ev.Date.Format("2006-01-02")),
-						slog.String("type", ev.Type),
-						slog.Float64("amount", ev.Amount),
+						slog.String("cum_date", ins.CumDate.Format("2006-01-02")),
+						slog.String("type", ins.Type),
+						slog.Float64("amount", ins.GrossAmount),
 						slog.String("ticker", asset.Ticker),
 						slog.Any("error", err),
 					)

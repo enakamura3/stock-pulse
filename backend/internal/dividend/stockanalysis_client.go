@@ -1,4 +1,4 @@
-package market
+package dividend
 
 import (
 	"context"
@@ -29,24 +29,14 @@ func NewStockAnalysisClient() *StockAnalysisClient {
 	}
 }
 
-// FetchDividends busca a tabela de dividendos do StockAnalysis.
-// A URL é escolhida com base no ticker e assetType:
-//   - .SA       → stockanalysis.com/quote/bvmf/{ticker}/dividend/
-//   - ETF_US    → stockanalysis.com/etf/{ticker}/dividend/
-//   - STOCK_US  → stockanalysis.com/stocks/{ticker}/dividend/
+// FetchDividends busca a tabela de dividendos do StockAnalysis para ativos americanos (STOCK_US e ETF_US).
 func (c *StockAnalysisClient) FetchDividends(ctx context.Context, ticker string, assetType string) ([]StockAnalysisRawDividend, error) {
-	var urlStr string
-	if strings.HasSuffix(strings.ToUpper(ticker), ".SA") {
-		cleanTicker := strings.ToLower(strings.TrimSuffix(ticker, ".SA"))
-		urlStr = fmt.Sprintf("https://stockanalysis.com/quote/bvmf/%s/dividend/", url.PathEscape(cleanTicker))
-	} else {
-		cleanTicker := strings.ToLower(ticker)
-		basePath := "stocks"
-		if strings.HasPrefix(strings.ToUpper(assetType), "ETF") {
-			basePath = "etf"
-		}
-		urlStr = fmt.Sprintf("https://stockanalysis.com/%s/%s/dividend/", basePath, url.PathEscape(cleanTicker))
+	cleanTicker := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(ticker), ".SA"))
+	basePath := "stocks"
+	if strings.HasPrefix(strings.ToUpper(assetType), "ETF") {
+		basePath = "etf"
 	}
+	urlStr := fmt.Sprintf("https://stockanalysis.com/%s/%s/dividend/", basePath, url.PathEscape(cleanTicker))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
@@ -91,10 +81,6 @@ func (c *StockAnalysisClient) FetchDividends(ctx context.Context, ticker string,
 			PayDate:    payDate,
 		})
 	})
-
-	if len(rawDividends) == 0 {
-		return nil, fmt.Errorf("dados de histórico não encontrados ou vazios na tabela do stockanalysis")
-	}
 
 	return rawDividends, nil
 }

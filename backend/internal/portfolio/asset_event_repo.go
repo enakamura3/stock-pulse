@@ -6,18 +6,10 @@ import (
 	"time"
 
 	"github.com/onigiri/stock-pulse/backend/internal/database"
+	"github.com/onigiri/stock-pulse/backend/internal/dividend"
 )
 
-type AssetEvent struct {
-	ID          string    `json:"id"`
-	AssetID     string    `json:"asset_id"`
-	Type        string    `json:"type"`
-	GrossAmount float64   `json:"gross_amount"`
-	NetAmount   float64   `json:"net_amount"`
-	CumDate     time.Time `json:"cum_date"`
-	PaymentDate time.Time `json:"payment_date"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
+type AssetEvent = dividend.AssetEvent
 
 func (r *Repository) UpsertAssetEvent(ctx context.Context, event AssetEvent) error {
 	query := `

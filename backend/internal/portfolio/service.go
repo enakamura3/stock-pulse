@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
+	"github.com/onigiri/stock-pulse/backend/internal/dividend"
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
 	"github.com/onigiri/stock-pulse/backend/internal/history"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
@@ -67,10 +68,14 @@ type LinkedPortfolio struct {
 type MarketService interface {
 	GetQuote(ctx context.Context, ticker string) (*market.Quote, error)
 	GetFundamentals(ctx context.Context, ticker string) (*market.Fundamentals, error)
-	GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error)
 	GetHistoricalExchangeRate(ctx context.Context, date time.Time) (float64, error)
 	GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]market.HistoricalPrice, error)
 	GetHistoricalPricesBetween(ctx context.Context, ticker string, period1, period2 int64) ([]market.HistoricalPrice, error)
+}
+
+// DividendProvider define o contrato para buscar proventos validados e deduplicados do pacote dividend.
+type DividendProvider interface {
+	GetDividends(ctx context.Context, ticker string, assetType string) ([]dividend.Event, error)
 }
 
 // Service gerencia as regras de negócio de carteiras, transações e histórico.

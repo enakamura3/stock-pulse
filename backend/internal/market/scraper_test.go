@@ -181,6 +181,22 @@ func TestGetFundamentals(t *testing.T) {
 	}
 }
 
+type errorTransport struct {
+	err error
+}
+
+func (t *errorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, t.err
+}
+
+type errReader struct {
+	err error
+}
+
+func (r *errReader) Read(p []byte) (int, error) {
+	return 0, r.err
+}
+
 func TestScraper_Errors(t *testing.T) {
 	s := NewScraper()
 

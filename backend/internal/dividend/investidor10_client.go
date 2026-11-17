@@ -1,4 +1,4 @@
-package market
+package dividend
 
 import (
 	"context"
@@ -41,22 +41,27 @@ func (c *Investidor10Client) WithHTTPClient(client *http.Client) *Investidor10Cl
 }
 
 // FetchDividends busca os proventos no Investidor10.
-// Determina as rotas a tentar com base no assetType (ex: "etfs", "fiis", "acoes").
+// Determina as rotas a tentar com base no assetType (ex: "etfs", "fiis", "acoes", "bdrs", "stocks", "etfs-global", "reits").
 func (c *Investidor10Client) FetchDividends(ctx context.Context, ticker string, assetType string) ([]Investidor10RawDividend, error) {
-	cleanTicker := strings.ToLower(strings.TrimSuffix(ticker, ".SA"))
+	cleanTicker := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(ticker), ".SA"))
+	cleanTicker = strings.TrimSuffix(cleanTicker, ".sa")
 	cleanTicker = strings.TrimSpace(cleanTicker)
 	if cleanTicker == "" {
 		return nil, fmt.Errorf("ticker inválido para investidor10")
 	}
 
 	var categories []string
-	switch strings.ToUpper(assetType) {
+	switch strings.ToUpper(strings.TrimSpace(assetType)) {
 	case "ETF_BR", "ETF":
 		categories = []string{"etfs", "fiis", "acoes"}
 	case "FII", "FIAGRO":
 		categories = []string{"fiis", "acoes", "etfs"}
 	case "BDR":
 		categories = []string{"bdrs", "acoes", "etfs"}
+	case "STOCK_US":
+		categories = []string{"stocks", "reits", "etfs-global"}
+	case "ETF_US":
+		categories = []string{"etfs-global", "stocks", "reits"}
 	default: // STOCK_BR ou outros
 		categories = []string{"acoes", "fiis", "etfs"}
 	}

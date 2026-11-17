@@ -17,7 +17,6 @@ import (
 type Service struct {
 	provider         QuoteProvider
 	scraper          FundamentalsScraper
-	dividendGateway  *DividendGateway
 	rdb              *redis.Client
 	ttlQuotes        time.Duration
 	ttlFundamentals  time.Duration
@@ -26,24 +25,9 @@ type Service struct {
 
 // NewService cria uma nova instância de Service com TTLs configuráveis.
 func NewService(provider QuoteProvider, rdb *redis.Client) *Service {
-	b3Client := NewB3Client()
-	fundamentusClient := NewFundamentusClient()
-	stockAnalysisClient := NewStockAnalysisClient()
-	yahooClient := NewYahooClient()
-	investidor10Client := NewInvestidor10Client()
-
-	b3Source := NewB3DividendSource(b3Client)
-	fundamentusSource := NewFundamentusDividendSource(fundamentusClient)
-	stockAnalysisSource := NewStockAnalysisDividendSource(stockAnalysisClient)
-	yahooSource := NewYahooDividendSource(yahooClient)
-	investidor10Source := NewInvestidor10DividendSource(investidor10Client)
-
-	ttlDividends := config.Envs.RedisTTLDividends
-
 	return &Service{
 		provider:         provider,
 		scraper:          NewScraper(),
-		dividendGateway:  NewDividendGateway(b3Source, fundamentusSource, stockAnalysisSource, yahooSource, investidor10Source, rdb, ttlDividends),
 		rdb:              rdb,
 		ttlQuotes:        config.Envs.RedisTTLQuotes,
 		ttlFundamentals:  config.Envs.RedisTTLFundamentals,
@@ -95,11 +79,6 @@ func (s *Service) GetQuoteWithCacheStatus(ctx context.Context, ticker string) (*
 func (s *Service) GetQuote(ctx context.Context, ticker string) (*Quote, error) {
 	q, _, err := s.GetQuoteWithCacheStatus(ctx, ticker)
 	return q, err
-}
-
-// GetDividends busca os proventos de um ativo e faz cache.
-func (s *Service) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
-	return s.dividendGateway.GetDividends(ctx, ticker, assetType)
 }
 
 // getExchangeRatesMap fetches the 10y history of BRL=X and returns it as a map[string]float64 (date string "YYYY-MM-DD" -> rate).

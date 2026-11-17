@@ -2,7 +2,6 @@ package portfolio
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"math"
 	"sort"
@@ -155,53 +154,10 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 		}
 	}
 
-	// Deduplica proventos mensais de FII/FIAGRO/ETF no mesmo mês/ano
-	// e concilia proventos de ações com mesma Data Com, Data de Pagamento e Valor por Ação (ex: JCP vs Dividendo)
-	dedupedResults := make([]CalculatedDividend, 0, len(results))
-	seenMonth := make(map[string]bool)
-
-	for _, res := range results {
-		upperType := strings.ToUpper(res.AssetType)
-		if upperType == "FII" || upperType == "FIAGRO" || upperType == "ETF" || upperType == "ETF_BR" {
-			dateForMonth := res.PaymentDate
-			if dateForMonth.IsZero() {
-				dateForMonth = res.CumDate
-			}
-			key := fmt.Sprintf("%s-%d-%02d", res.Ticker, dateForMonth.Year(), dateForMonth.Month())
-			if seenMonth[key] {
-				continue
-			}
-			seenMonth[key] = true
-			dedupedResults = append(dedupedResults, res)
-			continue
-		}
-
-		dupIdx := -1
-		for i := range dedupedResults {
-			existing := &dedupedResults[i]
-			if existing.Ticker == res.Ticker &&
-				sameCalendarDate(existing.CumDate, res.CumDate) &&
-				sameCalendarDate(existing.PaymentDate, res.PaymentDate) &&
-				math.Abs(existing.PerShareAmount-res.PerShareAmount) < calculator.FinancialEpsilon {
-				dupIdx = i
-				break
-			}
-		}
-
-		if dupIdx >= 0 {
-			if dedupedResults[dupIdx].Type == "Dividendo" && res.Type != "Dividendo" {
-				dedupedResults[dupIdx] = res
-			}
-			continue
-		}
-
-		dedupedResults = append(dedupedResults, res)
-	}
-
 	// Ordena do mais recente para o mais antigo
-	sort.Slice(dedupedResults, func(i, j int) bool {
-		return dedupedResults[i].PaymentDate.After(dedupedResults[j].PaymentDate)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].PaymentDate.After(results[j].PaymentDate)
 	})
 
-	return dedupedResults, nil
+	return results, nil
 }

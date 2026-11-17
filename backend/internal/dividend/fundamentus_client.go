@@ -1,4 +1,4 @@
-package market
+package dividend
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 )
 
 // FundamentusRawDividend contém os dados crus extraídos da tabela HTML do Fundamentus.
-// Nenhum campo é convertido — todos são strings exatamente como aparecem no HTML.
 type FundamentusRawDividend struct {
 	Date        string // "12/02/2026" (DD/MM/YYYY)
 	Amount      string // "1.002,5499" (ponto = milhar, vírgula = decimal)
@@ -31,19 +30,14 @@ func NewFundamentusClient() *FundamentusClient {
 	}
 }
 
-// FetchDividends busca a tabela de proventos do Fundamentus.
-// Tenta a URL de ações primeiro; se não retornar dados, tenta a URL de FIIs.
-// Retorna os dados crus e o layout detectado ("acao" ou "fii").
 func (c *FundamentusClient) FetchDividends(ctx context.Context, ticker string) ([]FundamentusRawDividend, string, error) {
 	cleanTicker := strings.TrimSuffix(ticker, ".SA")
 
-	// Tenta como Ação primeiro
 	raw, err := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/proventos.php?papel=%s&tipo=2", url.QueryEscape(cleanTicker)), "acao")
 	if err == nil && len(raw) > 0 {
 		return raw, "acao", nil
 	}
 
-	// Se retornou vazio (ou deu erro na raspagem), tenta como FII
 	rawFii, errFii := c.fetchAndScrape(ctx, fmt.Sprintf("https://www.fundamentus.com.br/fii_proventos.php?papel=%s&tipo=2", url.QueryEscape(cleanTicker)), "fii")
 	if errFii == nil && len(rawFii) > 0 {
 		return rawFii, "fii", nil
@@ -52,8 +46,8 @@ func (c *FundamentusClient) FetchDividends(ctx context.Context, ticker string) (
 	return nil, "", fmt.Errorf("nenhum provento encontrado no fundamentus para %s", ticker)
 }
 
-func (c *FundamentusClient) fetchAndScrape(ctx context.Context, url string, layout string) ([]FundamentusRawDividend, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+func (c *FundamentusClient) fetchAndScrape(ctx context.Context, reqURL string, layout string) ([]FundamentusRawDividend, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -85,13 +79,11 @@ func (c *FundamentusClient) fetchAndScrape(ctx context.Context, url string, layo
 			var dateStr, amountStr, paymentDateStr, tipoStr string
 
 			if layout == "acao" {
-				// Ação: Data (0), Valor (1), Tipo (2), Data de Pagamento (3)
 				dateStr = strings.TrimSpace(tds.Eq(0).Text())
 				amountStr = strings.TrimSpace(tds.Eq(1).Text())
 				tipoStr = strings.TrimSpace(tds.Eq(2).Text())
 				paymentDateStr = strings.TrimSpace(tds.Eq(3).Text())
 			} else {
-				// FII: Data (0), Tipo (1), Data de Pagamento (2), Valor (3)
 				dateStr = strings.TrimSpace(tds.Eq(0).Text())
 				tipoStr = strings.TrimSpace(tds.Eq(1).Text())
 				paymentDateStr = strings.TrimSpace(tds.Eq(2).Text())
