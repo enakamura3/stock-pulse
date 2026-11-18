@@ -116,9 +116,9 @@ func (c *Investidor10Client) fetchAndScrape(ctx context.Context, reqURL string) 
 			tipoStr := strings.TrimSpace(tds.Eq(0).Text())
 			cumDateStr := strings.TrimSpace(tds.Eq(1).Text())
 			paymentDateStr := strings.TrimSpace(tds.Eq(2).Text())
-			amountStr := strings.TrimSpace(tds.Eq(3).Text())
+			amountStr := extractInvestidor10Amount(tds.Eq(3))
 
-			if tipoStr != "" && cumDateStr != "" && amountStr != "" {
+			if tipoStr != "" && cumDateStr != "" && amountStr != "" && !strings.Contains(strings.ToUpper(tipoStr), "BONIFICA") {
 				rawDividends = append(rawDividends, Investidor10RawDividend{
 					Type:        tipoStr,
 					CumDate:     cumDateStr,
@@ -134,4 +134,21 @@ func (c *Investidor10Client) fetchAndScrape(ctx context.Context, reqURL string) 
 	}
 
 	return rawDividends, nil
+}
+
+// extractInvestidor10Amount extrai o valor bruto por ação na Data Com.
+// Quando o Investidor10 recalcula retroativamente o valor exibido por conta de desdobramento/grupamento,
+// ele preserva o "Valor original <b>X,XXXXXXXX</b>" no atributo data-content do tooltip.
+func extractInvestidor10Amount(td *goquery.Selection) string {
+	if content, ok := td.Find("[data-content]").Attr("data-content"); ok && strings.Contains(strings.ToLower(content), "valor original") {
+		if start := strings.Index(content, "<b>"); start != -1 {
+			rest := content[start+3:]
+			if end := strings.Index(rest, "</b>"); end != -1 {
+				if orig := strings.TrimSpace(rest[:end]); orig != "" {
+					return orig
+				}
+			}
+		}
+	}
+	return strings.TrimSpace(td.Text())
 }

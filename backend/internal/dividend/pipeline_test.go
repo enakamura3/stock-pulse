@@ -46,8 +46,13 @@ func TestPipeline_Functions(t *testing.T) {
 		assert.Equal(t, "JCP", NormalizeType("JRS CAP PROPRIO", "STOCK_BR"))
 		assert.Equal(t, "JCP", NormalizeType("Juros sobre Capital Próprio", "STOCK_BR"))
 		assert.Equal(t, "JCP", NormalizeType("JCP", "STOCK_BR"))
+		assert.Equal(t, "JCP", NormalizeType("JSCP", "STOCK_BR"))
 		assert.Equal(t, "Rendimento", NormalizeType("RENDIMENTO", "STOCK_BR"))
+		assert.Equal(t, "Rendimento", NormalizeType("Rend. Trib.", "STOCK_BR"))
+		assert.Equal(t, "Rendimento", NormalizeType("Rend Trib", "STOCK_BR"))
 		assert.Equal(t, "Amortização", NormalizeType("AMORTIZACAO", "FII"))
+		assert.Equal(t, "Amortização", NormalizeType("Red. Cap.", "STOCK_BR"))
+		assert.Equal(t, "Amortização", NormalizeType("REST CAP DIN", "STOCK_BR"))
 		assert.Equal(t, "Rendimento", NormalizeType("DIVIDENDO", "FII"))
 		assert.Equal(t, "Rendimento", NormalizeType("OUTRO", "FIAGRO"))
 		assert.Equal(t, "Dividendo", NormalizeType("DIVIDENDO", "STOCK_BR"))
@@ -146,6 +151,40 @@ func TestPipeline_Functions(t *testing.T) {
 		assert.Len(t, plan.Inserts, 1)
 		assert.Equal(t, 2.00, plan.Inserts[0].GrossAmount)
 	})
+
+	t.Run("Resolve Split Multiple Reconciliation (VIVT3 JSCP Dec 2025)", func(t *testing.T) {
+		cumMar := time.Date(2025, 3, 24, 0, 0, 0, 0, time.UTC)
+		cumFeb := time.Date(2025, 2, 24, 0, 0, 0, 0, time.UTC)
+		payDec := time.Date(2025, 12, 2, 0, 0, 0, 0, time.UTC)
+
+		// Existing records previously imported as split-adjusted Dividendo (0.06172680 and 0.05546619)
+		existing := []AssetEvent{
+			{ID: "vivt-other-date", AssetID: "vivt", CumDate: time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC), PaymentDate: payDec, GrossAmount: 0.10, Type: "Dividendo"},
+			{ID: "vivt-mar", AssetID: "vivt", CumDate: cumMar, PaymentDate: payDec, GrossAmount: 0.06172680, Type: "Dividendo"},
+			{ID: "vivt-feb", AssetID: "vivt", CumDate: cumFeb, PaymentDate: payDec, GrossAmount: 0.05546619, Type: "Dividendo"},
+		}
+
+		incoming := []Event{
+			{Date: cumMar, PaymentDate: payDec, Amount: 0.12345360, Type: "JCP"},
+			{Date: cumFeb, PaymentDate: payDec, Amount: 0.11093237, Type: "JCP"},
+		}
+
+		plan := Resolve("vivt", incoming, existing)
+		assert.Equal(t, 0, plan.Skips)
+		assert.Empty(t, plan.Inserts)
+		assert.Len(t, plan.Updates, 2)
+		assert.Equal(t, "vivt-mar", plan.Updates[0].ID)
+		assert.Equal(t, "JCP", plan.Updates[0].Type)
+		assert.InDelta(t, 0.12345360, plan.Updates[0].GrossAmount, 1e-8)
+		assert.Equal(t, "vivt-feb", plan.Updates[1].ID)
+		assert.Equal(t, "JCP", plan.Updates[1].Type)
+		assert.InDelta(t, 0.11093237, plan.Updates[1].GrossAmount, 1e-8)
+
+		assert.False(t, isSplitMultiple(0, 0.12))
+		assert.False(t, isSplitMultiple(0.10, 0.12))   // ratio 1.2 -> rounded 1 < 2
+		assert.False(t, isSplitMultiple(0.10, 0.25))   // ratio 2.5 -> not close to integer
+		assert.True(t, isSplitMultiple(0.06172680, 0.12345360))
+	})
 }
 
 type mockSource struct {
@@ -229,7 +268,15 @@ func TestInvestidor10Source_And_Client(t *testing.T) {
 	<html><body>
 	<table id="table-dividends-history">
 		<tbody>
-			<tr><td>JCP</td><td>10/02/2026</td><td>25/02/2026</td><td>1,2500</td></tr>
+			<tr>
+				<td>JSCP</td>
+				<td>24/03/2025</td>
+				<td>02/12/2025</td>
+				<td> 0,06172680
+					<span class="ds-tooltip-trigger popover-trigger" data-popover-variant="ds" data-content="&lt;div class=&quot;popover-ds&quot;&gt;&lt;div class=&quot;popover-ds-header&quot;&gt;Valor&lt;/div&gt;&lt;div class=&quot;popover-ds-paragraph&quot;&gt;Valor original &lt;b&gt;0,12345360&lt;/b&gt; recalculado considerando desdobramendos e/ou grupamentos&lt;/div&gt;&lt;/div&gt;"></span>
+				</td>
+			</tr>
+			<tr><td>Bonificação</td><td>17/03/2025</td><td>20/03/2025</td><td>0,10000000</td></tr>
 			<tr><td>Dividendos</td><td>invalid</td><td>25/02/2026</td><td>1,00</td></tr>
 			<tr><td>Dividendos</td><td>10/02/2026</td><td>25/02/2026</td><td>invalid</td></tr>
 			<tr><td>Dividendos</td><td>10/02/2026</td><td>-</td><td>0,50</td></tr>
@@ -255,6 +302,8 @@ func TestInvestidor10Source_And_Client(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Len(t, evs, 2)
 			assert.False(t, evs[0].PaymentDate.IsZero())
+			assert.InDelta(t, 0.12345360, evs[0].Amount, 1e-8)
+			assert.Equal(t, "JSCP", evs[0].Type)
 			assert.True(t, evs[1].PaymentDate.IsZero())
 		}
 	})
@@ -530,7 +579,7 @@ func TestGateway_CacheHitCorruptedJSON(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	defer rdb.Close()
 
-	_ = mr.Set("dividends:PETR4", "not-json")
+	_ = mr.Set("dividends:v2:PETR4", "not-json")
 
 	cum := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
 	pay := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)

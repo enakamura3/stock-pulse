@@ -53,13 +53,13 @@ func isFiiType(assetType string) bool {
 // "JCP", "Rendimento", "Amortização" ou "Dividendo".
 func NormalizeType(rawType, assetType string) string {
 	tipoUpper := strings.ToUpper(strings.TrimSpace(rawType))
-	if strings.Contains(tipoUpper, "JRS") || strings.Contains(tipoUpper, "JUROS") || strings.Contains(tipoUpper, "JCP") {
+	if strings.Contains(tipoUpper, "JRS") || strings.Contains(tipoUpper, "JUROS") || strings.Contains(tipoUpper, "JCP") || strings.Contains(tipoUpper, "JSCP") {
 		return "JCP"
 	}
-	if strings.Contains(tipoUpper, "RENDIMENTO") {
+	if strings.Contains(tipoUpper, "RENDIMENTO") || strings.Contains(tipoUpper, "REND. TRIB") || strings.Contains(tipoUpper, "REND TRIB") {
 		return "Rendimento"
 	}
-	if strings.Contains(tipoUpper, "AMORTIZA") {
+	if strings.Contains(tipoUpper, "AMORTIZA") || strings.Contains(tipoUpper, "RED. CAP") || strings.Contains(tipoUpper, "REST CAP") {
 		return "Amortização"
 	}
 	if isFiiType(assetType) {
@@ -263,5 +263,39 @@ func findBestMatch(ev Event, existingEvents []AssetEvent, matchedIDs map[string]
 		}
 	}
 
-	return bestMatch
+	if bestMatch != nil {
+		return bestMatch
+	}
+
+	// 3. Conciliação de valor ajustado por desdobramento/grupamento vs valor original
+	// quando possuem mesma CumDate, mesma PaymentDate e razão inteira (ex: 1:2, 1:3, 1:4...)
+	for i := range existingEvents {
+		existing := &existingEvents[i]
+		if matchedIDs[existing.ID] || !SameCalendarDate(existing.CumDate, ev.Date) {
+			continue
+		}
+		if (existing.Type == ev.Type || existing.Type == "Dividendo" || ev.Type == "Dividendo") &&
+			SameCalendarDate(existing.PaymentDate, ev.PaymentDate) &&
+			isSplitMultiple(existing.GrossAmount, ev.Amount) {
+			return existing
+		}
+	}
+
+	return nil
+}
+
+// isSplitMultiple verifica se dois valores positivos guardam entre si uma razão inteira >= 2
+// típica de desdobramento ou grupamento (ex: 0,12345360 vs 0,06172680 -> razão 2.0).
+func isSplitMultiple(a, b float64) bool {
+	if a <= calculator.FinancialEpsilon || b <= calculator.FinancialEpsilon {
+		return false
+	}
+	larger := math.Max(a, b)
+	smaller := math.Min(a, b)
+	ratio := larger / smaller
+	rounded := math.Round(ratio)
+	if rounded < 2 {
+		return false
+	}
+	return math.Abs(ratio-rounded)/rounded < 1e-2
 }

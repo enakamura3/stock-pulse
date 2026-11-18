@@ -59,7 +59,7 @@ func NewDefaultGateway(rdb *redis.Client, ttl time.Duration) *Gateway {
 // pelo pipeline único (Normalize -> Deduplicate -> Validate).
 func (g *Gateway) GetDividends(ctx context.Context, ticker string, assetType string) ([]Event, error) {
 	ticker = strings.ToUpper(strings.TrimSpace(ticker))
-	cacheKey := fmt.Sprintf("dividends:%s", ticker)
+	cacheKey := fmt.Sprintf("dividends:v2:%s", ticker)
 
 	if g.cache != nil {
 		val, err := g.cache.Get(ctx, cacheKey).Result()
