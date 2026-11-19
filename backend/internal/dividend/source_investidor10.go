@@ -1,8 +1,7 @@
-package market
+package dividend
 
 import (
 	"context"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,16 +20,16 @@ func (s *Investidor10DividendSource) Name() string {
 }
 
 func (s *Investidor10DividendSource) SupportedAssetTypes() []string {
-	return []string{"STOCK_BR", "FII", "FIAGRO", "ETF_BR", "BDR"}
+	return []string{"STOCK_BR", "FII", "FIAGRO", "ETF_BR", "BDR", "STOCK_US", "ETF_US"}
 }
 
-func (s *Investidor10DividendSource) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
+func (s *Investidor10DividendSource) GetDividends(ctx context.Context, ticker string, assetType string) ([]Event, error) {
 	rawDividends, err := s.client.FetchDividends(ctx, ticker, assetType)
 	if err != nil {
 		return nil, err
 	}
 
-	var events []DividendEvent
+	var events []Event
 	layoutDate := "02/01/2006"
 
 	for _, raw := range rawDividends {
@@ -47,7 +46,7 @@ func (s *Investidor10DividendSource) GetDividends(ctx context.Context, ticker st
 			continue
 		}
 
-		paymentDate := cumDate
+		var paymentDate time.Time
 		if raw.PaymentDate != "" && raw.PaymentDate != "-" && raw.PaymentDate != "n/a" {
 			pd, err := time.Parse(layoutDate, raw.PaymentDate)
 			if err == nil {
@@ -55,24 +54,13 @@ func (s *Investidor10DividendSource) GetDividends(ctx context.Context, ticker st
 			}
 		}
 
-		cleanType := normalizeDividendType(raw.Type, assetType)
-
-		events = append(events, DividendEvent{
+		events = append(events, Event{
 			Date:        cumDate,
 			PaymentDate: paymentDate,
 			Amount:      amount,
-			Type:        cleanType,
+			Type:        raw.Type,
 		})
 	}
-
-	if len(events) == 0 {
-		return nil, nil
-	}
-
-	// Ordena por data decrescente (mais recente primeiro)
-	sort.SliceStable(events, func(i, j int) bool {
-		return events[i].Date.After(events[j].Date)
-	})
 
 	return events, nil
 }

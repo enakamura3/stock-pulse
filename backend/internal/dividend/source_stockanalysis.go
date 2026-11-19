@@ -1,4 +1,4 @@
-package market
+package dividend
 
 import (
 	"context"
@@ -20,36 +20,27 @@ func (s *StockAnalysisDividendSource) Name() string {
 }
 
 func (s *StockAnalysisDividendSource) SupportedAssetTypes() []string {
-	return []string{"STOCK_BR", "FII", "FIAGRO", "ETF_BR", "BDR", "STOCK_US", "ETF_US"}
+	return []string{"STOCK_US", "ETF_US"}
 }
 
-func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker string, assetType string) ([]DividendEvent, error) {
+func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker string, assetType string) ([]Event, error) {
 	rawDividends, err := s.client.FetchDividends(ctx, ticker, assetType)
 	if err != nil {
 		return nil, err
 	}
 
-	var events []DividendEvent
+	var events []Event
 	layout := "Jan 2, 2006"
 
 	for _, raw := range rawDividends {
-		dateStr := raw.RecordDate
-		usedExDate := false
-		if dateStr == "-" || dateStr == "n/a" || dateStr == "" {
-			dateStr = raw.ExDivDate // Fallback to Ex-Div Date
-			usedExDate = true
-		}
-
-		cumDate, err := time.Parse(layout, dateStr)
+		exDate, err := time.Parse(layout, raw.ExDivDate)
 		if err != nil {
 			continue
 		}
 
-		// A normalização da Data Ex: a Data Com é o dia anterior à Data Ex.
-		// Se já pegamos a RecordDate, ela já é a Data Com. Se usamos a Ex-Div Date, subtraímos 1 dia.
-		if usedExDate {
-			cumDate = cumDate.Add(-24 * time.Hour)
-		}
+		// Calcula a Data Com (CumDate) recuando para o dia útil anterior à Ex-Dividend Date,
+		// garantindo consistência exata com o calendário da NYSE/Nasdaq e Investidor10.
+		cumDate := PreviousBusinessDay(exDate)
 
 		amtStr := strings.ReplaceAll(raw.Amount, "$", "")
 		amtStr = strings.ReplaceAll(amtStr, " BRL", "")
@@ -59,7 +50,7 @@ func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker s
 			continue
 		}
 
-		paymentDate := cumDate
+		var paymentDate time.Time
 		if raw.PayDate != "-" && raw.PayDate != "n/a" && raw.PayDate != "" {
 			pd, err := time.Parse(layout, raw.PayDate)
 			if err == nil {
@@ -67,17 +58,11 @@ func (s *StockAnalysisDividendSource) GetDividends(ctx context.Context, ticker s
 			}
 		}
 
-		cleanType := "Dividendo"
-		upperType := strings.ToUpper(assetType)
-		if upperType == "FII" || upperType == "FIAGRO" {
-			cleanType = "Rendimento"
-		}
-
-		events = append(events, DividendEvent{
+		events = append(events, Event{
 			Date:        cumDate,
 			PaymentDate: paymentDate,
 			Amount:      amount,
-			Type:        cleanType,
+			Type:        "Dividendo",
 		})
 	}
 

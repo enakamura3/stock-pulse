@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redismock/v9"
-	"github.com/onigiri/stock-pulse/backend/internal/market"
+	"github.com/onigiri/stock-pulse/backend/internal/dividend"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,7 +30,7 @@ func TestDividendWorker_SyncAllDividends_FuzzyMatch(t *testing.T) {
 	exDate := time.Date(2024, 4, 25, 0, 0, 0, 0, time.UTC)
 	payDate := time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC)
 
-	scrapedEvents := []market.DividendEvent{
+	scrapedEvents := []dividend.Event{
 		{
 			Date:        exDate,
 			Type:        "Dividendo",
@@ -80,7 +80,7 @@ func TestDividendWorker_SyncAllDividends_NoMatch(t *testing.T) {
 	exDate := time.Date(2024, 4, 25, 0, 0, 0, 0, time.UTC)
 	payDate := time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC)
 
-	scrapedEvents := []market.DividendEvent{
+	scrapedEvents := []dividend.Event{
 		{
 			Date:        exDate,
 			Type:        "Dividendo",
@@ -131,7 +131,7 @@ func TestDividendWorker_SyncAllDividends_ExactMatchSkip(t *testing.T) {
 	exDate := time.Date(2024, 4, 25, 0, 0, 0, 0, time.UTC)
 	payDate := time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC)
 
-	scrapedEvents := []market.DividendEvent{
+	scrapedEvents := []dividend.Event{
 		{
 			Date:        exDate,
 			Type:        "Dividendo",
@@ -185,7 +185,7 @@ func TestDividendWorker_SyncAllDividends_ErrorScenariosAndBranches(t *testing.T)
 			{ID: "err-1", Ticker: "VALE3.SA", AssetType: "STOCK_BR"},
 		}
 		repo.On("GetAllAssets", mock.Anything).Return(assets, nil)
-		ms.On("GetDividends", mock.Anything, "VALE3.SA", "STOCK_BR").Return(([]market.DividendEvent)(nil), assert.AnError)
+		ms.On("GetDividends", mock.Anything, "VALE3.SA", "STOCK_BR").Return(([]dividend.Event)(nil), assert.AnError)
 
 		worker.SyncAllDividends(context.Background())
 		repo.AssertExpectations(t)
@@ -207,7 +207,7 @@ func TestDividendWorker_SyncAllDividends_ErrorScenariosAndBranches(t *testing.T)
 		exDate3 := time.Date(2024, 3, 10, 0, 0, 0, 0, time.UTC)
 		payDate := time.Date(2024, 4, 10, 0, 0, 0, 0, time.UTC)
 
-		scrapedEvents := []market.DividendEvent{
+		scrapedEvents := []dividend.Event{
 			{Date: exDate1, Type: "Dividendo", Amount: 1.0, PaymentDate: payDate},
 			{Date: exDate2, Type: "JCP", Amount: 2.0, PaymentDate: payDate},
 			{Date: exDate3, Type: "Rendimento", Amount: 3.0, PaymentDate: payDate},
@@ -249,7 +249,7 @@ func TestDividendWorker_SyncAllDividends_ErrorScenariosAndBranches(t *testing.T)
 
 		// Event 1: incoming JCP matches existing Dividendo on same CumDate & PaymentDate -> upgrades existing to JCP
 		// Event 2: incoming Dividendo (e.g. fallback) matches existing JCP on same CumDate & PaymentDate -> skips to preserve JCP
-		scrapedEvents := []market.DividendEvent{
+		scrapedEvents := []dividend.Event{
 			{Date: cumDate, Type: "JCP", Amount: 0.02, PaymentDate: payDate},
 			{Date: cumDate, Type: "Dividendo", Amount: 0.02, PaymentDate: payDate},
 		}
@@ -284,7 +284,7 @@ func TestDividendWorker_SyncAllDividends_ErrorScenariosAndBranches(t *testing.T)
 		payDate1 := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)
 		payDate2 := time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC)
 
-		scrapedEvents := []market.DividendEvent{
+		scrapedEvents := []dividend.Event{
 			// First on cumDate1: matches evt-already-matched in Pass 1 (marking it in matchedIDs)
 			{Date: cumDate1, Type: "JCP", Amount: 0.50, PaymentDate: payDate1},
 			// Second on cumDate1: incoming JCP, skips evt-already-matched in Pass 2, matches Dividendo (evt-1) -> upgrades DB row to JCP

@@ -18,6 +18,7 @@ import (
 	"github.com/onigiri/stock-pulse/backend/internal/auth"
 	"github.com/onigiri/stock-pulse/backend/internal/config"
 	"github.com/onigiri/stock-pulse/backend/internal/database"
+	"github.com/onigiri/stock-pulse/backend/internal/dividend"
 	"github.com/onigiri/stock-pulse/backend/internal/docs"
 
 	"github.com/onigiri/stock-pulse/backend/internal/fixedincome"
@@ -142,7 +143,8 @@ func main() {
 	portfolioService := portfolio.NewService(portfolioRepo, marketService, marketProvider, fiService, uow)
 	portfolioHandler := portfolio.NewHandler(portfolioService)
 	portfolioWorker := portfolio.NewDailyWorker(portfolioRepo, marketProvider)
-	dividendWorker := portfolio.NewDividendWorker(portfolioRepo, marketService)
+	dividendGateway := dividend.NewDefaultGateway(rdb, config.Envs.RedisTTLDividends)
+	dividendWorker := portfolio.NewDividendWorker(portfolioRepo, dividendGateway)
 
 	// Inicialização das Camadas da Fase 3 (Alertas & Tempo Real)
 

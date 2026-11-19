@@ -16,64 +16,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestService_GetDividends(t *testing.T) {
-	t.Run("Cache Hit", func(t *testing.T) {
-		s, _, _, rmock := setupServiceTest()
-		events := []DividendEvent{{Type: "DIVIDEND", Amount: 1.5}}
-		b, _ := json.Marshal(events)
-
-		rmock.ExpectGet("dividends:PETR4.SA").SetVal(string(b))
-
-		res, err := s.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
-		assert.NoError(t, err)
-		assert.Len(t, res, 1)
-		assert.Equal(t, 1.5, res[0].Amount)
-	})
-
-	t.Run("Cache Miss Fundamentus Success", func(t *testing.T) {
-		s, _, rdb, rmock := setupServiceTest()
-		rmock.ExpectGet("dividends:PETR4.SA").RedisNil()
-		rmock.ExpectSet("dividends:PETR4.SA", mock.Anything, 12*time.Hour).SetVal("OK")
-
-		mockB3 := &mockDividendSource{}
-		mockFund := &mockDividendSource{}
-		mockSA := &mockDividendSource{}
-		mockYahoo := &mockDividendSource{}
-
-		evs := []DividendEvent{{Date: time.Now(), Amount: 1.5, Type: "Dividendo"}}
-		mockB3.On("GetDividends", mock.Anything, "PETR4.SA", "STOCK_BR").Return(evs, nil)
-		mockFund.On("GetDividends", mock.Anything, "PETR4.SA", "STOCK_BR").Return(evs, nil)
-
-		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, nil, rdb, 12*time.Hour)
-
-		res, err := s.GetDividends(context.Background(), "PETR4.SA", "STOCK_BR")
-		assert.NoError(t, err)
-		assert.NotEmpty(t, res)
-	})
-
-	t.Run("Cache Miss StockAnalysis Success", func(t *testing.T) {
-		s, _, rdb, rmock := setupServiceTest()
-		rmock.ExpectGet("dividends:AAPL").RedisNil()
-		rmock.ExpectSet("dividends:AAPL", mock.Anything, 12*time.Hour).SetVal("OK")
-
-		mockB3 := &mockDividendSource{}
-		mockFund := &mockDividendSource{}
-		mockSA := &mockDividendSource{}
-		mockYahoo := &mockDividendSource{}
-
-		evs := []DividendEvent{{Date: time.Now(), Amount: 0.25, Type: "Dividendo"}}
-		mockSA.On("GetDividends", mock.Anything, "AAPL", "STOCK_US").Return(evs, nil)
-
-		s.dividendGateway = NewDividendGateway(mockB3, mockFund, mockSA, mockYahoo, nil, rdb, 12*time.Hour)
-
-		res, err := s.GetDividends(context.Background(), "AAPL", "STOCK_US")
-		assert.NoError(t, err)
-		assert.NotEmpty(t, res)
-	})
-
-
-}
-
 func TestService_GetHistoricalExchangeRate(t *testing.T) {
 	t.Run("Cache Hit Map", func(t *testing.T) {
 		s, _, _, rmock := setupServiceTest()

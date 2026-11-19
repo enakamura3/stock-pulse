@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/dividend"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -190,9 +191,9 @@ func (m *MockMarketService) SearchAssets(ctx context.Context, query string) ([]m
 	return args.Get(0).([]market.SearchResult), args.Error(1)
 }
 
-func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
+func (m *MockMarketService) GetDividends(ctx context.Context, ticker string, assetType string) ([]dividend.Event, error) {
 	args := m.Called(ctx, ticker, assetType)
-	return args.Get(0).([]market.DividendEvent), args.Error(1)
+	return args.Get(0).([]dividend.Event), args.Error(1)
 }
 
 func (m *MockMarketService) GetHistoricalPrices(ctx context.Context, ticker string, rangePeriod string) ([]market.HistoricalPrice, error) {
@@ -240,14 +241,6 @@ func (m *MockMarketProvider) GetHistoricalPricesBetween(ctx context.Context, tic
 	args := m.Called(ctx, ticker, period1, period2)
 	if args.Get(0) != nil {
 		return args.Get(0).([]market.HistoricalPrice), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
-func (m *MockMarketProvider) GetDividends(ctx context.Context, ticker string, assetType string) ([]market.DividendEvent, error) {
-	args := m.Called(ctx, ticker)
-	if args.Get(0) != nil {
-		return args.Get(0).([]market.DividendEvent), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -1059,7 +1052,7 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 		assert.InDelta(t, 15.0*5.80, divs[0].GrossAmount, 1e-6) // R$ 87.00 projetado
 	})
 
-	t.Run("FII Deduplication and Zero PaymentDate Month Key", func(t *testing.T) {
+	t.Run("Multiple FII Payments in Same Month Preserved", func(t *testing.T) {
 		s, repo, _, _ := setupServiceTest()
 		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
 
@@ -1071,39 +1064,13 @@ func TestService_GetPortfolioDividends(t *testing.T) {
 
 		baseDate := time.Date(now.Year(), now.Month(), 5, 0, 0, 0, 0, time.UTC).AddDate(0, -1, 0)
 		repo.On("GetAssetEvents", mock.Anything, "fii1").Return([]AssetEvent{
-			// Event 1 with PaymentDate: time.Time{} (zero date)
-			{AssetID: "fii1", CumDate: baseDate, PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
-			// Event 2 in same month (should be deduped / skipped)
-			{AssetID: "fii1", CumDate: baseDate.AddDate(0, 0, 5), PaymentDate: time.Time{}, GrossAmount: 0.10, Type: "DIVIDEND"},
+			{AssetID: "fii1", CumDate: baseDate, PaymentDate: baseDate.AddDate(0, 0, 10), GrossAmount: 0.10, Type: "Rendimento"},
+			{AssetID: "fii1", CumDate: baseDate.AddDate(0, 0, 5), PaymentDate: baseDate.AddDate(0, 0, 15), GrossAmount: 0.50, Type: "Amortização"},
 		}, nil)
 
 		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
 		assert.NoError(t, err)
-		assert.Len(t, divs, 1) // Deduped to 1
-		assert.InDelta(t, 10.0, divs[0].GrossAmount, 1e-6)
-	})
-
-	t.Run("Stock Deduplication JCP vs Dividendo on Same CumDate and PaymentDate", func(t *testing.T) {
-		s, repo, _, _ := setupServiceTest()
-		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{}, nil)
-
-		cumDate := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
-		payDate := time.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC)
-		txs := []Transaction{
-			{AssetID: "itsa4", Ticker: "ITSA4.SA", Type: "BUY", Quantity: 100, ExecutedAt: cumDate.AddDate(0, -1, 0), Currency: "BRL", AssetType: "STOCK_BR"},
-		}
-		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return(txs, nil)
-		repo.On("GetAssetEvents", mock.Anything, "itsa4").Return([]AssetEvent{
-			{AssetID: "itsa4", CumDate: cumDate, PaymentDate: payDate, GrossAmount: 0.02, Type: "Dividendo"},
-			{AssetID: "itsa4", CumDate: cumDate, PaymentDate: payDate, GrossAmount: 0.02, Type: "JCP"},
-			{AssetID: "itsa4", CumDate: cumDate, PaymentDate: payDate, GrossAmount: 0.02, Type: "Dividendo"},
-		}, nil)
-
-		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
-		assert.NoError(t, err)
-		assert.Len(t, divs, 1)
-		assert.Equal(t, "JCP", divs[0].Type)
-		assert.InDelta(t, 2.0*0.85, divs[0].NetAmount, 1e-6)
+		assert.Len(t, divs, 2)
 	})
 }
 
