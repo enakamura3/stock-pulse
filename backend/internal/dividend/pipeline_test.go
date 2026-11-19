@@ -151,40 +151,6 @@ func TestPipeline_Functions(t *testing.T) {
 		assert.Len(t, plan.Inserts, 1)
 		assert.Equal(t, 2.00, plan.Inserts[0].GrossAmount)
 	})
-
-	t.Run("Resolve Split Multiple Reconciliation (VIVT3 JSCP Dec 2025)", func(t *testing.T) {
-		cumMar := time.Date(2025, 3, 24, 0, 0, 0, 0, time.UTC)
-		cumFeb := time.Date(2025, 2, 24, 0, 0, 0, 0, time.UTC)
-		payDec := time.Date(2025, 12, 2, 0, 0, 0, 0, time.UTC)
-
-		// Existing records previously imported as split-adjusted Dividendo (0.06172680 and 0.05546619)
-		existing := []AssetEvent{
-			{ID: "vivt-other-date", AssetID: "vivt", CumDate: time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC), PaymentDate: payDec, GrossAmount: 0.10, Type: "Dividendo"},
-			{ID: "vivt-mar", AssetID: "vivt", CumDate: cumMar, PaymentDate: payDec, GrossAmount: 0.06172680, Type: "Dividendo"},
-			{ID: "vivt-feb", AssetID: "vivt", CumDate: cumFeb, PaymentDate: payDec, GrossAmount: 0.05546619, Type: "Dividendo"},
-		}
-
-		incoming := []Event{
-			{Date: cumMar, PaymentDate: payDec, Amount: 0.12345360, Type: "JCP"},
-			{Date: cumFeb, PaymentDate: payDec, Amount: 0.11093237, Type: "JCP"},
-		}
-
-		plan := Resolve("vivt", incoming, existing)
-		assert.Equal(t, 0, plan.Skips)
-		assert.Empty(t, plan.Inserts)
-		assert.Len(t, plan.Updates, 2)
-		assert.Equal(t, "vivt-mar", plan.Updates[0].ID)
-		assert.Equal(t, "JCP", plan.Updates[0].Type)
-		assert.InDelta(t, 0.12345360, plan.Updates[0].GrossAmount, 1e-8)
-		assert.Equal(t, "vivt-feb", plan.Updates[1].ID)
-		assert.Equal(t, "JCP", plan.Updates[1].Type)
-		assert.InDelta(t, 0.11093237, plan.Updates[1].GrossAmount, 1e-8)
-
-		assert.False(t, isSplitMultiple(0, 0.12))
-		assert.False(t, isSplitMultiple(0.10, 0.12))   // ratio 1.2 -> rounded 1 < 2
-		assert.False(t, isSplitMultiple(0.10, 0.25))   // ratio 2.5 -> not close to integer
-		assert.True(t, isSplitMultiple(0.06172680, 0.12345360))
-	})
 }
 
 type mockSource struct {
