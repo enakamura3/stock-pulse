@@ -711,7 +711,7 @@ func TestHandlers_Operations(t *testing.T) {
 		}, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 		pSvc.On("GetPortfolioDetails", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(&portfolio.Portfolio{ID: "p1"}, []portfolio.Position{{Ticker: "AAPL"}}, nil).Once()
-		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_TICKER", PortfolioID: "p1"}).Return(nil).Once()
+		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{Step: "EXPECT_TICKER", PortfolioID: "p1", PortfolioName: "P1"}).Return(nil).Once()
 
 		mCtx.On("Edit", mock.Anything, mock.Anything).Return(nil)
 
@@ -1948,7 +1948,9 @@ func TestHandlers_EdgeCases_FullCoverage(t *testing.T) {
 		}
 		svc.On("GetConversationState", mock.Anything, int64(123)).Return(state, nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), mock.Anything).Return(nil).Once()
-		mCtx.On("Send", "Qual o preço unitário da transação? (ex: 15.50)", mock.Anything).Return(nil).Once()
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Qual o preço unitário da transação? (ex: 15.50)")
+		}), mock.Anything).Return(nil).Once()
 
 		err := h.HandleText(mCtx)
 		assert.NoError(t, err)
