@@ -208,7 +208,7 @@ func (h *Handlers) handleWatchlistAddTicker(c telebot.Context, text string) erro
 		menu := &telebot.ReplyMarkup{}
 		btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
 		menu.Inline(menu.Row(btnCancel))
-		return c.Send(fmt.Sprintf("⚠️ Não foi possível adicionar *%s*: %s\n\nVerifique se o código está correto ou tente novamente:", escapeMarkdown(ticker), err.Error()), telebot.ModeMarkdown, menu)
+		return c.Send(fmt.Sprintf("⚠️ Não foi possível adicionar *%s*: %s\n\nVerifique se o código está correto ou tente novamente:", escapeMarkdown(ticker), escapeMarkdown(err.Error())), telebot.ModeMarkdown, menu)
 	}
 
 	_ = h.svc.ClearConversationState(ctx, c.Chat().ID)

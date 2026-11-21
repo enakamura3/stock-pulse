@@ -186,6 +186,17 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 		return h.handleSelectedPrice(c, priceStr)
 	}
 
+	if strings.HasPrefix(data, "txda_") {
+		payload := strings.TrimPrefix(data, "txda_")
+		return h.handleAskDeleteTransaction(c, payload)
+	}
+
+	if strings.HasPrefix(data, "txdc_") {
+		payload := strings.TrimPrefix(data, "txdc_")
+		txID, returnData := parseTxDeleteCallback(payload)
+		return h.handleDeleteTransactionWithReturn(c, txID, returnData)
+	}
+
 	if strings.HasPrefix(data, "btn_tx_del_") {
 		txID := strings.TrimPrefix(data, "btn_tx_del_")
 		return h.handleDeleteTransaction(c, txID)
@@ -702,7 +713,7 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 	successMenu := &telebot.ReplyMarkup{}
 	var rows []telebot.Row
 	if savedTx != nil && savedTx.ID != "" {
-		btnUndo := successMenu.Data("🗑️ Desfazer Operação", "btn_tx_del_"+savedTx.ID)
+		btnUndo := successMenu.Data("🗑️ Desfazer Operação", "txda_"+savedTx.ID)
 		rows = append(rows, successMenu.Row(btnUndo))
 	}
 	btnNewOp := successMenu.Data("➕ Nova Operação", "btn_operacao")
@@ -750,7 +761,7 @@ func (h *Handlers) HandleUndoLastOperation(c telebot.Context) error {
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("⚠️ *Confirmar cancelamento da última operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f\n\nDeseja realmente excluir esta operação?",
-		portName, cleanTickerForDisplay(lastTx.Ticker), tipoStr, lastTx.Quantity, currSymbol, lastTx.UnitPrice, currSymbol, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), currSymbol, lastTx.TotalCost)
+		escapeMarkdown(portName), cleanTickerForDisplay(lastTx.Ticker), tipoStr, lastTx.Quantity, currSymbol, lastTx.UnitPrice, currSymbol, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), currSymbol, lastTx.TotalCost)
 
 	menu := &telebot.ReplyMarkup{}
 	btnConfirm := menu.Data("🗑️ Sim, Desfazer", "btn_tx_del_"+lastTx.ID)
@@ -760,7 +771,83 @@ func (h *Handlers) HandleUndoLastOperation(c telebot.Context) error {
 	return c.Send(msg, telebot.ModeMarkdown, menu)
 }
 
+func (h *Handlers) handleAskDeleteTransaction(c telebot.Context, payload string) error {
+	defer c.Respond()
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return c.Edit("⚠️ Carteira não encontrada.")
+	}
+
+	portID, portName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	txID, returnData := parseTxDeleteCallback(payload)
+
+	txs, err := h.portfolioSvc.GetPortfolioTransactions(ctx, portID, userIDStr)
+	var targetTx *portfolio.Transaction
+	if err == nil {
+		for i := range txs {
+			if txs[i].ID == txID {
+				targetTx = &txs[i]
+				break
+			}
+		}
+	}
+
+	if targetTx == nil {
+		menu := &telebot.ReplyMarkup{}
+		if returnData != "" {
+			btnBack := menu.Data("📜 Voltar ao Histórico", "btn_history", returnData)
+			btnMenu := menu.Data("🏠 Menu", "btn_menu")
+			menu.Inline(menu.Row(btnBack, btnMenu))
+		} else {
+			btnMenu := menu.Data("🏠 Voltar ao Menu", "btn_menu")
+			menu.Inline(menu.Row(btnMenu))
+		}
+		return c.Edit("⚠️ Operação não encontrada ou já foi removida.", menu)
+	}
+
+	tipoStr := "COMPRA"
+	if targetTx.Type == "SELL" {
+		tipoStr = "VENDA"
+	}
+
+	currSymbol := getTickerDefaultCurrency(targetTx.Ticker)
+	if targetTx.Currency != "" {
+		currSymbol = getCurrencySymbol(targetTx.Currency)
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("⚠️ *Confirmar exclusão de operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %s\n• Preço: %s %s\n• Taxas: %s %s\n• Data: %s\n• Total: %s %s\n\nDeseja realmente excluir esta operação?",
+		escapeMarkdown(portName), cleanTickerForDisplay(targetTx.Ticker), tipoStr, formatQuantity(targetTx.Quantity),
+		currSymbol, formatFinancialPrice(p, targetTx.UnitPrice), currSymbol, formatFinancialPrice(p, targetTx.Fee),
+		targetTx.ExecutedAt.Format("02/01/2006"), currSymbol, formatFinancialPrice(p, targetTx.TotalCost))
+
+	menu := &telebot.ReplyMarkup{}
+	if returnData != "" {
+		btnConfirm := menu.Data("🗑️ Sim, Excluir", "txdc_"+payload)
+		btnBack := menu.Data("⬅️ Voltar ao Histórico", "btn_history", returnData)
+		menu.Inline(menu.Row(btnConfirm, btnBack))
+	} else {
+		btnConfirm := menu.Data("🗑️ Sim, Excluir", "btn_tx_del_"+txID)
+		btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
+		menu.Inline(menu.Row(btnConfirm, btnCancel))
+	}
+
+	return c.Edit(msg, telebot.ModeMarkdown, menu)
+}
+
 func (h *Handlers) handleDeleteTransaction(c telebot.Context, txID string) error {
+	return h.handleDeleteTransactionWithReturn(c, txID, "")
+}
+
+func (h *Handlers) handleDeleteTransactionWithReturn(c telebot.Context, txID, returnData string) error {
 	defer c.Respond()
 	userIDStr, err := h.getUserID(c)
 	if err != nil {
@@ -784,9 +871,14 @@ func (h *Handlers) handleDeleteTransaction(c telebot.Context, txID string) error
 	}
 
 	menu := &telebot.ReplyMarkup{}
-	btnNewOp := menu.Data("➕ Nova Operação", "btn_operacao")
 	btnMenu := menu.Data("🏠 Voltar ao Menu", "btn_menu")
-	menu.Inline(menu.Row(btnNewOp, btnMenu))
+	if returnData != "" {
+		btnHist := menu.Data("📜 Voltar ao Histórico", "btn_history", returnData)
+		menu.Inline(menu.Row(btnHist, btnMenu))
+	} else {
+		btnNewOp := menu.Data("➕ Nova Operação", "btn_operacao")
+		menu.Inline(menu.Row(btnNewOp, btnMenu))
+	}
 
 	return c.Edit("🗑️ *Operação desfeita com sucesso!*\nA transação foi removida da sua carteira.", telebot.ModeMarkdown, menu)
 }
@@ -1143,7 +1235,7 @@ func (h *Handlers) handleQuickWatchlistAdd(c telebot.Context, ticker string) err
 	}
 
 	if err != nil {
-		return c.Send(fmt.Sprintf("⚠️ Não foi possível adicionar *%s* aos Favoritos: %s", escapeMarkdown(cleanTickerForDisplay(resolvedTicker)), err.Error()), telebot.ModeMarkdown)
+		return c.Send(fmt.Sprintf("⚠️ Não foi possível adicionar *%s* aos Favoritos: %s", escapeMarkdown(cleanTickerForDisplay(resolvedTicker)), escapeMarkdown(err.Error())), telebot.ModeMarkdown)
 	}
 
 	menu := &telebot.ReplyMarkup{}

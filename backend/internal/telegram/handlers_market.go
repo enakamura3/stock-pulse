@@ -60,15 +60,15 @@ func (h *Handlers) renderMultiQuote(c telebot.Context, tickers []string) error {
 			continue
 		}
 
-		curr := quote.Currency
-		if curr == "" {
+		curr := getCurrencySymbol(quote.Currency)
+		if quote.Currency == "" {
 			curr = getTickerDefaultCurrency(t)
 		}
 
 		badge := "⚪ "
 		changeStr := p.Sprintf("%.2f%%", 0.0)
 		if quote.ChangePercent > 1e-6 {
-			badge = "🟢 +"
+			badge = "🟢 "
 			changeStr = p.Sprintf("+%.2f%%", quote.ChangePercent)
 		} else if quote.ChangePercent < -1e-6 {
 			badge = "🔴 "

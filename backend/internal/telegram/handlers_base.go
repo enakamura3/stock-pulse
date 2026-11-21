@@ -111,6 +111,7 @@ func (h *Handlers) Register(bot *telebot.Bot) {
 	bot.Handle("\fbtn_proventos", h.HandleDividends)
 	bot.Handle("\fbtn_agenda", h.HandleAgenda)
 	bot.Handle("\fbtn_history", h.HandleHistory)
+	bot.Handle("\fbtn_history_del", h.HandleHistoryDeleteMode)
 	bot.Handle("\fbtn_renda_fixa", h.HandleFixedIncome)
 	bot.Handle("\fbtn_divs_year", h.HandleDividendsByYear)
 	bot.Handle("\fbtn_divs_month", h.HandleDividendsByMonth)

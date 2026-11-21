@@ -3,6 +3,7 @@ package telegram
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 
@@ -35,10 +36,15 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	}
 
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, chatID, portfolios)
-	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
+	port, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
 		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar sua carteira.")
+	}
+
+	baseCurr := "R$"
+	if port != nil && port.BaseCurrency != "" {
+		baseCurr = getCurrencySymbol(port.BaseCurrency)
 	}
 
 	var totalValue, totalCost, totalDailyChange float64
@@ -46,7 +52,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		totalValue += pos.CurrentValue
 		totalCost += pos.TotalCost
 		rate := 1.0
-		if pos.CurrentPrice > 0 && pos.Quantity > 0 {
+		if pos.CurrentPrice > 1e-6 && pos.Quantity > 1e-6 {
 			rate = pos.CurrentValue / (pos.CurrentPrice * pos.Quantity)
 		}
 		totalDailyChange += pos.DailyChange * pos.Quantity * rate
@@ -90,27 +96,27 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 
 	totalProfitLoss := totalValue - totalCost
 	totalReturnPercent := 0.0
-	if totalCost > 0 {
+	if totalCost > 1e-6 {
 		totalReturnPercent = (totalProfitLoss / totalCost) * 100
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📊 *Resumo: %s*\n\n", escapeMarkdown(portfolioName))
-	msg += p.Sprintf("💰 Valor Total: *R$ %.2f*\n", totalValue)
+	msg += p.Sprintf("💰 Valor Total: *%s %.2f*\n", baseCurr, totalValue)
 
 	var variacaoDiaria string
-	if totalDailyChange >= 0 {
-		variacaoDiaria = p.Sprintf("🟢 +R$ %.2f", totalDailyChange)
+	if totalDailyChange < -1e-6 {
+		variacaoDiaria = p.Sprintf("🔴 %s %.2f", baseCurr, totalDailyChange)
 	} else {
-		variacaoDiaria = p.Sprintf("🔴 R$ %.2f", totalDailyChange)
+		variacaoDiaria = p.Sprintf("🟢 +%s %.2f", baseCurr, math.Max(0, totalDailyChange))
 	}
 	msg += p.Sprintf("📈 Variação Diária: *%s*\n", variacaoDiaria)
 
 	var lucroPrejuizo string
-	if totalProfitLoss >= 0 {
-		lucroPrejuizo = p.Sprintf("🟢 +R$ %.2f (%.2f%%)", totalProfitLoss, totalReturnPercent)
+	if totalProfitLoss < -1e-6 {
+		lucroPrejuizo = p.Sprintf("🔴 %s %.2f (%.2f%%)", baseCurr, totalProfitLoss, totalReturnPercent)
 	} else {
-		lucroPrejuizo = p.Sprintf("🔴 R$ %.2f (%.2f%%)", totalProfitLoss, totalReturnPercent)
+		lucroPrejuizo = p.Sprintf("🟢 +%s %.2f (%.2f%%)", baseCurr, math.Max(0, totalProfitLoss), totalReturnPercent)
 	}
 	msg += p.Sprintf("⚖️ Lucro/Prejuízo Total: %s\n", lucroPrejuizo)
 
@@ -139,11 +145,11 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		catID := getMacroCategoryKey(pos.Type, pos.Ticker)
 		catTotals[catID] += pos.CurrentValue
 	}
-	if totalFIValue > 0 {
+	if totalFIValue > 1e-6 {
 		catTotals["RF"] += totalFIValue
 	}
 
-	if totalValue > 0 && len(catTotals) > 0 {
+	if totalValue > 1e-6 && len(catTotals) > 0 {
 		msg += "\n🧱 *Alocação Patrimonial*\n"
 		type catItem struct {
 			key   string
@@ -152,7 +158,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		}
 		var catList []catItem
 		for k, val := range catTotals {
-			if val > 0 {
+			if val > 1e-6 {
 				catList = append(catList, catItem{
 					key:   k,
 					total: val,
@@ -167,7 +173,7 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 		for _, item := range catList {
 			name := catNames[item.key]
 			emoji := catEmojis[item.key]
-			msg += p.Sprintf("• %s %s: *R$ %.2f* (%.2f%%)\n", emoji, name, item.total, item.pct)
+			msg += p.Sprintf("• %s %s: *%s %.2f* (%.2f%%)\n", emoji, name, baseCurr, item.total, item.pct)
 		}
 	}
 
@@ -312,10 +318,15 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	}
 
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, chatID, portfolios)
-	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
+	port, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		slog.Error("Failed to fetch portfolio for telegram bot", "error", err, "user_id", userIDStr)
 		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar sua carteira.")
+	}
+
+	baseCurr := "R$"
+	if port != nil && port.BaseCurrency != "" {
+		baseCurr = getCurrencySymbol(port.BaseCurrency)
 	}
 
 	if len(positions) == 0 {
@@ -371,7 +382,7 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📋 *Ativos: %s*\n", escapeMarkdown(portfolioName))
 	if totalPortValue > 1e-6 {
-		msg += p.Sprintf("💰 Patrimônio em Ativos: *R$ %s* (Custo: R$ %s)\n", formatFinancialPrice(p, totalPortValue), formatFinancialPrice(p, totalPortCost))
+		msg += p.Sprintf("💰 Patrimônio em Ativos: *%s %s* (Custo: %s %s)\n", baseCurr, formatFinancialPrice(p, totalPortValue), baseCurr, formatFinancialPrice(p, totalPortCost))
 	}
 	msg += p.Sprintf("_Página %d de %d_\n\n", page+1, totalPages)
 
@@ -465,8 +476,8 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 }
 
 func getMacroCategoryKey(assetType, ticker string) string {
-	tUpper := strings.ToUpper(ticker)
-	typeUpper := strings.ToUpper(assetType)
+	tUpper := strings.ToUpper(strings.TrimSpace(ticker))
+	typeUpper := strings.ToUpper(strings.TrimSpace(assetType))
 
 	if strings.Contains(typeUpper, "ETF") {
 		return "ETF"
@@ -480,7 +491,13 @@ func getMacroCategoryKey(assetType, ticker string) string {
 	if strings.Contains(typeUpper, "RF") || strings.Contains(typeUpper, "FIXED") {
 		return "RF"
 	}
-	if typeUpper == "FII" || strings.HasSuffix(tUpper, "11.SA") || strings.HasSuffix(tUpper, "11") {
+	if typeUpper == "FII" || typeUpper == "FIAGRO" {
+		return "FII"
+	}
+	if strings.Contains(typeUpper, "STOCK") {
+		return "STOCK"
+	}
+	if strings.HasSuffix(tUpper, "11.SA") || strings.HasSuffix(tUpper, "11") {
 		return "FII"
 	}
 	return "STOCK"

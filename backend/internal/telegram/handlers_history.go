@@ -11,7 +11,68 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
+func encodeHistoryFilterChar(filter string) string {
+	switch filter {
+	case "BUY":
+		return "B"
+	case "SELL":
+		return "S"
+	default:
+		return "A"
+	}
+}
+
+func decodeHistoryFilterChar(ch string) string {
+	switch ch {
+	case "B":
+		return "BUY"
+	case "S":
+		return "SELL"
+	default:
+		return "ALL"
+	}
+}
+
+// buildTxDeleteCallback constrói payload compacto "<prefix><txID>|<page>|<F>|<ticker>" garantindo <= 63 bytes (margem para '\f' no limite de 64B do Telegram).
+func buildTxDeleteCallback(prefix, txID string, page int, filter, ticker string) string {
+	base := fmt.Sprintf("%s%s|%d|%s", prefix, txID, page, encodeHistoryFilterChar(filter))
+	if ticker != "" {
+		full := base + "|" + ticker
+		if len(full) <= 63 {
+			return full
+		}
+	}
+	if len(base) <= 63 {
+		return base
+	}
+	return prefix + txID
+}
+
+// parseTxDeleteCallback extrai txID e returnData ("PAGE:FILTER[:TICKER]") de um payload compacto.
+func parseTxDeleteCallback(payload string) (string, string) {
+	parts := strings.SplitN(payload, "|", 4)
+	txID := parts[0]
+	if len(parts) < 3 {
+		return txID, ""
+	}
+	page := 0
+	fmt.Sscanf(parts[1], "%d", &page)
+	filter := decodeHistoryFilterChar(parts[2])
+	if len(parts) == 4 && parts[3] != "" {
+		return txID, fmt.Sprintf("%d:%s:%s", page, filter, parts[3])
+	}
+	return txID, fmt.Sprintf("%d:%s", page, filter)
+}
+
 func (h *Handlers) HandleHistory(c telebot.Context) error {
+	return h.renderHistory(c, false)
+}
+
+func (h *Handlers) HandleHistoryDeleteMode(c telebot.Context) error {
+	return h.renderHistory(c, true)
+}
+
+func (h *Handlers) renderHistory(c telebot.Context, deleteMode bool) error {
 	defer c.Respond()
 	userIDStr, err := h.getUserID(c)
 	if err != nil {
@@ -117,10 +178,15 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 		return fmt.Sprintf("%d:%s", p, f)
 	}
 
+	cbUnique := "btn_history"
+	if deleteMode {
+		cbUnique = "btn_history_del"
+	}
+
 	menu := &telebot.ReplyMarkup{}
-	btnAll := menu.Data(fmt.Sprintf("%s Todas", map[bool]string{true: "▪️", false: "📋"}[filter == "ALL"]), "btn_history", buildFilterData(0, "ALL"))
-	btnBuy := menu.Data(fmt.Sprintf("%s Compras", map[bool]string{true: "▪️", false: "🟢"}[filter == "BUY"]), "btn_history", buildFilterData(0, "BUY"))
-	btnSell := menu.Data(fmt.Sprintf("%s Vendas", map[bool]string{true: "▪️", false: "🔴"}[filter == "SELL"]), "btn_history", buildFilterData(0, "SELL"))
+	btnAll := menu.Data(fmt.Sprintf("%s Todas", map[bool]string{true: "▪️", false: "📋"}[filter == "ALL"]), cbUnique, buildFilterData(0, "ALL"))
+	btnBuy := menu.Data(fmt.Sprintf("%s Compras", map[bool]string{true: "▪️", false: "🟢"}[filter == "BUY"]), cbUnique, buildFilterData(0, "BUY"))
+	btnSell := menu.Data(fmt.Sprintf("%s Vendas", map[bool]string{true: "▪️", false: "🔴"}[filter == "SELL"]), cbUnique, buildFilterData(0, "SELL"))
 
 	if len(filtered) == 0 {
 		msg := fmt.Sprintf("📜 *Histórico: %s*\n_%s %s — Nenhuma operação encontrada._", escapeMarkdown(portfolioName), filterEmoji, filterLabel)
@@ -135,7 +201,12 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	if tickerFilter != "" {
 		msg += p.Sprintf("🔎 Ativo filtrado: *`%s`*\n", escapeMarkdown(tickerFilter))
 	}
-	msg += p.Sprintf("_%s %s — Página %d de %d_\n\n", filterEmoji, filterLabel, page+1, totalPages)
+	msg += p.Sprintf("_%s %s — Página %d de %d_\n", filterEmoji, filterLabel, page+1, totalPages)
+	if deleteMode {
+		msg += "_🗑️ Selecione a operação que deseja excluir:_\n\n"
+	} else {
+		msg += "\n"
+	}
 
 	for _, tx := range filtered[start:end] {
 		tipoStr := "🟢 Compra"
@@ -161,33 +232,42 @@ func (h *Handlers) HandleHistory(c telebot.Context) error {
 	var rows []telebot.Row
 	rows = append(rows, menu.Row(btnAll, btnBuy, btnSell))
 
-	// Atalhos para exclusão pontual de operações exibidas na página
-	var delBtns []telebot.Btn
-	for _, tx := range filtered[start:end] {
-		btnDel := menu.Data(fmt.Sprintf("🗑️ %s (%s)", cleanTickerForDisplay(tx.Ticker), tx.ExecutedAt.Format("02/01")), "btn_tx_del_"+tx.ID)
-		delBtns = append(delBtns, btnDel)
-	}
-	for i := 0; i < len(delBtns); i += 2 {
-		if i+1 < len(delBtns) {
-			rows = append(rows, menu.Row(delBtns[i], delBtns[i+1]))
-		} else {
-			rows = append(rows, menu.Row(delBtns[i]))
+	if deleteMode {
+		// Atalhos para exclusão pontual de operações exibidas na página (com confirmação inline)
+		var delBtns []telebot.Btn
+		for _, tx := range filtered[start:end] {
+			cbData := buildTxDeleteCallback("txda_", tx.ID, page, filter, tickerFilter)
+			btnDel := menu.Data(fmt.Sprintf("🗑️ %s (%s)", cleanTickerForDisplay(tx.Ticker), tx.ExecutedAt.Format("02/01")), cbData)
+			delBtns = append(delBtns, btnDel)
+		}
+		for i := 0; i < len(delBtns); i += 2 {
+			if i+1 < len(delBtns) {
+				rows = append(rows, menu.Row(delBtns[i], delBtns[i+1]))
+			} else {
+				rows = append(rows, menu.Row(delBtns[i]))
+			}
 		}
 	}
 
 	var navBtns []telebot.Btn
 	if start > 0 {
-		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_history", buildFilterData(page-1, filter)))
+		navBtns = append(navBtns, menu.Data("⬅️ Anterior", cbUnique, buildFilterData(page-1, filter)))
 	}
 	if end < len(filtered) {
-		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_history", buildFilterData(page+1, filter)))
+		navBtns = append(navBtns, menu.Data("Próxima ➡️", cbUnique, buildFilterData(page+1, filter)))
 	}
 	if len(navBtns) > 0 {
 		rows = append(rows, menu.Row(navBtns...))
 	}
 
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
-	rows = append(rows, menu.Row(btnBack))
+	if deleteMode {
+		btnDone := menu.Data("✅ Concluir", "btn_history", buildFilterData(page, filter))
+		rows = append(rows, menu.Row(btnDone, btnBack))
+	} else {
+		btnDelMode := menu.Data("🗑️ Excluir Operação", "btn_history_del", buildFilterData(page, filter))
+		rows = append(rows, menu.Row(btnDelMode, btnBack))
+	}
 
 	menu.Inline(rows...)
 
