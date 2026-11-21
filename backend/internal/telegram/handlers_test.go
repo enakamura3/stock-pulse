@@ -109,8 +109,13 @@ func (m *MockTelebotContext) Data() string {
 }
 
 func (m *MockTelebotContext) Text() string {
-	args := m.Called()
-	return args.String(0)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Text" {
+			args := m.Called()
+			return args.String(0)
+		}
+	}
+	return ""
 }
 
 func (m *MockTelebotContext) Message() *telebot.Message {
@@ -369,19 +374,29 @@ type MockWatchlistSvc struct {
 }
 
 func (m *MockWatchlistSvc) GetWatchlists(ctx context.Context, userID string) ([]watchlist.Watchlist, error) {
-	args := m.Called(ctx, userID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetWatchlists" && call.Repeatability > -1 {
+			args := m.Called(ctx, userID)
+			if args.Get(0) == nil {
+				return nil, args.Error(1)
+			}
+			return args.Get(0).([]watchlist.Watchlist), args.Error(1)
+		}
 	}
-	return args.Get(0).([]watchlist.Watchlist), args.Error(1)
+	return nil, nil
 }
 
 func (m *MockWatchlistSvc) GetWatchlist(ctx context.Context, id, userID string) (*watchlist.Watchlist, error) {
-	args := m.Called(ctx, id, userID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "GetWatchlist" && call.Repeatability > -1 {
+			args := m.Called(ctx, id, userID)
+			if args.Get(0) == nil {
+				return nil, args.Error(1)
+			}
+			return args.Get(0).(*watchlist.Watchlist), args.Error(1)
+		}
 	}
-	return args.Get(0).(*watchlist.Watchlist), args.Error(1)
+	return nil, nil
 }
 
 func (m *MockWatchlistSvc) AddAssetToWatchlist(ctx context.Context, watchlistID, userID, ticker string) (*watchlist.Item, error) {

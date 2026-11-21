@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -254,4 +255,80 @@ func (h *Handlers) handleWatchlistDelete(c telebot.Context, payload string) erro
 	}
 
 	return h.renderWatchlist(c, page)
+}
+
+// findWatchlistItem verifica (best-effort) se o ticker já está na watchlist padrão do usuário, retornando (watchlistID, storedTicker, found).
+func (h *Handlers) findWatchlistItem(ctx context.Context, c telebot.Context, ticker string) (string, string, bool) {
+	if h.watchlistSvc == nil || c == nil {
+		return "", "", false
+	}
+	val := c.Get("user_id")
+	userIDStr, ok := val.(string)
+	if !ok || userIDStr == "" {
+		return "", "", false
+	}
+	lists, err := h.watchlistSvc.GetWatchlists(ctx, userIDStr)
+	if err != nil || len(lists) == 0 {
+		return "", "", false
+	}
+	wl, err := h.watchlistSvc.GetWatchlist(ctx, lists[0].ID, userIDStr)
+	if err != nil || wl == nil {
+		return lists[0].ID, "", false
+	}
+	for _, item := range wl.Items {
+		if tickersMatch(item.Ticker, ticker) {
+			return lists[0].ID, item.Ticker, true
+		}
+	}
+	return lists[0].ID, "", false
+}
+
+// handleQuickWatchlistToggle alterna um ativo nos Favoritos inline no card de Cotação ("q") ou Análise ("a") com feedback via toast.
+func (h *Handlers) handleQuickWatchlistToggle(c telebot.Context, source, ticker string) error {
+	if h.watchlistSvc == nil {
+		_ = c.Respond(&telebot.CallbackResponse{Text: "⚠️ Módulo de Favoritos não está ativo."})
+		return nil
+	}
+
+	userIDStr, err := h.getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	wlID, storedTicker, found := h.findWatchlistItem(ctx, c, ticker)
+	if wlID == "" {
+		_ = c.Respond(&telebot.CallbackResponse{Text: "❌ Erro ao buscar lista de favoritos."})
+		return nil
+	}
+
+	if found {
+		if err := h.watchlistSvc.RemoveAssetFromWatchlist(ctx, wlID, userIDStr, storedTicker); err != nil {
+			slog.Error("Falha ao remover favorito via toggle", "error", err, "ticker", storedTicker)
+			_ = c.Respond(&telebot.CallbackResponse{Text: "⚠️ Erro ao remover dos Favoritos."})
+			return nil
+		}
+		_ = c.Respond(&telebot.CallbackResponse{Text: "💔 Removido dos Favoritos!"})
+	} else {
+		resolvedTicker := strings.ToUpper(strings.TrimSpace(ticker))
+		_, err = h.watchlistSvc.AddAssetToWatchlist(ctx, wlID, userIDStr, resolvedTicker)
+		if err != nil && isB3Ticker(resolvedTicker) && !strings.HasSuffix(resolvedTicker, ".SA") {
+			if _, errSA := h.watchlistSvc.AddAssetToWatchlist(ctx, wlID, userIDStr, resolvedTicker+".SA"); errSA == nil {
+				err = nil
+			}
+		}
+		if err != nil {
+			slog.Error("Falha ao adicionar favorito via toggle", "error", err, "ticker", resolvedTicker)
+			_ = c.Respond(&telebot.CallbackResponse{Text: "⚠️ Não foi possível adicionar aos Favoritos."})
+			return nil
+		}
+		_ = c.Respond(&telebot.CallbackResponse{Text: "⭐ Adicionado aos Favoritos!"})
+	}
+
+	if source == "a" {
+		return h.renderAnalysisView(c, ticker, false)
+	}
+	return h.renderQuoteView(c, ticker, false)
 }
