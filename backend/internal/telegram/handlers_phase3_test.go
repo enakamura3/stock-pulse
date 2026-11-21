@@ -675,7 +675,7 @@ func TestHandlers_Phase3_YesterdayDateShortcut(t *testing.T) {
 func TestHandlers_Phase3_HistoryDeletion_And_CustodyHelpers(t *testing.T) {
 	h, svc, pSvc, _, _, _ := setupHandlersTest()
 
-	t.Run("HandleHistory renders delete buttons for displayed transactions", func(t *testing.T) {
+	t.Run("HandleHistory renders delete mode toggle and HandleHistoryDeleteMode renders confirmation buttons", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
 		mCtx.On("Respond", mock.Anything).Return(nil).Once()
@@ -706,16 +706,61 @@ func TestHandlers_Phase3_HistoryDeletion_And_CustodyHelpers(t *testing.T) {
 		err := h.HandleHistory(mCtx)
 		assert.NoError(t, err)
 		assert.NotNil(t, sentMenu)
-		// Check that delete buttons are in rows
-		foundDelBtn := false
+		// Default mode hides per-tx delete buttons and shows toggle btn_history_del
+		foundDelToggle := false
+		foundDirectDel := false
 		for _, row := range sentMenu.InlineKeyboard {
 			for _, btn := range row {
-				if strings.HasPrefix(btn.Unique, "btn_tx_del_") || strings.HasPrefix(btn.Data, "btn_tx_del_") {
-					foundDelBtn = true
+				if btn.Unique == "btn_history_del" || strings.HasPrefix(btn.Data, "\fbtn_history_del") {
+					foundDelToggle = true
+				}
+				if strings.HasPrefix(btn.Unique, "txda_") || strings.HasPrefix(btn.Unique, "btn_tx_del_") {
+					foundDirectDel = true
 				}
 			}
 		}
-		assert.True(t, foundDelBtn)
+		assert.True(t, foundDelToggle)
+		assert.False(t, foundDirectDel)
+
+		// Delete mode renders per-tx txda_ confirmation buttons
+		mCtxDel := new(MockTelebotContext)
+		mCtxDel.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtxDel.On("Respond", mock.Anything).Return(nil).Once()
+		mCtxDel.On("Data").Return("0:ALL")
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(txs, nil).Once()
+
+		var delMenu *telebot.ReplyMarkup
+		mCtxDel.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Selecione a operação que deseja excluir")
+		}), mock.MatchedBy(func(opts []interface{}) bool {
+			for _, opt := range opts {
+				if menu, ok := opt.(*telebot.ReplyMarkup); ok {
+					delMenu = menu
+					return true
+				}
+			}
+			return false
+		})).Return(nil).Once()
+
+		err = h.HandleHistoryDeleteMode(mCtxDel)
+		assert.NoError(t, err)
+		assert.NotNil(t, delMenu)
+		foundAskDelBtn := false
+		foundDoneBtn := false
+		for _, row := range delMenu.InlineKeyboard {
+			for _, btn := range row {
+				if strings.HasPrefix(btn.Unique, "txda_") || strings.HasPrefix(btn.Data, "\ftxda_") {
+					foundAskDelBtn = true
+				}
+				if btn.Unique == "btn_history" && strings.Contains(btn.Text, "Concluir") {
+					foundDoneBtn = true
+				}
+			}
+		}
+		assert.True(t, foundAskDelBtn)
+		assert.True(t, foundDoneBtn)
 	})
 
 	t.Run("handleDeleteTransaction errors and success via DynamicCallback", func(t *testing.T) {

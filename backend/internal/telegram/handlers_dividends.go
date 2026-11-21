@@ -15,12 +15,12 @@ import (
 )
 
 func getCurrencySymbol(code string) string {
-	switch code {
-	case "USD":
+	switch strings.ToUpper(strings.TrimSpace(code)) {
+	case "USD", "US$":
 		return "US$"
-	case "EUR":
+	case "EUR", "€":
 		return "€"
-	case "BRL":
+	case "BRL", "R$":
 		return "R$"
 	default:
 		return "R$"
@@ -64,29 +64,55 @@ func getMonthNamePT(m time.Month) string {
 }
 
 func getAssetTypeEmoji(assetType, ticker string) string {
-	tickerUpper := strings.ToUpper(ticker)
-	if !strings.HasSuffix(tickerUpper, ".SA") {
+	tickerUpper := strings.ToUpper(strings.TrimSpace(ticker))
+	typeUpper := strings.ToUpper(strings.TrimSpace(assetType))
+
+	switch typeUpper {
+	case "FII", "FIAGRO":
+		return "🏢"
+	case "ETF_BR", "ETF", "ETF_US":
+		return "📊"
+	case "BDR":
+		return "🌐"
+	case "CRYPTO":
+		return "🪙"
+	case "STOCK_BR":
+		return "📈"
+	case "STOCK_US":
+		return "🇺🇸"
+	}
+
+	if !strings.HasSuffix(tickerUpper, ".SA") && !isB3Ticker(tickerUpper) {
 		if strings.Contains(tickerUpper, "-") {
 			return "🪙"
 		}
 		return "🇺🇸"
 	}
 
-	switch strings.ToUpper(assetType) {
-	case "FII", "FIAGRO":
+	if typeUpper != "STOCK" && (strings.HasSuffix(tickerUpper, "11.SA") || strings.HasSuffix(tickerUpper, "11")) {
 		return "🏢"
-	case "ETF_BR", "ETF":
-		return "📊"
-	case "BDR":
-		return "🌐"
-	case "CRYPTO":
-		return "🪙"
-	default:
-		if strings.HasSuffix(tickerUpper, "11.SA") {
-			return "🏢"
-		}
-		return "📈"
 	}
+	return "📈"
+}
+
+func filterDividendsByTicker(divs []portfolio.CalculatedDividend, tickerFilter string) []portfolio.CalculatedDividend {
+	if tickerFilter == "" {
+		return divs
+	}
+	var filtered []portfolio.CalculatedDividend
+	for _, d := range divs {
+		if cleanTickerForDisplay(d.Ticker) == tickerFilter {
+			filtered = append(filtered, d)
+		}
+	}
+	return filtered
+}
+
+func formatCumDateSuffix(cumDate time.Time) string {
+	if !cumDate.IsZero() && cumDate.Year() > 1 {
+		return " • Com: " + cumDate.Format("2006-01-02")
+	}
+	return ""
 }
 
 func cleanTickerForDisplay(ticker string) string {
@@ -165,6 +191,14 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar os proventos da sua carteira.")
 	}
 
+	tickerFilter := ""
+	if args := c.Args(); len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+		tickerFilter = cleanTickerForDisplay(strings.TrimSpace(args[0]))
+	} else if rawData := strings.TrimSpace(c.Data()); rawData != "" {
+		tickerFilter = cleanTickerForDisplay(rawData)
+	}
+	divs = filterDividendsByTicker(divs, tickerFilter)
+
 	totalPaidMonth := make(map[string]float64)
 	totalFutureMonth := make(map[string]float64)
 	totalAccumulated := make(map[string]float64)
@@ -210,6 +244,9 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 
 	refMonthName := getMonthNamePT(currentMonth)
 	msg := p.Sprintf("💸 *Proventos: %s*\n", escapeMarkdown(portfolioName))
+	if tickerFilter != "" {
+		msg += p.Sprintf("🔎 Ativo filtrado: *`%s`*\n", escapeMarkdown(tickerFilter))
+	}
 	msg += p.Sprintf("💰 *Total Acumulado:* %s\n", totalAccumulatedStr)
 	msg += p.Sprintf("📅 *Mês de Referência:* %s/%s\n\n", refMonthName, fmt.Sprintf("%d", currentYear))
 
@@ -262,7 +299,10 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				return pastDivs[i].PaymentDate.After(pastDivs[j].PaymentDate)
 			})
 			limit := 5
-			if len(pastDivs) < 5 {
+			if tickerFilter != "" {
+				limit = 10
+			}
+			if len(pastDivs) < limit {
 				limit = len(pastDivs)
 			}
 			for i := 0; i < limit; i++ {
@@ -278,12 +318,13 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				emoji := getAssetTypeEmoji(d.AssetType, d.Ticker)
 				tickerClean := cleanTickerForDisplay(d.Ticker)
 				tipoAbbr := abbreviateDividendType(tipoStr)
+				cumSuffix := formatCumDateSuffix(d.CumDate)
 
 				msg += p.Sprintf("✅ %s `%s` • %s %.2f • %s\n", emoji, tickerClean, getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
-				if d.Quantity > 0 && d.PerShareAmount > 0 {
-					msg += p.Sprintf("   ↳ _%s • %s un x %s %s_\n", tipoAbbr, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+				if d.Quantity > 1e-6 && d.PerShareAmount > 1e-6 {
+					msg += p.Sprintf("   ↳ _%s • %s un x %s %s%s_\n", tipoAbbr, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount), cumSuffix)
 				} else {
-					msg += p.Sprintf("   ↳ _%s_\n", tipoAbbr)
+					msg += p.Sprintf("   ↳ _%s%s_\n", tipoAbbr, cumSuffix)
 				}
 			}
 		}
@@ -294,7 +335,10 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				return futureDivs[i].PaymentDate.Before(futureDivs[j].PaymentDate)
 			})
 			limit := 5
-			if len(futureDivs) < 5 {
+			if tickerFilter != "" {
+				limit = 10
+			}
+			if len(futureDivs) < limit {
 				limit = len(futureDivs)
 			}
 			for i := 0; i < limit; i++ {
@@ -310,31 +354,48 @@ func (h *Handlers) HandleDividends(c telebot.Context) error {
 				emoji := getAssetTypeEmoji(d.AssetType, d.Ticker)
 				tickerClean := cleanTickerForDisplay(d.Ticker)
 				tipoAbbr := abbreviateDividendType(tipoStr)
+				cumSuffix := formatCumDateSuffix(d.CumDate)
 
 				msg += p.Sprintf("⏳ %s `%s` • %s %.2f • %s\n", emoji, tickerClean, getCurrencySymbol(curr), d.NetAmount, d.PaymentDate.Format("2006-01-02"))
-				if d.Quantity > 0 && d.PerShareAmount > 0 {
-					msg += p.Sprintf("   ↳ _%s • %s un x %s %s_\n", tipoAbbr, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+				if d.Quantity > 1e-6 && d.PerShareAmount > 1e-6 {
+					msg += p.Sprintf("   ↳ _%s • %s un x %s %s%s_\n", tipoAbbr, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount), cumSuffix)
 				} else {
-					msg += p.Sprintf("   ↳ _%s_\n", tipoAbbr)
+					msg += p.Sprintf("   ↳ _%s%s_\n", tipoAbbr, cumSuffix)
 				}
 			}
 		}
+	} else if tickerFilter != "" {
+		msg += p.Sprintf("\nNenhum provento registrado para `%s` nesta carteira.", escapeMarkdown(tickerFilter))
 	} else {
 		msg += "\nNenhum provento registrado na sua carteira ainda."
 	}
 
 	menu := &telebot.ReplyMarkup{}
-	btnRefresh := menu.Data("🔄 Atualizar", "btn_proventos")
+	var filterExtra []string
+	monthPayload := "0"
+	if tickerFilter != "" {
+		filterExtra = []string{tickerFilter}
+		monthPayload = "0:" + tickerFilter
+	}
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_proventos", filterExtra...)
 	btnAgenda := menu.Data("📋 Agenda (30 dias)", "btn_agenda")
-	btnAno := menu.Data("📅 Agrupar por Ano", "btn_divs_year")
-	btnMes := menu.Data("📆 Agrupar por Mês", "btn_divs_month")
+	btnAno := menu.Data("📅 Agrupar por Ano", "btn_divs_year", filterExtra...)
+	btnMes := menu.Data("📆 Agrupar por Mês", "btn_divs_month", monthPayload)
 	btnBack := menu.Data("⬅️ Voltar ao Menu", "btn_menu")
 
+	var rows []telebot.Row
 	if len(divs) > 0 {
-		menu.Inline(menu.Row(btnRefresh, btnAgenda), menu.Row(btnAno, btnMes), menu.Row(btnBack))
+		rows = append(rows, menu.Row(btnRefresh, btnAgenda), menu.Row(btnAno, btnMes))
 	} else {
-		menu.Inline(menu.Row(btnRefresh), menu.Row(btnBack))
+		rows = append(rows, menu.Row(btnRefresh))
 	}
+	if tickerFilter != "" {
+		btnAll := menu.Data("🔄 Ver Todos", "btn_proventos")
+		rows = append(rows, menu.Row(btnAll, btnBack))
+	} else {
+		rows = append(rows, menu.Row(btnBack))
+	}
+	menu.Inline(rows...)
 
 	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
@@ -415,10 +476,13 @@ func (h *Handlers) HandleAgenda(c telebot.Context) error {
 			tickerClean := cleanTickerForDisplay(d.Ticker)
 			tipoAbbr := abbreviateDividendType(d.Type)
 
+			cumSuffix := formatCumDateSuffix(d.CumDate)
 			entry := p.Sprintf("📅 *%s* — %s `%s` (%s)\n", d.PaymentDate.Format("02/01/2006"), emoji, tickerClean, tipoAbbr)
-			if d.Quantity > 0 && d.PerShareAmount > 0 {
-				entry += p.Sprintf("   ↳ *%s %.2f* _(%s un x %s %s)_\n",
-					getCurrencySymbol(curr), d.NetAmount, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount))
+			if d.Quantity > 1e-6 && d.PerShareAmount > 1e-6 {
+				entry += p.Sprintf("   ↳ *%s %.2f* _(%s un x %s %s%s)_\n",
+					getCurrencySymbol(curr), d.NetAmount, formatQuantity(d.Quantity), getCurrencySymbol(curr), formatPerShareAmount(p, d.PerShareAmount), cumSuffix)
+			} else if cumSuffix != "" {
+				entry += p.Sprintf("   ↳ *%s %.2f* _%s_\n", getCurrencySymbol(curr), d.NetAmount, strings.TrimPrefix(cumSuffix, " • "))
 			} else {
 				entry += p.Sprintf("   ↳ *%s %.2f*\n", getCurrencySymbol(curr), d.NetAmount)
 			}
@@ -457,6 +521,12 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	if err != nil {
 		return c.Edit("❌ Erro ao buscar proventos.")
 	}
+
+	tickerFilter := ""
+	if rawData := strings.TrimSpace(c.Data()); rawData != "" {
+		tickerFilter = cleanTickerForDisplay(rawData)
+	}
+	divs = filterDividendsByTicker(divs, tickerFilter)
 
 	// 1. Calcular totais gerais por moeda (Acumulado Geral)
 	grandTotals := make(map[string]float64)
@@ -523,6 +593,9 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	}
 
 	msg := p.Sprintf("📅 *Proventos por Ano: %s*\n", escapeMarkdown(portfolioName))
+	if tickerFilter != "" {
+		msg += p.Sprintf("🔎 Ativo filtrado: *`%s`*\n", escapeMarkdown(tickerFilter))
+	}
 	msg += p.Sprintf("💰 *Acumulado Geral:* %s\n", grandTotalStr)
 	msg += "----------------------------------\n\n"
 
@@ -549,12 +622,12 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 			growthStr := ""
 			if y > 1 {
 				if prevMap, ok := grouped[y-1]; ok {
-					if prevVal, exists := prevMap[curr]; exists && prevVal > 0 {
+					if prevVal, exists := prevMap[curr]; exists && prevVal > 1e-6 {
 						growth := ((val - prevVal) / prevVal) * 100
-						if growth >= 0 {
-							growthStr = p.Sprintf(" (+%.1f%% YoY)", growth)
-						} else {
+						if growth < -1e-6 {
 							growthStr = p.Sprintf(" (%.1f%% YoY)", growth)
+						} else {
+							growthStr = p.Sprintf(" (+%.1f%% YoY)", math.Max(0, growth))
 						}
 					}
 				}
@@ -652,7 +725,11 @@ func (h *Handlers) HandleDividendsByYear(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
-	btnBack := menu.Data("⬅️ Voltar", "btn_proventos")
+	var filterExtra []string
+	if tickerFilter != "" {
+		filterExtra = []string{tickerFilter}
+	}
+	btnBack := menu.Data("⬅️ Voltar", "btn_proventos", filterExtra...)
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
 	menu.Inline(menu.Row(btnBack, btnMenu))
 
@@ -665,6 +742,17 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	if err != nil {
 		return c.Edit("❌ Erro ao buscar proventos.")
 	}
+
+	page := 0
+	tickerFilter := ""
+	if rawData := strings.TrimSpace(c.Data()); rawData != "" {
+		parts := strings.SplitN(rawData, ":", 2)
+		fmt.Sscanf(parts[0], "%d", &page)
+		if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
+			tickerFilter = cleanTickerForDisplay(strings.TrimSpace(parts[1]))
+		}
+	}
+	divs = filterDividendsByTicker(divs, tickerFilter)
 
 	grouped := make(map[string][]portfolio.CalculatedDividend)
 	for _, d := range divs {
@@ -681,30 +769,32 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
 
-	pageStr := c.Data()
-	page := 0
-	if pageStr != "" {
-		fmt.Sscanf(pageStr, "%d", &page)
+	if len(keys) == 0 {
+		return c.Edit("📆 Nenhum provento encontrado.")
 	}
 
 	pageSize := 3
-	start := page * pageSize
-	if start >= len(keys) {
-		start = len(keys)
+	totalPages := (len(keys) + pageSize - 1) / pageSize
+	if page < 0 {
+		page = 0
 	}
+	if page >= totalPages {
+		page = totalPages - 1
+	}
+	start := page * pageSize
 	end := start + pageSize
 	if end > len(keys) {
 		end = len(keys)
 	}
 
-	if len(keys) == 0 {
-		return c.Edit("📆 Nenhum provento encontrado.")
-	}
-
 	pageKeys := keys[start:end]
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("📆 *Proventos por Mês: %s*\n_Página %d_\n\n", escapeMarkdown(portfolioName), page+1)
+	msg := p.Sprintf("📆 *Proventos por Mês: %s*\n", escapeMarkdown(portfolioName))
+	if tickerFilter != "" {
+		msg += p.Sprintf("🔎 Ativo filtrado: *`%s`*\n", escapeMarkdown(tickerFilter))
+	}
+	msg += p.Sprintf("_Página %d de %d_\n\n", page+1, totalPages)
 
 	for _, k := range pageKeys {
 		display := ""
@@ -812,20 +902,30 @@ func (h *Handlers) HandleDividendsByMonth(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	buildMonthData := func(p int) string {
+		if tickerFilter != "" {
+			return fmt.Sprintf("%d:%s", p, tickerFilter)
+		}
+		return fmt.Sprintf("%d", p)
+	}
 	var btns []telebot.Btn
 
 	if start > 0 {
-		btns = append(btns, menu.Data("⬅️ Anterior", "btn_divs_month", fmt.Sprintf("%d", page-1)))
+		btns = append(btns, menu.Data("⬅️ Anterior", "btn_divs_month", buildMonthData(page-1)))
 	}
 	if end < len(keys) {
-		btns = append(btns, menu.Data("Próxima ➡️", "btn_divs_month", fmt.Sprintf("%d", page+1)))
+		btns = append(btns, menu.Data("Próxima ➡️", "btn_divs_month", buildMonthData(page+1)))
 	}
 
 	var rows []telebot.Row
 	if len(btns) > 0 {
 		rows = append(rows, menu.Row(btns...))
 	}
-	btnBack := menu.Data("⬅️ Voltar", "btn_proventos")
+	var backExtra []string
+	if tickerFilter != "" {
+		backExtra = []string{tickerFilter}
+	}
+	btnBack := menu.Data("⬅️ Voltar", "btn_proventos", backExtra...)
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
 	rows = append(rows, menu.Row(btnBack, btnMenu))
 	menu.Inline(rows...)
