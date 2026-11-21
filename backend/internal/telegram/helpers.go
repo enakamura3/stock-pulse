@@ -149,3 +149,74 @@ func isBlockedByUser(err error) bool {
 	}
 	return false
 }
+
+// isCryptoPairTicker verifica se o texto segue o padrão de par cripto (ex: BTC-USD, ETH-BRL, SOL-USD).
+func isCryptoPairTicker(ticker string) bool {
+	t := strings.ToUpper(strings.TrimSpace(ticker))
+	idx := strings.IndexByte(t, '-')
+	if idx < 2 || idx > 10 {
+		return false
+	}
+	base := t[:idx]
+	quote := t[idx+1:]
+	if len(quote) < 3 || len(quote) > 4 {
+		return false
+	}
+	for _, r := range base {
+		if !((r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+			return false
+		}
+	}
+	for _, r := range quote {
+		if r < 'A' || r > 'Z' {
+			return false
+		}
+	}
+	return true
+}
+
+// parseExplicitDollarTicker verifica se o token usa prefixo explícito '$' (ex: $AAPL, $VOO, $BRK.B).
+func parseExplicitDollarTicker(token string) (string, bool) {
+	t := strings.ToUpper(strings.TrimSpace(token))
+	if !strings.HasPrefix(t, "$") {
+		return "", false
+	}
+	clean := t[1:]
+	if len(clean) < 1 || len(clean) > 12 {
+		return "", false
+	}
+	hasLetter := false
+	for _, r := range clean {
+		if r >= 'A' && r <= 'Z' {
+			hasLetter = true
+		} else if !((r >= '0' && r <= '9') || r == '.' || r == '-') {
+			return "", false
+		}
+	}
+	if !hasLetter {
+		return "", false
+	}
+	return clean, true
+}
+
+// isPlainTickerCandidate verifica se um token simples pode ser um ticker presente na carteira/favoritos do usuário.
+func isPlainTickerCandidate(token string) bool {
+	t := strings.ToUpper(strings.TrimSpace(token))
+	if len(t) < 1 || len(t) > 10 {
+		return false
+	}
+	hasLetter := false
+	for _, r := range t {
+		if r >= 'A' && r <= 'Z' {
+			hasLetter = true
+		} else if !((r >= '0' && r <= '9') || r == '.' || r == '-') {
+			return false
+		}
+	}
+	return hasLetter
+}
+
+// tickersMatch compara dois tickers ignorando case, espaços e sufixo .SA.
+func tickersMatch(a, b string) bool {
+	return cleanTickerForDisplay(strings.TrimSpace(a)) == cleanTickerForDisplay(strings.TrimSpace(b))
+}

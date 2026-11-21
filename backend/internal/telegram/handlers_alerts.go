@@ -156,10 +156,16 @@ func (h *Handlers) HandleAlertCreate(c telebot.Context) error {
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	rows := h.buildPortfolioQuickAssetRows(ctx, c, menu, "btn_alert_create_", 10)
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	menu.Inline(menu.Row(btnCancel))
+	rows = append(rows, menu.Row(btnCancel))
+	menu.Inline(rows...)
 
-	return c.Edit("🔔 *Criar Alerta de Preço*\n\nDigite o código do ativo:\n_(ex: PETR4, VALE3, AAPL, BTC-USD)_", telebot.ModeMarkdown, menu)
+	msg := "🔔 *Criar Alerta de Preço*\n\nDigite o código do ativo:\n_(ex: PETR4, VALE3, AAPL, BTC-USD)_"
+	if len(rows) > 1 {
+		msg = "🔔 *Criar Alerta de Preço*\n\nEscolha um ativo da sua carteira abaixo ou digite o código:\n_(ex: PETR4, VALE3, AAPL, BTC-USD)_"
+	}
+	return c.Edit(msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleAlertConditionAbove(c telebot.Context) error {

@@ -237,6 +237,16 @@ func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
 		return h.handleSelectedAlertPrice(c, priceStr)
 	}
 
+	if strings.HasPrefix(data, "btn_wl_tog_q_") {
+		ticker := strings.TrimPrefix(data, "btn_wl_tog_q_")
+		return h.handleQuickWatchlistToggle(c, "q", ticker)
+	}
+
+	if strings.HasPrefix(data, "btn_wl_tog_a_") {
+		ticker := strings.TrimPrefix(data, "btn_wl_tog_a_")
+		return h.handleQuickWatchlistToggle(c, "a", ticker)
+	}
+
 	if strings.HasPrefix(data, "btn_wl_add_") {
 		ticker := strings.TrimPrefix(data, "btn_wl_add_")
 		return h.handleQuickWatchlistAdd(c, ticker)
@@ -889,13 +899,20 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 
 	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
 	if err != nil || state == nil {
+		if tickers := h.tryResolveFreeTextTickers(ctx, c, c.Text()); len(tickers) > 0 {
+			if len(tickers) == 1 {
+				return h.renderQuote(c, tickers[0])
+			}
+			return h.renderMultiQuote(c, tickers)
+		}
+
 		menu := &telebot.ReplyMarkup{}
 		btnMenu := menu.Data("🏠 Abrir Menu Principal", "btn_menu")
 		menu.Inline(menu.Row(btnMenu))
 		msg := "🤖 *Olá!*\n\nNão entendi esse comando ou mensagem solta.\n\n" +
 			"💡 *Você pode:*\n" +
+			"• Digitar um ativo direto no chat (ex: `PETR4`, `BTC-USD`, `$AAPL`)\n" +
 			"• Usar o botão abaixo para abrir o menu interativo\n" +
-			"• Consultar um ativo: `/cotacao PETR4`\n" +
 			"• Fazer análise fundamentalista: `/analise WEGE3`\n" +
 			"• Ver todos os comandos disponíveis: `/help`"
 		return c.Send(msg, telebot.ModeMarkdown, menu)
@@ -1117,27 +1134,7 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 			resolvedTicker = quote.Ticker
 		}
 
-		msg := formatQuoteMessage(resolvedTicker, quote)
-		if pos := h.findActiveCustodyPosition(ctx, c, resolvedTicker); pos != nil {
-			msg += formatCustodyQuoteSummary(pos, quote.Price, quote.Currency)
-		}
-
-		replyMenu := &telebot.ReplyMarkup{}
-		btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+resolvedTicker)
-		btnAnalise := replyMenu.Data("🔍 Análise", "btn_analise_"+resolvedTicker)
-		btnOperar := replyMenu.Data("💵 Operar", "btn_op_quick_"+resolvedTicker)
-		btnAlerta := replyMenu.Data("🔔 Criar Alerta", "btn_alert_create_"+resolvedTicker)
-		btnWlAdd := replyMenu.Data("⭐ Favoritar", "btn_wl_add_"+resolvedTicker)
-		btnNew := replyMenu.Data("🔍 Outra Cotação", "btn_cotacao")
-		btnMenuBtn := replyMenu.Data("🏠 Menu", "btn_menu")
-		replyMenu.Inline(
-			replyMenu.Row(btnRefresh, btnAnalise),
-			replyMenu.Row(btnOperar, btnAlerta),
-			replyMenu.Row(btnWlAdd, btnNew),
-			replyMenu.Row(btnMenuBtn),
-		)
-
-		return c.Send(msg, telebot.ModeMarkdown, replyMenu)
+		return h.sendQuoteCard(ctx, c, resolvedTicker, quote)
 
 	case "ANALYSIS_EXPECT_TICKER":
 		ticker := strings.ToUpper(text)
@@ -1151,6 +1148,91 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
 		return c.Send("⚠️ Ação não reconhecida ou expirada. Envie /menu para navegar pelas opções.")
 	}
+}
+
+func (h *Handlers) tryResolveFreeTextTickers(ctx context.Context, c telebot.Context, text string) []string {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" || strings.HasPrefix(trimmed, "/") {
+		return nil
+	}
+
+	fields := strings.FieldsFunc(trimmed, func(r rune) bool {
+		return r == ' ' || r == ',' || r == ';'
+	})
+	if len(fields) == 0 || len(fields) > 10 {
+		return nil
+	}
+
+	resolved := make([]string, len(fields))
+	var pendingIdx []int
+
+	for i, raw := range fields {
+		tok := strings.ToUpper(strings.TrimSpace(raw))
+		if clean, ok := parseExplicitDollarTicker(tok); ok {
+			resolved[i] = clean
+			continue
+		}
+		if isB3Ticker(tok) || isCryptoPairTicker(tok) {
+			resolved[i] = tok
+			continue
+		}
+		if isPlainTickerCandidate(tok) {
+			resolved[i] = tok
+			pendingIdx = append(pendingIdx, i)
+			continue
+		}
+		return nil
+	}
+
+	if len(pendingIdx) > 0 {
+		known := h.collectUserKnownTickers(ctx, c)
+		for _, idx := range pendingIdx {
+			if !known[cleanTickerForDisplay(resolved[idx])] {
+				return nil
+			}
+		}
+	}
+
+	return resolved
+}
+
+func (h *Handlers) collectUserKnownTickers(ctx context.Context, c telebot.Context) map[string]bool {
+	known := make(map[string]bool)
+	if c == nil {
+		return known
+	}
+	val := c.Get("user_id")
+	userIDStr, ok := val.(string)
+	if !ok || userIDStr == "" {
+		return known
+	}
+
+	if h.portfolioSvc != nil {
+		var chatID int64
+		if c.Chat() != nil {
+			chatID = c.Chat().ID
+		}
+		if portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr); err == nil && len(portfolios) > 0 {
+			portID, _ := h.resolveActivePortfolio(ctx, chatID, portfolios)
+			if _, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portID, userIDStr); err == nil {
+				for _, pos := range positions {
+					known[cleanTickerForDisplay(pos.Ticker)] = true
+				}
+			}
+		}
+	}
+
+	if h.watchlistSvc != nil {
+		if lists, err := h.watchlistSvc.GetWatchlists(ctx, userIDStr); err == nil && len(lists) > 0 {
+			if wl, err := h.watchlistSvc.GetWatchlist(ctx, lists[0].ID, userIDStr); err == nil && wl != nil {
+				for _, item := range wl.Items {
+					known[cleanTickerForDisplay(item.Ticker)] = true
+				}
+			}
+		}
+	}
+
+	return known
 }
 
 func (h *Handlers) getCustodyPosition(ctx context.Context, portfolioID, userID, ticker string) (*portfolio.Position, error) {

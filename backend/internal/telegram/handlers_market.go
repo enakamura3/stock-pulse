@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/onigiri/stock-pulse/backend/internal/market"
@@ -121,54 +122,77 @@ func (h *Handlers) getFundamentalsWithFallback(ctx context.Context, ticker strin
 }
 
 func (h *Handlers) renderQuote(c telebot.Context, ticker string) error {
-	if c.Callback() != nil {
+	return h.renderQuoteView(c, ticker, true)
+}
+
+func (h *Handlers) renderQuoteView(c telebot.Context, ticker string, shouldRespond bool) error {
+	if shouldRespond && c.Callback() != nil {
 		_ = c.Respond()
 	}
 
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
+	if c.Chat() != nil && h.svc != nil {
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
+
 	quote, err := h.getQuoteWithFallback(ctx, ticker)
 	if err != nil {
 		msgErr := "⚠️ Ativo não encontrado. Verifique o código e tente novamente."
-		if c.Callback() != nil {
-			return c.Edit(msgErr)
-		}
-		return c.Send(msgErr)
+		return h.sendOrEdit(c, msgErr)
 	}
 
+	resolvedTicker := ticker
+	if quote.Ticker != "" {
+		resolvedTicker = quote.Ticker
+	}
+
+	return h.sendQuoteCard(ctx, c, resolvedTicker, quote)
+}
+
+func (h *Handlers) sendQuoteCard(ctx context.Context, c telebot.Context, ticker string, quote *market.Quote) error {
 	msg := formatQuoteMessage(ticker, quote)
 	if pos := h.findActiveCustodyPosition(ctx, c, ticker); pos != nil {
 		msg += formatCustodyQuoteSummary(pos, quote.Price, quote.Currency)
 	}
 
+	replyMenu := h.buildQuoteReplyMarkup(ctx, c, ticker)
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, replyMenu)
+}
+
+func (h *Handlers) buildQuoteReplyMarkup(ctx context.Context, c telebot.Context, ticker string) *telebot.ReplyMarkup {
 	replyMenu := &telebot.ReplyMarkup{}
 	btnRefresh := replyMenu.Data("🔄 Atualizar", "btn_quote_"+ticker)
 	btnAnalise := replyMenu.Data("🔍 Análise", "btn_analise_"+ticker)
 	btnOperar := replyMenu.Data("💵 Operar", "btn_op_quick_"+ticker)
 	btnAlerta := replyMenu.Data("🔔 Criar Alerta", "btn_alert_create_"+ticker)
-	btnWlAdd := replyMenu.Data("⭐ Favoritar", "btn_wl_add_"+ticker)
 	btnNew := replyMenu.Data("🔍 Outra Cotação", "btn_cotacao")
 	btnMenuBtn := replyMenu.Data("🏠 Menu", "btn_menu")
-	replyMenu.Inline(
+
+	rows := []telebot.Row{
 		replyMenu.Row(btnRefresh, btnAnalise),
 		replyMenu.Row(btnOperar, btnAlerta),
-		replyMenu.Row(btnWlAdd, btnNew),
-		replyMenu.Row(btnMenuBtn),
-	)
-
-	if c.Callback() != nil {
-		err = c.Edit(msg, telebot.ModeMarkdown, replyMenu)
-		if err != nil && strings.Contains(err.Error(), "message is not modified") {
-			return nil
-		}
-		return err
 	}
-	return c.Send(msg, telebot.ModeMarkdown, replyMenu)
+	if h.watchlistSvc != nil {
+		_, _, inWl := h.findWatchlistItem(ctx, c, ticker)
+		wlLabel := "⭐ Favoritar"
+		if inWl {
+			wlLabel = "💔 Remover Favorito"
+		}
+		btnWl := replyMenu.Data(wlLabel, "btn_wl_tog_q_"+ticker)
+		rows = append(rows, replyMenu.Row(btnWl, btnNew), replyMenu.Row(btnMenuBtn))
+	} else {
+		rows = append(rows, replyMenu.Row(btnNew, btnMenuBtn))
+	}
+	replyMenu.Inline(rows...)
+	return replyMenu
 }
 
 func (h *Handlers) HandleQuoteStart(c telebot.Context) error {
-	defer c.Respond()
+	if c.Callback() != nil {
+		defer c.Respond()
+	}
 
 	ctx, cancel := h.getContext(c)
 	defer cancel()
@@ -177,21 +201,20 @@ func (h *Handlers) HandleQuoteStart(c telebot.Context) error {
 		Step: "QUOTE_EXPECT_TICKER",
 	})
 	if err != nil {
-		if c.Callback() != nil {
-			return c.Edit("❌ Erro interno ao iniciar consulta de cotação.")
-		}
-		return c.Send("❌ Erro interno ao iniciar consulta de cotação.")
+		return h.sendOrEdit(c, "❌ Erro interno ao iniciar consulta de cotação.")
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	rows := h.buildPortfolioQuickAssetRows(ctx, c, menu, "btn_quote_", 10)
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	menu.Inline(menu.Row(btnCancel))
+	rows = append(rows, menu.Row(btnCancel))
+	menu.Inline(rows...)
 
 	msg := "📈 *Cotação Rápida*\n\nDigite o código do ativo:\n_(ex: VALE3, AAPL, BTC-USD)_"
-	if c.Callback() != nil {
-		return c.Edit(msg, telebot.ModeMarkdown, menu)
+	if len(rows) > 1 {
+		msg = "📈 *Cotação Rápida*\n\nEscolha um ativo da sua carteira abaixo ou digite o código:\n_(ex: VALE3, AAPL, BTC-USD)_"
 	}
-	return c.Send(msg, telebot.ModeMarkdown, menu)
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleAnalysis(c telebot.Context) error {
@@ -222,39 +245,43 @@ func (h *Handlers) HandleAnalysisStart(c telebot.Context) error {
 		Step: "ANALYSIS_EXPECT_TICKER",
 	})
 	if err != nil {
-		if c.Callback() != nil {
-			return c.Edit("❌ Erro interno ao iniciar análise fundamentalista.")
-		}
-		return c.Send("❌ Erro interno ao iniciar análise fundamentalista.")
+		return h.sendOrEdit(c, "❌ Erro interno ao iniciar análise fundamentalista.")
 	}
 
 	menu := &telebot.ReplyMarkup{}
+	rows := h.buildPortfolioQuickAssetRows(ctx, c, menu, "btn_analise_", 10)
 	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
-	menu.Inline(menu.Row(btnCancel))
+	rows = append(rows, menu.Row(btnCancel))
+	menu.Inline(rows...)
 
 	msg := "🔍 *Análise Fundamentalista*\n\nDigite o código do ativo que deseja analisar:\n_(ex: PETR4, VALE3, AAPL)_"
-	if c.Callback() != nil {
-		return c.Edit(msg, telebot.ModeMarkdown, menu)
+	if len(rows) > 1 {
+		msg = "🔍 *Análise Fundamentalista*\n\nEscolha um ativo da sua carteira abaixo ou digite o código:\n_(ex: PETR4, VALE3, AAPL)_"
 	}
-	return c.Send(msg, telebot.ModeMarkdown, menu)
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
-	if c.Callback() != nil {
+	return h.renderAnalysisView(c, ticker, true)
+}
+
+func (h *Handlers) renderAnalysisView(c telebot.Context, ticker string, shouldRespond bool) error {
+	if shouldRespond && c.Callback() != nil {
 		_ = c.Respond()
 	}
 
 	ctx, cancel := h.getContext(c)
 	defer cancel()
 
+	if c.Chat() != nil && h.svc != nil {
+		_ = h.svc.ClearConversationState(ctx, c.Chat().ID)
+	}
+
 	fund, err := h.getFundamentalsWithFallback(ctx, ticker)
 	if err != nil || fund == nil {
 		slog.Error("Failed to fetch fundamentals for telegram", "ticker", ticker, "error", err)
 		msgErr := "⚠️ Dados fundamentalistas não encontrados para `" + escapeMarkdown(ticker) + "`. Verifique o código e tente novamente."
-		if c.Callback() != nil {
-			return c.Edit(msgErr, telebot.ModeMarkdown)
-		}
-		return c.Send(msgErr, telebot.ModeMarkdown)
+		return h.sendOrEdit(c, msgErr, telebot.ModeMarkdown)
 	}
 
 	quote, _ := h.getQuoteWithFallback(ctx, ticker)
@@ -272,29 +299,89 @@ func (h *Handlers) renderAnalysis(c telebot.Context, ticker string) error {
 		msg += formatCustodyAnalysisSummary(pos, fund, currentPrice, curr)
 	}
 
+	menu := h.buildAnalysisReplyMarkup(ctx, c, ticker)
+	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
+}
+
+func (h *Handlers) buildAnalysisReplyMarkup(ctx context.Context, c telebot.Context, ticker string) *telebot.ReplyMarkup {
 	menu := &telebot.ReplyMarkup{}
 	btnRefresh := menu.Data("🔄 Atualizar", "btn_analise_"+ticker)
 	btnQuote := menu.Data("📈 Ver Cotação", "btn_quote_"+ticker)
 	btnOperar := menu.Data("💵 Operar", "btn_op_quick_"+ticker)
 	btnAlerta := menu.Data("🔔 Criar Alerta", "btn_alert_create_"+ticker)
-	btnWlAdd := menu.Data("⭐ Favoritar", "btn_wl_add_"+ticker)
 	btnNew := menu.Data("🔍 Outra Análise", "btn_analise")
 	btnMenu := menu.Data("🏠 Menu", "btn_menu")
-	menu.Inline(
+
+	rows := []telebot.Row{
 		menu.Row(btnRefresh, btnQuote),
 		menu.Row(btnOperar, btnAlerta),
-		menu.Row(btnWlAdd, btnNew),
-		menu.Row(btnMenu),
-	)
-
-	if c.Callback() != nil {
-		err = c.Edit(msg, telebot.ModeMarkdown, menu)
-		if err != nil && strings.Contains(err.Error(), "message is not modified") {
-			return nil
-		}
-		return err
 	}
-	return c.Send(msg, telebot.ModeMarkdown, menu)
+	if h.watchlistSvc != nil {
+		_, _, inWl := h.findWatchlistItem(ctx, c, ticker)
+		wlLabel := "⭐ Favoritar"
+		if inWl {
+			wlLabel = "💔 Remover Favorito"
+		}
+		btnWl := menu.Data(wlLabel, "btn_wl_tog_a_"+ticker)
+		rows = append(rows, menu.Row(btnWl, btnNew), menu.Row(btnMenu))
+	} else {
+		rows = append(rows, menu.Row(btnNew, btnMenu))
+	}
+	menu.Inline(rows...)
+	return menu
+}
+
+// buildPortfolioQuickAssetRows monta até maxAssets botões em 2 colunas com os principais ativos da carteira ativa (best-effort).
+func (h *Handlers) buildPortfolioQuickAssetRows(ctx context.Context, c telebot.Context, menu *telebot.ReplyMarkup, callbackPrefix string, maxAssets int) []telebot.Row {
+	if h.portfolioSvc == nil || c == nil {
+		return nil
+	}
+	val := c.Get("user_id")
+	userIDStr, ok := val.(string)
+	if !ok || userIDStr == "" {
+		return nil
+	}
+	var chatID int64
+	if c.Chat() != nil {
+		chatID = c.Chat().ID
+	}
+	portfolios, err := h.portfolioSvc.GetPortfolios(ctx, userIDStr)
+	if err != nil || len(portfolios) == 0 {
+		return nil
+	}
+	portfolioID, _ := h.resolveActivePortfolio(ctx, chatID, portfolios)
+	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
+	if err != nil || len(positions) == 0 {
+		return nil
+	}
+
+	displayPositions := make([]portfolio.Position, len(positions))
+	copy(displayPositions, positions)
+	sort.Slice(displayPositions, func(i, j int) bool {
+		return displayPositions[i].CurrentValue > displayPositions[j].CurrentValue
+	})
+	if len(displayPositions) > maxAssets {
+		displayPositions = displayPositions[:maxAssets]
+	}
+
+	var assetBtns []telebot.Btn
+	for _, pos := range displayPositions {
+		cbData := callbackPrefix + pos.Ticker
+		if len(cbData) > 63 {
+			continue
+		}
+		assetBtns = append(assetBtns, menu.Data(cleanTickerForDisplay(pos.Ticker), cbData))
+	}
+
+	var rows []telebot.Row
+	for i := 0; i < len(assetBtns); i += 2 {
+		if i+1 < len(assetBtns) {
+			rows = append(rows, menu.Row(assetBtns[i], assetBtns[i+1]))
+		} else {
+			rows = append(rows, menu.Row(assetBtns[i]))
+		}
+	}
+	return rows
 }
 
 func formatAnalysisMessage(ticker string, fund *market.Fundamentals, price float64, currency string) string {
