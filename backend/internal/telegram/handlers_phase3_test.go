@@ -103,9 +103,10 @@ func TestHandlers_Phase3_QuickOperation(t *testing.T) {
 		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return(portfolios, nil).Once()
 		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
 		svc.On("SetConversationState", mock.Anything, int64(123), ConversationState{
-			PortfolioID: "p1",
-			Ticker:      "PETR4",
-			Step:        "EXPECT_TYPE",
+			PortfolioID:   "p1",
+			PortfolioName: "Principal",
+			Ticker:        "PETR4",
+			Step:          "EXPECT_TYPE",
 		}).Return(nil).Once()
 
 		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
@@ -361,7 +362,9 @@ func TestHandlers_Phase3_SellValidation_And_ShortSellingGapF7(t *testing.T) {
 			return s.Step == "EXPECT_PRICE" && s.Quantity == 80
 		})).Return(nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Price: 35.0, Currency: "BRL"}, nil).Once()
-		mCtxOk.On("Edit", "Qual o preço unitário da transação? (ex: 15.50)", mock.Anything).Return(nil).Once()
+		mCtxOk.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Qual o preço unitário da transação? (ex: 15.50)")
+		}), mock.Anything).Return(nil).Once()
 
 		err = h.HandleQtyAll(mCtxOk)
 		assert.NoError(t, err)
@@ -421,7 +424,9 @@ func TestHandlers_Phase3_SellValidation_And_ShortSellingGapF7(t *testing.T) {
 			return s.Step == "EXPECT_PRICE" && s.Quantity == 40
 		})).Return(nil).Once()
 		mSvc.On("GetQuote", mock.Anything, "PETR4").Return(&market.Quote{Price: 35.0, Currency: "BRL"}, nil).Once()
-		mCtxHalfOk.On("Edit", "Qual o preço unitário da transação? (ex: 15.50)", mock.Anything).Return(nil).Once()
+		mCtxHalfOk.On("Edit", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Qual o preço unitário da transação? (ex: 15.50)")
+		}), mock.Anything).Return(nil).Once()
 
 		err = h.HandleQtyHalf(mCtxHalfOk)
 		assert.NoError(t, err)
@@ -523,7 +528,9 @@ func TestHandlers_Phase3_CurrentPriceShortcut(t *testing.T) {
 		}, nil).Once()
 
 		var sentMenu *telebot.ReplyMarkup
-		mCtx.On("Send", "Qual o preço unitário da transação? (ex: 15.50)", mock.MatchedBy(func(opts []interface{}) bool {
+		mCtx.On("Send", mock.MatchedBy(func(msg string) bool {
+			return strings.Contains(msg, "Qual o preço unitário da transação? (ex: 15.50)")
+		}), mock.MatchedBy(func(opts []interface{}) bool {
 			for _, opt := range opts {
 				if menu, ok := opt.(*telebot.ReplyMarkup); ok {
 					sentMenu = menu

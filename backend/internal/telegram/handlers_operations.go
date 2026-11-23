@@ -42,14 +42,19 @@ func (h *Handlers) HandleOperationBack(c telebot.Context) error {
 		return h.handleSetType(c, state.Type)
 
 	case "EXPECT_DATE":
+		state.UnitPrice = 0
+		state.ExecutedAt = ""
+		state.Fee = 0
 		state.Step = "EXPECT_PRICE"
 		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 		return h.askPrice(c, state, c.Callback() != nil)
 
 	case "EXPECT_FEE":
+		state.ExecutedAt = ""
+		state.Fee = 0
 		state.Step = "EXPECT_DATE"
 		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
-		return h.askDate(c, c.Callback() != nil)
+		return h.askDate(c, state, c.Callback() != nil)
 
 	case "ALERT_EXPECT_COND":
 		return h.HandleAlertCreate(c)
@@ -79,6 +84,114 @@ func (h *Handlers) HandleOperationBack(c telebot.Context) error {
 	}
 }
 
+func formatOperationBreadcrumb(state *ConversationState, stepNum int) string {
+	if state == nil {
+		return ""
+	}
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	header := "🧾 *Nova Operação*"
+	if state.PortfolioName != "" {
+		header += fmt.Sprintf(" (%s)", escapeMarkdown(state.PortfolioName))
+	}
+	lines := []string{header}
+
+	var line1 []string
+	if state.Ticker != "" {
+		line1 = append(line1, fmt.Sprintf("Ativo: `%s`", escapeMarkdown(cleanTickerForDisplay(state.Ticker))))
+	}
+	if stepNum >= 2 && state.Type != "" {
+		tipoLabel := "🟢 Compra"
+		if state.Type == "SELL" {
+			tipoLabel = "🔴 Venda"
+		}
+		line1 = append(line1, "Tipo: "+tipoLabel)
+	}
+	if stepNum >= 3 && state.Quantity > 1e-6 {
+		line1 = append(line1, fmt.Sprintf("Qtd: `%s`", formatQuantity(state.Quantity)))
+	}
+	if len(line1) > 0 {
+		lines = append(lines, "• "+strings.Join(line1, " | "))
+	}
+
+	currSymbol := getTickerDefaultCurrency(state.Ticker)
+	var line2 []string
+	if stepNum >= 4 && state.UnitPrice > 1e-6 {
+		subtotal := state.Quantity * state.UnitPrice
+		line2 = append(line2, p.Sprintf("Preço: `%s %s` _(Subtotal: %s %s)_",
+			currSymbol, formatFinancialPrice(p, state.UnitPrice), currSymbol, formatFinancialPrice(p, subtotal)))
+	}
+	if stepNum >= 5 && state.ExecutedAt != "" {
+		line2 = append(line2, fmt.Sprintf("Data: `%s`", state.ExecutedAt))
+	}
+	if len(line2) > 0 {
+		lines = append(lines, "• "+strings.Join(line2, " | "))
+	}
+
+	return strings.Join(lines, "\n") + "\n\n"
+}
+
+func parseOperationDate(text string) (time.Time, error) {
+	trimmed := strings.TrimSpace(text)
+	lower := strings.ToLower(trimmed)
+	if lower == "hoje" || lower == "today" {
+		return time.Now(), nil
+	}
+	if lower == "ontem" || lower == "yesterday" {
+		return time.Now().AddDate(0, 0, -1), nil
+	}
+	for _, layout := range []string{"2006-01-02", "02/01/2006", "02-01-2006"} {
+		if parsed, err := time.Parse(layout, trimmed); err == nil {
+			return parsed, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid date")
+}
+
+func parseQuickOperationArgs(args []string) (string, string, float64, float64, string, float64, string) {
+	var opType string
+	switch strings.ToUpper(strings.TrimSpace(args[0])) {
+	case "C", "COMPRA", "BUY":
+		opType = "BUY"
+	case "V", "VENDA", "SELL":
+		opType = "SELL"
+	default:
+		return "", "", 0, 0, "", 0, "⚠️ Tipo inválido. Use `C` (Compra) ou `V` (Venda).\nEx: `/operacao C PETR4 100 36,50`"
+	}
+
+	ticker := strings.ToUpper(strings.TrimSpace(args[1]))
+
+	var qty float64
+	if _, err := fmt.Sscanf(strings.ReplaceAll(strings.TrimSpace(args[2]), ",", "."), "%f", &qty); err != nil || qty <= 1e-6 {
+		return "", "", 0, 0, "", 0, "⚠️ Quantidade inválida. Informe um número maior que zero."
+	}
+
+	var price float64
+	if _, err := fmt.Sscanf(strings.ReplaceAll(strings.TrimSpace(args[3]), ",", "."), "%f", &price); err != nil || price <= 1e-6 {
+		return "", "", 0, 0, "", 0, "⚠️ Preço unitário inválido. Informe um número maior que zero."
+	}
+
+	dateStr := time.Now().Format("2006-01-02")
+	if len(args) >= 5 {
+		parsedDate, err := parseOperationDate(args[4])
+		if err != nil {
+			return "", "", 0, 0, "", 0, "⚠️ Data inválida. Use o formato `AAAA-MM-DD` (ex: `2026-03-15`)."
+		}
+		dateStr = parsedDate.Format("2006-01-02")
+	}
+
+	fee := 0.0
+	if len(args) == 6 {
+		if _, err := fmt.Sscanf(strings.ReplaceAll(strings.TrimSpace(args[5]), ",", "."), "%f", &fee); err != nil || fee < -1e-6 {
+			return "", "", 0, 0, "", 0, "⚠️ Taxa inválida. Informe um valor positivo ou zero (ex: `4,50`)."
+		}
+		if fee < 1e-6 {
+			fee = 0
+		}
+	}
+
+	return opType, ticker, qty, price, dateStr, fee, ""
+}
+
 func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	defer c.Respond()
 	userIDStr, err := h.getUserID(c)
@@ -95,14 +208,21 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	}
 	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
+	if c.Callback() == nil {
+		if args := c.Args(); len(args) > 0 {
+			return h.handleLaunchOperationArgs(ctx, c, userIDStr, portfolioID, portfolioName, args)
+		}
+	}
+
 	_, positions, err := h.portfolioSvc.GetPortfolioDetails(ctx, portfolioID, userIDStr)
 	if err != nil {
 		return h.sendOrEdit(c, "❌ Ocorreu um erro ao buscar seus ativos.")
 	}
 
 	err = h.svc.SetConversationState(ctx, c.Chat().ID, ConversationState{
-		Step:        "EXPECT_TICKER",
-		PortfolioID: portfolioID,
+		Step:          "EXPECT_TICKER",
+		PortfolioID:   portfolioID,
+		PortfolioName: portfolioName,
 	})
 	if err != nil {
 		return h.sendOrEdit(c, "❌ Erro interno ao iniciar operação.")
@@ -150,6 +270,153 @@ func (h *Handlers) HandleLaunchOperation(c telebot.Context) error {
 	menu.Inline(rows...)
 
 	return h.sendOrEdit(c, fmt.Sprintf("🏢 *Carteira Ativa:* %s\n\nEscolha um ativo abaixo ou *digite o ticker* no chat (ex: `PETR4`, `AAPL`):", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
+}
+
+func (h *Handlers) handleLaunchOperationArgs(ctx context.Context, c telebot.Context, userIDStr, portfolioID, portfolioName string, args []string) error {
+	if len(args) == 1 {
+		ticker := strings.ToUpper(strings.TrimSpace(args[0]))
+		quote, err := h.getQuoteWithFallback(ctx, ticker)
+		if err != nil {
+			return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique o código e tente novamente (ex: `/operacao PETR4`).", telebot.ModeMarkdown)
+		}
+		resolvedTicker := ticker
+		if quote != nil && quote.Ticker != "" {
+			resolvedTicker = quote.Ticker
+		}
+
+		state := ConversationState{
+			Step:          "EXPECT_TYPE",
+			PortfolioID:   portfolioID,
+			PortfolioName: portfolioName,
+			Ticker:        resolvedTicker,
+		}
+		if err := h.svc.SetConversationState(ctx, c.Chat().ID, state); err != nil {
+			return c.Send("❌ Erro interno ao iniciar operação.")
+		}
+
+		menu := &telebot.ReplyMarkup{}
+		btnBuy := menu.Data("🟢 Compra", "btn_buy")
+		btnSell := menu.Data("🔴 Venda", "btn_sell")
+		btnBack := menu.Data("⬅️ Voltar", "btn_op_back")
+		btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
+		menu.Inline(
+			menu.Row(btnBuy, btnSell),
+			menu.Row(btnBack, btnCancel),
+		)
+
+		text := formatOperationBreadcrumb(&state, 1) +
+			fmt.Sprintf("📌 *Passo 1/5* — Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(cleanTickerForDisplay(resolvedTicker)))
+		return h.sendOrEdit(c, text, telebot.ModeMarkdown, menu)
+	}
+
+	if len(args) < 4 || len(args) > 6 {
+		usage := "⚠️ *Formato inválido.*\n\nUse:\n" +
+			"• `/operacao` — assistente passo a passo\n" +
+			"• `/operacao PETR4` — iniciar direto no ativo\n" +
+			"• `/operacao C PETR4 100 36,50` — lançamento rápido\n" +
+			"• `/operacao V PETR4 50 38,00 2026-03-15 4,50` — com data (`AAAA-MM-DD`) e taxa"
+		return c.Send(usage, telebot.ModeMarkdown)
+	}
+
+	opType, ticker, qty, price, dateStr, fee, errMsg := parseQuickOperationArgs(args)
+	if errMsg != "" {
+		return c.Send(errMsg, telebot.ModeMarkdown)
+	}
+
+	quote, err := h.getQuoteWithFallback(ctx, ticker)
+	if err != nil {
+		return c.Send("⚠️ Ativo não encontrado na bolsa. Verifique o código e tente novamente.", telebot.ModeMarkdown)
+	}
+	resolvedTicker := ticker
+	if quote != nil && quote.Ticker != "" {
+		resolvedTicker = quote.Ticker
+	}
+
+	if opType == "SELL" {
+		pos, _ := h.getCustodyPosition(ctx, portfolioID, userIDStr, resolvedTicker)
+		custodyQty := 0.0
+		if pos != nil {
+			custodyQty = pos.Quantity
+		}
+		if pos == nil || (qty-pos.Quantity) > 1e-6 {
+			p := message.NewPrinter(language.BrazilianPortuguese)
+			return c.Send(p.Sprintf("⚠️ *Quantidade indisponível para venda!*\n\nVocê possui apenas *%.4f* cotas de *%s* em custódia.", custodyQty, escapeMarkdown(cleanTickerForDisplay(resolvedTicker))), telebot.ModeMarkdown)
+		}
+	}
+
+	state := ConversationState{
+		Step:          "CONFIRM_OP",
+		PortfolioID:   portfolioID,
+		PortfolioName: portfolioName,
+		Ticker:        resolvedTicker,
+		Type:          opType,
+		Quantity:      qty,
+		UnitPrice:     price,
+		ExecutedAt:    dateStr,
+		Fee:           fee,
+	}
+	if err := h.svc.SetConversationState(ctx, c.Chat().ID, state); err != nil {
+		return c.Send("❌ Erro interno ao iniciar operação.")
+	}
+
+	currSymbol := getTickerDefaultCurrency(resolvedTicker)
+	if quote != nil && quote.Currency != "" {
+		currSymbol = getCurrencySymbol(quote.Currency)
+	}
+
+	tipoStr := "🟢 COMPRA"
+	totalCost := (qty * price) + fee
+	if opType == "SELL" {
+		tipoStr = "🔴 VENDA"
+		totalCost = (qty * price) - fee
+	}
+
+	p := message.NewPrinter(language.BrazilianPortuguese)
+	msg := p.Sprintf("🧾 *Confirmar Operação*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %s\n• Preço Unitário: %s %s\n• Data: `%s`\n• Taxas: %s %s\n• Total: *%s %s*\n\nDeseja confirmar o lançamento?",
+		escapeMarkdown(portfolioName), escapeMarkdown(cleanTickerForDisplay(resolvedTicker)), tipoStr, formatQuantity(qty),
+		currSymbol, formatFinancialPrice(p, price), dateStr, currSymbol, formatFinancialPrice(p, fee), currSymbol, formatFinancialPrice(p, totalCost))
+
+	menu := &telebot.ReplyMarkup{}
+	btnConfirm := menu.Data("✅ Confirmar Operação", "btn_op_confirm")
+	btnEdit := menu.Data("✏️ Alterar Data/Taxa", "btn_op_edit_date")
+	btnCancel := menu.Data("❌ Cancelar", "btn_cancel_op")
+	menu.Inline(
+		menu.Row(btnConfirm),
+		menu.Row(btnEdit, btnCancel),
+	)
+
+	return c.Send(msg, telebot.ModeMarkdown, menu)
+}
+
+func (h *Handlers) HandleOperationConfirm(c telebot.Context) error {
+	defer c.Respond()
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
+	if err != nil || state == nil || state.Step != "CONFIRM_OP" {
+		return h.sendOrEdit(c, "⚠️ Nenhuma operação pendente de confirmação.")
+	}
+
+	return h.finalizeTransaction(c, state, state.Fee, c.Callback() != nil)
+}
+
+func (h *Handlers) HandleOperationEditDate(c telebot.Context) error {
+	defer c.Respond()
+	ctx, cancel := h.getContext(c)
+	defer cancel()
+
+	state, err := h.svc.GetConversationState(ctx, c.Chat().ID)
+	if err != nil || state == nil || state.Step != "CONFIRM_OP" {
+		return h.sendOrEdit(c, "⚠️ Nenhuma operação pendente de confirmação.")
+	}
+
+	state.ExecutedAt = ""
+	state.Fee = 0
+	state.Step = "EXPECT_DATE"
+	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
+
+	return h.askDate(c, state, c.Callback() != nil)
 }
 
 func (h *Handlers) HandleDynamicCallback(c telebot.Context) error {
@@ -273,12 +540,13 @@ func (h *Handlers) handleQuickOperation(c telebot.Context, ticker string) error 
 	if err != nil || len(portfolios) == 0 {
 		return h.sendOrEdit(c, "⚠️ Nenhuma carteira encontrada na sua conta.")
 	}
-	portfolioID, _ := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
+	portfolioID, portfolioName := h.resolveActivePortfolio(ctx, c.Chat().ID, portfolios)
 
 	state := ConversationState{
-		PortfolioID: portfolioID,
-		Ticker:      ticker,
-		Step:        "EXPECT_TYPE",
+		PortfolioID:   portfolioID,
+		PortfolioName: portfolioName,
+		Ticker:        ticker,
+		Step:          "EXPECT_TYPE",
 	}
 	_ = h.svc.SetConversationState(ctx, c.Chat().ID, state)
 
@@ -292,7 +560,8 @@ func (h *Handlers) handleQuickOperation(c telebot.Context, ticker string) error 
 		menu.Row(btnBack, btnCancel),
 	)
 
-	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(cleanTickerForDisplay(ticker)))
+	text := formatOperationBreadcrumb(&state, 1) +
+		fmt.Sprintf("📌 *Passo 1/5* — Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(cleanTickerForDisplay(ticker)))
 	return h.sendOrEdit(c, text, telebot.ModeMarkdown, menu)
 }
 
@@ -307,6 +576,11 @@ func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error 
 	}
 
 	state.Ticker = ticker
+	state.Type = ""
+	state.Quantity = 0
+	state.UnitPrice = 0
+	state.ExecutedAt = ""
+	state.Fee = 0
 	state.Step = "EXPECT_TYPE"
 	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
@@ -321,11 +595,9 @@ func (h *Handlers) handleSelectedTicker(c telebot.Context, ticker string) error 
 		menu.Row(btnBack, btnCancel),
 	)
 
-	text := fmt.Sprintf("Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(cleanTickerForDisplay(ticker)))
-	if c.Callback() != nil {
-		return c.Edit(text, telebot.ModeMarkdown, menu)
-	}
-	return c.Send(text, telebot.ModeMarkdown, menu)
+	text := formatOperationBreadcrumb(state, 1) +
+		fmt.Sprintf("📌 *Passo 1/5* — Você selecionou *%s*.\nQual o tipo da operação?", escapeMarkdown(cleanTickerForDisplay(ticker)))
+	return h.sendOrEdit(c, text, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleNewAsset(c telebot.Context) error {
@@ -370,6 +642,10 @@ func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 	}
 
 	state.Type = opType
+	state.Quantity = 0
+	state.UnitPrice = 0
+	state.ExecutedAt = ""
+	state.Fee = 0
 	state.Step = "EXPECT_QTY"
 	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
@@ -394,8 +670,9 @@ func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 			menu.Row(btnBack, btnCancel),
 		)
 
-		text := p.Sprintf("📊 *Posição em Custódia:* %.4f cotas (PM: %s %.2f)\n\nQual a quantidade que deseja vender? (Escolha abaixo ou digite o valor no chat):",
-			pos.Quantity, currSymbol, pos.AveragePrice)
+		text := formatOperationBreadcrumb(state, 2) +
+			p.Sprintf("📊 *Posição em Custódia:* %.4f cotas (PM: %s %.2f)\n\n📦 *Passo 2/5* — Qual a quantidade que deseja vender? (Escolha abaixo ou digite o valor no chat):",
+				pos.Quantity, currSymbol, pos.AveragePrice)
 		return c.Edit(text, telebot.ModeMarkdown, menu)
 	}
 
@@ -411,7 +688,8 @@ func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 		menu.Row(btnBack, btnCancel),
 	)
 
-	return c.Edit("Qual a quantidade negociada? (Escolha abaixo ou digite o valor no chat):", menu)
+	text := formatOperationBreadcrumb(state, 2) + "📦 *Passo 2/5* — Qual a quantidade negociada? (Escolha abaixo ou digite o valor no chat):"
+	return c.Edit(text, telebot.ModeMarkdown, menu)
 }
 
 func (h *Handlers) HandleQtyAll(c telebot.Context) error {
@@ -534,7 +812,7 @@ func (h *Handlers) askPrice(c telebot.Context, state *ConversationState, isCallb
 	rows = append(rows, menu.Row(btnBack, btnCancel))
 	menu.Inline(rows...)
 
-	text := "Qual o preço unitário da transação? (ex: 15.50)"
+	text := formatOperationBreadcrumb(state, 3) + "💵 *Passo 3/5* — Qual o preço unitário da transação? (ex: 15.50)"
 	if isCallback {
 		return c.Edit(text, telebot.ModeMarkdown, menu)
 	}
@@ -560,10 +838,10 @@ func (h *Handlers) handleSelectedPrice(c telebot.Context, priceStr string) error
 	state.Step = "EXPECT_DATE"
 	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
-	return h.askDate(c, true)
+	return h.askDate(c, state, true)
 }
 
-func (h *Handlers) askDate(c telebot.Context, isCallback bool) error {
+func (h *Handlers) askDate(c telebot.Context, state *ConversationState, isCallback bool) error {
 	dateMenu := &telebot.ReplyMarkup{}
 	btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
 	btnYesterday := dateMenu.Data("⏮️ Ontem", "btn_op_date_yesterday")
@@ -574,7 +852,8 @@ func (h *Handlers) askDate(c telebot.Context, isCallback bool) error {
 		dateMenu.Row(btnBack, btnCancel),
 	)
 
-	text := "📅 *Data da Operação*\n\nClique em *Hoje*, *Ontem* ou digite a data no formato `DD/MM/AAAA` (ex: `15/03/2024`):"
+	text := formatOperationBreadcrumb(state, 4) +
+		"📅 *Passo 4/5 — Data da Operação*\n\nClique em *Hoje*, *Ontem* ou digite a data no formato `AAAA-MM-DD` (ex: `2026-03-15`):"
 	if isCallback {
 		return c.Edit(text, telebot.ModeMarkdown, dateMenu)
 	}
@@ -595,7 +874,7 @@ func (h *Handlers) HandleDateToday(c telebot.Context) error {
 	state.Step = "EXPECT_FEE"
 	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
-	return h.askFee(c, state.Ticker, true)
+	return h.askFee(c, state, true)
 }
 
 func (h *Handlers) HandleDateYesterday(c telebot.Context) error {
@@ -612,7 +891,7 @@ func (h *Handlers) HandleDateYesterday(c telebot.Context) error {
 	state.Step = "EXPECT_FEE"
 	_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
-	return h.askFee(c, state.Ticker, true)
+	return h.askFee(c, state, true)
 }
 
 func (h *Handlers) HandleFeeZero(c telebot.Context) error {
@@ -629,8 +908,8 @@ func (h *Handlers) HandleFeeZero(c telebot.Context) error {
 	return h.finalizeTransaction(c, state, 0, true)
 }
 
-func (h *Handlers) askFee(c telebot.Context, ticker string, isCallback bool) error {
-	currSymbol := getTickerDefaultCurrency(ticker)
+func (h *Handlers) askFee(c telebot.Context, state *ConversationState, isCallback bool) error {
+	currSymbol := getTickerDefaultCurrency(state.Ticker)
 
 	feeMenu := &telebot.ReplyMarkup{}
 	btnNoFee := feeMenu.Data("0️⃣ Sem Taxas", "btn_op_fee_zero")
@@ -641,7 +920,8 @@ func (h *Handlers) askFee(c telebot.Context, ticker string, isCallback bool) err
 		feeMenu.Row(btnBack, btnCancel),
 	)
 
-	text := fmt.Sprintf("💵 *Taxas / Corretagem*\n\nInforme o valor total de taxas em %s (ex: `4.50`) ou clique em *Sem Taxas*:", currSymbol)
+	text := formatOperationBreadcrumb(state, 5) +
+		fmt.Sprintf("💵 *Passo 5/5 — Taxas / Corretagem*\n\nInforme o valor total de taxas em %s (ex: `4.50`) ou clique em *Sem Taxas*:", currSymbol)
 	if isCallback {
 		return c.Edit(text, telebot.ModeMarkdown, feeMenu)
 	}
@@ -981,45 +1261,33 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 		state.Step = "EXPECT_DATE"
 		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
-		return h.askDate(c, false)
+		return h.askDate(c, state, false)
 
 	case "EXPECT_DATE":
-		textLower := strings.ToLower(text)
-		var opDate time.Time
-		if textLower == "hoje" || textLower == "today" {
-			opDate = time.Now()
-		} else if textLower == "ontem" || textLower == "yesterday" {
-			opDate = time.Now().AddDate(0, 0, -1)
-		} else {
-			var parseErr error
-			opDate, parseErr = time.Parse("02/01/2006", text)
-			if parseErr != nil {
-				opDate, parseErr = time.Parse("02-01-2006", text)
-			}
-			if parseErr != nil {
-				dateMenu := &telebot.ReplyMarkup{}
-				btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
-				btnYesterday := dateMenu.Data("⏮️ Ontem", "btn_op_date_yesterday")
-				btnBack := dateMenu.Data("⬅️ Voltar", "btn_op_back")
-				btnCancelOp := dateMenu.Data("❌ Cancelar", "btn_cancel_op")
-				dateMenu.Inline(
-					dateMenu.Row(btnToday, btnYesterday),
-					dateMenu.Row(btnBack, btnCancelOp),
-				)
-				return c.Send("⚠️ Formato de data inválido. Use `DD/MM/AAAA` (ex: `15/03/2024`) ou clique em *Hoje* / *Ontem*:", telebot.ModeMarkdown, dateMenu)
-			}
+		opDate, parseErr := parseOperationDate(text)
+		if parseErr != nil {
+			dateMenu := &telebot.ReplyMarkup{}
+			btnToday := dateMenu.Data("📅 Hoje", "btn_op_date_today")
+			btnYesterday := dateMenu.Data("⏮️ Ontem", "btn_op_date_yesterday")
+			btnBack := dateMenu.Data("⬅️ Voltar", "btn_op_back")
+			btnCancelOp := dateMenu.Data("❌ Cancelar", "btn_cancel_op")
+			dateMenu.Inline(
+				dateMenu.Row(btnToday, btnYesterday),
+				dateMenu.Row(btnBack, btnCancelOp),
+			)
+			return c.Send("⚠️ Formato de data inválido. Use `AAAA-MM-DD` (ex: `2026-03-15`) ou clique em *Hoje* / *Ontem*:", telebot.ModeMarkdown, dateMenu)
 		}
 
 		state.ExecutedAt = opDate.Format("2006-01-02")
 		state.Step = "EXPECT_FEE"
 		_ = h.svc.SetConversationState(ctx, c.Chat().ID, *state)
 
-		return h.askFee(c, state.Ticker, false)
+		return h.askFee(c, state, false)
 
 	case "EXPECT_FEE":
 		textClean := strings.ReplaceAll(text, ",", ".")
 		var fee float64
-		if _, err := fmt.Sscanf(textClean, "%f", &fee); err != nil || fee < 0 {
+		if _, err := fmt.Sscanf(textClean, "%f", &fee); err != nil || fee < -1e-6 {
 			feeMenu := &telebot.ReplyMarkup{}
 			btnNoFee := feeMenu.Data("0️⃣ Sem Taxas", "btn_op_fee_zero")
 			btnBack := feeMenu.Data("⬅️ Voltar", "btn_op_back")
@@ -1029,6 +1297,9 @@ func (h *Handlers) HandleText(c telebot.Context) error {
 				feeMenu.Row(btnBack, btnCancelOp),
 			)
 			return c.Send("⚠️ Valor de taxa inválido. Envie um número positivo (ex: 4.50) ou clique em *Sem Taxas*:", telebot.ModeMarkdown, feeMenu)
+		}
+		if fee < 1e-6 {
+			fee = 0
 		}
 
 		state.Fee = fee

@@ -280,22 +280,46 @@ func (h *Handlers) HandlePortfolioSummary(c telebot.Context) error {
 	return h.sendOrEdit(c, msg, telebot.ModeMarkdown, menu)
 }
 
+func getMacroCategoryDisplay(catKey string) (string, string) {
+	switch catKey {
+	case "STOCK":
+		return "📈", "Ações"
+	case "FII":
+		return "🏢", "FIIs"
+	case "ETF":
+		return "🌐", "ETFs"
+	case "BDR":
+		return "📦", "BDRs"
+	case "CRYPTO":
+		return "₿", "Cripto"
+	default:
+		return "📋", "Todos"
+	}
+}
+
 func (h *Handlers) HandleAssetList(c telebot.Context) error {
 	defer c.Respond()
 	rawData := c.Data()
 	page := 0
 	sortBy := "VAL"
+	catFilter := "ALL"
 	if rawData != "" {
-		parts := strings.SplitN(rawData, ":", 2)
-		if len(parts) == 2 {
+		parts := strings.SplitN(rawData, ":", 3)
+		if len(parts) >= 2 {
 			fmt.Sscanf(parts[0], "%d", &page)
 			sortBy = strings.ToUpper(parts[1])
+			if len(parts) == 3 {
+				catFilter = strings.ToUpper(strings.TrimSpace(parts[2]))
+			}
 		} else {
 			fmt.Sscanf(rawData, "%d", &page)
 		}
 	}
 	if sortBy != "VAL" && sortBy != "RET" && sortBy != "AZ" {
 		sortBy = "VAL"
+	}
+	if catFilter != "ALL" && catFilter != "STOCK" && catFilter != "FII" && catFilter != "ETF" && catFilter != "BDR" && catFilter != "CRYPTO" {
+		catFilter = "ALL"
 	}
 
 	userIDStr, err := h.getUserID(c)
@@ -337,8 +361,30 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		return h.sendOrEdit(c, fmt.Sprintf("📋 *Ativos: %s*\n\nNenhum ativo encontrado nesta carteira.", escapeMarkdown(portfolioName)), telebot.ModeMarkdown, menu)
 	}
 
-	posByValue := make([]portfolio.Position, len(positions))
-	copy(posByValue, positions)
+	totalPortValue := 0.0
+	totalPortCost := 0.0
+	presentCats := make(map[string]bool)
+	for _, pos := range positions {
+		totalPortValue += pos.CurrentValue
+		totalPortCost += pos.TotalCost
+		presentCats[getMacroCategoryKey(pos.Type, pos.Ticker)] = true
+	}
+
+	if catFilter != "ALL" && !presentCats[catFilter] {
+		catFilter = "ALL"
+	}
+
+	var posByValue []portfolio.Position
+	catValue := 0.0
+	catCost := 0.0
+	for _, pos := range positions {
+		if catFilter == "ALL" || getMacroCategoryKey(pos.Type, pos.Ticker) == catFilter {
+			posByValue = append(posByValue, pos)
+			catValue += pos.CurrentValue
+			catCost += pos.TotalCost
+		}
+	}
+
 	sort.Slice(posByValue, func(i, j int) bool {
 		switch sortBy {
 		case "RET":
@@ -357,13 +403,6 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		}
 	})
 
-	totalPortValue := 0.0
-	totalPortCost := 0.0
-	for _, pos := range positions {
-		totalPortValue += pos.CurrentValue
-		totalPortCost += pos.TotalCost
-	}
-
 	pageSize := 10
 	totalPages := (len(posByValue) + pageSize - 1) / pageSize
 	if page < 0 {
@@ -381,7 +420,15 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("📋 *Ativos: %s*\n", escapeMarkdown(portfolioName))
-	if totalPortValue > 1e-6 {
+	if catFilter != "ALL" {
+		catEmoji, catName := getMacroCategoryDisplay(catFilter)
+		catPct := 0.0
+		if totalPortValue > 1e-6 {
+			catPct = (catValue / totalPortValue) * 100
+		}
+		msg += p.Sprintf("%s *%s:* *%s %s* (%.1f%% da carteira | Custo: %s %s)\n",
+			catEmoji, catName, baseCurr, formatFinancialPrice(p, catValue), catPct, baseCurr, formatFinancialPrice(p, catCost))
+	} else if totalPortValue > 1e-6 {
 		msg += p.Sprintf("💰 Patrimônio em Ativos: *%s %s* (Custo: %s %s)\n", baseCurr, formatFinancialPrice(p, totalPortValue), baseCurr, formatFinancialPrice(p, totalPortCost))
 	}
 	msg += p.Sprintf("_Página %d de %d_\n\n", page+1, totalPages)
@@ -443,26 +490,59 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 		}
 	}
 
+	buildAssetsData := func(pg int, s, cat string) string {
+		if cat == "ALL" {
+			return fmt.Sprintf("%d:%s", pg, s)
+		}
+		return fmt.Sprintf("%d:%s:%s", pg, s, cat)
+	}
+
 	menu := &telebot.ReplyMarkup{}
 	var rows []telebot.Row
 
-	btnSortVal := menu.Data(fmt.Sprintf("%s Valor", map[bool]string{true: "▪️", false: "💰"}[sortBy == "VAL"]), "btn_ativos", "0:VAL")
-	btnSortRet := menu.Data(fmt.Sprintf("%s Lucro%%", map[bool]string{true: "▪️", false: "📈"}[sortBy == "RET"]), "btn_ativos", "0:RET")
-	btnSortAZ := menu.Data(fmt.Sprintf("%s A-Z", map[bool]string{true: "▪️", false: "🔤"}[sortBy == "AZ"]), "btn_ativos", "0:AZ")
+	if len(presentCats) >= 2 {
+		var catBtns []telebot.Btn
+		allPrefix := "📋"
+		if catFilter == "ALL" {
+			allPrefix = "▪️"
+		}
+		catBtns = append(catBtns, menu.Data(allPrefix+" Todos", "btn_ativos", buildAssetsData(0, sortBy, "ALL")))
+		for _, ck := range []string{"STOCK", "FII", "ETF", "BDR", "CRYPTO"} {
+			if !presentCats[ck] {
+				continue
+			}
+			cEmoji, cName := getMacroCategoryDisplay(ck)
+			if catFilter == ck {
+				cEmoji = "▪️"
+			}
+			catBtns = append(catBtns, menu.Data(cEmoji+" "+cName, "btn_ativos", buildAssetsData(0, sortBy, ck)))
+		}
+		for i := 0; i < len(catBtns); i += 3 {
+			endIdx := i + 3
+			if endIdx > len(catBtns) {
+				endIdx = len(catBtns)
+			}
+			rows = append(rows, menu.Row(catBtns[i:endIdx]...))
+		}
+	}
+
+	btnSortVal := menu.Data(fmt.Sprintf("%s Valor", map[bool]string{true: "▪️", false: "💰"}[sortBy == "VAL"]), "btn_ativos", buildAssetsData(0, "VAL", catFilter))
+	btnSortRet := menu.Data(fmt.Sprintf("%s Lucro%%", map[bool]string{true: "▪️", false: "📈"}[sortBy == "RET"]), "btn_ativos", buildAssetsData(0, "RET", catFilter))
+	btnSortAZ := menu.Data(fmt.Sprintf("%s A-Z", map[bool]string{true: "▪️", false: "🔤"}[sortBy == "AZ"]), "btn_ativos", buildAssetsData(0, "AZ", catFilter))
 	rows = append(rows, menu.Row(btnSortVal, btnSortRet, btnSortAZ))
 
 	var navBtns []telebot.Btn
 	if start > 0 {
-		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_ativos", fmt.Sprintf("%d:%s", page-1, sortBy)))
+		navBtns = append(navBtns, menu.Data("⬅️ Anterior", "btn_ativos", buildAssetsData(page-1, sortBy, catFilter)))
 	}
 	if end < len(posByValue) {
-		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_ativos", fmt.Sprintf("%d:%s", page+1, sortBy)))
+		navBtns = append(navBtns, menu.Data("Próxima ➡️", "btn_ativos", buildAssetsData(page+1, sortBy, catFilter)))
 	}
 	if len(navBtns) > 0 {
 		rows = append(rows, menu.Row(navBtns...))
 	}
 
-	btnRefresh := menu.Data("🔄 Atualizar", "btn_ativos", fmt.Sprintf("%d:%s", page, sortBy))
+	btnRefresh := menu.Data("🔄 Atualizar", "btn_ativos", buildAssetsData(page, sortBy, catFilter))
 	btnOp := menu.Data("💵 Lançar Operação", "btn_operacao")
 	btnCotacao := menu.Data("📈 Cotação", "btn_cotacao")
 	rows = append(rows, menu.Row(btnRefresh, btnOp, btnCotacao))
