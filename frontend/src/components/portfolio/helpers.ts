@@ -118,6 +118,15 @@ export const formatMoney = (val: number, currency: string) => {
   }).format(val);
 };
 
+export const formatUnitPrice = (val: number, currency: string) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: currency || 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 5,
+  }).format(val);
+};
+
 export const formatPercentage = (val: number) => {
   const formatted = Math.abs(val) < 1e-6 ? 0 : val;
   const isPos = formatted > 1e-6;
@@ -221,6 +230,46 @@ export function parsePastedCurrency(pasted: string): string {
 
   if (isNaN(num) || Math.abs(num) < 1e-6) return '';
   return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Formata a entrada livre de preço unitário aceitando vírgula ou ponto como separador decimal,
+ * limitando a até 5 casas decimais (ex: "9,12345", "36,50", "36").
+ * Quando recebe um número (ex: ao carregar modo de edição), formata entre 2 e 5 casas decimais.
+ */
+export function formatUnitPriceInput(val: string | number | undefined | null): string {
+  if (val === undefined || val === null || val === '') return '';
+
+  if (typeof val === 'number') {
+    if (!Number.isFinite(val) || val <= 1e-6) return '';
+    const rounded = Math.round(val * 100000) / 100000;
+    return rounded.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 5,
+      useGrouping: false,
+    });
+  }
+
+  const cleaned = val.replace(/\./g, ',').replace(/[^\d,]/g, '');
+  if (!cleaned) return '';
+
+  const commaIndex = cleaned.indexOf(',');
+  if (commaIndex === -1) {
+    return cleaned.replace(/^0+(?=\d)/, '');
+  }
+
+  const rawInt = cleaned.slice(0, commaIndex);
+  const intPart = rawInt ? rawInt.replace(/^0+(?=\d)/, '') : '0';
+  const decPart = cleaned.slice(commaIndex + 1).replace(/,/g, '').slice(0, 5);
+  return `${intPart},${decPart}`;
+}
+
+/**
+ * Trata colagem (paste) de preços unitários, preservando entre 2 e 5 casas decimais.
+ */
+export function parsePastedUnitPrice(pasted: string): string {
+  const num = parseCurrency(pasted);
+  return formatUnitPriceInput(num);
 }
 
 /**

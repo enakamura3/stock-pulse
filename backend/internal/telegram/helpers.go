@@ -139,6 +139,30 @@ func formatFinancialPrice(p *message.Printer, val float64) string {
 	return printer.Sprintf("%.6f", val)
 }
 
+// formatUnitPrice formata preços unitários e preço médio exibindo de 2 a 5 casas decimais
+// (removendo zeros à direita além da 2ª casa decimal, e mantendo até 6 casas para valores < 0,01).
+func formatUnitPrice(p *message.Printer, val float64) string {
+	printer := p
+	if printer == nil {
+		printer = message.NewPrinter(language.BrazilianPortuguese)
+	}
+	absVal := math.Abs(val)
+	if absVal < 1e-6 {
+		return printer.Sprintf("%.2f", 0.0)
+	}
+	if absVal < 0.01 {
+		return printer.Sprintf("%.6f", val)
+	}
+	formatted := printer.Sprintf("%.5f", val)
+	commaIdx := strings.LastIndexByte(formatted, ',')
+	minLen := commaIdx + 3
+	end := len(formatted)
+	for end > minLen && formatted[end-1] == '0' {
+		end--
+	}
+	return formatted[:end]
+}
+
 // isBlockedByUser detecta se o erro retornado pela API do Telegram indica que o usuário bloqueou o bot.
 func isBlockedByUser(err error) bool {
 	if err == nil {

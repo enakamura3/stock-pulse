@@ -13,7 +13,7 @@ import {
   UnifiedTransaction,
   TreasuryPosition,
 } from '@/components/portfolio/types';
-import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatExchangeRateInput, getLocalDateString } from '@/components/portfolio/helpers';
+import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatUnitPriceInput, formatExchangeRateInput, getLocalDateString } from '@/components/portfolio/helpers';
 
 interface PortfolioContextType {
   // Data
@@ -594,7 +594,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxAssetType(tx.asset_type || ''); setTxType(tx.type as any);
     setTxQuantity(tx.quantity || 0);
-    setTxUnitPrice(formatCurrencyInput(tx.unit_price ?? 0));
+    setTxUnitPrice(formatUnitPriceInput(tx.unit_price ?? 0));
     setTxFee(formatCurrencyInput(tx.fee ?? 0));
     setTxExchangeRate(formatExchangeRateInput(tx.exchange_rate ?? 0));
     setSelectedAssetCurrency(tx.currency || 'BRL');

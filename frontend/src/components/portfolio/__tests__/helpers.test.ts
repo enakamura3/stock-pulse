@@ -17,6 +17,9 @@ import {
   formatCurrencyInput,
   parseCurrency,
   parsePastedCurrency,
+  formatUnitPrice,
+  formatUnitPriceInput,
+  parsePastedUnitPrice,
   formatExchangeRateInput,
   parsePastedExchangeRate,
 } from '../helpers';
@@ -520,6 +523,64 @@ describe('Portfolio Helpers', () => {
       expect(parsePastedExchangeRate('abc')).toBe('');
       expect(parsePastedExchangeRate('0')).toBe('');
       expect(parsePastedExchangeRate('-')).toBe('');
+    });
+  });
+
+  describe('formatUnitPrice', () => {
+    it('formats unit prices with 2 to 5 decimal places depending on precision', () => {
+      expect(formatUnitPrice(36.5, 'BRL')).toContain('36,50');
+      expect(formatUnitPrice(9.123, 'BRL')).toContain('9,123');
+      expect(formatUnitPrice(9.12345, 'BRL')).toContain('9,12345');
+      expect(formatUnitPrice(10.12345, 'USD')).toContain('10,12345');
+      expect(formatUnitPrice(50, '')).toContain('50,00');
+    });
+  });
+
+  describe('formatUnitPriceInput (free decimal up to 5 decimal places)', () => {
+    it('accepts free decimal typing with comma or dot up to 5 decimals', () => {
+      expect(formatUnitPriceInput('36')).toBe('36');
+      expect(formatUnitPriceInput('0')).toBe('0');
+      expect(formatUnitPriceInput('007')).toBe('7');
+      expect(formatUnitPriceInput(',5')).toBe('0,5');
+      expect(formatUnitPriceInput('9,')).toBe('9,');
+      expect(formatUnitPriceInput('9,12345')).toBe('9,12345');
+      expect(formatUnitPriceInput('9.12345')).toBe('9,12345');
+      expect(formatUnitPriceInput('9,12,34')).toBe('9,1234');
+      expect(formatUnitPriceInput('9,123456')).toBe('9,12345');
+      expect(formatUnitPriceInput('009,12345')).toBe('9,12345');
+    });
+
+    it('returns empty string for invalid, empty or zero numeric inputs', () => {
+      expect(formatUnitPriceInput(undefined)).toBe('');
+      expect(formatUnitPriceInput(null)).toBe('');
+      expect(formatUnitPriceInput('')).toBe('');
+      expect(formatUnitPriceInput('abc')).toBe('');
+      expect(formatUnitPriceInput(0)).toBe('');
+      expect(formatUnitPriceInput(NaN)).toBe('');
+      expect(formatUnitPriceInput(-5)).toBe('');
+    });
+
+    it('formats numeric values into editable string preserving up to 5 decimals', () => {
+      expect(formatUnitPriceInput(36.5)).toBe('36,50');
+      expect(formatUnitPriceInput(9.123)).toBe('9,123');
+      expect(formatUnitPriceInput(9.12345)).toBe('9,12345');
+      expect(formatUnitPriceInput(9.123456)).toBe('9,12346');
+    });
+  });
+
+  describe('parsePastedUnitPrice', () => {
+    it('handles pasted prices with 2 to 5 decimals in BR and US formats', () => {
+      expect(parsePastedUnitPrice('38.50')).toBe('38,50');
+      expect(parsePastedUnitPrice('9,12345')).toBe('9,12345');
+      expect(parsePastedUnitPrice('R$ 1.250,12345')).toBe('1250,12345');
+      expect(parsePastedUnitPrice('1,250.12345')).toBe('1250,12345');
+      expect(parsePastedUnitPrice('100')).toBe('100,00');
+    });
+
+    it('returns empty string for invalid or non-positive pastes', () => {
+      expect(parsePastedUnitPrice('')).toBe('');
+      expect(parsePastedUnitPrice('abc')).toBe('');
+      expect(parsePastedUnitPrice('-10')).toBe('');
     });
   });
 });

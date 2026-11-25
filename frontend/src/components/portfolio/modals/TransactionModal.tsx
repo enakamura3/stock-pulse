@@ -1,6 +1,6 @@
 import React from 'react';
 import { SearchResult } from '../types';
-import { formatCurrencyInput, parseCurrency, parsePastedCurrency, formatExchangeRateInput, parsePastedExchangeRate } from '../helpers';
+import { formatCurrencyInput, parseCurrency, parsePastedCurrency, formatUnitPriceInput, parsePastedUnitPrice, formatExchangeRateInput, parsePastedExchangeRate } from '../helpers';
 
 export interface TransactionModalProps {
   showTxModal: boolean;
@@ -289,12 +289,12 @@ export default function TransactionModal({
                   id="tx-unit-price"
                   className="form-input"
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={txUnitPrice}
-                  onChange={(e) => setTxUnitPrice(formatCurrencyInput(e.target.value))}
+                  onChange={(e) => setTxUnitPrice(formatUnitPriceInput(e.target.value))}
                   onPaste={(e) => {
                     const text = e.clipboardData.getData('text');
-                    const formatted = parsePastedCurrency(text);
+                    const formatted = parsePastedUnitPrice(text);
                     if (formatted) {
                       e.preventDefault();
                       setTxUnitPrice(formatted);
@@ -387,7 +387,7 @@ export default function TransactionModal({
             >
               <div className="flex-row justify-between text-xs text-secondary">
                 <span>Valor dos Ativos:</span>
-                <span>{currencySymbol} {grossTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span>{currencySymbol} {grossTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</span>
               </div>
               {parsedFee > 1e-6 && (
                 <div className="flex-row justify-between text-xs text-secondary mt-xs">
@@ -398,7 +398,7 @@ export default function TransactionModal({
               <div className="flex-row justify-between text-sm font-bold mt-xs" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem', color: 'var(--text-primary)' }}>
                 <span>Total Operação:</span>
                 <span style={{ color: txType === 'BUY' ? '#00e676' : '#ff3d00' }}>
-                  {currencySymbol} {netTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {currencySymbol} {netTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
                 </span>
               </div>
             </div>

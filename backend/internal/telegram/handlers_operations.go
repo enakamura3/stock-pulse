@@ -118,7 +118,7 @@ func formatOperationBreadcrumb(state *ConversationState, stepNum int) string {
 	if stepNum >= 4 && state.UnitPrice > 1e-6 {
 		subtotal := state.Quantity * state.UnitPrice
 		line2 = append(line2, p.Sprintf("Preço: `%s %s` _(Subtotal: %s %s)_",
-			currSymbol, formatFinancialPrice(p, state.UnitPrice), currSymbol, formatFinancialPrice(p, subtotal)))
+			currSymbol, formatUnitPrice(p, state.UnitPrice), currSymbol, formatFinancialPrice(p, subtotal)))
 	}
 	if stepNum >= 5 && state.ExecutedAt != "" {
 		line2 = append(line2, fmt.Sprintf("Data: `%s`", state.ExecutedAt))
@@ -374,7 +374,7 @@ func (h *Handlers) handleLaunchOperationArgs(ctx context.Context, c telebot.Cont
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("🧾 *Confirmar Operação*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %s\n• Preço Unitário: %s %s\n• Data: `%s`\n• Taxas: %s %s\n• Total: *%s %s*\n\nDeseja confirmar o lançamento?",
 		escapeMarkdown(portfolioName), escapeMarkdown(cleanTickerForDisplay(resolvedTicker)), tipoStr, formatQuantity(qty),
-		currSymbol, formatFinancialPrice(p, price), dateStr, currSymbol, formatFinancialPrice(p, fee), currSymbol, formatFinancialPrice(p, totalCost))
+		currSymbol, formatUnitPrice(p, price), dateStr, currSymbol, formatFinancialPrice(p, fee), currSymbol, formatFinancialPrice(p, totalCost))
 
 	menu := &telebot.ReplyMarkup{}
 	btnConfirm := menu.Data("✅ Confirmar Operação", "btn_op_confirm")
@@ -671,8 +671,8 @@ func (h *Handlers) handleSetType(c telebot.Context, opType string) error {
 		)
 
 		text := formatOperationBreadcrumb(state, 2) +
-			p.Sprintf("📊 *Posição em Custódia:* %.4f cotas (PM: %s %.2f)\n\n📦 *Passo 2/5* — Qual a quantidade que deseja vender? (Escolha abaixo ou digite o valor no chat):",
-				pos.Quantity, currSymbol, pos.AveragePrice)
+			p.Sprintf("📊 *Posição em Custódia:* %.4f cotas (PM: %s %s)\n\n📦 *Passo 2/5* — Qual a quantidade que deseja vender? (Escolha abaixo ou digite o valor no chat):",
+				pos.Quantity, currSymbol, formatUnitPrice(p, pos.AveragePrice))
 		return c.Edit(text, telebot.ModeMarkdown, menu)
 	}
 
@@ -986,8 +986,8 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço Unitário: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f",
-		cleanTickerForDisplay(state.Ticker), tipoStr, state.Quantity, currSymbol, state.UnitPrice, currSymbol, fee, executedAt.Format("02/01/2006"), currSymbol, totalCost)
+	successMsg := p.Sprintf("✅ *Operação Lançada com Sucesso!*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço Unitário: %s %s\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f",
+		cleanTickerForDisplay(state.Ticker), tipoStr, state.Quantity, currSymbol, formatUnitPrice(p, state.UnitPrice), currSymbol, fee, executedAt.Format("02/01/2006"), currSymbol, totalCost)
 
 	if pos, _ := h.getCustodyPosition(ctx, state.PortfolioID, userIDStr, state.Ticker); pos != nil && pos.Quantity > 1e-6 {
 		avgPrice := pos.AveragePrice
@@ -996,7 +996,7 @@ func (h *Handlers) finalizeTransaction(c telebot.Context, state *ConversationSta
 		}
 		if avgPrice > 1e-6 {
 			successMsg += p.Sprintf("\n\n📊 *Posição Atualizada:* %s cotas (PM: %s %s)",
-				formatQuantity(pos.Quantity), currSymbol, formatFinancialPrice(p, avgPrice))
+				formatQuantity(pos.Quantity), currSymbol, formatUnitPrice(p, avgPrice))
 		}
 	}
 
@@ -1050,8 +1050,8 @@ func (h *Handlers) HandleUndoLastOperation(c telebot.Context) error {
 	}
 
 	p := message.NewPrinter(language.BrazilianPortuguese)
-	msg := p.Sprintf("⚠️ *Confirmar cancelamento da última operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço: %s %.2f\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f\n\nDeseja realmente excluir esta operação?",
-		escapeMarkdown(portName), cleanTickerForDisplay(lastTx.Ticker), tipoStr, lastTx.Quantity, currSymbol, lastTx.UnitPrice, currSymbol, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), currSymbol, lastTx.TotalCost)
+	msg := p.Sprintf("⚠️ *Confirmar cancelamento da última operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %.4f\n• Preço: %s %s\n• Taxas: %s %.2f\n• Data: %s\n• Total: %s %.2f\n\nDeseja realmente excluir esta operação?",
+		escapeMarkdown(portName), cleanTickerForDisplay(lastTx.Ticker), tipoStr, lastTx.Quantity, currSymbol, formatUnitPrice(p, lastTx.UnitPrice), currSymbol, lastTx.Fee, lastTx.ExecutedAt.Format("02/01/2006"), currSymbol, lastTx.TotalCost)
 
 	menu := &telebot.ReplyMarkup{}
 	btnConfirm := menu.Data("🗑️ Sim, Desfazer", "btn_tx_del_"+lastTx.ID)
@@ -1116,7 +1116,7 @@ func (h *Handlers) handleAskDeleteTransaction(c telebot.Context, payload string)
 	p := message.NewPrinter(language.BrazilianPortuguese)
 	msg := p.Sprintf("⚠️ *Confirmar exclusão de operação:*\n🏢 Carteira: *%s*\n\n• Ativo: `%s`\n• Tipo: %s\n• Quantidade: %s\n• Preço: %s %s\n• Taxas: %s %s\n• Data: %s\n• Total: %s %s\n\nDeseja realmente excluir esta operação?",
 		escapeMarkdown(portName), cleanTickerForDisplay(targetTx.Ticker), tipoStr, formatQuantity(targetTx.Quantity),
-		currSymbol, formatFinancialPrice(p, targetTx.UnitPrice), currSymbol, formatFinancialPrice(p, targetTx.Fee),
+		currSymbol, formatUnitPrice(p, targetTx.UnitPrice), currSymbol, formatFinancialPrice(p, targetTx.Fee),
 		targetTx.ExecutedAt.Format("02/01/2006"), currSymbol, formatFinancialPrice(p, targetTx.TotalCost))
 
 	menu := &telebot.ReplyMarkup{}

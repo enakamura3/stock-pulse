@@ -37,6 +37,19 @@ describe('AssetList Component', () => {
       return_percent: -14.28,
       currency: 'BRL',
     },
+    {
+      asset_id: 'pos-3',
+      ticker: 'SNME11',
+      name: 'Suno Multiestrategia FII',
+      quantity: 100,
+      average_price: 9.12345,
+      current_price: 9.2,
+      total_cost: 912.345,
+      current_value: 920,
+      profit_loss: 7.655,
+      return_percent: 0.84,
+      currency: 'BRL',
+    },
   ];
 
   it('renders positions table with columns and sorting functionality', () => {
@@ -57,6 +70,8 @@ describe('AssetList Component', () => {
     expect(screen.getByText('Posições Ativas')).toBeInTheDocument();
     expect(screen.getByText('PETR4')).toBeInTheDocument();
     expect(screen.getByText('VALE3')).toBeInTheDocument();
+    expect(screen.getByText('SNME11')).toBeInTheDocument();
+    expect(screen.getByText(/9,12345/)).toBeInTheDocument();
 
     // Test sorting by clicking column headers
     const sortHeaders = [

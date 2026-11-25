@@ -222,10 +222,10 @@ func (h *Handlers) renderHistory(c telebot.Context, deleteMode bool) error {
 		msg += p.Sprintf("%s | `%s` • %s\n", tipoStr, cleanTickerForDisplay(tx.Ticker), tx.ExecutedAt.Format("02/01/2006"))
 		if tx.Fee > 1e-6 {
 			msg += p.Sprintf("Qtd: %s | Preço: %s %s | Total: %s %s (Taxas: %s %s)\n\n",
-				formatQuantity(tx.Quantity), curr, formatFinancialPrice(p, tx.UnitPrice), curr, formatFinancialPrice(p, tx.TotalCost), curr, formatFinancialPrice(p, tx.Fee))
+				formatQuantity(tx.Quantity), curr, formatUnitPrice(p, tx.UnitPrice), curr, formatFinancialPrice(p, tx.TotalCost), curr, formatFinancialPrice(p, tx.Fee))
 		} else {
 			msg += p.Sprintf("Qtd: %s | Preço: %s %s | Total: %s %s\n\n",
-				formatQuantity(tx.Quantity), curr, formatFinancialPrice(p, tx.UnitPrice), curr, formatFinancialPrice(p, tx.TotalCost))
+				formatQuantity(tx.Quantity), curr, formatUnitPrice(p, tx.UnitPrice), curr, formatFinancialPrice(p, tx.TotalCost))
 		}
 	}
 

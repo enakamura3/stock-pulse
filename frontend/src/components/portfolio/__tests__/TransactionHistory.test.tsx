@@ -512,6 +512,38 @@ describe('TransactionHistory Component', () => {
     // BBAS3 buy should be present
     expect(screen.getAllByText('R$ 250,00')[0]).toBeInTheDocument();
   });
+
+  it('displays up to 5 decimal places for transaction unit prices when present', () => {
+    const txs: UnifiedTransaction[] = [
+      {
+        id: 'tx-snme11',
+        portfolio_id: 'port-1',
+        module: 'RV',
+        date: currentDate(10),
+        asset_name: 'SNME11',
+        asset_type: 'FII',
+        type: 'BUY',
+        quantity: 100,
+        unit_price: 9.12345,
+        total_value: 912.345,
+        currency: 'BRL',
+      },
+    ];
+
+    render(
+      <TransactionHistory
+        transactions={txs}
+        filterTxTicker=""
+        setFilterTxTicker={mockSetFilterTxTicker}
+        handleEditTransaction={mockHandleEditTransaction}
+        handleDeleteTransaction={mockHandleDeleteTransaction}
+        onLaunchOperation={mockOnLaunchOperation}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText(/9,12345/)).toBeInTheDocument();
+  });
 });
 
 

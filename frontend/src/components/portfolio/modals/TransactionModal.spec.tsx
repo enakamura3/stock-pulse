@@ -68,46 +68,43 @@ describe('TransactionModal', () => {
     expect(screen.getByLabelText(/Corretagem \/ Taxas/i)).toBeInTheDocument();
   });
 
-  it('applies ATM mask when typing digits into Preço Unitário', () => {
+  it('allows free decimal typing up to 5 decimal places in Preço Unitário', () => {
     render(<TransactionModalWrapper />);
     const priceInput = screen.getByLabelText(/Preço Unitário/i) as HTMLInputElement;
 
-    // Type '2' -> '0,02'
-    fireEvent.change(priceInput, { target: { value: '2' } });
-    expect(priceInput.value).toBe('0,02');
+    fireEvent.change(priceInput, { target: { value: '9' } });
+    expect(priceInput.value).toBe('9');
 
-    // Type '3' -> '0,23'
-    fireEvent.change(priceInput, { target: { value: '0,023' } });
-    expect(priceInput.value).toBe('0,23');
+    fireEvent.change(priceInput, { target: { value: '9,' } });
+    expect(priceInput.value).toBe('9,');
 
-    // Type '5' -> '2,35'
-    fireEvent.change(priceInput, { target: { value: '0,235' } });
-    expect(priceInput.value).toBe('2,35');
+    fireEvent.change(priceInput, { target: { value: '9,12345' } });
+    expect(priceInput.value).toBe('9,12345');
 
-    // Type '0' -> '23,50'
-    fireEvent.change(priceInput, { target: { value: '2,350' } });
-    expect(priceInput.value).toBe('23,50');
+    // Accepts dot as decimal separator and limits to 5 decimal places
+    fireEvent.change(priceInput, { target: { value: '9.123456' } });
+    expect(priceInput.value).toBe('9,12345');
   });
 
-  it('handles backspacing correctly in Preço Unitário', () => {
-    render(<TransactionModalWrapper txUnitPrice="2,35" />);
+  it('handles backspacing naturally in Preço Unitário', () => {
+    render(<TransactionModalWrapper txUnitPrice="9,12" />);
     const priceInput = screen.getByLabelText(/Preço Unitário/i) as HTMLInputElement;
-    expect(priceInput.value).toBe('2,35');
+    expect(priceInput.value).toBe('9,12');
 
-    // Backspace from '2,35' -> '2,3' -> becomes '0,23'
-    fireEvent.change(priceInput, { target: { value: '2,3' } });
-    expect(priceInput.value).toBe('0,23');
+    fireEvent.change(priceInput, { target: { value: '9,1' } });
+    expect(priceInput.value).toBe('9,1');
 
-    // Backspace from '0,23' -> '0,2' -> becomes '0,02'
-    fireEvent.change(priceInput, { target: { value: '0,2' } });
-    expect(priceInput.value).toBe('0,02');
+    fireEvent.change(priceInput, { target: { value: '9,' } });
+    expect(priceInput.value).toBe('9,');
 
-    // Backspace from '0,02' -> '0,0' -> becomes empty ''
-    fireEvent.change(priceInput, { target: { value: '0,0' } });
+    fireEvent.change(priceInput, { target: { value: '9' } });
+    expect(priceInput.value).toBe('9');
+
+    fireEvent.change(priceInput, { target: { value: '' } });
     expect(priceInput.value).toBe('');
   });
 
-  it('handles pasting formatted and unformatted prices via clipboard paste event', () => {
+  it('handles pasting formatted and unformatted prices up to 5 decimals via clipboard paste event', () => {
     render(<TransactionModalWrapper />);
     const priceInput = screen.getByLabelText(/Preço Unitário/i) as HTMLInputElement;
 
@@ -118,6 +115,14 @@ describe('TransactionModal', () => {
       },
     });
     expect(priceInput.value).toBe('38,50');
+
+    // Paste "9.12345" (5 decimal places)
+    fireEvent.paste(priceInput, {
+      clipboardData: {
+        getData: (format: string) => (format === 'text' ? '9.12345' : ''),
+      },
+    });
+    expect(priceInput.value).toBe('9,12345');
 
     // Paste "100" (integer)
     fireEvent.paste(priceInput, {
@@ -171,6 +176,11 @@ describe('TransactionModal', () => {
     // Switch to SELL: Gross: 235.00, Fee: 4.50, Net: 230.50
     rerender(<TransactionModalWrapper txQuantity="100" txUnitPrice="2,35" txFee="4,50" txType="SELL" />);
     expect(screen.getByText(/R\$ 230,50/i)).toBeInTheDocument();
+  });
+
+  it('displays up to 5 decimal places in summary card when unit price has extra decimals', () => {
+    render(<TransactionModalWrapper txQuantity="1" txUnitPrice="9,12345" txFee="" txType="BUY" />);
+    expect(screen.getAllByText(/R\$ 9,12345/i)).toHaveLength(2);
   });
 
   it('supports editing mode with readonly ticker and update button label', () => {

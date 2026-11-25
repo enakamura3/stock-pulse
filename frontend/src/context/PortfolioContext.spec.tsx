@@ -553,15 +553,16 @@ describe('PortfolioContext', () => {
         module: 'RV',
         type: 'BUY',
         quantity: 50,
-        unit_price: 30,
+        unit_price: 9.12345,
         fee: 5,
         exchange_rate: 1,
-        total_value: 1500,
+        total_value: 456.1725,
         date: '2024-01-01',
       });
     });
     expect(context.editingTxId).toBe('tx-1');
     expect(context.showTxModal).toBe(true);
+    expect(context.txUnitPrice).toBe('9,12345');
 
     // Save edited transaction
     await act(async () => {
