@@ -85,6 +85,32 @@ func TestFormatFinancialPrice(t *testing.T) {
 	})
 }
 
+func TestFormatUnitPrice(t *testing.T) {
+	p := message.NewPrinter(language.BrazilianPortuguese)
+
+	t.Run("zero value with printer and nil printer", func(t *testing.T) {
+		assert.Equal(t, "0,00", formatUnitPrice(p, 0.0))
+		assert.Equal(t, "0,00", formatUnitPrice(nil, 0.0))
+		assert.Equal(t, "0,00", formatUnitPrice(p, 1e-7))
+	})
+
+	t.Run("micro value < 0.01", func(t *testing.T) {
+		assert.Equal(t, "0,000034", formatUnitPrice(p, 0.000034))
+		assert.Equal(t, "-0,005678", formatUnitPrice(nil, -0.005678))
+	})
+
+	t.Run("standard 2 decimal places when no extra precision", func(t *testing.T) {
+		assert.Equal(t, "38,50", formatUnitPrice(p, 38.5))
+		assert.Equal(t, "1.234,56", formatUnitPrice(nil, 1234.56))
+	})
+
+	t.Run("up to 5 decimal places preserving significant digits", func(t *testing.T) {
+		assert.Equal(t, "9,123", formatUnitPrice(p, 9.123))
+		assert.Equal(t, "9,12345", formatUnitPrice(p, 9.12345))
+		assert.Equal(t, "-9,12345", formatUnitPrice(nil, -9.12345))
+	})
+}
+
 func TestIsBlockedByUser(t *testing.T) {
 	t.Run("nil error", func(t *testing.T) {
 		assert.False(t, isBlockedByUser(nil))

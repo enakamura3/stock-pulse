@@ -1,0 +1,1 @@
+ALTER TABLE transaction ALTER COLUMN total_cost TYPE DECIMAL(18, 6);

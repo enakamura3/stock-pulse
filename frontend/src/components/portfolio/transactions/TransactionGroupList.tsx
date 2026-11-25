@@ -1,6 +1,6 @@
 import React from 'react';
 import { UnifiedTransaction } from '../types';
-import { formatMoney, formatQuantity } from '../helpers';
+import { formatMoney, formatUnitPrice, formatQuantity } from '../helpers';
 import {
   TransactionWithBalance,
   formatDateStr,
@@ -163,7 +163,7 @@ export default function TransactionGroupList({
               <div className="flex-col items-start" style={{ minWidth: 120 }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.15rem' }}>Qtd. & Preço</span>
                 <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {formatQuantity(tx.quantity || 0)} un. a {formatMoney(tx.unit_price || 0, tx.currency || 'BRL')}
+                  {formatQuantity(tx.quantity || 0)} un. a {formatUnitPrice(tx.unit_price || 0, tx.currency || 'BRL')}
                 </span>
                 {hasFx && (
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 'normal', marginTop: '0.1rem' }}>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Position, FixedIncomePosition, TreasuryPosition } from '../types';
-import { formatMoney, formatPercentage, exportDailyReportCSV } from '../helpers';
+import { formatMoney, formatUnitPrice, formatPercentage, exportDailyReportCSV } from '../helpers';
 import { SortKey, SortDir, EnrichedPosition, AssetTypeBadge } from './types';
 
 export interface DailyReportTableProps {
@@ -226,7 +226,7 @@ export default function DailyReportTable({
                       <span className="text-xs text-secondary">{portfolioWeight.toFixed(1)}%</span>
                     </td>
                     <td className="text-right" style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                      {formatMoney(pos.average_price ?? 0, pos.currency)}
+                      {formatUnitPrice(pos.average_price ?? 0, pos.currency)}
                     </td>
                     <td className={`text-right ${prevCloseColor}`} style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                       {formatMoney(previousClose, pos.currency)}

@@ -470,9 +470,9 @@ func (h *Handlers) HandleAssetList(c telebot.Context) error {
 
 		if avgPrice > 1e-6 && pos.CurrentPrice > 1e-6 {
 			msg += p.Sprintf("   PM: %s %s → Atual: %s %s\n",
-				curr, formatFinancialPrice(p, avgPrice), curr, formatFinancialPrice(p, pos.CurrentPrice))
+				curr, formatUnitPrice(p, avgPrice), curr, formatFinancialPrice(p, pos.CurrentPrice))
 		} else if avgPrice > 1e-6 {
-			msg += p.Sprintf("   PM: %s %s\n", curr, formatFinancialPrice(p, avgPrice))
+			msg += p.Sprintf("   PM: %s %s\n", curr, formatUnitPrice(p, avgPrice))
 		} else if pos.CurrentPrice > 1e-6 {
 			msg += p.Sprintf("   Atual: %s %s\n", curr, formatFinancialPrice(p, pos.CurrentPrice))
 		}

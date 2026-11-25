@@ -227,7 +227,7 @@ func (h *Handlers) handleAlertCondition(c telebot.Context, condition string) err
 	}
 
 	if pos := h.findActiveCustodyPosition(ctx, c, state.Ticker); pos != nil && pos.AveragePrice > 1e-6 {
-		msg += p.Sprintf("💼 Seu PM: *%s %s*\n", currSymbol, formatFinancialPrice(p, pos.AveragePrice))
+		msg += p.Sprintf("💼 Seu PM: *%s %s*\n", currSymbol, formatUnitPrice(p, pos.AveragePrice))
 		btnPM := menu.Data(p.Sprintf("🎯 Meu PM (%s %.2f)", currSymbol, pos.AveragePrice), fmt.Sprintf("btn_alert_price_%.2f", pos.AveragePrice))
 		rows = append(rows, menu.Row(btnPM))
 	}

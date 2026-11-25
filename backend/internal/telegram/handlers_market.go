@@ -521,7 +521,7 @@ func formatCustodyQuoteSummary(pos *portfolio.Position, currentPrice float64, cu
 	if avgPrice > 1e-6 && currentPrice > 1e-6 {
 		retPct := ((currentPrice - avgPrice) / avgPrice) * 100
 		return p.Sprintf("\n💼 *Na sua carteira:* %s cotas | PM: %s %s (%+.2f%%)\n",
-			formatQuantity(pos.Quantity), curr, formatFinancialPrice(p, avgPrice), retPct)
+			formatQuantity(pos.Quantity), curr, formatUnitPrice(p, avgPrice), retPct)
 	}
 	return p.Sprintf("\n💼 *Na sua carteira:* %s cotas\n", formatQuantity(pos.Quantity))
 }
@@ -540,7 +540,7 @@ func formatCustodyAnalysisSummary(pos *portfolio.Position, fund *market.Fundamen
 		return ""
 	}
 	line := p.Sprintf("\n💼 *Sua Posição:* %s cotas (PM: %s %s)\n",
-		formatQuantity(pos.Quantity), curr, formatFinancialPrice(p, avgPrice))
+		formatQuantity(pos.Quantity), curr, formatUnitPrice(p, avgPrice))
 	if fund != nil && fund.DividendYield > 1e-6 && currentPrice > 1e-6 {
 		yoc := fund.DividendYield * (currentPrice / avgPrice)
 		line += p.Sprintf("• Yield on Cost (YoC): *%.2f%%*\n", yoc)

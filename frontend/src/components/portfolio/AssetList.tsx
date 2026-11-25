@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Position } from './types';
-import { formatMoney, formatPercentage, formatQuantity } from './helpers';
+import { formatMoney, formatUnitPrice, formatPercentage, formatQuantity } from './helpers';
 import { TrendingUpIcon, ReceiptIcon, WalletIcon } from '@/components/ui/icons';
 
 interface AssetListProps {
@@ -118,7 +118,7 @@ export default function AssetList({ positions, kpiCurrency, onImportCsv, onLaunc
                         <span className="font-bold font-mono text-accent">{pos.ticker}</span>
                       </td>
                       <td className="text-right font-semibold font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatQuantity(pos.quantity)}</td>
-                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(pos.average_price, pos.currency)}</td>
+                      <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatUnitPrice(pos.average_price, pos.currency)}</td>
                       <td className="text-right font-semibold font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{pos.current_price ? formatMoney(pos.current_price, pos.currency) : '--'}</td>
                       <td className="text-right font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(pos.total_cost, kpiCurrency)}</td>
                       <td className="text-right font-bold text-primary font-mono" style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{pos.current_value ? formatMoney(pos.current_value, kpiCurrency) : '--'}</td>
