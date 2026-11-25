@@ -624,6 +624,17 @@ func TestHandler_UpdateTransaction(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
 
+	t.Run("Insufficient Sell Balance", func(t *testing.T) {
+		h, s := setupHandlerTest()
+		s.On("UpdateTransaction", mock.Anything, "u1", "p1", "tx1", mock.Anything).Return(errors.New("saldo insuficiente do ativo para realizar a venda"))
+		body := `{"ticker": "KISU11.SA", "type": "SELL", "quantity": 100, "unit_price": 8.5}`
+		req := reqWithUserAndParams(httptest.NewRequest("PUT", "/portfolios/p1/transactions/tx1", bytes.NewBufferString(body)), "u1", map[string]string{"id": "p1", "txId": "tx1"})
+		rec := httptest.NewRecorder()
+		h.UpdateTransaction(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "saldo insuficiente")
+	})
+
 	t.Run("Success", func(t *testing.T) {
 		h, s := setupHandlerTest()
 		s.On("UpdateTransaction", mock.Anything, "u1", "p1", "tx1", mock.Anything).Return(nil)

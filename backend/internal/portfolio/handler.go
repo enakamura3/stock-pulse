@@ -452,6 +452,10 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.UpdateTransaction(ctxOrDefault(r), userID, portfolioID, txID, tx); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "saldo insuficiente") {
+			httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		slog.Error("falha ao atualizar transação", "user_id", userID, "portfolio_id", portfolioID, "tx_id", txID, "error", err)
 		httputils.RespondWithError(w, http.StatusInternalServerError, "Erro ao atualizar transação")
 		return

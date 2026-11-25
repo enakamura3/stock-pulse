@@ -22,6 +22,7 @@ import {
   parsePastedUnitPrice,
   formatExchangeRateInput,
   parsePastedExchangeRate,
+  getAvailableSellQuantity,
 } from '../helpers';
 
 describe('Portfolio Helpers', () => {
@@ -581,6 +582,59 @@ describe('Portfolio Helpers', () => {
       expect(parsePastedUnitPrice('')).toBe('');
       expect(parsePastedUnitPrice('abc')).toBe('');
       expect(parsePastedUnitPrice('-10')).toBe('');
+    });
+  });
+
+  describe('getAvailableSellQuantity', () => {
+    it('returns 0 for empty ticker', () => {
+      expect(getAvailableSellQuantity('', '2024-01-10', [], [])).toBe(0);
+    });
+
+    it('falls back to active positions when no RV transactions exist for the ticker', () => {
+      const positions = [{ asset_id: '1', ticker: 'PETR4.SA', name: 'Petrobras', type: 'STOCK_BR', currency: 'BRL', quantity: 100, average_price: 30, total_cost: 3000 }];
+      expect(getAvailableSellQuantity('PETR4', '2024-01-10', positions, [])).toBe(100);
+      expect(getAvailableSellQuantity('VALE3', '2024-01-10', positions, [])).toBe(0);
+    });
+
+    it('allows editing a full SELL of an already closed position (0 active shares)', () => {
+      const txs = [
+        { id: 'tx-sell', portfolio_id: 'p1', module: 'RV' as const, date: '2024-05-10', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'SELL', quantity: 100, unit_price: 8.5, total_value: 850, currency: 'BRL' },
+        { id: 'tx-buy', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-10', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'BUY', quantity: 100, unit_price: 8.0, total_value: 800, currency: 'BRL' },
+      ];
+      // Without editingTxId, remaining balance is 0
+      expect(getAvailableSellQuantity('KISU11.SA', '2024-05-10', [], txs)).toBe(0);
+      // Editing tx-sell ignores it and allows up to 100
+      expect(getAvailableSellQuantity('KISU11', '2024-05-10', [], txs, 'tx-sell')).toBe(100);
+    });
+
+    it('accounts for BONUS, SPLIT, REVERSE_SPLIT, and unknown types chronologically', () => {
+      const txs = [
+        { id: 'tx-unk', portfolio_id: 'p1', module: 'RV' as const, date: '2024-04-01', asset_name: 'ITUB4', asset_type: 'STOCK_BR', type: 'OTHER', quantity: 5, unit_price: 0, total_value: 0, currency: 'BRL' },
+        { id: 'tx-rev', portfolio_id: 'p1', module: 'RV' as const, date: '2024-03-01', asset_name: 'ITUB4', asset_type: 'STOCK_BR', type: 'REVERSE_SPLIT', quantity: 5, unit_price: 0, total_value: 0, currency: 'BRL' },
+        { id: 'tx-split', portfolio_id: 'p1', module: 'RV' as const, date: '2024-02-01', asset_name: 'ITUB4', asset_type: 'STOCK_BR', type: 'SPLIT', quantity: 2, unit_price: 0, total_value: 0, currency: 'BRL' },
+        { id: 'tx-bonus', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-15', asset_name: 'ITUB4', asset_type: 'STOCK_BR', type: 'BONUS', quantity: 10, unit_price: 0, total_value: 0, currency: 'BRL' },
+        { id: 'tx-buy', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-01', asset_name: 'ITUB4', asset_type: 'STOCK_BR', type: 'BUY', quantity: 100, unit_price: 20, total_value: 2000, currency: 'BRL' },
+      ];
+      // (100 + 10) * 2 = 220; floor(220 / 5) = 44
+      expect(getAvailableSellQuantity('ITUB4', '2024-05-01', [], txs)).toBe(44);
+    });
+
+    it('caps available sell quantity when subsequent sales exist and handles negative running balance', () => {
+      const txs = [
+        { id: 'tx-sell-2', portfolio_id: 'p1', module: 'RV' as const, date: '2024-03-01', asset_name: 'MXRF11', asset_type: 'FII', type: 'SELL', quantity: 50, unit_price: 10, total_value: 500, currency: 'BRL' },
+        { id: 'tx-sell-1', portfolio_id: 'p1', module: 'RV' as const, date: '2024-02-01', asset_name: 'MXRF11', asset_type: 'FII', type: 'SELL', quantity: 40, unit_price: 10, total_value: 400, currency: 'BRL' },
+        { id: 'tx-buy', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-01', asset_name: 'MXRF11', asset_type: 'FII', type: 'BUY', quantity: 100, unit_price: 10, total_value: 1000, currency: 'BRL' },
+      ];
+      // At 2024-02-01 editing tx-sell-1: bought 100, later sold 50 -> max available is 50
+      expect(getAvailableSellQuantity('MXRF11', '2024-02-01', [], txs, 'tx-sell-1')).toBe(50);
+
+      // Historical negative running balance before sellDate -> returns 0
+      const brokenTxs = [
+        { id: 'tx-sell-early', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-15', asset_name: 'HGLG11', asset_type: 'FII', type: 'SELL', quantity: 20, unit_price: 160, total_value: 3200, currency: 'BRL' },
+        { id: 'tx-buy-early', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-01', asset_name: 'HGLG11', asset_type: 'FII', type: 'BUY', quantity: 10, unit_price: 160, total_value: 1600, currency: 'BRL' },
+      ];
+      expect(getAvailableSellQuantity('HGLG11', '2024-02-01', [], brokenTxs)).toBe(0);
+      expect(getAvailableSellQuantity('HGLG11', '', [], [])).toBe(0);
     });
   });
 });
