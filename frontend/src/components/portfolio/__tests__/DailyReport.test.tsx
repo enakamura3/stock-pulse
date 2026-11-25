@@ -5,13 +5,6 @@ import DailyReport from '../DailyReport';
 import { Position, FixedIncomePosition, TreasuryPosition } from '../types';
 import { getLocalDateString } from '../helpers';
 
-const mockPush = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-}));
-
 describe('DailyReport Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -527,7 +520,7 @@ describe('DailyReport Component', () => {
     expect(mockGoToAssets).toHaveBeenCalledTimes(1);
   });
 
-  it('navigates to dashboard monitoring when table row and top riser/faller cards are clicked', () => {
+  it('renders ticker links to dashboard monitoring without making entire rows or mover cards clickable', () => {
     render(
       <DailyReport
         positions={mockPositions}
@@ -535,16 +528,27 @@ describe('DailyReport Component', () => {
       />
     );
 
-    // Click on table row for PETR4
+    expect(screen.getByText('Clique no código do ativo para abrir no Monitoramento')).toBeInTheDocument();
+
+    const petrLinks = screen.getAllByRole('link', { name: /Ver PETR4 no Monitoramento/i });
+    expect(petrLinks).toHaveLength(2);
+    petrLinks.forEach(link => {
+      expect(link).toHaveAttribute('href', '/dashboard?ticker=PETR4');
+    });
+
+    const valeLinks = screen.getAllByRole('link', { name: /Ver VALE3 no Monitoramento/i });
+    expect(valeLinks).toHaveLength(2);
+    valeLinks.forEach(link => {
+      expect(link).toHaveAttribute('href', '/dashboard?ticker=VALE3');
+    });
+
     const petrRow = screen.getAllByText('PETR4').find(el => el.closest('tr'))?.closest('tr');
     expect(petrRow).toBeInTheDocument();
-    fireEvent.click(petrRow!);
-    expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
+    expect(petrRow).not.toHaveAttribute('tabindex');
+    expect(petrRow).not.toHaveAttribute('role');
 
-    // Click on top riser card for PETR4
-    const petrRiser = screen.getAllByText('PETR4')[0];
-    fireEvent.click(petrRiser);
-    expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
+    expect(screen.queryByRole('button', { name: /Ver PETR4 no Monitoramento/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ver VALE3 no Monitoramento/i })).not.toBeInTheDocument();
   });
 
   it('renders refresh buttons, handles isRefreshing state, and triggers onRefresh with forceRealtime options', () => {
@@ -1026,29 +1030,22 @@ describe('DailyReport Component', () => {
     fireEvent.keyDown(tickerHeader, { key: 'Tab' });
     expect(tickerHeader).toHaveAttribute('aria-sort', 'ascending');
 
-    // Keyboard navigation on top risers card
-    const riserCard = screen.getAllByRole('button', { name: /Ver PETR4 no Monitoramento/i })[0];
-    if (riserCard) {
-      fireEvent.keyDown(riserCard, { key: 'Enter' });
-      expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
-    }
+    // Semantic links exist only on tickers in top movers cards and table rows
+    const petrLinks = screen.getAllByRole('link', { name: /Ver PETR4 no Monitoramento/i });
+    expect(petrLinks.length).toBeGreaterThanOrEqual(1);
+    petrLinks.forEach(link => {
+      expect(link).toHaveAttribute('href', '/dashboard?ticker=PETR4');
+    });
 
-    // Keyboard navigation with space on table row
     const rowPETR4 = screen.getAllByText('PETR4').find(el => el.closest('tr'))?.closest('tr');
     expect(rowPETR4).toBeInTheDocument();
-    fireEvent.keyDown(rowPETR4!, { key: ' ' });
-    expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=PETR4');
+    expect(rowPETR4).not.toHaveAttribute('tabindex');
 
-    // Non-navigation key on table row
-    fireEvent.keyDown(rowPETR4!, { key: 'Escape' });
-    expect(mockPush).toHaveBeenCalledTimes(2);
-
-    // Keyboard navigation on top fallers card
-    const fallerCard = screen.getAllByRole('button', { name: /Ver VALE3 no Monitoramento/i })[0];
-    if (fallerCard) {
-      fireEvent.keyDown(fallerCard, { key: 'Enter' });
-      expect(mockPush).toHaveBeenCalledWith('/dashboard?ticker=VALE3');
-    }
+    const valeLinks = screen.getAllByRole('link', { name: /Ver VALE3 no Monitoramento/i });
+    expect(valeLinks.length).toBeGreaterThanOrEqual(1);
+    valeLinks.forEach(link => {
+      expect(link).toHaveAttribute('href', '/dashboard?ticker=VALE3');
+    });
   });
 
   it('covers PRE fixed income, PREFIXADO and IPCA treasury, and empty risers/fallers', () => {

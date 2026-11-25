@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/api';
 import {
@@ -14,6 +15,9 @@ import {
   TreasuryPosition,
 } from '@/components/portfolio/types';
 import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatUnitPriceInput, formatExchangeRateInput, getLocalDateString, getAvailableSellQuantity } from '@/components/portfolio/helpers';
+
+export type PortfolioTab = 'ativos' | 'operacoes' | 'proventos' | 'insights' | 'analise' | 'diario' | 'renda-fixa' | 'tesouro';
+const VALID_PORTFOLIO_TABS: readonly PortfolioTab[] = ['ativos', 'renda-fixa', 'tesouro', 'operacoes', 'proventos', 'analise', 'diario', 'insights'];
 
 interface PortfolioContextType {
   // Data
@@ -37,8 +41,8 @@ interface PortfolioContextType {
   lastFetchedAt: Date | null;
 
   // Filters & Tabs
-  activeTab: 'ativos' | 'operacoes' | 'proventos' | 'insights' | 'analise' | 'diario' | 'renda-fixa' | 'tesouro';
-  setActiveTab: (tab: 'ativos' | 'operacoes' | 'proventos' | 'insights' | 'analise' | 'diario' | 'renda-fixa' | 'tesouro') => void;
+  activeTab: PortfolioTab;
+  setActiveTab: (tab: PortfolioTab) => void;
   activeCategoryFilter: string;
   setActiveCategoryFilter: (cat: string) => void;
   filterTxTicker: string;
@@ -147,6 +151,10 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 
 export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialPortfolioParamRef = useRef<string | null>(searchParams?.get('portfolio') ?? null);
 
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [activePortfolioId, setActivePortfolioId] = useState<string>('');
@@ -165,7 +173,10 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
   const [filterDivYear, setFilterDivYear] = useState<string>(currentYear);
   const [filterDivMonth, setFilterDivMonth] = useState<string>(currentMonth);
-  const [activeTab, setActiveTab] = useState<'ativos' | 'operacoes' | 'proventos' | 'insights' | 'analise' | 'diario' | 'renda-fixa' | 'tesouro'>('ativos');
+  const [activeTab, setActiveTab] = useState<PortfolioTab>(() => {
+    const tabParam = searchParams?.get('tab');
+    return tabParam && VALID_PORTFOLIO_TABS.includes(tabParam as PortfolioTab) ? (tabParam as PortfolioTab) : 'ativos';
+  });
   const [period, setPeriod] = useState<string>('ALL');
 
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
@@ -224,8 +235,11 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         const data: Portfolio[] = await res.json();
         setPortfolios(data || []);
         if (data && data.length > 0) {
+          const urlPortfolioId = initialPortfolioParamRef.current;
+          initialPortfolioParamRef.current = null;
+          const urlMatch = !selectId && urlPortfolioId ? data.find(p => p.id === urlPortfolioId) : undefined;
           const defaultP = data.find(p => p.is_default);
-          const nextId = selectId || (defaultP ? defaultP.id : data[0].id);
+          const nextId = selectId || (urlMatch ? urlMatch.id : (defaultP ? defaultP.id : data[0].id));
           setActivePortfolioId(nextId);
         }
       }
@@ -351,6 +365,22 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => { if (user) loadPortfolios(); }, [user, loadPortfolios]);
+
+  useEffect(() => {
+    if (isLoadingPortfolios) return;
+    const currentQuery = searchParams?.toString() || '';
+    const params = new URLSearchParams(currentQuery);
+    params.set('tab', activeTab);
+    if (activePortfolioId) {
+      params.set('portfolio', activePortfolioId);
+    } else {
+      params.delete('portfolio');
+    }
+    const nextQuery = params.toString();
+    if (nextQuery !== currentQuery) {
+      router.replace(`${pathname}?${nextQuery}`, { scroll: false });
+    }
+  }, [activeTab, activePortfolioId, isLoadingPortfolios, pathname, router, searchParams]);
 
   useEffect(() => {
     if (activePortfolioId) {

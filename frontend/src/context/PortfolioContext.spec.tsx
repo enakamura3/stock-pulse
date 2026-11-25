@@ -5,6 +5,16 @@ import { PortfolioProvider, usePortfolio, usePortfolioOptional } from './Portfol
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
+const mockReplace = vi.fn();
+const mockRouter = { push: vi.fn(), replace: mockReplace };
+let mockSearchParams = new URLSearchParams();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/dashboard/portfolio',
+  useSearchParams: () => mockSearchParams,
+}));
+
 vi.mock('@/lib/api', () => ({
   apiFetch: vi.fn(),
 }));
@@ -16,6 +26,7 @@ vi.mock('@/context/AuthContext', () => ({
 describe('PortfolioContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
     (useAuth as any).mockReturnValue({ user: { id: 'user-1', email: 'user@test.com' } });
     const mockAlert = vi.fn();
     const mockConfirm = vi.fn(() => true);
@@ -1018,6 +1029,124 @@ describe('PortfolioContext', () => {
       await context.loadTreasuryPositions('p-only');
     });
     consoleError.mockRestore();
+  });
+
+  it('initializes activeTab and activePortfolioId from valid URL search params without redundant replace', async () => {
+    mockSearchParams = new URLSearchParams('tab=diario&portfolio=port-1');
+    const mockPortfolios = [
+      { id: 'port-1', name: 'Geral', base_currency: 'BRL', is_default: false },
+      { id: 'port-2', name: 'Dividendos', base_currency: 'USD', is_default: true },
+    ];
+
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/portfolios') {
+        return Promise.resolve({ ok: true, json: async () => mockPortfolios });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ positions: [] }) });
+    });
+
+    const TestComponent = () => {
+      const { activeTab, activePortfolioId, isLoadingPortfolios } = usePortfolio();
+      return (
+        <div>
+          <div data-testid="loading">{String(isLoadingPortfolios)}</div>
+          <div data-testid="tab">{activeTab}</div>
+          <div data-testid="active">{activePortfolioId}</div>
+        </div>
+      );
+    };
+
+    render(
+      <PortfolioProvider>
+        <TestComponent />
+      </PortfolioProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('false');
+      expect(screen.getByTestId('tab')).toHaveTextContent('diario');
+      expect(screen.getByTestId('active')).toHaveTextContent('port-1');
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('falls back when URL params are invalid, updates URL on tab/portfolio change, and removes portfolio param when empty', async () => {
+    mockSearchParams = new URLSearchParams('tab=invalida&portfolio=inexistente');
+    const mockPortfolios = [
+      { id: 'port-1', name: 'Geral', base_currency: 'BRL', is_default: false },
+      { id: 'port-2', name: 'Dividendos', base_currency: 'USD', is_default: true },
+    ];
+
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/portfolios') {
+        return Promise.resolve({ ok: true, json: async () => mockPortfolios });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ positions: [] }) });
+    });
+
+    let context: any;
+    const TestComponent = () => {
+      context = usePortfolio();
+      return (
+        <div>
+          <div data-testid="tab">{context.activeTab}</div>
+          <div data-testid="active">{context.activePortfolioId}</div>
+        </div>
+      );
+    };
+
+    render(
+      <PortfolioProvider>
+        <TestComponent />
+      </PortfolioProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tab')).toHaveTextContent('ativos');
+      expect(screen.getByTestId('active')).toHaveTextContent('port-2');
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith(
+      '/dashboard/portfolio?tab=ativos&portfolio=port-2',
+      { scroll: false }
+    );
+
+    mockReplace.mockClear();
+    act(() => {
+      context.setActiveTab('diario');
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/dashboard/portfolio?tab=diario&portfolio=port-2',
+        { scroll: false }
+      );
+    });
+
+    mockReplace.mockClear();
+    act(() => {
+      context.setActivePortfolioId('port-1');
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/dashboard/portfolio?tab=diario&portfolio=port-1',
+        { scroll: false }
+      );
+    });
+
+    mockReplace.mockClear();
+    act(() => {
+      context.setActivePortfolioId('');
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/dashboard/portfolio?tab=diario',
+        { scroll: false }
+      );
+    });
   });
 });
 
