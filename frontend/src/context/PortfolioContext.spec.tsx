@@ -573,6 +573,56 @@ describe('PortfolioContext', () => {
       expect.objectContaining({ method: 'PUT' })
     );
 
+    // Test editing a SELL transaction when active position is closed (0 shares in positions)
+    (apiFetch as any).mockImplementation((url: string) => {
+      if (url === '/portfolios/p-1') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ positions: [] }),
+        });
+      }
+      if (url === '/portfolios/p-1/history') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'tx-kisu-sell', portfolio_id: 'p-1', module: 'RV', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'SELL', quantity: 100, unit_price: 8.5, total_value: 850, date: '2024-05-10' },
+            { id: 'tx-kisu-buy', portfolio_id: 'p-1', module: 'RV', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'BUY', quantity: 100, unit_price: 8.0, total_value: 800, date: '2024-01-10' },
+          ],
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await act(async () => {
+      await context.loadPortfolioDetails('p-1');
+    });
+
+    act(() => {
+      context.handleEditTransaction({
+        id: 'tx-kisu-sell',
+        asset_name: 'KISU11.SA',
+        asset_type: 'FII',
+        module: 'RV',
+        type: 'SELL',
+        quantity: 100,
+        unit_price: 8.12345,
+        fee: 0,
+        exchange_rate: 1,
+        total_value: 812.345,
+        date: '2024-05-10',
+      });
+    });
+
+    (window.alert as any).mockClear();
+    await act(async () => {
+      await context.handleAddTransaction({ preventDefault: vi.fn() } as any);
+    });
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/portfolios/p-1/transactions/tx-kisu-sell',
+      expect.objectContaining({ method: 'PUT' })
+    );
+
     // Test editing transaction: RF with TESOURO
     act(() => {
       context.handleEditTransaction({

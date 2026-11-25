@@ -1,4 +1,4 @@
-import type { Position, FixedIncomePosition, TreasuryPosition } from './types';
+import type { Position, FixedIncomePosition, TreasuryPosition, UnifiedTransaction } from './types';
 
 export const ASSET_TYPE_OPTIONS = [
   { value: 'STOCK_BR', label: 'Ação (B3) — ex: PETR4, TAEE11, SANB11' },
@@ -495,6 +495,77 @@ export function getLocalDateString(date: Date = new Date()): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function applyTxQtyStep(qty: number, tx: UnifiedTransaction): number {
+  const q = tx.quantity || 0;
+  if (tx.type === 'BUY' || tx.type === 'BONUS') return qty + q;
+  if (tx.type === 'SELL') return qty - q;
+  if (tx.type === 'SPLIT' && q > 1e-6) return qty * q;
+  if (tx.type === 'REVERSE_SPLIT' && q > 1e-6) return Math.floor(qty / q);
+  return qty;
+}
+
+/**
+ * Calcula a quantidade máxima disponível para venda de um ativo na data informada,
+ * excluindo a própria transação quando em modo de edição (editingTxId).
+ * Usa o histórico cronológico de transações RV (suportando posições já zeradas, splits e vendas parciais)
+ * com fallback para positions quando não houver histórico carregado.
+ */
+export function getAvailableSellQuantity(
+  ticker: string,
+  executedAt: string,
+  positions: Position[],
+  transactions: UnifiedTransaction[],
+  editingTxId: string | null = null
+): number {
+  const normalize = (t: string) => (t || '').trim().toUpperCase().replace(/\.SA$/, '');
+  const target = normalize(ticker);
+  if (!target) return 0;
+
+  const assetTxs = transactions.filter(
+    (t) => t.module === 'RV' && normalize(t.asset_name) === target
+  );
+
+  if (assetTxs.length === 0) {
+    const posQty = positions.find((p) => normalize(p.ticker) === target)?.quantity || 0;
+    return Math.max(0, posQty);
+  }
+
+  const otherTxs = editingTxId ? assetTxs.filter((t) => t.id !== editingTxId) : assetTxs;
+  const chronological = [...otherTxs]
+    .reverse()
+    .sort((a, b) => (a.date || '').substring(0, 10).localeCompare((b.date || '').substring(0, 10)));
+
+  const sellDate = (executedAt || '').substring(0, 10);
+  let runningQty = 0;
+  let idx = 0;
+  while (idx < chronological.length && (chronological[idx].date || '').substring(0, 10) <= sellDate) {
+    runningQty = applyTxQtyStep(runningQty, chronological[idx]);
+    idx++;
+  }
+
+  const qtyAtSellDate = Math.max(0, runningQty);
+  const canSell = (candidateQty: number): boolean => {
+    let sim = runningQty - candidateQty;
+    if (sim < -1e-9) return false;
+    for (let i = idx; i < chronological.length; i++) {
+      sim = applyTxQtyStep(sim, chronological[i]);
+      if (sim < -1e-9) return false;
+    }
+    return true;
+  };
+
+  if (canSell(qtyAtSellDate)) return qtyAtSellDate;
+
+  let low = 0;
+  let high = qtyAtSellDate;
+  for (let step = 0; step < 50; step++) {
+    const mid = (low + high) / 2;
+    if (canSell(mid)) low = mid;
+    else high = mid;
+  }
+  return Math.floor(low * 1e6) / 1e6;
 }
 
 

@@ -13,7 +13,7 @@ import {
   UnifiedTransaction,
   TreasuryPosition,
 } from '@/components/portfolio/types';
-import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatUnitPriceInput, formatExchangeRateInput, getLocalDateString } from '@/components/portfolio/helpers';
+import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatUnitPriceInput, formatExchangeRateInput, getLocalDateString, getAvailableSellQuantity } from '@/components/portfolio/helpers';
 
 interface PortfolioContextType {
   // Data
@@ -500,8 +500,10 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (txType === 'SELL') {
-      const currentQty = positions.find((p) => p.ticker.toUpperCase() === txTicker.toUpperCase())?.quantity || 0;
-      if (parsedQty > currentQty) return alert(`Saldo insuficiente. Você possui apenas ${currentQty} cotas.`);
+      const availableQty = getAvailableSellQuantity(txTicker, txExecutedAt, positions, transactions, editingTxId);
+      if (parsedQty - availableQty > 1e-6) {
+        return alert(`Saldo insuficiente. Você possui apenas ${Number(availableQty.toFixed(6))} cotas.`);
+      }
     }
 
     setIsAddingTx(true);
