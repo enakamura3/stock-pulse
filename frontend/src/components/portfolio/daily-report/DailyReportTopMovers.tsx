@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { formatMoney, formatPercentage } from '../helpers';
 import { EnrichedPosition, AssetTypeBadge } from './types';
 import { Position } from '../types';
@@ -17,19 +17,6 @@ export default function DailyReportTopMovers({
   kpiCurrency,
   getAssetTypeBadge,
 }: DailyReportTopMoversProps) {
-  const router = useRouter();
-
-  const handleNavigate = (ticker: string) => {
-    router.push(`/dashboard?ticker=${encodeURIComponent(ticker)}`);
-  };
-
-  const handleNavigateKeyDown = (e: React.KeyboardEvent, ticker: string) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleNavigate(ticker);
-    }
-  };
-
   return (
     <div className="flex-row gap-lg flex-wrap">
       {/* Maiores Altas */}
@@ -42,24 +29,26 @@ export default function DailyReportTopMovers({
               return (
                 <div
                   key={pos.asset_id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Ver ${pos.ticker} no Monitoramento`}
                   className="flex-row justify-between items-center"
                   style={{
                     padding: '0.5rem 0.75rem',
                     background: 'var(--color-success-bg)',
                     borderRadius: '8px',
                     borderLeft: '3px solid var(--color-success)',
-                    cursor: 'pointer',
                   }}
-                  onClick={() => handleNavigate(pos.ticker)}
-                  onKeyDown={(e) => handleNavigateKeyDown(e, pos.ticker)}
-                  title={`Ver ${pos.ticker} no Monitoramento`}
                 >
                   <div className="flex-col" style={{ gap: '2px' }}>
                     <div className="flex-row items-center gap-sm">
-                      <span className="font-bold text-accent">{pos.ticker}</span>
+                      <Link
+                        href={`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`}
+                        aria-label={`Ver ${pos.ticker} no Monitoramento`}
+                        title={`Ver ${pos.ticker} no Monitoramento`}
+                        className="flex-row items-center gap-xs font-bold text-accent"
+                        style={{ textDecoration: 'none', cursor: 'pointer' }}
+                      >
+                        <span>{pos.ticker}</span>
+                        <span className="text-xs text-secondary" style={{ opacity: 0.7 }}>↗</span>
+                      </Link>
                       {badge && (
                         <span
                           style={{
@@ -101,24 +90,26 @@ export default function DailyReportTopMovers({
               return (
                 <div
                   key={pos.asset_id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Ver ${pos.ticker} no Monitoramento`}
                   className="flex-row justify-between items-center"
                   style={{
                     padding: '0.5rem 0.75rem',
                     background: 'var(--color-danger-bg)',
                     borderRadius: '8px',
                     borderLeft: '3px solid var(--color-danger)',
-                    cursor: 'pointer',
                   }}
-                  onClick={() => handleNavigate(pos.ticker)}
-                  onKeyDown={(e) => handleNavigateKeyDown(e, pos.ticker)}
-                  title={`Ver ${pos.ticker} no Monitoramento`}
                 >
                   <div className="flex-col" style={{ gap: '2px' }}>
                     <div className="flex-row items-center gap-sm">
-                      <span className="font-bold text-accent">{pos.ticker}</span>
+                      <Link
+                        href={`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`}
+                        aria-label={`Ver ${pos.ticker} no Monitoramento`}
+                        title={`Ver ${pos.ticker} no Monitoramento`}
+                        className="flex-row items-center gap-xs font-bold text-accent"
+                        style={{ textDecoration: 'none', cursor: 'pointer' }}
+                      >
+                        <span>{pos.ticker}</span>
+                        <span className="text-xs text-secondary" style={{ opacity: 0.7 }}>↗</span>
+                      </Link>
                       {badge && (
                         <span
                           style={{

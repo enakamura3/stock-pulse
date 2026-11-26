@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { PortfolioProvider, usePortfolio } from '@/context/PortfolioContext';
@@ -470,8 +470,10 @@ function PortfolioContent() {
 
 export default function PortfolioPage() {
   return (
-    <PortfolioProvider>
-      <PortfolioContent />
-    </PortfolioProvider>
+    <Suspense fallback={null}>
+      <PortfolioProvider>
+        <PortfolioContent />
+      </PortfolioProvider>
+    </Suspense>
   );
 }

@@ -6,10 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { usePortfolio } from '@/context/PortfolioContext';
 import { apiFetch } from '@/lib/api';
 
+const mockRouter = { push: vi.fn(), replace: vi.fn() };
+const mockSearchParams = new URLSearchParams();
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard/portfolio',
-  useRouter: () => ({ push: vi.fn() }),
-  useSearchParams: () => ({ get: vi.fn().mockReturnValue(null) }),
+  useRouter: () => mockRouter,
+  useSearchParams: () => mockSearchParams,
 }));
 
 vi.mock('@/lib/api', () => ({

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Position, FixedIncomePosition, TreasuryPosition } from '../types';
 import { formatMoney, formatUnitPrice, formatPercentage, exportDailyReportCSV } from '../helpers';
 import { SortKey, SortDir, EnrichedPosition, AssetTypeBadge } from './types';
@@ -27,8 +27,6 @@ export default function DailyReportTable({
   kpiCurrency,
   getAssetTypeBadge,
 }: DailyReportTableProps) {
-  const router = useRouter();
-
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>⇅</span>;
     return <span style={{ marginLeft: '4px' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>;
@@ -46,19 +44,12 @@ export default function DailyReportTable({
     }
   };
 
-  const handleNavigateKeyDown = (e: React.KeyboardEvent, ticker: string) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      router.push(`/dashboard?ticker=${encodeURIComponent(ticker)}`);
-    }
-  };
-
   return (
     <div className="card flex-col gap-md w-full">
       <div className="flex-row justify-between items-center flex-wrap gap-sm">
         <div>
           <h3 className="card-title m-0">📊 Resumo Diário Completo (Renda Variável)</h3>
-          <span className="text-xs text-secondary">Clique em um ativo para abrir no Monitoramento</span>
+          <span className="text-xs text-secondary">Clique no código do ativo para abrir no Monitoramento</span>
         </div>
         <button
           onClick={() => exportDailyReportCSV(positions, fiPositions, treasuryPositions, kpiCurrency)}
@@ -182,19 +173,19 @@ export default function DailyReportTable({
                 const isUSD = pos.currency?.toUpperCase() === 'USD' || pos.type === 'STOCK_US' || pos.type === 'ETF_US';
 
                 return (
-                  <tr
-                    key={pos.asset_id || pos.ticker}
-                    tabIndex={0}
-                    aria-label={`Ver ${pos.ticker} no Monitoramento`}
-                    onClick={() => router.push(`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`)}
-                    onKeyDown={(e) => handleNavigateKeyDown(e, pos.ticker)}
-                    style={{ cursor: 'pointer', transition: 'background-color 0.15s ease' }}
-                    title={`Clique para ver ${pos.ticker} no Monitoramento de Cotações`}
-                  >
+                  <tr key={pos.asset_id || pos.ticker}>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <div className="flex-row items-center gap-sm">
-                        <span className="font-bold text-accent">{pos.ticker}</span>
-                        <span className="text-xs text-secondary" style={{ opacity: 0.6 }}>↗</span>
+                        <Link
+                          href={`/dashboard?ticker=${encodeURIComponent(pos.ticker)}`}
+                          aria-label={`Ver ${pos.ticker} no Monitoramento`}
+                          title={`Clique para ver ${pos.ticker} no Monitoramento de Cotações`}
+                          className="flex-row items-center gap-xs font-bold text-accent"
+                          style={{ textDecoration: 'none', cursor: 'pointer' }}
+                        >
+                          <span>{pos.ticker}</span>
+                          <span className="text-xs text-secondary" style={{ opacity: 0.7 }}>↗</span>
+                        </Link>
                         {badge && (
                           <span
                             style={{
