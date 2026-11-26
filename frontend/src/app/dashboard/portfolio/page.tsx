@@ -18,7 +18,6 @@ import FixedIncomeTab from '@/components/portfolio/FixedIncomeTab';
 import TreasuryTab from '@/components/portfolio/TreasuryTab';
 import PortfolioAnalysis from '@/components/portfolio/PortfolioAnalysis';
 import Modals from '@/components/portfolio/Modals';
-import IdeStatusBar from '@/components/ui/IdeStatusBar';
 
 const PortfolioChart = dynamic(() => import('@/components/PortfolioChart'), { ssr: false });
 
@@ -458,12 +457,6 @@ function PortfolioContent() {
       {/* Renderizado sem prop drilling! Todos os modais consomem o PortfolioContext */}
       <Modals />
       </main>
-
-      <IdeStatusBar
-        wsConnected={true}
-        activePortfolioName={portfolios.find(p => p.id === activePortfolioId)?.name || 'Principal'}
-        currency={kpiCurrency}
-      />
     </div>
   );
 }

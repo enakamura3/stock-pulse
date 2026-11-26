@@ -627,8 +627,8 @@ body {
     position: fixed !important;
     top: 0;
     left: 0;
-    bottom: 24px;
-    height: calc(100vh - 24px) !important;
+    bottom: 0;
+    height: 100vh !important;
     transform: translateX(-100%);
   }
   .app-sidebar.open {
@@ -728,24 +728,6 @@ body {
   background: var(--panel-bg);
   border-top-color: var(--accent-color);
   font-weight: 600;
-}
-
-.ide-statusbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 24px;
-  z-index: var(--z-header);
-  background: #050505;
-  border-top: 1px solid var(--panel-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0.85rem;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--text-muted);
 }
 
 .table-line-num {
