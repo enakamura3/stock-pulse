@@ -6,6 +6,12 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { apiFetch } from '@/lib/api';
 
+const mockRouter = { push: vi.fn(), replace: vi.fn() };
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard/alerts',
+  useRouter: () => mockRouter,
+}));
+
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(),
 }));

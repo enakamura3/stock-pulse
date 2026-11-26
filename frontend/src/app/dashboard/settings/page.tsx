@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext';
 import AppSidebar from '@/components/AppSidebar';
 import { apiFetch } from '@/lib/api';
 import { SettingsIcon } from '@/components/ui/icons';
-import IdeStatusBar from '@/components/ui/IdeStatusBar';
 import { ASSET_TYPE_OPTIONS } from '@/components/portfolio/helpers';
 
 interface TelegramStatus {
@@ -1070,12 +1069,6 @@ export default function SettingsPage() {
 
         </div>
       </main>
-
-      <IdeStatusBar
-        wsConnected={true}
-        currency="BRL"
-        version="v2.4-term"
-      />
     </div>
   );
 }

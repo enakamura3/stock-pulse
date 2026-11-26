@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import {
   WalletIcon,
   ChartIcon,
@@ -35,7 +36,56 @@ export default function AppSidebar({
   wsConnected,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowShortcuts(false);
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.getAttribute?.('contenteditable') === 'true' ||
+          target.closest?.('[contenteditable="true"]'))
+      ) {
+        return;
+      }
+
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const altNavMap: Record<string, string> = {
+          '1': '/dashboard/portfolio',
+          '2': '/dashboard',
+          '3': '/dashboard/alerts',
+          '4': '/dashboard/settings',
+        };
+        const dest = altNavMap[e.key];
+        if (dest) {
+          e.preventDefault();
+          setIsOpen(false);
+          setShowShortcuts(false);
+          router.push(dest);
+        }
+        return;
+      }
+
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShowShortcuts(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router]);
 
   const isPortfolioPage = pathname === '/dashboard/portfolio';
   const isDashboardPage = pathname === '/dashboard';
@@ -104,7 +154,7 @@ export default function AppSidebar({
         style={{
           position: 'sticky',
           top: 0,
-          height: 'calc(100vh - 24px)',
+          height: '100vh',
           width: '260px',
           flexShrink: 0,
           overflowY: 'auto',
@@ -166,7 +216,7 @@ export default function AppSidebar({
             >
               {'// WORKBENCH'}
             </span>
-            {mainNavItems.map((item) => (
+            {mainNavItems.map((item, idx) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -190,6 +240,12 @@ export default function AppSidebar({
               >
                 <span style={{ opacity: item.active ? 1 : 0.7 }}>{item.icon}</span>
                 <span>{item.label}</span>
+                <span
+                  className="text-muted font-mono hide-mobile"
+                  style={{ marginLeft: 'auto', fontSize: '0.65rem', opacity: item.active ? 0.85 : 0.4 }}
+                >
+                  Alt+{idx + 1}
+                </span>
               </Link>
             ))}
           </nav>
@@ -241,17 +297,21 @@ export default function AppSidebar({
           )}
         </div>
 
-        {/* Rodapé do Sidebar: Terminal Mode, Perfil e Sair */}
+        {/* Rodapé do Sidebar: Atalhos de Teclado, Perfil e Sair */}
         <div
           className="flex-col gap-sm pt-sm"
           style={{ borderTop: '1px solid var(--panel-border)', marginTop: '1rem' }}
         >
-          <div className="flex-row items-center justify-between px-xs">
-            <span className="font-mono text-muted text-xs">ENV</span>
-            <span className="badge badge-neutral" style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem' }}>
-              TERM // PROD
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowShortcuts(true)}
+            aria-label="Abrir atalhos de teclado"
+            className="btn-secondary font-mono flex-row items-center justify-between"
+            style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', width: '100%' }}
+          >
+            <span>Atalhos de Teclado</span>
+            <span className="text-accent font-bold">[?]</span>
+          </button>
 
           <div className="flex-row items-center justify-between px-xs pt-xs" style={{ borderTop: '1px dashed var(--panel-border)' }}>
             <div className="flex-col">
@@ -273,6 +333,8 @@ export default function AppSidebar({
           </div>
         </div>
       </aside>
+
+      <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </>
   );
 }
