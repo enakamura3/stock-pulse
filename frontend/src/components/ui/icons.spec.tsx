@@ -21,6 +21,9 @@ import {
   TrashIcon,
   DownloadIcon,
   PlusIcon,
+  ShieldCheckIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
 } from './icons';
 
 describe('SVG Icons Components', () => {
@@ -30,6 +33,7 @@ describe('SVG Icons Components', () => {
       SunIcon, MoonIcon, MenuIcon, XIcon, TrendingUpIcon,
       TrendingDownIcon, BankIcon, CoinsIcon, ReceiptIcon, MicroscopeIcon,
       CalendarIcon, StarIcon, TrashIcon, DownloadIcon, PlusIcon,
+      ShieldCheckIcon, ChevronsLeftIcon, ChevronsRightIcon,
     ];
 
     icons.forEach((IconComponent) => {

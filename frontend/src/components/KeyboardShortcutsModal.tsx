@@ -42,6 +42,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'Geral',
     items: [
+      { keys: 'Ctrl + B', description: 'Recolher / expandir barra lateral' },
       { keys: '?', description: 'Abrir / fechar este painel de atalhos' },
       { keys: 'ESC', description: 'Fechar modais e painéis abertos' },
     ],

@@ -202,3 +202,30 @@ export function PlusIcon({ size = 18, color = 'currentColor', ...props }: IconPr
     </svg>
   );
 }
+
+export function ShieldCheckIcon({ size = 18, color = 'currentColor', ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+export function ChevronsLeftIcon({ size = 18, color = 'currentColor', ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="11 17 6 12 11 7" />
+      <polyline points="18 17 13 12 18 7" />
+    </svg>
+  );
+}
+
+export function ChevronsRightIcon({ size = 18, color = 'currentColor', ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="13 17 18 12 13 7" />
+      <polyline points="6 17 11 12 6 7" />
+    </svg>
+  );
+}

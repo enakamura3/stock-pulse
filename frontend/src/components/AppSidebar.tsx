@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
@@ -14,11 +14,16 @@ import {
   XIcon,
   TrendingUpIcon,
   BankIcon,
+  ShieldCheckIcon,
   ReceiptIcon,
   CoinsIcon,
   MicroscopeIcon,
   CalendarIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
 } from '@/components/ui/icons';
+
+const SIDEBAR_COLLAPSED_KEY = 'stock_pulse_sidebar_collapsed';
 
 interface AppSidebarProps {
   userName?: string;
@@ -39,6 +44,23 @@ export default function AppSidebar({
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true') {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      return next;
+    });
+  }, []);
+
+  const collapsed = isCollapsed && !isOpen;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,6 +79,12 @@ export default function AppSidebar({
           target.getAttribute?.('contenteditable') === 'true' ||
           target.closest?.('[contenteditable="true"]'))
       ) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleCollapsed();
         return;
       }
 
@@ -85,7 +113,7 @@ export default function AppSidebar({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [router]);
+  }, [router, toggleCollapsed]);
 
   const isPortfolioPage = pathname === '/dashboard/portfolio';
   const isDashboardPage = pathname === '/dashboard';
@@ -102,7 +130,7 @@ export default function AppSidebar({
   const portfolioSubTabs = [
     { key: 'ativos', label: 'Renda Variável', icon: <TrendingUpIcon size={16} /> },
     { key: 'renda-fixa', label: 'Renda Fixa', icon: <BankIcon size={16} /> },
-    { key: 'tesouro', label: 'Tesouro Direto', icon: <BankIcon size={16} /> },
+    { key: 'tesouro', label: 'Tesouro Direto', icon: <ShieldCheckIcon size={16} /> },
     { key: 'operacoes', label: 'Histórico de Operações', icon: <ReceiptIcon size={16} /> },
     { key: 'proventos', label: 'Proventos', icon: <CoinsIcon size={16} /> },
     { key: 'analise', label: 'Análise da Carteira', icon: <MicroscopeIcon size={16} /> },
@@ -150,83 +178,130 @@ export default function AppSidebar({
 
       {/* Container Principal do AppSidebar (IDE Terminal Workbench) */}
       <aside
-        className={`app-sidebar ${isOpen ? 'open' : ''}`}
+        className={`app-sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}
         style={{
           position: 'sticky',
           top: 0,
           height: '100vh',
-          width: '260px',
+          width: collapsed ? '64px' : '260px',
           flexShrink: 0,
           overflowY: 'auto',
+          overflowX: 'hidden',
           background: 'var(--panel-bg)',
           borderRight: '1px solid var(--panel-border)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          padding: '1.25rem 0.85rem',
-          transition: 'transform var(--transition-normal)',
+          padding: collapsed ? '1rem 0.45rem' : '1.25rem 0.85rem',
+          transition: 'width 0.2s ease, padding 0.2s ease, transform var(--transition-normal)',
           zIndex: 'var(--z-header)',
         }}
       >
         <div className="flex-col gap-md">
           {/* Terminal Title Bar & Brand */}
           <div className="flex-col gap-xs px-xs pb-sm" style={{ borderBottom: '1px solid var(--panel-border)' }}>
-            <div className="flex-row items-center justify-between">
-              <span className="font-mono text-muted text-xs" style={{ letterSpacing: '0.06em' }}>[TERMINAL]</span>
-              {wsConnected !== undefined && (
-                <div className="flex-row items-center gap-xs font-mono" style={{ fontSize: '0.65rem' }}>
+            {collapsed ? (
+              <div className="flex-col items-center gap-xs">
+                <button
+                  type="button"
+                  onClick={toggleCollapsed}
+                  aria-label="Expandir barra lateral"
+                  title="Expandir barra lateral (Ctrl+B)"
+                  className="btn-secondary hide-mobile"
+                  style={{ padding: '0.35rem', justifyContent: 'center' }}
+                >
+                  <ChevronsRightIcon size={16} />
+                </button>
+                {wsConnected !== undefined && (
                   <span
+                    title={wsConnected ? 'WebSocket Conectado (LIVE)' : 'WebSocket Desconectado (DISC)'}
                     style={{
-                      width: '6px',
-                      height: '6px',
+                      width: '7px',
+                      height: '7px',
                       borderRadius: '50%',
                       backgroundColor: wsConnected ? 'var(--color-success)' : 'var(--color-danger)',
                       boxShadow: wsConnected ? '0 0 6px var(--color-success)' : 'none',
                     }}
                   />
-                  <span style={{ color: wsConnected ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                    {wsConnected ? 'LIVE' : 'DISC'}
-                  </span>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="flex-row items-center justify-between">
+                  <span className="font-mono text-muted text-xs" style={{ letterSpacing: '0.06em' }}>[TERMINAL]</span>
+                  <div className="flex-row items-center gap-xs">
+                    {wsConnected !== undefined && (
+                      <div className="flex-row items-center gap-xs font-mono" style={{ fontSize: '0.65rem' }}>
+                        <span
+                          style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: wsConnected ? 'var(--color-success)' : 'var(--color-danger)',
+                            boxShadow: wsConnected ? '0 0 6px var(--color-success)' : 'none',
+                          }}
+                        />
+                        <span style={{ color: wsConnected ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                          {wsConnected ? 'LIVE' : 'DISC'}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={toggleCollapsed}
+                      aria-label="Recolher barra lateral"
+                      title="Recolher barra lateral (Ctrl+B)"
+                      className="btn-secondary hide-mobile"
+                      style={{ padding: '0.2rem 0.3rem' }}
+                    >
+                      <ChevronsLeftIcon size={15} />
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div className="flex-row items-center gap-xs mt-xs">
-              <span className="font-mono text-muted" style={{ fontSize: '1rem', color: 'var(--accent-color)' }}>&gt;</span>
-              <h1
-                className="font-mono"
-                style={{
-                  fontSize: '1.35rem',
-                  color: 'var(--text-primary)',
-                  margin: 0,
-                  fontWeight: 700,
-                  letterSpacing: '-0.03em',
-                }}
-              >
-                stock-pulse
-              </h1>
-            </div>
+                <div className="flex-row items-center gap-xs mt-xs">
+                  <span className="font-mono text-muted" style={{ fontSize: '1rem', color: 'var(--accent-color)' }}>&gt;</span>
+                  <h1
+                    className="font-mono"
+                    style={{
+                      fontSize: '1.35rem',
+                      color: 'var(--text-primary)',
+                      margin: 0,
+                      fontWeight: 700,
+                      letterSpacing: '-0.03em',
+                    }}
+                  >
+                    stock-pulse
+                  </h1>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Navegação Global Primária */}
           <nav className="flex-col gap-xs">
-            <span
-              className="text-muted font-mono uppercase"
-              style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', padding: '0 0.5rem 0.25rem' }}
-            >
-              {'// WORKBENCH'}
-            </span>
+            {!collapsed && (
+              <span
+                className="text-muted font-mono uppercase"
+                style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', padding: '0 0.5rem 0.25rem' }}
+              >
+                {'// WORKBENCH'}
+              </span>
+            )}
             {mainNavItems.map((item, idx) => (
               <Link
                 key={item.href}
                 href={item.href}
+                aria-label={item.label}
+                title={collapsed ? `${item.label} (Alt+${idx + 1})` : undefined}
                 onClick={() => setIsOpen(false)}
                 className={`sidebar-link ${item.active ? 'active' : ''}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
                   gap: '8px',
-                  padding: '0.5rem 0.65rem',
+                  padding: collapsed ? '0.55rem 0' : '0.5rem 0.65rem',
                   borderRadius: '4px',
                   fontFamily: 'var(--font-mono)',
                   fontSize: '0.82rem',
@@ -239,13 +314,17 @@ export default function AppSidebar({
                 }}
               >
                 <span style={{ opacity: item.active ? 1 : 0.7 }}>{item.icon}</span>
-                <span>{item.label}</span>
-                <span
-                  className="text-muted font-mono hide-mobile"
-                  style={{ marginLeft: 'auto', fontSize: '0.65rem', opacity: item.active ? 0.85 : 0.4 }}
-                >
-                  Alt+{idx + 1}
-                </span>
+                {!collapsed && (
+                  <>
+                    <span>{item.label}</span>
+                    <span
+                      className="text-muted font-mono hide-mobile"
+                      style={{ marginLeft: 'auto', fontSize: '0.65rem', opacity: item.active ? 0.85 : 0.4 }}
+                    >
+                      Alt+{idx + 1}
+                    </span>
+                  </>
+                )}
               </Link>
             ))}
           </nav>
@@ -253,17 +332,21 @@ export default function AppSidebar({
           {/* Navegação Secundária da Carteira (Context-Aware Tree View) */}
           {isPortfolioPage && onSelectTab && (
             <div className="flex-col gap-xs mt-xs pt-xs" style={{ borderTop: '1px dashed var(--panel-border)' }}>
-              <span
-                className="text-muted font-mono uppercase"
-                style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', padding: '0 0.5rem 0.25rem' }}
-              >
-                {'// SUB-MÓDULOS'}
-              </span>
+              {!collapsed && (
+                <span
+                  className="text-muted font-mono uppercase"
+                  style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', padding: '0 0.5rem 0.25rem' }}
+                >
+                  {'// SUB-MÓDULOS'}
+                </span>
+              )}
               {portfolioSubTabs.map((sub, idx) => {
                 const isSubActive = activeTab === sub.key;
                 return (
                   <button
                     key={sub.key}
+                    aria-label={sub.label}
+                    title={collapsed ? `${sub.label} [${idx + 1}]` : undefined}
                     onClick={() => {
                       onSelectTab(sub.key);
                       setIsOpen(false);
@@ -272,8 +355,9 @@ export default function AppSidebar({
                     style={{
                       display: 'flex',
                       alignItems: 'center',
+                      justifyContent: collapsed ? 'center' : 'flex-start',
                       gap: '8px',
-                      padding: '0.42rem 0.65rem 0.42rem 0.85rem',
+                      padding: collapsed ? '0.5rem 0' : '0.42rem 0.65rem 0.42rem 0.85rem',
                       fontFamily: 'var(--font-mono)',
                       fontSize: '0.78rem',
                       color: isSubActive ? 'var(--accent-color)' : 'var(--text-secondary)',
@@ -287,9 +371,11 @@ export default function AppSidebar({
                       width: '100%',
                     }}
                   >
-                    <span className="text-muted font-mono" style={{ fontSize: '0.68rem', opacity: isSubActive ? 1 : 0.45 }}>[{idx + 1}]</span>
+                    {!collapsed && (
+                      <span className="text-muted font-mono" style={{ fontSize: '0.68rem', opacity: isSubActive ? 1 : 0.45 }}>[{idx + 1}]</span>
+                    )}
                     <span style={{ opacity: isSubActive ? 1 : 0.6 }}>{sub.icon}</span>
-                    <span>{sub.label}</span>
+                    {!collapsed && <span>{sub.label}</span>}
                   </button>
                 );
               })}
@@ -306,29 +392,59 @@ export default function AppSidebar({
             type="button"
             onClick={() => setShowShortcuts(true)}
             aria-label="Abrir atalhos de teclado"
-            className="btn-secondary font-mono flex-row items-center justify-between"
-            style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', width: '100%' }}
+            title="Atalhos de Teclado (?)"
+            className="btn-secondary font-mono flex-row items-center"
+            style={{
+              padding: collapsed ? '0.35rem 0' : '0.35rem 0.6rem',
+              fontSize: '0.72rem',
+              width: '100%',
+              justifyContent: collapsed ? 'center' : 'space-between',
+            }}
           >
-            <span>Atalhos de Teclado</span>
+            {!collapsed && <span>Atalhos de Teclado</span>}
             <span className="text-accent font-bold">[?]</span>
           </button>
 
-          <div className="flex-row items-center justify-between px-xs pt-xs" style={{ borderTop: '1px dashed var(--panel-border)' }}>
-            <div className="flex-col">
-              <span className="font-mono text-xs font-semibold text-primary">{userName}</span>
-              <span className="font-mono text-muted" style={{ fontSize: '0.65rem' }}>Sessão Segura</span>
-            </div>
+          <div
+            className="flex-row items-center pt-xs"
+            style={{
+              borderTop: '1px dashed var(--panel-border)',
+              justifyContent: collapsed ? 'center' : 'space-between',
+              paddingLeft: collapsed ? 0 : '0.25rem',
+              paddingRight: collapsed ? 0 : '0.25rem',
+            }}
+          >
+            {collapsed ? (
+              onLogout && (
+                <button
+                  onClick={onLogout}
+                  aria-label="Sair"
+                  className="btn-danger"
+                  style={{ padding: '0.35rem 0.5rem', fontSize: '0.74rem' }}
+                  title={`${userName} — Encerrar Sessão`}
+                >
+                  <LogOutIcon size={15} />
+                </button>
+              )
+            ) : (
+              <>
+                <div className="flex-col">
+                  <span className="font-mono text-xs font-semibold text-primary">{userName}</span>
+                  <span className="font-mono text-muted" style={{ fontSize: '0.65rem' }}>Sessão Segura</span>
+                </div>
 
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                className="btn-danger"
-                style={{ padding: '0.35rem 0.6rem', fontSize: '0.74rem' }}
-                title="Encerrar Sessão"
-              >
-                <LogOutIcon size={13} />
-                <span>Sair</span>
-              </button>
+                {onLogout && (
+                  <button
+                    onClick={onLogout}
+                    className="btn-danger"
+                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.74rem' }}
+                    title="Encerrar Sessão"
+                  >
+                    <LogOutIcon size={13} />
+                    <span>Sair</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
