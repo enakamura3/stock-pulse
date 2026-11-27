@@ -197,4 +197,77 @@ describe('AppSidebar Component', () => {
     expect(screen.queryByRole('dialog', { name: 'Atalhos de Teclado' })).not.toBeInTheDocument();
     document.body.removeChild(editable);
   });
+
+  it('collapses and expands sidebar rail, persists state in localStorage, and exposes tooltips', async () => {
+    const user = userEvent.setup();
+    const logoutMock = vi.fn();
+    const selectTabMock = vi.fn();
+
+    const { container } = render(
+      <ThemeProvider>
+        <AppSidebar
+          userName="Maria Souza"
+          onLogout={logoutMock}
+          activeTab="tesouro"
+          onSelectTab={selectTabMock}
+          wsConnected={true}
+        />
+      </ThemeProvider>
+    );
+
+    const aside = container.querySelector('aside') as HTMLElement;
+    expect(aside).toHaveStyle({ width: '260px' });
+    expect(screen.getByText('stock-pulse')).toBeInTheDocument();
+
+    // Collapse via header button
+    await user.click(screen.getByRole('button', { name: 'Recolher barra lateral' }));
+    expect(aside).toHaveStyle({ width: '64px' });
+    expect(aside).toHaveClass('collapsed');
+    expect(localStorage.getItem('stock_pulse_sidebar_collapsed')).toBe('true');
+    expect(screen.queryByText('stock-pulse')).not.toBeInTheDocument();
+    expect(screen.getByTitle('WebSocket Conectado (LIVE)')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Minha Carteira' })).toHaveAttribute('title', 'Minha Carteira (Alt+1)');
+    expect(screen.getByRole('button', { name: 'Tesouro Direto' })).toHaveAttribute('title', 'Tesouro Direto [3]');
+
+    // Compact logout button works while collapsed
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+
+    // Expand back via header button
+    await user.click(screen.getByRole('button', { name: 'Expandir barra lateral' }));
+    expect(aside).toHaveStyle({ width: '260px' });
+    expect(aside).not.toHaveClass('collapsed');
+    expect(localStorage.getItem('stock_pulse_sidebar_collapsed')).toBe('false');
+    expect(screen.getByText('stock-pulse')).toBeInTheDocument();
+  });
+
+  it('restores collapsed state from localStorage and toggles with Ctrl+B / Cmd+B', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('stock_pulse_sidebar_collapsed', 'true');
+
+    const { container } = render(
+      <ThemeProvider>
+        <AppSidebar userName="Maria Souza" wsConnected={false} />
+      </ThemeProvider>
+    );
+
+    const aside = container.querySelector('aside') as HTMLElement;
+    expect(aside).toHaveStyle({ width: '64px' });
+    expect(screen.getByTitle('WebSocket Desconectado (DISC)')).toBeInTheDocument();
+
+    // Toggle expanded via Ctrl+B
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(aside).toHaveStyle({ width: '260px' });
+    expect(localStorage.getItem('stock_pulse_sidebar_collapsed')).toBe('false');
+
+    // Toggle collapsed via Cmd+B
+    fireEvent.keyDown(window, { key: 'B', metaKey: true });
+    expect(aside).toHaveStyle({ width: '64px' });
+    expect(localStorage.getItem('stock_pulse_sidebar_collapsed')).toBe('true');
+
+    // Verify Ctrl+B shortcut is documented in shortcuts modal
+    await user.click(screen.getByRole('button', { name: /Abrir atalhos de teclado/i }));
+    expect(screen.getByText('Ctrl + B')).toBeInTheDocument();
+    expect(screen.getByText('Recolher / expandir barra lateral')).toBeInTheDocument();
+  });
 });
