@@ -96,10 +96,10 @@ export default function TransactionHistory({
           current.invested -= tx.total_value || 0;
         }
       } else {
-        if (tx.type === 'BUY') {
+        if (tx.type === 'BUY' || tx.type === 'CONVERSION_IN') {
           current.qty += tx.quantity || 0;
           current.invested += tx.total_value || 0;
-        } else if (tx.type === 'SELL') {
+        } else if (tx.type === 'SELL' || tx.type === 'CONVERSION_OUT') {
           current.qty -= tx.quantity || 0;
           current.invested -= tx.total_value || 0;
         } else if (tx.type === 'SPLIT' && tx.quantity) {
@@ -133,6 +133,8 @@ export default function TransactionHistory({
       if (filterTxType !== 'Todos') {
         if (filterTxType === 'SUBSCRIPTION') {
           if (tx.module !== 'RF') return false;
+        } else if (filterTxType === 'CONVERSION') {
+          if (tx.type !== 'CONVERSION_IN' && tx.type !== 'CONVERSION_OUT') return false;
         } else {
           if (tx.type !== filterTxType) return false;
         }

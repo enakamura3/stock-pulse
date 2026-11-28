@@ -32,7 +32,17 @@ export interface Position {
   dividend_yield?: number;
 }
 
-export type TransactionType = 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS' | string;
+export type TxModalType =
+  | 'BUY'
+  | 'SELL'
+  | 'SPLIT'
+  | 'REVERSE_SPLIT'
+  | 'BONUS'
+  | 'CONVERSION'
+  | 'CONVERSION_IN'
+  | 'CONVERSION_OUT';
+
+export type TransactionType = TxModalType | string;
 
 export interface Transaction {
   id: string;

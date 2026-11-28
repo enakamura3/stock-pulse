@@ -210,8 +210,13 @@ func (h *Handlers) renderHistory(c telebot.Context, deleteMode bool) error {
 
 	for _, tx := range filtered[start:end] {
 		tipoStr := "🟢 Compra"
-		if tx.Type == "SELL" {
+		switch tx.Type {
+		case "SELL":
 			tipoStr = "🔴 Venda"
+		case "CONVERSION_IN":
+			tipoStr = "🔄 Conversão (Entrada)"
+		case "CONVERSION_OUT":
+			tipoStr = "🔄 Conversão (Saída)"
 		}
 
 		curr := getTickerDefaultCurrency(tx.Ticker)

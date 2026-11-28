@@ -504,6 +504,35 @@ func TestHandlers_HistoryAndFixedIncome(t *testing.T) {
 		assert.Contains(t, sentMsg, `Minha\_Carteira\*Top`)
 	})
 
+	t.Run("HandleHistory renders CONVERSION_IN and CONVERSION_OUT labels", func(t *testing.T) {
+		mCtx := new(MockTelebotContext)
+		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})
+		mCtx.On("Respond", mock.Anything).Return(nil).Once()
+		mCtx.On("Data").Return("0").Once()
+
+		pSvc.On("GetPortfolios", mock.Anything, "00000000-0000-0000-0000-000000000000").Return([]portfolio.Portfolio{
+			{ID: "p1", Name: "P1"},
+		}, nil).Once()
+		svc.On("GetActivePortfolio", mock.Anything, int64(123)).Return("p1", nil).Once()
+
+		txs := []portfolio.Transaction{
+			{Ticker: "ORIG11.SA", Type: "CONVERSION_OUT", Quantity: 100, UnitPrice: 10.0, TotalCost: 1000, ExecutedAt: time.Now()},
+			{Ticker: "DEST11.SA", Type: "CONVERSION_IN", Quantity: 80, UnitPrice: 12.5, TotalCost: 1000, ExecutedAt: time.Now()},
+		}
+		pSvc.On("GetPortfolioTransactions", mock.Anything, "p1", "00000000-0000-0000-0000-000000000000").Return(txs, nil).Once()
+
+		var sentMsg string
+		mCtx.On("Edit", mock.MatchedBy(func(msg string) bool {
+			sentMsg = msg
+			return strings.Contains(msg, "Conversão (Saída)") && strings.Contains(msg, "Conversão (Entrada)")
+		}), mock.Anything).Return(nil).Once()
+
+		err := h.HandleHistory(mCtx)
+		assert.NoError(t, err)
+		assert.Contains(t, sentMsg, "🔄 Conversão (Saída)")
+		assert.Contains(t, sentMsg, "🔄 Conversão (Entrada)")
+	})
+
 	t.Run("HandleDividends escapes markdown in portfolioName", func(t *testing.T) {
 		mCtx := new(MockTelebotContext)
 		mCtx.On("Chat").Return(&telebot.Chat{ID: 123})

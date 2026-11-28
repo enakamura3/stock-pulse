@@ -13,6 +13,7 @@ import {
   FixedIncomePosition,
   UnifiedTransaction,
   TreasuryPosition,
+  TxModalType,
 } from '@/components/portfolio/types';
 import { getAssetCategory, determineAssetTypeLocal, parseCurrency, formatCurrencyInput, formatUnitPriceInput, formatExchangeRateInput, getLocalDateString, getAvailableSellQuantity } from '@/components/portfolio/helpers';
 
@@ -78,8 +79,12 @@ interface PortfolioContextType {
   setTxTicker: (s: string) => void;
   txAssetType: string;
   setTxAssetType: (s: string) => void;
-  txType: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS';
-  setTxType: (t: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS') => void;
+  txType: TxModalType;
+  setTxType: (t: TxModalType) => void;
+  convSourceTicker: string;
+  setConvSourceTicker: (s: string) => void;
+  convSourceQty: string | number;
+  setConvSourceQty: (q: string | number) => void;
   txQuantity: string | number;
   setTxQuantity: (q: string | number) => void;
   txUnitPrice: string | number;
@@ -197,7 +202,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
   const [txTicker, setTxTicker] = useState('');
   const [txAssetType, setTxAssetType] = useState('');
-  const [txType, setTxType] = useState<'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS'>('BUY');
+  const [txType, setTxType] = useState<TxModalType>('BUY');
+  const [convSourceTicker, setConvSourceTicker] = useState<string>('');
+  const [convSourceQty, setConvSourceQty] = useState<string | number>('');
   const [txQuantity, setTxQuantity] = useState<string | number>('');
   const [txUnitPrice, setTxUnitPrice] = useState<string | number>('');
   const [txFee, setTxFee] = useState<string | number>('');
@@ -524,41 +531,102 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     const parsedPrice = parseCurrency(txUnitPrice);
     const parsedFee = parseCurrency(txFee);
     const parsedRate = parseCurrency(txExchangeRate);
+    const isConversion = !editingTxId && txType === 'CONVERSION';
 
-    if (!txTicker || isNaN(parsedQty) || parsedQty <= 1e-6 || (txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (isNaN(parsedPrice) || parsedPrice <= 1e-6))) {
-      return alert('Preencha todos os campos obrigatórios corretamente.');
-    }
+    let url = editingTxId ? `/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `/portfolios/${activePortfolioId}/transactions`;
+    let method: 'POST' | 'PUT' = editingTxId ? 'PUT' : 'POST';
+    let bodyPayload: Record<string, unknown>;
+    let fallbackError = 'Erro ao cadastrar transação.';
 
-    if (txType === 'SELL') {
-      const availableQty = getAvailableSellQuantity(txTicker, txExecutedAt, positions, transactions, editingTxId);
-      if (parsedQty - availableQty > 1e-6) {
-        return alert(`Saldo insuficiente. Você possui apenas ${Number(availableQty.toFixed(6))} cotas.`);
+    if (isConversion) {
+      const parsedSourceQty = parseFloat(convSourceQty.toString());
+      if (
+        !convSourceTicker ||
+        !txTicker ||
+        isNaN(parsedSourceQty) ||
+        parsedSourceQty <= 1e-6 ||
+        isNaN(parsedQty) ||
+        parsedQty <= 1e-6 ||
+        isNaN(parsedPrice) ||
+        parsedPrice <= 1e-6
+      ) {
+        return alert('Preencha todos os campos obrigatórios corretamente.');
       }
+
+      const normalize = (t: string) => t.trim().toUpperCase().replace(/\.SA$/, '');
+      if (normalize(convSourceTicker) === normalize(txTicker)) {
+        return alert('O ativo de origem e de destino devem ser diferentes.');
+      }
+
+      const availableQty = getAvailableSellQuantity(convSourceTicker, txExecutedAt, positions, transactions, null);
+      if (parsedSourceQty - availableQty > 1e-6) {
+        return alert(`Saldo insuficiente no ativo de origem. Você possui apenas ${Number(availableQty.toFixed(6))} cotas.`);
+      }
+
+      const sourceAvgPrice = positions.find(p => p.ticker === convSourceTicker)?.average_price ?? 0;
+      url = `/portfolios/${activePortfolioId}/conversions`;
+      method = 'POST';
+      fallbackError = 'Erro ao registrar conversão.';
+      bodyPayload = {
+        source_ticker: convSourceTicker,
+        source_quantity: parsedSourceQty,
+        source_unit_price: sourceAvgPrice,
+        target_ticker: txTicker,
+        target_asset_type: txAssetType,
+        target_quantity: parsedQty,
+        target_unit_price: parsedPrice,
+        exchange_rate: isNaN(parsedRate) || parsedRate <= 1e-6 ? 0.0 : parsedRate,
+        executed_at: txExecutedAt,
+      };
+    } else {
+      const priceOptional = txType === 'SPLIT' || txType === 'REVERSE_SPLIT';
+      const invalidPrice = txType === 'CONVERSION_OUT'
+        ? (isNaN(parsedPrice) || parsedPrice < 0)
+        : (!priceOptional && (isNaN(parsedPrice) || parsedPrice <= 1e-6));
+
+      if (!txTicker || isNaN(parsedQty) || parsedQty <= 1e-6 || invalidPrice) {
+        return alert('Preencha todos os campos obrigatórios corretamente.');
+      }
+
+      if (txType === 'SELL' || txType === 'CONVERSION_OUT') {
+        const availableQty = getAvailableSellQuantity(txTicker, txExecutedAt, positions, transactions, editingTxId);
+        if (parsedQty - availableQty > 1e-6) {
+          return alert(`Saldo insuficiente. Você possui apenas ${Number(availableQty.toFixed(6))} cotas.`);
+        }
+      }
+
+      const noFee = txType === 'SPLIT' || txType === 'REVERSE_SPLIT' || txType === 'BONUS' || txType === 'CONVERSION_IN' || txType === 'CONVERSION_OUT';
+      bodyPayload = {
+        ticker: txTicker,
+        asset_type: txAssetType,
+        type: txType,
+        quantity: parsedQty,
+        unit_price: priceOptional ? 0 : parsedPrice,
+        fee: (noFee || isNaN(parsedFee) || parsedFee <= 1e-6) ? 0.0 : parsedFee,
+        exchange_rate: isNaN(parsedRate) || parsedRate <= 1e-6 ? 0.0 : parsedRate,
+        executed_at: txExecutedAt,
+      };
     }
 
     setIsAddingTx(true);
     try {
-      const url = editingTxId ? `/portfolios/${activePortfolioId}/transactions/${editingTxId}` : `/portfolios/${activePortfolioId}/transactions`;
       const res = await apiFetch(url, {
-        method: editingTxId ? 'PUT' : 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticker: txTicker,
-          asset_type: txAssetType,
-          type: txType,
-          quantity: parsedQty,
-          unit_price: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT') ? 0 : parsedPrice,
-          fee: (txType === 'SPLIT' || txType === 'REVERSE_SPLIT' || txType === 'BONUS' || isNaN(parsedFee) || parsedFee <= 1e-6) ? 0.0 : parsedFee,
-          exchange_rate: isNaN(parsedRate) || parsedRate <= 1e-6 ? 0.0 : parsedRate,
-          executed_at: txExecutedAt,
-        }), cache: 'no-store',
+        body: JSON.stringify(bodyPayload),
+        cache: 'no-store',
       });
 
       if (res.ok) {
+        setConvSourceTicker(''); setConvSourceQty('');
         setTxTicker(''); setTxAssetType(''); setSearchQuery(''); setTxQuantity(''); setTxUnitPrice(''); setTxFee(''); setTxExchangeRate(1.0);
-        setEditingTxId(null); setSelectedAssetCurrency('BRL'); setShowTxModal(false);
-        await loadPortfolioDetails(activePortfolioId); await loadPerformance(activePortfolioId, period);
-      } else { alert((await res.json()).error || 'Erro ao cadastrar transação.'); }
+        setTxType('BUY'); setEditingTxId(null); setSelectedAssetCurrency('BRL'); setShowTxModal(false);
+        await loadPortfolioDetails(activePortfolioId);
+        if (isConversion) await loadDividends(activePortfolioId);
+        await loadPerformance(activePortfolioId, period);
+      } else {
+        alert((await res.json()).error || fallbackError);
+      }
     } catch (e) { console.error(e); } finally { setIsAddingTx(false); }
   };
 
@@ -624,6 +692,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
+    setConvSourceTicker(''); setConvSourceQty('');
     setEditingTxId(tx.id); setTxTicker(tx.asset_name); setTxAssetType(tx.asset_type || ''); setTxType(tx.type as any);
     setTxQuantity(tx.quantity || 0);
     setTxUnitPrice(formatUnitPriceInput(tx.unit_price ?? 0));
@@ -777,7 +846,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         newPortfolioCurrency,
         setNewPortfolioCurrency,
         isCreatingPortfolio,
-        txTicker, setTxTicker, txAssetType, setTxAssetType, txType, setTxType, txQuantity, setTxQuantity, txUnitPrice, setTxUnitPrice, txFee, setTxFee, txExchangeRate, setTxExchangeRate, txExecutedAt, setTxExecutedAt, isAddingTx, editingTxId, setEditingTxId,
+        txTicker, setTxTicker, txAssetType, setTxAssetType, txType, setTxType, convSourceTicker, setConvSourceTicker, convSourceQty, setConvSourceQty, txQuantity, setTxQuantity, txUnitPrice, setTxUnitPrice, txFee, setTxFee, txExchangeRate, setTxExchangeRate, txExecutedAt, setTxExecutedAt, isAddingTx, editingTxId, setEditingTxId,
         searchQuery,
         setSearchQuery,
         searchResults,

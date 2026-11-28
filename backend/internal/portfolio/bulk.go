@@ -59,7 +59,7 @@ func (s *Service) BulkAddTransactions(ctx context.Context, userID, portfolioID s
 			continue
 		}
 
-		if txType != "BUY" && txType != "SELL" && txType != "SPLIT" && txType != "REVERSE_SPLIT" && txType != "BONUS" {
+		if txType != "BUY" && txType != "SELL" && txType != "SPLIT" && txType != "REVERSE_SPLIT" && txType != "BONUS" && txType != "CONVERSION_OUT" && txType != "CONVERSION_IN" {
 			result.Errors = append(result.Errors, fmt.Sprintf("Linha %d: tipo '%s' inválido", lineNum, txType))
 			continue
 		}
@@ -71,7 +71,7 @@ func (s *Service) BulkAddTransactions(ctx context.Context, userID, portfolioID s
 		}
 
 		price, err := strconv.ParseFloat(priceStr, 64)
-		if err != nil || (price <= 0 && txType != "SPLIT" && txType != "REVERSE_SPLIT" && txType != "BONUS") {
+		if err != nil || price < 0 || (price <= 0 && (txType == "BUY" || txType == "SELL" || txType == "CONVERSION_IN")) {
 			result.Errors = append(result.Errors, fmt.Sprintf("Linha %d: preço '%s' inválido", lineNum, priceStr))
 			continue
 		}

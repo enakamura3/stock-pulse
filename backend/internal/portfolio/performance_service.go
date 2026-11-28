@@ -172,10 +172,10 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 				rate = 1.0
 			}
 
-			if tx.Type == "BUY" || tx.Type == "BONUS" {
+			if tx.Type == "BUY" || tx.Type == "BONUS" || tx.Type == "CONVERSION_IN" {
 				runningQuantities[tx.AssetID] += tx.Quantity
 				runningCosts[tx.AssetID] += ((tx.Quantity * tx.UnitPrice) + tx.Fee) * rate
-			} else if tx.Type == "SELL" {
+			} else if tx.Type == "SELL" || tx.Type == "CONVERSION_OUT" {
 				if runningQuantities[tx.AssetID] >= tx.Quantity {
 					runningQuantities[tx.AssetID] -= tx.Quantity
 					// Reduz o custo proporcionalmente
@@ -276,6 +276,21 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 	}
 
 	// Precomputa o fluxo de caixa diário das transações: O(T)
+	// Em carteira completa, conversões são trocas internas sem fluxo externo.
+	// Em séries filtradas (ex: único ticker), uma ponta isolada conta como fluxo apenas daquele recorte.
+	hasConvInOnDate := make(map[string]bool)
+	hasConvOutOnDate := make(map[string]bool)
+	if len(filterTickers) > 0 {
+		for _, tx := range txs {
+			dateKey := tx.ExecutedAt.Format("2006-01-02")
+			if tx.Type == "CONVERSION_IN" {
+				hasConvInOnDate[dateKey] = true
+			} else if tx.Type == "CONVERSION_OUT" {
+				hasConvOutOnDate[dateKey] = true
+			}
+		}
+	}
+
 	dailyCashFlowMap := make(map[string]float64)
 	for _, tx := range txs {
 		rate := tx.ExchangeRate
@@ -283,10 +298,19 @@ func (s *Service) GetPortfolioPerformance(ctx context.Context, portfolioID strin
 			rate = 1.0
 		}
 		dateKey := tx.ExecutedAt.Format("2006-01-02")
-		if tx.Type == "BUY" {
+		switch tx.Type {
+		case "BUY":
 			dailyCashFlowMap[dateKey] += tx.TotalCost * rate
-		} else if tx.Type == "SELL" {
+		case "SELL":
 			dailyCashFlowMap[dateKey] -= tx.TotalCost * rate
+		case "CONVERSION_IN":
+			if len(filterTickers) > 0 && !hasConvOutOnDate[dateKey] {
+				dailyCashFlowMap[dateKey] += tx.TotalCost * rate
+			}
+		case "CONVERSION_OUT":
+			if len(filterTickers) > 0 && !hasConvInOnDate[dateKey] {
+				dailyCashFlowMap[dateKey] -= tx.TotalCost * rate
+			}
 		}
 	}
 

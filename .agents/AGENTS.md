@@ -37,3 +37,8 @@ Toda a coleta, normalização, deduplicação, validação e resolução (Fuzzy 
 - Após commitar suas alterações, faça push para o remote e abra uma Pull Request via `gh pr create`.
 - **Nunca** faça push direto na `master`. Aguarde o merge da sua PR pelo usuário antes de prosseguir com tarefas dependentes.
 - Antes de iniciar qualquer novo trabalho, sempre sincronize o repositório local com a branch principal usando `git fetch origin master && git rebase origin/master`.
+
+## 7. Privacidade: Sem Dados Reais da Carteira no Código ou PRs
+- Nunca inclua tickers específicos, nomes de ativos, quantidades exatas, preços médios ou datas reais informadas pelo usuário em conversas dentro de código, comentários, testes, mensagens de commit ou títulos/descrições de Pull Requests.
+- Utilize sempre fixtures genéricas e fictícias (como `ORIG11.SA`, `DEST11.SA`, `ABCD11`, `PETR4`, `AAPL`) e valores numéricos redondos e meramente ilustrativos.
+

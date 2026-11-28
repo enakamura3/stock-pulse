@@ -39,15 +39,15 @@ describe('AssetList Component', () => {
     },
     {
       asset_id: 'pos-3',
-      ticker: 'SNME11',
-      name: 'Suno Multiestrategia FII',
+      ticker: 'ABCD11',
+      name: 'Fundo Imobiliario Exemplo',
       quantity: 100,
-      average_price: 9.12345,
-      current_price: 9.2,
-      total_cost: 912.345,
-      current_value: 920,
-      profit_loss: 7.655,
-      return_percent: 0.84,
+      average_price: 10.12345,
+      current_price: 10.5,
+      total_cost: 1012.345,
+      current_value: 1050,
+      profit_loss: 37.655,
+      return_percent: 3.72,
       currency: 'BRL',
     },
   ];
@@ -70,8 +70,8 @@ describe('AssetList Component', () => {
     expect(screen.getByText('Posições Ativas')).toBeInTheDocument();
     expect(screen.getByText('PETR4')).toBeInTheDocument();
     expect(screen.getByText('VALE3')).toBeInTheDocument();
-    expect(screen.getByText('SNME11')).toBeInTheDocument();
-    expect(screen.getByText(/9,12345/)).toBeInTheDocument();
+    expect(screen.getByText('ABCD11')).toBeInTheDocument();
+    expect(screen.getByText(/10,12345/)).toBeInTheDocument();
 
     // Test sorting by clicking column headers
     const sortHeaders = [

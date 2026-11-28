@@ -147,6 +147,28 @@ func TestUpdatePositionOnTransaction(t *testing.T) {
 	if qty != 0 || totalCost != 0 || avgPrice != 0 {
 		t.Errorf("Over-sell failed: got qty=%.2f, cost=%.2f, avg=%.2f", qty, totalCost, avgPrice)
 	}
+
+	// 9. CONVERSION_IN on empty position
+	cQty, cCost, cAvg := UpdatePositionOnTransaction(0, 0, 0, "CONVERSION_IN", 150, 12.34567, 1.0, 0.0)
+	if !FloatEquals(cQty, 150) || !FloatEquals(cCost, 150*12.34567) || !FloatEquals(cAvg, 12.34567) {
+		t.Errorf("CONVERSION_IN empty failed: got qty=%.2f, cost=%.6f, avg=%.6f", cQty, cCost, cAvg)
+	}
+
+	// 10. CONVERSION_IN on existing position (weighted average)
+	cQty, cCost, cAvg = UpdatePositionOnTransaction(100, 1000.0, 10.0, "CONVERSION_IN", 100, 12.0, 1.0, 0.0)
+	if !FloatEquals(cQty, 200) || !FloatEquals(cCost, 2200.0) || !FloatEquals(cAvg, 11.0) {
+		t.Errorf("CONVERSION_IN existing failed: got qty=%.2f, cost=%.2f, avg=%.2f", cQty, cCost, cAvg)
+	}
+
+	// 11. CONVERSION_OUT partial and full close
+	cQty, cCost, cAvg = UpdatePositionOnTransaction(200, 2000.0, 10.0, "CONVERSION_OUT", 80, 10.0, 1.0, 0.0)
+	if !FloatEquals(cQty, 120) || !FloatEquals(cCost, 1200.0) || !FloatEquals(cAvg, 10.0) {
+		t.Errorf("CONVERSION_OUT partial failed: got qty=%.2f, cost=%.2f, avg=%.2f", cQty, cCost, cAvg)
+	}
+	cQty, cCost, cAvg = UpdatePositionOnTransaction(cQty, cCost, cAvg, "CONVERSION_OUT", 120, 10.0, 1.0, 0.0)
+	if !FloatEquals(cQty, 0) || !FloatEquals(cCost, 0) || !FloatEquals(cAvg, 0) {
+		t.Errorf("CONVERSION_OUT full failed: got qty=%.2f, cost=%.2f, avg=%.2f", cQty, cCost, cAvg)
+	}
 }
 
 func TestCalculatePositionMetrics(t *testing.T) {

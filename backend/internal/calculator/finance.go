@@ -87,7 +87,7 @@ func UpdatePositionOnTransaction(
 	}
 
 	switch txType {
-	case "BUY":
+	case "BUY", "CONVERSION_IN":
 		nativeCost := (txQty * txUnitPrice) + txFee
 		txCostInBase := nativeCost * fxRate
 		newQty = currentQty + txQty
@@ -98,7 +98,7 @@ func UpdatePositionOnTransaction(
 			newAvgPrice = txUnitPrice
 		}
 
-	case "SELL":
+	case "SELL", "CONVERSION_OUT":
 		remainingQty := currentQty - txQty
 		if remainingQty > FinancialEpsilon && currentQty > FinancialEpsilon {
 			newQty = remainingQty

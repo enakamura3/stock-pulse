@@ -596,8 +596,8 @@ describe('PortfolioContext', () => {
         return Promise.resolve({
           ok: true,
           json: async () => [
-            { id: 'tx-kisu-sell', portfolio_id: 'p-1', module: 'RV', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'SELL', quantity: 100, unit_price: 8.5, total_value: 850, date: '2024-05-10' },
-            { id: 'tx-kisu-buy', portfolio_id: 'p-1', module: 'RV', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'BUY', quantity: 100, unit_price: 8.0, total_value: 800, date: '2024-01-10' },
+            { id: 'tx-orig-sell', portfolio_id: 'p-1', module: 'RV', asset_name: 'ORIG11.SA', asset_type: 'FII', type: 'SELL', quantity: 100, unit_price: 10.5, total_value: 1050, date: '2024-05-10' },
+            { id: 'tx-orig-buy', portfolio_id: 'p-1', module: 'RV', asset_name: 'ORIG11.SA', asset_type: 'FII', type: 'BUY', quantity: 100, unit_price: 10.0, total_value: 1000, date: '2024-01-10' },
           ],
         });
       }
@@ -610,16 +610,16 @@ describe('PortfolioContext', () => {
 
     act(() => {
       context.handleEditTransaction({
-        id: 'tx-kisu-sell',
-        asset_name: 'KISU11.SA',
+        id: 'tx-orig-sell',
+        asset_name: 'ORIG11.SA',
         asset_type: 'FII',
         module: 'RV',
         type: 'SELL',
         quantity: 100,
-        unit_price: 8.12345,
+        unit_price: 10.12345,
         fee: 0,
         exchange_rate: 1,
-        total_value: 812.345,
+        total_value: 1012.345,
         date: '2024-05-10',
       });
     });
@@ -630,7 +630,7 @@ describe('PortfolioContext', () => {
     });
     expect(window.alert).not.toHaveBeenCalled();
     expect(apiFetch).toHaveBeenCalledWith(
-      '/portfolios/p-1/transactions/tx-kisu-sell',
+      '/portfolios/p-1/transactions/tx-orig-sell',
       expect.objectContaining({ method: 'PUT' })
     );
 
@@ -1147,6 +1147,144 @@ describe('PortfolioContext', () => {
         { scroll: false }
       );
     });
+  });
+
+  it('handles asset conversion flow (CONVERSION mode, validations, POST /conversions, CONVERSION_OUT, and errors)', async () => {
+    (apiFetch as any).mockImplementation((url: string, opts?: any) => {
+      if (url === '/portfolios') {
+        return Promise.resolve({ ok: true, json: async () => [{ id: 'p-1', base_currency: 'BRL', is_default: true }] });
+      }
+      if (url === '/portfolios/p-1') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            positions: [
+              { asset_id: 'a-orig', ticker: 'ORIG11.SA', name: 'Fundo Origem', type: 'FII', currency: 'BRL', quantity: 200, average_price: 10, total_cost: 2000 },
+            ],
+          }),
+        });
+      }
+      if (url === '/portfolios/p-1/conversions' && opts?.method === 'POST') {
+        return Promise.resolve({ ok: true, json: async () => ({ conversion_out: { id: 'out-1' }, conversion_in: { id: 'in-1' } }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    let context: any;
+    const TestComponent = () => {
+      context = usePortfolio();
+      return null;
+    };
+
+    render(
+      <PortfolioProvider>
+        <TestComponent />
+      </PortfolioProvider>
+    );
+
+    await waitFor(() => {
+      expect(context.activePortfolioId).toBe('p-1');
+    });
+
+    // 1. Missing conversion fields
+    act(() => {
+      context.setTxType('CONVERSION');
+      context.setConvSourceTicker('');
+      context.setTxTicker('');
+    });
+    await act(async () => {
+      await context.handleAddTransaction({ preventDefault: vi.fn() } as any);
+    });
+    expect(window.alert).toHaveBeenCalledWith('Preencha todos os campos obrigatórios corretamente.');
+
+    // 2. Same origin and destination ticker
+    act(() => {
+      context.setConvSourceTicker('ORIG11.SA');
+      context.setConvSourceQty(200);
+      context.setTxTicker('ORIG11');
+      context.setTxQuantity(160);
+      context.setTxUnitPrice('12,34567');
+    });
+    await act(async () => {
+      await context.handleAddTransaction({ preventDefault: vi.fn() } as any);
+    });
+    expect(window.alert).toHaveBeenCalledWith('O ativo de origem e de destino devem ser diferentes.');
+
+    // 3. Insufficient source balance
+    act(() => {
+      context.setConvSourceTicker('ORIG11.SA');
+      context.setConvSourceQty(300);
+      context.setTxTicker('DEST11.SA');
+      context.setTxAssetType('FII');
+      context.setTxQuantity(160);
+      context.setTxUnitPrice('12,34567');
+    });
+    await act(async () => {
+      await context.handleAddTransaction({ preventDefault: vi.fn() } as any);
+    });
+    expect(window.alert).toHaveBeenCalledWith('Saldo insuficiente no ativo de origem. Você possui apenas 200 cotas.');
+
+    // 4. Success conversion
+    (window.alert as any).mockClear();
+    act(() => {
+      context.setConvSourceQty(200);
+    });
+    await act(async () => {
+      await context.handleAddTransaction({ preventDefault: vi.fn() } as any);
+    });
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/portfolios/p-1/conversions',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"source_ticker":"ORIG11.SA"'),
+      })
+    );
+    expect(context.txType).toBe('BUY');
+    expect(context.convSourceTicker).toBe('');
+
+    // 5. Conversion API error fallback
+    (apiFetch as any).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({}),
+    });
+    act(() => {
+      context.setTxType('CONVERSION');
+      context.setConvSourceTicker('ORIG11.SA');
+      context.setConvSourceQty(100);
+      context.setTxTicker('DEST11.SA');
+      context.setTxQuantity(80);
+      context.setTxUnitPrice('12,50');
+    });
+    await act(async () => {
+      await context.handleAddTransaction({ preventDefault: vi.fn() } as any);
+    });
+    expect(window.alert).toHaveBeenCalledWith('Erro ao registrar conversão.');
+
+    // 6. Standard CONVERSION_OUT editing allows 0 price and validates balance
+    act(() => {
+      context.handleEditTransaction({
+        id: 'tx-conv-out',
+        asset_name: 'ORIG11.SA',
+        asset_type: 'FII',
+        module: 'RV',
+        type: 'CONVERSION_OUT',
+        quantity: 100,
+        unit_price: 0,
+        fee: 0,
+        exchange_rate: 1,
+        total_value: 0,
+        date: '2025-06-15',
+      });
+    });
+    (apiFetch as any).mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    await act(async () => {
+      await context.handleAddTransaction({ preventDefault: vi.fn() } as any);
+    });
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/portfolios/p-1/transactions/tx-conv-out',
+      expect.objectContaining({ method: 'PUT' })
+    );
   });
 });
 

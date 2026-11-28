@@ -66,9 +66,9 @@ func (s *Service) GetPortfolioDividends(ctx context.Context, portfolioID, userID
 					break
 				}
 
-				if tx.Type == "BUY" {
+				if tx.Type == "BUY" || tx.Type == "CONVERSION_IN" {
 					quantity += tx.Quantity
-				} else if tx.Type == "SELL" {
+				} else if tx.Type == "SELL" || tx.Type == "CONVERSION_OUT" {
 					quantity -= tx.Quantity
 				} else if tx.Type == "SPLIT" {
 					quantity = quantity * tx.Quantity

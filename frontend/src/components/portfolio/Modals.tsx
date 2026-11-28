@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { SearchResult } from './types';
+import { Position, SearchResult, TxModalType } from './types';
 import { usePortfolioOptional } from '@/context/PortfolioContext';
 
 import NewPortfolioModal from './modals/NewPortfolioModal';
@@ -33,8 +33,13 @@ export interface ModalsProps {
   searchResults?: SearchResult[];
   handleSelectAsset?: (s: string) => void;
   isAddingTx?: boolean;
-  txType?: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS';
-  setTxType?: (t: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS') => void;
+  txType?: TxModalType;
+  setTxType?: (t: TxModalType) => void;
+  positions?: Position[];
+  convSourceTicker?: string;
+  setConvSourceTicker?: (s: string) => void;
+  convSourceQty?: string | number;
+  setConvSourceQty?: (q: string | number) => void;
   txQuantity?: string | number;
   setTxQuantity?: (q: string | number) => void;
   txUnitPrice?: string | number;
@@ -108,6 +113,11 @@ export default function Modals(props: ModalsProps) {
   const isAddingTx = props.isAddingTx ?? context?.isAddingTx ?? false;
   const txType = props.txType ?? context?.txType ?? 'BUY';
   const setTxType = props.setTxType ?? context?.setTxType ?? (() => {});
+  const positions = props.positions ?? context?.positions ?? [];
+  const convSourceTicker = props.convSourceTicker ?? context?.convSourceTicker ?? '';
+  const setConvSourceTicker = props.setConvSourceTicker ?? context?.setConvSourceTicker ?? (() => {});
+  const convSourceQty = props.convSourceQty ?? context?.convSourceQty ?? '';
+  const setConvSourceQty = props.setConvSourceQty ?? context?.setConvSourceQty ?? (() => {});
   const txQuantity = props.txQuantity ?? context?.txQuantity ?? '';
   const setTxQuantity = props.setTxQuantity ?? context?.setTxQuantity ?? (() => {});
   const txUnitPrice = props.txUnitPrice ?? context?.txUnitPrice ?? '';
@@ -201,6 +211,11 @@ export default function Modals(props: ModalsProps) {
         isAddingTx={isAddingTx}
         txType={txType}
         setTxType={setTxType}
+        positions={positions}
+        convSourceTicker={convSourceTicker}
+        setConvSourceTicker={setConvSourceTicker}
+        convSourceQty={convSourceQty}
+        setConvSourceQty={setConvSourceQty}
         txQuantity={txQuantity}
         setTxQuantity={setTxQuantity}
         txUnitPrice={txUnitPrice}

@@ -598,13 +598,13 @@ describe('Portfolio Helpers', () => {
 
     it('allows editing a full SELL of an already closed position (0 active shares)', () => {
       const txs = [
-        { id: 'tx-sell', portfolio_id: 'p1', module: 'RV' as const, date: '2024-05-10', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'SELL', quantity: 100, unit_price: 8.5, total_value: 850, currency: 'BRL' },
-        { id: 'tx-buy', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-10', asset_name: 'KISU11.SA', asset_type: 'FII', type: 'BUY', quantity: 100, unit_price: 8.0, total_value: 800, currency: 'BRL' },
+        { id: 'tx-sell', portfolio_id: 'p1', module: 'RV' as const, date: '2024-05-10', asset_name: 'ORIG11.SA', asset_type: 'FII', type: 'SELL', quantity: 100, unit_price: 10.5, total_value: 1050, currency: 'BRL' },
+        { id: 'tx-buy', portfolio_id: 'p1', module: 'RV' as const, date: '2024-01-10', asset_name: 'ORIG11.SA', asset_type: 'FII', type: 'BUY', quantity: 100, unit_price: 10.0, total_value: 1000, currency: 'BRL' },
       ];
       // Without editingTxId, remaining balance is 0
-      expect(getAvailableSellQuantity('KISU11.SA', '2024-05-10', [], txs)).toBe(0);
+      expect(getAvailableSellQuantity('ORIG11.SA', '2024-05-10', [], txs)).toBe(0);
       // Editing tx-sell ignores it and allows up to 100
-      expect(getAvailableSellQuantity('KISU11', '2024-05-10', [], txs, 'tx-sell')).toBe(100);
+      expect(getAvailableSellQuantity('ORIG11', '2024-05-10', [], txs, 'tx-sell')).toBe(100);
     });
 
     it('accounts for BONUS, SPLIT, REVERSE_SPLIT, and unknown types chronologically', () => {
@@ -635,6 +635,14 @@ describe('Portfolio Helpers', () => {
       ];
       expect(getAvailableSellQuantity('HGLG11', '2024-02-01', [], brokenTxs)).toBe(0);
       expect(getAvailableSellQuantity('HGLG11', '', [], [])).toBe(0);
+    });
+
+    it('accounts for CONVERSION_IN and CONVERSION_OUT in balance calculation', () => {
+      const convTxs = [
+        { id: 'tx-conv-out', portfolio_id: 'p1', module: 'RV' as const, date: '2025-06-15', asset_name: 'DEST11.SA', asset_type: 'FII', type: 'CONVERSION_OUT', quantity: 40, unit_price: 12.5, total_value: 500, currency: 'BRL' },
+        { id: 'tx-conv-in', portfolio_id: 'p1', module: 'RV' as const, date: '2025-06-15', asset_name: 'DEST11.SA', asset_type: 'FII', type: 'CONVERSION_IN', quantity: 160, unit_price: 12.5, total_value: 2000, currency: 'BRL' },
+      ];
+      expect(getAvailableSellQuantity('DEST11.SA', '2025-06-16', [], convTxs)).toBe(120);
     });
   });
 });

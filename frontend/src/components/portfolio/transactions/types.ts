@@ -28,6 +28,7 @@ export const TX_TYPES = [
   { value: 'BONUS', label: 'Bônus' },
   { value: 'SPLIT', label: 'Split' },
   { value: 'REVERSE_SPLIT', label: 'Agrupamento' },
+  { value: 'CONVERSION', label: 'Conversão' },
   { value: 'SUBSCRIPTION', label: 'Aplicação/Resgate' },
 ];
 
@@ -69,9 +70,11 @@ export function getBadge(tx: UnifiedTransaction): { text: string; color: string;
     case 'BUY':          return { text: 'COMPRA',      color: 'var(--color-success)', bg: 'var(--color-success-bg)' };
     case 'SELL':         return { text: 'VENDA',       color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' };
     case 'BONUS':        return { text: 'BÔNUS',       color: 'var(--color-success)', bg: 'var(--color-success-bg)' };
-    case 'SPLIT':        return { text: 'SPLIT',       color: 'var(--accent-color)', bg: 'var(--accent-bg)' };
-    case 'REVERSE_SPLIT':return { text: 'AGRUPAMENTO', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' };
-    default:             return { text: tx.type,       color: 'var(--text-secondary)', bg: 'var(--panel-bg)' };
+    case 'SPLIT':        return { text: 'SPLIT',               color: 'var(--accent-color)', bg: 'var(--accent-bg)' };
+    case 'REVERSE_SPLIT':return { text: 'AGRUPAMENTO',         color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' };
+    case 'CONVERSION_IN':return { text: 'CONVERSÃO (ENTRADA)', color: 'var(--color-info)',   bg: 'var(--color-info-bg)' };
+    case 'CONVERSION_OUT':return { text: 'CONVERSÃO (SAÍDA)',  color: 'var(--color-warning)',bg: 'var(--color-warning-bg)' };
+    default:             return { text: tx.type,               color: 'var(--text-secondary)', bg: 'var(--panel-bg)' };
   }
 }
 
@@ -127,6 +130,18 @@ export function getTransactionCircleDetails(tx: UnifiedTransaction): {
         emoji: '🔄',
         gradient: 'var(--color-danger-bg)',
         borderColor: 'rgba(var(--danger-rgb), 0.3)',
+      };
+    case 'CONVERSION_IN':
+      return {
+        emoji: '🔄',
+        gradient: 'var(--color-info-bg)',
+        borderColor: 'rgba(var(--info-rgb), 0.3)',
+      };
+    case 'CONVERSION_OUT':
+      return {
+        emoji: '🔄',
+        gradient: 'var(--color-warning-bg)',
+        borderColor: 'rgba(var(--warning-rgb), 0.3)',
       };
     default:
       return {
