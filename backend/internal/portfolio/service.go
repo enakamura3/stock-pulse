@@ -282,6 +282,89 @@ func (s *Service) GetPortfolioDetails(ctx context.Context, portfolioID, userID s
 	return p, activePositions, nil
 }
 
+// ConversionRequest representa os parâmetros para registrar uma conversão/incorporação societária entre dois ativos.
+type ConversionRequest struct {
+	SourceTicker       string
+	SourceQuantity     float64
+	SourceUnitPrice    float64
+	TargetTicker       string
+	TargetAssetType    string
+	TargetQuantity     float64
+	TargetUnitPrice    float64
+	TargetExchangeRate float64
+	ExecutedAt         time.Time
+}
+
+// ConversionResult retorna as duas transações (saída e entrada) geradas atomicamente pela conversão.
+type ConversionResult struct {
+	ConversionOut *Transaction `json:"conversion_out"`
+	ConversionIn  *Transaction `json:"conversion_in"`
+}
+
+func (s *Service) resolveOrCreateAsset(ctx context.Context, ticker, requestedAssetType string) (string, string, error) {
+	meta, err := s.repo.GetAssetMetadataByTicker(ctx, ticker)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", "", fmt.Errorf("erro ao consultar ativo no banco: %w", err)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		slog.InfoContext(ctx, "ativo não existe na base, importando", slog.String("ticker", ticker))
+		quote, err := s.marketProvider.GetQuote(ctx, ticker)
+		if err != nil {
+			return "", "", fmt.Errorf("ativo '%s' não encontrado no mercado: %w", ticker, err)
+		}
+
+		assetType := strings.ToUpper(strings.TrimSpace(requestedAssetType))
+		if assetType == "" {
+			assetType = determineAssetType(ticker, quote.Name, quote.Currency)
+		}
+
+		assetID, err := s.repo.CreateAsset(ctx, ticker, quote.Name, assetType, quote.Currency)
+		if err != nil {
+			return "", "", fmt.Errorf("erro ao registrar ativo localmente: %w", err)
+		}
+		return assetID, quote.Currency, nil
+	}
+	return meta.ID, meta.Currency, nil
+}
+
+func (s *Service) triggerAssetBackfillAsync(assetID, ticker, currency, baseCurrency string, executedAt time.Time) {
+	go func(id, tkr, curr, base string, execAt time.Time) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+
+		existing, err := s.repo.GetDailyPrices(bgCtx, id, time.Now().AddDate(0, 0, -7), time.Now())
+		if err == nil && len(existing) > 0 {
+			slog.InfoContext(bgCtx, "ativo já possui histórico recente", slog.String("ticker", tkr))
+
+			oldestDate, err := s.repo.GetOldestPriceDate(bgCtx, id)
+			if err == nil && !oldestDate.IsZero() && execAt.Before(oldestDate) {
+				slog.InfoContext(bgCtx, "transação antiga detectada, disparando BackfillGap", slog.String("ticker", tkr), slog.String("oldest_date", oldestDate.Format("2006-01-02")))
+				if err := s.BackfillGap(bgCtx, tkr, execAt); err != nil {
+					slog.ErrorContext(bgCtx, "falha ao rodar BackfillGap", slog.String("ticker", tkr), slog.Any("error", err))
+				}
+			}
+		} else {
+			slog.InfoContext(bgCtx, "iniciando preenchimento histórico máximo para ativo", slog.String("ticker", tkr))
+			if err := s.BackfillHistoricalPrices(bgCtx, id, tkr); err != nil {
+				slog.ErrorContext(bgCtx, "falha ao rodar backfill histórico", slog.String("ticker", tkr), slog.Any("error", err))
+			}
+		}
+
+		if curr == "USD" && base == "BRL" {
+			usdBrlID, err := s.repo.GetAssetByTicker(bgCtx, "USDBRL=X")
+			if err != nil {
+				usdBrlID, err = s.repo.CreateAsset(bgCtx, "USDBRL=X", "USD/BRL Currency Pair", "CURRENCY", "BRL")
+			}
+			if err == nil {
+				slog.InfoContext(bgCtx, "iniciando preenchimento cambial de USDBRL=X para carteira BRL")
+				if err := s.BackfillHistoricalPrices(bgCtx, usdBrlID, "USDBRL=X"); err != nil {
+					slog.ErrorContext(bgCtx, "falha ao rodar backfill histórico de USDBRL=X", slog.Any("error", err))
+				}
+			}
+		}
+	}(assetID, ticker, currency, baseCurrency, executedAt)
+}
+
 // AddTransaction registra uma nova transação, importando o ativo e disparando backfill se necessário.
 func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error) {
 	// Anti-IDOR: Valida se a carteira pertence ao usuário logado
@@ -296,29 +379,9 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	}
 
 	// Busca ou cria o ativo na base local
-	meta, err := s.repo.GetAssetMetadataByTicker(ctx, tx.Ticker)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("erro ao consultar ativo no banco: %w", err)
-	}
-	var assetID, currency string
-	if errors.Is(err, pgx.ErrNoRows) {
-		// Importa metadados do Yahoo Finance
-		slog.InfoContext(ctx, "ativo não existe na base, importando", slog.String("ticker", tx.Ticker))
-		quote, err := s.marketProvider.GetQuote(ctx, tx.Ticker)
-		if err != nil {
-			return nil, fmt.Errorf("ativo '%s' não encontrado no mercado: %w", tx.Ticker, err)
-		}
-
-		assetType := determineAssetType(tx.Ticker, quote.Name, quote.Currency)
-
-		assetID, err = s.repo.CreateAsset(ctx, tx.Ticker, quote.Name, assetType, quote.Currency)
-		if err != nil {
-			return nil, fmt.Errorf("erro ao registrar ativo localmente: %w", err)
-		}
-		currency = quote.Currency
-	} else {
-		assetID = meta.ID
-		currency = meta.Currency
+	assetID, currency, err := s.resolveOrCreateAsset(ctx, tx.Ticker, tx.AssetType)
+	if err != nil {
+		return nil, err
 	}
 
 	tx.AssetID = assetID
@@ -326,7 +389,7 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 	// Correção Cambial: Se a taxa não foi fornecida, busca automaticamente
 	tx.ExchangeRate = s.resolveTransactionExchangeRate(ctx, currency, p.BaseCurrency, tx.ExecutedAt, tx.ExchangeRate)
 
-	if tx.Type == "SELL" {
+	if tx.Type == "SELL" || tx.Type == "CONVERSION_OUT" {
 		if err := s.validateSellQuantity(ctx, userID, tx.PortfolioID, tx.AssetID, tx.Ticker, "", tx.Quantity, tx.ExecutedAt); err != nil {
 			return nil, err
 		}
@@ -339,47 +402,111 @@ func (s *Service) AddTransaction(ctx context.Context, userID string, tx *Transac
 		return nil, err
 	}
 
-	// Dispara o Auto-Backfill de 5 anos de forma assíncrona (Goroutine controlada)
-	go func(id, ticker, curr string) {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-		defer cancel()
-
-		// Verifica se o histórico já existe no banco
-		existing, err := s.repo.GetDailyPrices(bgCtx, id, time.Now().AddDate(0, 0, -7), time.Now())
-		if err == nil && len(existing) > 0 {
-			slog.InfoContext(bgCtx, "ativo já possui histórico recente", slog.String("ticker", ticker))
-
-			// Se possui histórico recente, vamos verificar se a transação é mais antiga que o nosso buraco
-			oldestDate, err := s.repo.GetOldestPriceDate(bgCtx, id)
-			if err == nil && !oldestDate.IsZero() && tx.ExecutedAt.Before(oldestDate) {
-				slog.InfoContext(bgCtx, "transação antiga detectada, disparando BackfillGap", slog.String("ticker", ticker), slog.String("oldest_date", oldestDate.Format("2006-01-02")))
-				if err := s.BackfillGap(bgCtx, ticker, tx.ExecutedAt); err != nil {
-					slog.ErrorContext(bgCtx, "falha ao rodar BackfillGap", slog.String("ticker", ticker), slog.Any("error", err))
-				}
-			}
-		} else {
-			slog.InfoContext(bgCtx, "iniciando preenchimento histórico máximo para ativo", slog.String("ticker", ticker))
-			if err := s.BackfillHistoricalPrices(bgCtx, id, ticker); err != nil {
-				slog.ErrorContext(bgCtx, "falha ao rodar backfill histórico", slog.String("ticker", ticker), slog.Any("error", err))
-			}
-		}
-
-		// Se o ativo for em USD e a carteira estiver em BRL, preenche também o histórico cambial de USDBRL=X!
-		if curr == "USD" && p.BaseCurrency == "BRL" {
-			usdBrlID, err := s.repo.GetAssetByTicker(bgCtx, "USDBRL=X")
-			if err != nil {
-				usdBrlID, err = s.repo.CreateAsset(bgCtx, "USDBRL=X", "USD/BRL Currency Pair", "CURRENCY", "BRL")
-			}
-			if err == nil {
-				slog.InfoContext(bgCtx, "iniciando preenchimento cambial de USDBRL=X para carteira BRL")
-				if err := s.BackfillHistoricalPrices(bgCtx, usdBrlID, "USDBRL=X"); err != nil {
-					slog.ErrorContext(bgCtx, "falha ao rodar backfill histórico de USDBRL=X", slog.Any("error", err))
-				}
-			}
-		}
-	}(assetID, tx.Ticker, currency)
+	// Dispara o Auto-Backfill de forma assíncrona (Goroutine controlada)
+	s.triggerAssetBackfillAsync(assetID, tx.Ticker, currency, p.BaseCurrency, tx.ExecutedAt)
 
 	return savedTx, nil
+}
+
+// ConvertAsset executa atomicamente a baixa por conversão do ativo de origem (CONVERSION_OUT) e a entrada no ativo de destino (CONVERSION_IN).
+func (s *Service) ConvertAsset(ctx context.Context, userID, portfolioID string, req ConversionRequest) (*ConversionResult, error) {
+	p, err := s.repo.GetPortfolioByID(ctx, portfolioID, userID)
+	if err != nil {
+		return nil, errors.New("carteira não encontrada ou acesso não autorizado")
+	}
+
+	sourceTicker := strings.ToUpper(strings.TrimSpace(req.SourceTicker))
+	targetTicker := strings.ToUpper(strings.TrimSpace(req.TargetTicker))
+	if sourceTicker == "" || targetTicker == "" {
+		return nil, errors.New("tickers de origem e destino são obrigatórios")
+	}
+	if strings.TrimSuffix(sourceTicker, ".SA") == strings.TrimSuffix(targetTicker, ".SA") {
+		return nil, errors.New("ativo de origem e destino devem ser diferentes")
+	}
+	if req.SourceQuantity <= calculator.FinancialEpsilon || req.TargetQuantity <= calculator.FinancialEpsilon || req.TargetUnitPrice <= calculator.FinancialEpsilon {
+		return nil, errors.New("quantidades e preço de aquisição do ativo de destino devem ser maiores que zero")
+	}
+
+	sourceMeta, err := s.repo.GetAssetMetadataByTicker(ctx, sourceTicker)
+	if err != nil {
+		return nil, fmt.Errorf("ativo de origem '%s' não encontrado na base", sourceTicker)
+	}
+
+	txs, err := s.repo.GetTransactionsByPortfolioID(ctx, portfolioID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao consultar transações da carteira: %w", err)
+	}
+
+	if err := validateSellQuantityFromTxs(txs, sourceMeta.ID, sourceTicker, "", req.SourceQuantity, req.ExecutedAt); err != nil {
+		return nil, err
+	}
+
+	sourceUnitPrice := req.SourceUnitPrice
+	if sourceUnitPrice <= calculator.FinancialEpsilon {
+		sourceUnitPrice = calculateAveragePriceFromTxs(txs, sourceMeta.ID, sourceTicker, req.ExecutedAt)
+	}
+
+	targetAssetID, targetCurrency, err := s.resolveOrCreateAsset(ctx, targetTicker, req.TargetAssetType)
+	if err != nil {
+		return nil, err
+	}
+	if targetAssetID == sourceMeta.ID {
+		return nil, errors.New("ativo de origem e destino devem ser diferentes")
+	}
+
+	sourceRate := s.resolveTransactionExchangeRate(ctx, sourceMeta.Currency, p.BaseCurrency, req.ExecutedAt, 0)
+	targetRate := s.resolveTransactionExchangeRate(ctx, targetCurrency, p.BaseCurrency, req.ExecutedAt, req.TargetExchangeRate)
+
+	outTx := &Transaction{
+		PortfolioID:  portfolioID,
+		AssetID:      sourceMeta.ID,
+		Ticker:       sourceTicker,
+		Type:         "CONVERSION_OUT",
+		Quantity:     req.SourceQuantity,
+		UnitPrice:    sourceUnitPrice,
+		TotalCost:    req.SourceQuantity * sourceUnitPrice,
+		Fee:          0,
+		ExchangeRate: sourceRate,
+		ExecutedAt:   req.ExecutedAt,
+	}
+
+	inTx := &Transaction{
+		PortfolioID:  portfolioID,
+		AssetID:      targetAssetID,
+		Ticker:       targetTicker,
+		AssetType:    req.TargetAssetType,
+		Type:         "CONVERSION_IN",
+		Quantity:     req.TargetQuantity,
+		UnitPrice:    req.TargetUnitPrice,
+		TotalCost:    req.TargetQuantity * req.TargetUnitPrice,
+		Fee:          0,
+		ExchangeRate: targetRate,
+		ExecutedAt:   req.ExecutedAt,
+	}
+
+	var savedOut, savedIn *Transaction
+	err = s.uow.Do(ctx, func(txCtx context.Context) error {
+		var txErr error
+		savedOut, txErr = s.repo.CreateTransaction(txCtx, outTx)
+		if txErr != nil {
+			return fmt.Errorf("erro ao registrar saída da conversão: %w", txErr)
+		}
+		savedIn, txErr = s.repo.CreateTransaction(txCtx, inTx)
+		if txErr != nil {
+			return fmt.Errorf("erro ao registrar entrada da conversão: %w", txErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.triggerAssetBackfillAsync(targetAssetID, targetTicker, targetCurrency, p.BaseCurrency, req.ExecutedAt)
+
+	return &ConversionResult{
+		ConversionOut: savedOut,
+		ConversionIn:  savedIn,
+	}, nil
 }
 
 // DeleteTransaction apaga uma transação da carteira.
@@ -522,7 +649,7 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, portfolioID, tx
 
 	tx.ID = txID
 	tx.PortfolioID = portfolioID
-	if tx.Type == "SELL" {
+	if tx.Type == "SELL" || tx.Type == "CONVERSION_OUT" {
 		if err := s.validateSellQuantity(ctx, userID, portfolioID, tx.AssetID, tx.Ticker, txID, tx.Quantity, tx.ExecutedAt); err != nil {
 			return err
 		}
@@ -663,7 +790,7 @@ func (s *Service) UpdateAssetTypeAdmin(ctx context.Context, assetID, assetType s
 	return s.repo.UpdateAssetType(ctx, assetID, assetType)
 }
 
-// validateSellQuantity verifica se há saldo suficiente do ativo no portfólio para realizar a venda.
+// validateSellQuantity verifica se há saldo suficiente do ativo no portfólio para realizar a venda ou saída por conversão.
 // Na atualização (UpdateTransaction), excludeTxID permite desconsiderar a transação original do cálculo.
 func (s *Service) validateSellQuantity(ctx context.Context, userID, portfolioID, assetID, ticker, excludeTxID string, sellQty float64, executedAt time.Time) error {
 	if sellQty <= calculator.FinancialEpsilon {
@@ -675,6 +802,10 @@ func (s *Service) validateSellQuantity(ctx context.Context, userID, portfolioID,
 		return fmt.Errorf("erro ao consultar transações da carteira: %w", err)
 	}
 
+	return validateSellQuantityFromTxs(txs, assetID, ticker, excludeTxID, sellQty, executedAt)
+}
+
+func filterAndSortAssetTxs(txs []Transaction, assetID, ticker, excludeTxID string) []Transaction {
 	var relevantTxs []Transaction
 	upperTicker := strings.ToUpper(strings.TrimSpace(ticker))
 	for _, t := range txs {
@@ -687,6 +818,22 @@ func (s *Service) validateSellQuantity(ctx context.Context, userID, portfolioID,
 		}
 	}
 
+	sort.Slice(relevantTxs, func(i, j int) bool {
+		if relevantTxs[i].ExecutedAt.Equal(relevantTxs[j].ExecutedAt) {
+			return relevantTxs[i].CreatedAt.Before(relevantTxs[j].CreatedAt)
+		}
+		return relevantTxs[i].ExecutedAt.Before(relevantTxs[j].ExecutedAt)
+	})
+
+	return relevantTxs
+}
+
+func validateSellQuantityFromTxs(txs []Transaction, assetID, ticker, excludeTxID string, sellQty float64, executedAt time.Time) error {
+	if sellQty <= calculator.FinancialEpsilon {
+		return errors.New("quantidade de venda deve ser maior que zero")
+	}
+
+	relevantTxs := filterAndSortAssetTxs(txs, assetID, ticker, excludeTxID)
 	simulatedTx := Transaction{
 		Type:       "SELL",
 		Quantity:   sellQty,
@@ -705,7 +852,7 @@ func (s *Service) validateSellQuantity(ctx context.Context, userID, portfolioID,
 	runningQty := 0.0
 	for _, t := range relevantTxs {
 		switch t.Type {
-		case "BUY", "BONUS":
+		case "BUY", "BONUS", "CONVERSION_IN":
 			runningQty += t.Quantity
 		case "SPLIT":
 			if t.Quantity > calculator.FinancialEpsilon {
@@ -715,7 +862,7 @@ func (s *Service) validateSellQuantity(ctx context.Context, userID, portfolioID,
 			if t.Quantity > calculator.FinancialEpsilon {
 				runningQty = math.Floor(runningQty / t.Quantity)
 			}
-		case "SELL":
+		case "SELL", "CONVERSION_OUT":
 			runningQty -= t.Quantity
 		}
 
@@ -725,5 +872,23 @@ func (s *Service) validateSellQuantity(ctx context.Context, userID, portfolioID,
 	}
 
 	return nil
+}
+
+func calculateAveragePriceFromTxs(txs []Transaction, assetID, ticker string, upToDate time.Time) float64 {
+	relevantTxs := filterAndSortAssetTxs(txs, assetID, ticker, "")
+	var qty, totalCost, avgPrice float64
+	for _, t := range relevantTxs {
+		if t.ExecutedAt.After(upToDate) {
+			break
+		}
+		qty, totalCost, avgPrice = calculator.UpdatePositionOnTransaction(
+			qty, totalCost, avgPrice,
+			t.Type, t.Quantity, t.UnitPrice, t.ExchangeRate, t.Fee,
+		)
+	}
+	if avgPrice <= calculator.FinancialEpsilon {
+		return 0
+	}
+	return avgPrice
 }
 

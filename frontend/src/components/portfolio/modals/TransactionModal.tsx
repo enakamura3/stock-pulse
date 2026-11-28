@@ -1,6 +1,6 @@
 import React from 'react';
-import { SearchResult } from '../types';
-import { formatCurrencyInput, parseCurrency, parsePastedCurrency, formatUnitPriceInput, parsePastedUnitPrice, formatExchangeRateInput, parsePastedExchangeRate } from '../helpers';
+import { Position, SearchResult, TxModalType } from '../types';
+import { formatCurrencyInput, formatQuantity, parseCurrency, parsePastedCurrency, formatUnitPriceInput, parsePastedUnitPrice, formatExchangeRateInput, parsePastedExchangeRate } from '../helpers';
 
 export interface TransactionModalProps {
   showTxModal: boolean;
@@ -17,8 +17,13 @@ export interface TransactionModalProps {
   searchResults: SearchResult[];
   handleSelectAsset: (s: string) => void;
   isAddingTx: boolean;
-  txType: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS';
-  setTxType: (t: 'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS') => void;
+  txType: TxModalType;
+  setTxType: (t: TxModalType) => void;
+  positions?: Position[];
+  convSourceTicker?: string;
+  setConvSourceTicker?: (s: string) => void;
+  convSourceQty?: string | number;
+  setConvSourceQty?: (q: string | number) => void;
   txQuantity: string | number;
   setTxQuantity: (q: string | number) => void;
   txUnitPrice: string | number;
@@ -51,6 +56,11 @@ export default function TransactionModal({
   isAddingTx,
   txType,
   setTxType,
+  positions = [],
+  convSourceTicker = '',
+  setConvSourceTicker,
+  convSourceQty = '',
+  setConvSourceQty,
   txQuantity,
   setTxQuantity,
   txUnitPrice,
@@ -75,12 +85,17 @@ export default function TransactionModal({
   const netTotal = txType === 'SELL' ? grossTotal - parsedFee : grossTotal + parsedFee;
 
   const currencySymbol = selectedAssetCurrency === 'USD' ? '$' : 'R$';
+  const isConversion = txType === 'CONVERSION' && !editingTxId;
+  const isConversionLeg = txType === 'CONVERSION' || txType === 'CONVERSION_IN' || txType === 'CONVERSION_OUT';
 
   const handleClose = () => {
     setShowTxModal(false);
     setEditingTxId(null);
     setSearchQuery('');
     if (setTxAssetType) setTxAssetType('');
+    if (setConvSourceTicker) setConvSourceTicker('');
+    if (setConvSourceQty) setConvSourceQty('');
+    if (isConversion) setTxType('BUY');
   };
 
   return (
@@ -107,8 +122,55 @@ export default function TransactionModal({
         </div>
 
         <form onSubmit={handleAddTransaction} className="flex-col gap-md">
+          {isConversion && (
+            <div className="flex-col gap-sm" style={{ padding: '0.75rem', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--panel-border)' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="conv-source-ticker" className="form-label">Ativo de Origem (Saída)</label>
+                <select
+                  id="conv-source-ticker"
+                  className="form-input"
+                  value={convSourceTicker}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (setConvSourceTicker) setConvSourceTicker(val);
+                    const found = positions.find((p) => p.ticker === val);
+                    if (setConvSourceQty) setConvSourceQty(found ? found.quantity : '');
+                  }}
+                  required
+                  disabled={isAddingTx}
+                >
+                  <option value="" style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>
+                    Selecione o ativo em carteira...
+                  </option>
+                  {positions.map((pos) => (
+                    <option key={pos.asset_id || pos.ticker} value={pos.ticker} style={{ background: 'var(--option-bg)', color: 'var(--option-color)' }}>
+                      {pos.ticker} — Saldo: {formatQuantity(pos.quantity)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="conv-source-qty" className="form-label">Quantidade de Saída</label>
+                <input
+                  id="conv-source-qty"
+                  className="form-input"
+                  type="number"
+                  step="any"
+                  value={convSourceQty}
+                  onChange={(e) => {
+                    if (setConvSourceQty) setConvSourceQty(e.target.value);
+                  }}
+                  placeholder="0"
+                  required
+                  disabled={isAddingTx}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="form-group" style={{ position: 'relative' }}>
-            <label className="form-label">Ativo / Ticker</label>
+            <label className="form-label">{isConversion ? 'Ativo de Destino (Novo Ticker)' : 'Ativo / Ticker'}</label>
             {editingTxId ? (
               <input
                 className="form-input"
@@ -254,13 +316,35 @@ export default function TransactionModal({
               >
                 🗜️ AGRUP.
               </button>
+              {!editingTxId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTxType('CONVERSION');
+                    setTxFee('');
+                  }}
+                  disabled={isAddingTx}
+                  className="flex-row justify-center items-center font-bold text-sm"
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    border: txType === 'CONVERSION' ? '1px solid var(--color-info)' : '1px solid var(--panel-border)',
+                    background: txType === 'CONVERSION' ? 'var(--color-info-bg)' : 'transparent',
+                    color: txType === 'CONVERSION' ? 'var(--color-info)' : 'var(--text-secondary)',
+                  }}
+                >
+                  🔄 CONVERSÃO
+                </button>
+              )}
             </div>
           </div>
 
           <div className="flex-row flex-wrap gap-md">
             <div className="form-group" style={{ flex: 1 }}>
               <label htmlFor="tx-quantity" className="form-label">
-                {txType === 'SPLIT' || txType === 'REVERSE_SPLIT' ? 'Fator / Multiplicador' : 'Quantidade'}
+                {txType === 'SPLIT' || txType === 'REVERSE_SPLIT' ? 'Fator / Multiplicador' : isConversion ? 'Quantidade Recebida' : 'Quantidade'}
               </label>
               <input
                 id="tx-quantity"
@@ -284,7 +368,9 @@ export default function TransactionModal({
 
             {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && (
               <div className="form-group" style={{ flex: 1 }}>
-                <label htmlFor="tx-unit-price" className="form-label">Preço Unitário ({selectedAssetCurrency})</label>
+                <label htmlFor="tx-unit-price" className="form-label">
+                  {isConversion ? `Preço de Aquisição / Novo PM (${selectedAssetCurrency})` : `Preço Unitário (${selectedAssetCurrency})`}
+                </label>
                 <input
                   id="tx-unit-price"
                   className="form-input"
@@ -308,7 +394,7 @@ export default function TransactionModal({
             )}
           </div>
 
-          {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && txType !== 'BONUS' && (
+          {txType !== 'SPLIT' && txType !== 'REVERSE_SPLIT' && txType !== 'BONUS' && !isConversionLeg && (
             <div className="form-group">
               <label htmlFor="tx-fee" className="form-label">Corretagem / Taxas ({selectedAssetCurrency})</label>
               <input
@@ -397,7 +483,7 @@ export default function TransactionModal({
               )}
               <div className="flex-row justify-between text-sm font-bold mt-xs" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem', color: 'var(--text-primary)' }}>
                 <span>Total Operação:</span>
-                <span style={{ color: txType === 'BUY' ? '#00e676' : '#ff3d00' }}>
+                <span style={{ color: isConversionLeg ? 'var(--color-info)' : txType === 'BUY' ? '#00e676' : '#ff3d00' }}>
                   {currencySymbol} {netTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
                 </span>
               </div>

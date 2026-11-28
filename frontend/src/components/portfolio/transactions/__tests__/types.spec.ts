@@ -78,6 +78,8 @@ describe('transactions/types utilities', () => {
       expect(getBadge({ ...baseTx, type: 'BONUS' }).text).toBe('BÔNUS');
       expect(getBadge({ ...baseTx, type: 'SPLIT' }).text).toBe('SPLIT');
       expect(getBadge({ ...baseTx, type: 'REVERSE_SPLIT' }).text).toBe('AGRUPAMENTO');
+      expect(getBadge({ ...baseTx, type: 'CONVERSION_IN' }).text).toBe('CONVERSÃO (ENTRADA)');
+      expect(getBadge({ ...baseTx, type: 'CONVERSION_OUT' }).text).toBe('CONVERSÃO (SAÍDA)');
       expect(getBadge({ ...baseTx, type: 'UNKNOWN_TYPE' as any }).text).toBe('UNKNOWN_TYPE');
     });
   });
@@ -124,6 +126,8 @@ describe('transactions/types utilities', () => {
       expect(getTransactionCircleDetails({ ...baseTx, type: 'BONUS' }).emoji).toBe('🎁');
       expect(getTransactionCircleDetails({ ...baseTx, type: 'SPLIT' }).emoji).toBe('⚡');
       expect(getTransactionCircleDetails({ ...baseTx, type: 'REVERSE_SPLIT' }).emoji).toBe('🔄');
+      expect(getTransactionCircleDetails({ ...baseTx, type: 'CONVERSION_IN' }).emoji).toBe('🔄');
+      expect(getTransactionCircleDetails({ ...baseTx, type: 'CONVERSION_OUT' }).emoji).toBe('🔄');
       expect(getTransactionCircleDetails({ ...baseTx, type: 'UNKNOWN' as any }).emoji).toBe('📄');
     });
   });

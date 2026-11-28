@@ -499,8 +499,8 @@ export function getLocalDateString(date: Date = new Date()): string {
 
 function applyTxQtyStep(qty: number, tx: UnifiedTransaction): number {
   const q = tx.quantity || 0;
-  if (tx.type === 'BUY' || tx.type === 'BONUS') return qty + q;
-  if (tx.type === 'SELL') return qty - q;
+  if (tx.type === 'BUY' || tx.type === 'BONUS' || tx.type === 'CONVERSION_IN') return qty + q;
+  if (tx.type === 'SELL' || tx.type === 'CONVERSION_OUT') return qty - q;
   if (tx.type === 'SPLIT' && q > 1e-6) return qty * q;
   if (tx.type === 'REVERSE_SPLIT' && q > 1e-6) return Math.floor(qty / q);
   return qty;

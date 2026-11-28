@@ -516,16 +516,16 @@ describe('TransactionHistory Component', () => {
   it('displays up to 5 decimal places for transaction unit prices when present', () => {
     const txs: UnifiedTransaction[] = [
       {
-        id: 'tx-snme11',
+        id: 'tx-abcd11',
         portfolio_id: 'port-1',
         module: 'RV',
         date: currentDate(10),
-        asset_name: 'SNME11',
+        asset_name: 'ABCD11',
         asset_type: 'FII',
         type: 'BUY',
         quantity: 100,
-        unit_price: 9.12345,
-        total_value: 912.345,
+        unit_price: 10.12345,
+        total_value: 1012.345,
         currency: 'BRL',
       },
     ];
@@ -542,7 +542,79 @@ describe('TransactionHistory Component', () => {
       />
     );
 
-    expect(screen.getByText(/9,12345/)).toBeInTheDocument();
+    expect(screen.getByText(/10,12345/)).toBeInTheDocument();
+  });
+
+  it('renders CONVERSION_OUT and CONVERSION_IN without inflating buy/sell totals and supports CONVERSION filter', () => {
+    const txs: UnifiedTransaction[] = [
+      {
+        id: 'tx-orig-buy',
+        portfolio_id: 'port-1',
+        module: 'RV',
+        date: currentDate(10),
+        asset_name: 'ORIG11.SA',
+        asset_type: 'FII',
+        type: 'BUY',
+        quantity: 200,
+        unit_price: 10,
+        total_value: 2000,
+        currency: 'BRL',
+      },
+      {
+        id: 'tx-conv-out',
+        portfolio_id: 'port-1',
+        module: 'RV',
+        date: currentDate(5),
+        asset_name: 'ORIG11.SA',
+        asset_type: 'FII',
+        type: 'CONVERSION_OUT',
+        quantity: 200,
+        unit_price: 10,
+        total_value: 2000,
+        currency: 'BRL',
+      },
+      {
+        id: 'tx-conv-in',
+        portfolio_id: 'port-1',
+        module: 'RV',
+        date: currentDate(5),
+        asset_name: 'DEST11.SA',
+        asset_type: 'FII',
+        type: 'CONVERSION_IN',
+        quantity: 160,
+        unit_price: 12.34567,
+        total_value: 1975.31,
+        currency: 'BRL',
+      },
+    ];
+
+    render(
+      <TransactionHistory
+        transactions={txs}
+        filterTxTicker=""
+        setFilterTxTicker={mockSetFilterTxTicker}
+        handleEditTransaction={mockHandleEditTransaction}
+        handleDeleteTransaction={mockHandleDeleteTransaction}
+        onLaunchOperation={mockOnLaunchOperation}
+        kpiCurrency="BRL"
+      />
+    );
+
+    expect(screen.getByText('CONVERSÃO (SAÍDA)')).toBeInTheDocument();
+    expect(screen.getByText('CONVERSÃO (ENTRADA)')).toBeInTheDocument();
+    expect(screen.getByText('0 un.')).toBeInTheDocument();
+    expect(screen.getByText('160 un.')).toBeInTheDocument();
+
+    // Total Comprado & Aporte Líquido stay R$ 2.000,00 (only the BUY); Total Vendido stays R$ 0,00
+    expect(screen.getByText('Total Vendido').nextElementSibling).toHaveTextContent('R$ 0,00');
+    expect(screen.getByText('Total Comprado').nextElementSibling).toHaveTextContent('R$ 2.000,00');
+
+    const typeSelect = screen.getByDisplayValue('Tipo: Todos');
+    fireEvent.change(typeSelect, { target: { value: 'CONVERSION' } });
+
+    expect(screen.getByText('CONVERSÃO (SAÍDA)')).toBeInTheDocument();
+    expect(screen.getByText('CONVERSÃO (ENTRADA)')).toBeInTheDocument();
+    expect(screen.queryByText('COMPRA')).not.toBeInTheDocument();
   });
 });
 

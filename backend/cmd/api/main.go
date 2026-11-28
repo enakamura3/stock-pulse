@@ -285,6 +285,7 @@ func main() {
 			r.Delete("/portfolios/{id}", portfolioHandler.DeletePortfolio)
 			r.Get("/portfolios/{id}/transactions", portfolioHandler.GetTransactions)
 			r.Post("/portfolios/{id}/transactions", portfolioHandler.AddTransaction)
+			r.Post("/portfolios/{id}/conversions", portfolioHandler.ConvertAsset)
 			r.Post("/portfolios/{id}/transactions/bulk", portfolioHandler.BulkImportTransactions)
 			r.Put("/portfolios/{id}/transactions/{txId}", portfolioHandler.UpdateTransaction)
 			r.Delete("/portfolios/{id}/transactions/{txId}", portfolioHandler.DeleteTransaction)

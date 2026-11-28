@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import TransactionModal, { TransactionModalProps } from './TransactionModal';
+import { TxModalType } from '../types';
 
 function TransactionModalWrapper(props: Partial<TransactionModalProps> = {}) {
   const [txUnitPrice, setTxUnitPrice] = useState<string | number>(props.txUnitPrice ?? '');
   const [txFee, setTxFee] = useState<string | number>(props.txFee ?? '');
   const [txQuantity, setTxQuantity] = useState<string | number>(props.txQuantity ?? '10');
-  const [txType, setTxType] = useState<'BUY' | 'SELL' | 'SPLIT' | 'REVERSE_SPLIT' | 'BONUS'>(props.txType ?? 'BUY');
+  const [txType, setTxType] = useState<TxModalType>(props.txType ?? 'BUY');
+  const [convSourceTicker, setConvSourceTicker] = useState<string>(props.convSourceTicker ?? '');
+  const [convSourceQty, setConvSourceQty] = useState<string | number>(props.convSourceQty ?? '');
   const [txAssetType, setTxAssetType] = useState<string>(props.txAssetType ?? 'STOCK_BR');
   const [searchQuery, setSearchQuery] = useState<string>(props.searchQuery ?? 'PETR4');
   const [txExchangeRate, setTxExchangeRate] = useState<string | number>(props.txExchangeRate ?? 1.0);
@@ -36,6 +39,11 @@ function TransactionModalWrapper(props: Partial<TransactionModalProps> = {}) {
     isAddingTx: false,
     txType,
     setTxType: props.setTxType ?? setTxType,
+    positions: props.positions ?? [],
+    convSourceTicker,
+    setConvSourceTicker: props.setConvSourceTicker ?? setConvSourceTicker,
+    convSourceQty,
+    setConvSourceQty: props.setConvSourceQty ?? setConvSourceQty,
     txQuantity,
     setTxQuantity: props.setTxQuantity ?? setTxQuantity,
     txUnitPrice,
@@ -52,7 +60,7 @@ function TransactionModalWrapper(props: Partial<TransactionModalProps> = {}) {
     ...props,
   };
 
-  return <TransactionModal {...defaultProps} txType={txType} txUnitPrice={txUnitPrice} txFee={txFee} txQuantity={txQuantity} />;
+  return <TransactionModal {...defaultProps} txType={txType} convSourceTicker={convSourceTicker} convSourceQty={convSourceQty} txUnitPrice={txUnitPrice} txFee={txFee} txQuantity={txQuantity} />;
 }
 
 describe('TransactionModal', () => {
@@ -345,5 +353,44 @@ describe('TransactionModal', () => {
     expect(submitBtn).not.toBeDisabled();
     fireEvent.submit(submitBtn.closest('form')!);
     expect(handleAddTransactionMock).toHaveBeenCalled();
+  });
+
+  it('supports CONVERSION mode, auto-fills source quantity, allows editing source qty, and resets on close', () => {
+    const setShowTxModalMock = vi.fn();
+    const positions = [
+      { asset_id: 'a-orig', ticker: 'ORIG11.SA', name: 'Fundo Origem', type: 'FII', currency: 'BRL', quantity: 200, average_price: 10, total_cost: 2000 },
+    ];
+
+    render(
+      <TransactionModalWrapper
+        positions={positions}
+        setShowTxModal={setShowTxModalMock}
+        txUnitPrice="12,34567"
+        txQuantity="160"
+      />
+    );
+
+    fireEvent.click(screen.getByText(/🔄 CONVERSÃO/i));
+    expect(screen.getByLabelText(/Ativo de Origem \(Saída\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ativo de Destino \(Novo Ticker\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Quantidade Recebida/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Preço de Aquisição \/ Novo PM/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Corretagem \/ Taxas/i)).not.toBeInTheDocument();
+
+    const sourceSelect = screen.getByLabelText(/Ativo de Origem \(Saída\)/i) as HTMLSelectElement;
+    fireEvent.change(sourceSelect, { target: { value: 'ORIG11.SA' } });
+    const sourceQtyInput = screen.getByLabelText(/Quantidade de Saída/i) as HTMLInputElement;
+    expect(sourceQtyInput.value).toBe('200');
+
+    fireEvent.change(sourceQtyInput, { target: { value: '100' } });
+    expect(sourceQtyInput.value).toBe('100');
+
+    // Selecting empty resets source qty
+    fireEvent.change(sourceSelect, { target: { value: '' } });
+    expect(sourceQtyInput.value).toBe('');
+
+    // Closing resets CONVERSION back to BUY
+    fireEvent.click(screen.getByText('✕'));
+    expect(setShowTxModalMock).toHaveBeenCalledWith(false);
   });
 });

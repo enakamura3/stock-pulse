@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/onigiri/stock-pulse/backend/internal/calculator"
 	"github.com/onigiri/stock-pulse/backend/internal/dividend"
 	"github.com/onigiri/stock-pulse/backend/internal/market"
 	"github.com/stretchr/testify/assert"
@@ -1276,12 +1278,314 @@ func TestService_BulkAddTransactions(t *testing.T) {
 			"invalid_date;PETR4.SA;BUY;10;30.0\n" +
 			"2024-01-10;PETR4.SA;BUY;10;30.0;1.0;2.5\n" +
 			"10/01/2024;PETR4.SA;BUY;10;30.0;1.0;2.5\n" +
+			"2024-01-10;PETR4.SA;CONVERSION_OUT;5;0;1.0;0\n" +
+			"2024-01-10;PETR4.SA;CONVERSION_IN;5;10.0;1.0;0\n" +
 			"2024-01-10;VALE3.SA;BUY;5;60.0;1.0;0.0\n"
 
 		file := &mockMultipartFile{bytes.NewReader([]byte(csvContent))}
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "tx-prev", AssetID: "a1", Ticker: "PETR4.SA", Type: "BUY", Quantity: 20, UnitPrice: 30, ExecutedAt: time.Date(2024, 1, 5, 0, 0, 0, 0, time.UTC)},
+		}, nil)
 		res, err := s.BulkAddTransactions(context.Background(), "u1", "p1", file)
 		assert.NoError(t, err)
-		assert.Equal(t, 2, res.Success)
+		assert.Equal(t, 4, res.Success)
 		assert.Len(t, res.Errors, 7)
+	})
+}
+
+type failingUOW struct{}
+
+func (f *failingUOW) Do(ctx context.Context, fn func(ctx context.Context) error) error {
+	return errors.New("uow commit failure")
+}
+
+func TestService_ConvertAsset(t *testing.T) {
+	execDate := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+
+	t.Run("Portfolio Not Found", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(nil, errors.New("not found"))
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "carteira não encontrada")
+	})
+
+	t.Run("Same Ticker Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "ORIG11", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "origem e destino devem ser diferentes")
+	})
+
+	t.Run("Invalid Quantities or Price", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 0, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "maiores que zero")
+	})
+
+	t.Run("Insufficient Balance Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "a-orig", Ticker: "ORIG11.SA", Currency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 100, UnitPrice: 10.0, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+		}, nil)
+
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 200, TargetQuantity: 160, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "saldo insuficiente")
+	})
+
+	t.Run("Success Atomic Conversion with Automatic Source Average Price", func(t *testing.T) {
+		s, repo, ms, mp := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "a-orig", Ticker: "ORIG11.SA", Currency: "BRL", AssetType: "FII"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 60, UnitPrice: 10.00, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -2, 0)},
+			{ID: "t2", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 40, UnitPrice: 15.00, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+		}, nil)
+
+		// Target DEST11.SA imported as new asset
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "DEST11.SA").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
+		mp.On("GetQuote", mock.Anything, "DEST11.SA").Return(&market.Quote{Name: "Fundo Destino FII", Currency: "BRL"}, nil)
+		repo.On("CreateAsset", mock.Anything, "DEST11.SA", "Fundo Destino FII", "FII", "BRL").Return("a-dest", nil)
+
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Type == "CONVERSION_OUT" && tx.AssetID == "a-orig" &&
+				math.Abs(tx.Quantity-100) < calculator.FinancialEpsilon &&
+				math.Abs(tx.UnitPrice-12.00) < calculator.FinancialEpsilon &&
+				math.Abs(tx.TotalCost-1200.0) < calculator.FinancialEpsilon &&
+				tx.Fee < calculator.FinancialEpsilon
+		})).Return(&Transaction{ID: "tx-out", Type: "CONVERSION_OUT", Quantity: 100, UnitPrice: 12.00, TotalCost: 1200.0}, nil).Once()
+
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Type == "CONVERSION_IN" && tx.AssetID == "a-dest" &&
+				math.Abs(tx.Quantity-80) < calculator.FinancialEpsilon &&
+				math.Abs(tx.UnitPrice-15.12345) < calculator.FinancialEpsilon &&
+				tx.Fee < calculator.FinancialEpsilon
+		})).Return(&Transaction{ID: "tx-in", Type: "CONVERSION_IN", Quantity: 80, UnitPrice: 15.12345, TotalCost: 80 * 15.12345}, nil).Once()
+
+		repo.On("GetDailyPrices", mock.Anything, "a-dest", mock.Anything, mock.Anything).Return([]DailyPrice{{}}, nil).Maybe()
+		repo.On("GetOldestPriceDate", mock.Anything, "a-dest").Return(time.Time{}, nil).Maybe()
+		ms.On("GetHistoricalPrices", mock.Anything, "DEST11.SA", "10y").Return([]market.HistoricalPrice{}, nil).Maybe()
+
+		res, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker:    "ORIG11.SA",
+			SourceQuantity:  100,
+			TargetTicker:    "DEST11.SA",
+			TargetAssetType: "FII",
+			TargetQuantity:  80,
+			TargetUnitPrice: 15.12345,
+			ExecutedAt:      execDate,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, "tx-out", res.ConversionOut.ID)
+		assert.Equal(t, "tx-in", res.ConversionIn.ID)
+	})
+
+	t.Run("UnitOfWork Error", func(t *testing.T) {
+		repo := new(MockPortfolioRepo)
+		ms := new(MockMarketService)
+		mp := new(MockMarketProvider)
+		s := NewService(repo, ms, mp, nil, &failingUOW{})
+
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "a-orig", Ticker: "ORIG11.SA", Currency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "DEST11.SA").Return(&AssetMetadata{ID: "a-dest", Ticker: "DEST11.SA", Currency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 100, UnitPrice: 10.0, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+		}, nil)
+
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", SourceQuantity: 100, TargetTicker: "DEST11.SA", TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "uow commit failure")
+	})
+
+	t.Run("Missing Tickers Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "", TargetTicker: "DEST11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "tickers de origem e destino são obrigatórios")
+	})
+
+	t.Run("Source Asset Not Found Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(nil, errors.New("not found"))
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "ativo de origem 'ORIG11.SA' não encontrado na base")
+	})
+
+	t.Run("GetTransactions Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "a-orig", Ticker: "ORIG11.SA", Currency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{}, errors.New("db failure"))
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "erro ao consultar transações da carteira")
+	})
+
+	t.Run("Resolve Target Asset Error", func(t *testing.T) {
+		s, repo, _, mp := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "a-orig", Ticker: "ORIG11.SA", Currency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 100, UnitPrice: 10.0, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+		}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "DEST11.SA").Return((*AssetMetadata)(nil), pgx.ErrNoRows)
+		mp.On("GetQuote", mock.Anything, "DEST11.SA").Return(nil, errors.New("quote unavailable"))
+
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "não encontrado no mercado")
+	})
+
+	t.Run("Same Resolved Asset ID Error", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "same-id", Ticker: "ORIG11.SA", Currency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "same-id", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 100, UnitPrice: 10.0, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+		}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "OLD11.SA").Return(&AssetMetadata{ID: "same-id", Ticker: "OLD11.SA", Currency: "BRL"}, nil)
+
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "OLD11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "ativo de origem e destino devem ser diferentes")
+	})
+
+	t.Run("CreateTransaction Error on CONVERSION_OUT", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "a-orig", Ticker: "ORIG11.SA", Currency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "DEST11.SA").Return(&AssetMetadata{ID: "a-dest", Ticker: "DEST11.SA", Currency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 100, UnitPrice: 10.0, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+		}, nil)
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Type == "CONVERSION_OUT"
+		})).Return(nil, errors.New("insert out failed"))
+
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "erro ao registrar saída da conversão")
+	})
+
+	t.Run("CreateTransaction Error on CONVERSION_IN", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "ORIG11.SA").Return(&AssetMetadata{ID: "a-orig", Ticker: "ORIG11.SA", Currency: "BRL"}, nil)
+		repo.On("GetAssetMetadataByTicker", mock.Anything, "DEST11.SA").Return(&AssetMetadata{ID: "a-dest", Ticker: "DEST11.SA", Currency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 100, UnitPrice: 10.0, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+		}, nil)
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Type == "CONVERSION_OUT"
+		})).Return(&Transaction{ID: "tx-out"}, nil)
+		repo.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx *Transaction) bool {
+			return tx.Type == "CONVERSION_IN"
+		})).Return(nil, errors.New("insert in failed"))
+
+		_, err := s.ConvertAsset(context.Background(), "u1", "p1", ConversionRequest{
+			SourceTicker: "ORIG11.SA", TargetTicker: "DEST11.SA", SourceQuantity: 100, TargetQuantity: 80, TargetUnitPrice: 12.50, ExecutedAt: execDate,
+		})
+		assert.ErrorContains(t, err, "erro ao registrar entrada da conversão")
+	})
+
+	t.Run("Helper Edge Cases", func(t *testing.T) {
+		err := validateSellQuantityFromTxs(nil, "a-orig", "ORIG11.SA", "", 0, execDate)
+		assert.ErrorContains(t, err, "quantidade de venda deve ser maior que zero")
+
+		avg := calculateAveragePriceFromTxs([]Transaction{
+			{ID: "b1", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BONUS", Quantity: 10, UnitPrice: 0, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, -1, 0)},
+			{ID: "t2", AssetID: "a-orig", Ticker: "ORIG11.SA", Type: "BUY", Quantity: 100, UnitPrice: 10, ExchangeRate: 1.0, ExecutedAt: execDate.AddDate(0, 0, 5)},
+		}, "a-orig", "ORIG11.SA", execDate)
+		assert.True(t, avg < calculator.FinancialEpsilon)
+	})
+}
+
+func TestService_ConversionDividendsAndPerformance(t *testing.T) {
+	t.Run("Dividends keep historical source asset events and compute target asset after conversion", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		d1 := time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)
+		dConv := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+		dAfter := time.Date(2025, 7, 10, 0, 0, 0, 0, time.UTC)
+
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", AssetType: "FII", Currency: "BRL", Type: "BUY", Quantity: 100, UnitPrice: 10.0, ExecutedAt: d1},
+			{ID: "t2", AssetID: "a-orig", Ticker: "ORIG11.SA", AssetType: "FII", Currency: "BRL", Type: "CONVERSION_OUT", Quantity: 100, UnitPrice: 10.0, ExecutedAt: dConv},
+			{ID: "t3", AssetID: "a-dest", Ticker: "DEST11.SA", AssetType: "FII", Currency: "BRL", Type: "CONVERSION_IN", Quantity: 80, UnitPrice: 12.50, ExecutedAt: dConv},
+		}, nil)
+		repo.On("GetAssetEvents", mock.Anything, "a-orig").Return([]AssetEvent{
+			{AssetID: "a-orig", Type: "Rendimento", GrossAmount: 0.10, CumDate: d1.AddDate(0, 0, 10), PaymentDate: d1.AddDate(0, 0, 20)},
+			{AssetID: "a-orig", Type: "Rendimento", GrossAmount: 0.10, CumDate: dAfter, PaymentDate: dAfter.AddDate(0, 0, 5)},
+		}, nil)
+		repo.On("GetAssetEvents", mock.Anything, "a-dest").Return([]AssetEvent{
+			{AssetID: "a-dest", Type: "Rendimento", GrossAmount: 0.15, CumDate: dAfter, PaymentDate: dAfter.AddDate(0, 0, 5)},
+		}, nil)
+
+		divs, err := s.GetPortfolioDividends(context.Background(), "p1", "u1")
+		assert.NoError(t, err)
+		assert.Len(t, divs, 2)
+	})
+
+	t.Run("Performance treats full-portfolio conversion as zero external cash flow and single-ticker filter as inflow", func(t *testing.T) {
+		s, repo, _, _ := setupServiceTest()
+		nowUTC := time.Now().UTC()
+		dStart := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day()-5, 0, 0, 0, 0, time.UTC)
+		dConv := dStart.AddDate(0, 0, 2)
+
+		repo.On("GetPortfolioByID", mock.Anything, "p1", "u1").Return(&Portfolio{BaseCurrency: "BRL"}, nil)
+		repo.On("GetTransactionsByPortfolioID", mock.Anything, "p1", "u1").Return([]Transaction{
+			{ID: "t1", AssetID: "a-orig", Ticker: "ORIG11.SA", AssetType: "FII", Currency: "BRL", Type: "BUY", Quantity: 100, UnitPrice: 10.0, TotalCost: 1000, ExchangeRate: 1.0, ExecutedAt: dStart},
+			{ID: "t2", AssetID: "a-orig", Ticker: "ORIG11.SA", AssetType: "FII", Currency: "BRL", Type: "CONVERSION_OUT", Quantity: 100, UnitPrice: 10.0, TotalCost: 1000, ExchangeRate: 1.0, ExecutedAt: dConv},
+			{ID: "t3", AssetID: "a-dest", Ticker: "DEST11.SA", AssetType: "FII", Currency: "BRL", Type: "CONVERSION_IN", Quantity: 80, UnitPrice: 12.5, TotalCost: 1000, ExchangeRate: 1.0, ExecutedAt: dConv},
+		}, nil)
+		repo.On("GetDailyPrices", mock.Anything, "a-orig", mock.Anything, mock.Anything).Return([]DailyPrice{
+			{AssetID: "a-orig", PriceDate: dStart, ClosePrice: 10.0},
+			{AssetID: "a-orig", PriceDate: dStart.AddDate(0, 0, 1), ClosePrice: 10.0},
+		}, nil)
+		repo.On("GetDailyPrices", mock.Anything, "a-dest", mock.Anything, mock.Anything).Return([]DailyPrice{
+			{AssetID: "a-dest", PriceDate: dConv, ClosePrice: 12.5},
+			{AssetID: "a-dest", PriceDate: dConv.AddDate(0, 0, 1), ClosePrice: 13.75},
+		}, nil)
+		repo.On("GetAssetByTicker", mock.Anything, "USDBRL=X").Return("", errors.New("no usd"))
+
+		ptsFull, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", nil)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, ptsFull)
+		// Last point: 80 * 13.75 = 1100 over 1000 => +10% TWRR with no conversion jump
+		assert.InDelta(t, 10.0, ptsFull[len(ptsFull)-1].ReturnPct, 0.01)
+
+		// Filtered by DEST11.SA only: starts on dConv with 80*12.5=1000, ends at 1100 => +10%
+		ptsSingle, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", []string{"DEST11.SA"})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, ptsSingle)
+		assert.InDelta(t, 10.0, ptsSingle[len(ptsSingle)-1].ReturnPct, 0.01)
+
+		// Filtered by ORIG11.SA only: conversion out treats exit as outflow at dConv => 0% return
+		ptsSourceOnly, err := s.GetPortfolioPerformance(context.Background(), "p1", "u1", "ALL", []string{"ORIG11.SA"})
+		assert.NoError(t, err)
+		assert.NotEmpty(t, ptsSourceOnly)
+		assert.InDelta(t, 0.0, ptsSourceOnly[len(ptsSourceOnly)-1].ReturnPct, 0.01)
 	})
 }

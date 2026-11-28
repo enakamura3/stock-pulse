@@ -25,6 +25,7 @@ type PortfolioService interface {
 	SetDefaultPortfolio(ctx context.Context, portfolioID, userID string) error
 	AddTransaction(ctx context.Context, userID string, tx *Transaction) (*Transaction, error)
 	UpdateTransaction(ctx context.Context, userID, portfolioID, txID string, tx *Transaction) error
+	ConvertAsset(ctx context.Context, userID, portfolioID string, req ConversionRequest) (*ConversionResult, error)
 	BulkAddTransactions(ctx context.Context, userID, portfolioID string, file multipart.File) (*BulkImportResult, error)
 	DeleteTransaction(ctx context.Context, txID, portfolioID, userID string) error
 	DeletePortfolio(ctx context.Context, id, userID string) error
@@ -69,12 +70,66 @@ var validAssetTypes = map[string]bool{
 type transactionPayload struct {
 	Ticker       string  `json:"ticker"`
 	AssetType    string  `json:"asset_type,omitempty"`
-	Type         string  `json:"type"` // "BUY" ou "SELL"
+	Type         string  `json:"type"` // "BUY", "SELL", "SPLIT", "REVERSE_SPLIT", "BONUS", "CONVERSION_OUT", "CONVERSION_IN"
 	Quantity     float64 `json:"quantity"`
 	UnitPrice    float64 `json:"unit_price"`
 	Fee          float64 `json:"fee"`
 	ExchangeRate float64 `json:"exchange_rate"`
 	ExecutedAt   string  `json:"executed_at"` // formato "YYYY-MM-DD"
+}
+
+type conversionPayload struct {
+	SourceTicker       string  `json:"source_ticker"`
+	SourceQuantity     float64 `json:"source_quantity"`
+	SourceUnitPrice    float64 `json:"source_unit_price"`
+	TargetTicker       string  `json:"target_ticker"`
+	TargetAssetType    string  `json:"target_asset_type,omitempty"`
+	TargetQuantity     float64 `json:"target_quantity"`
+	TargetUnitPrice    float64 `json:"target_unit_price"`
+	TargetExchangeRate float64 `json:"exchange_rate"`
+	ExecutedAt         string  `json:"executed_at"`
+}
+
+var validTxTypes = map[string]bool{
+	"BUY":            true,
+	"SELL":           true,
+	"SPLIT":          true,
+	"REVERSE_SPLIT":  true,
+	"BONUS":          true,
+	"CONVERSION_OUT": true,
+	"CONVERSION_IN":  true,
+}
+
+func validateTransactionPayload(payload *transactionPayload) (time.Time, float64, error) {
+	payload.AssetType = strings.ToUpper(strings.TrimSpace(payload.AssetType))
+	if payload.AssetType != "" && !validAssetTypes[payload.AssetType] {
+		return time.Time{}, 0, errors.New("Tipo de ativo inválido")
+	}
+
+	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
+	if !validTxTypes[payload.Type] {
+		return time.Time{}, 0, errors.New("Tipo de transação deve ser BUY, SELL, SPLIT, REVERSE_SPLIT, BONUS, CONVERSION_OUT ou CONVERSION_IN")
+	}
+
+	requiresPositivePrice := payload.Type == "BUY" || payload.Type == "SELL" || payload.Type == "CONVERSION_IN"
+	if payload.Quantity <= 0 || (requiresPositivePrice && payload.UnitPrice <= 0) || payload.UnitPrice < 0 {
+		return time.Time{}, 0, errors.New("Quantidade deve ser maior que zero (e preço unitário também, exceto para splits, bônus e saída por conversão)")
+	}
+
+	if payload.Fee < 0 {
+		return time.Time{}, 0, errors.New("Taxa/Corretagem não pode ser negativa")
+	}
+
+	fee := payload.Fee
+	if payload.Type != "BUY" && payload.Type != "SELL" {
+		fee = 0
+	}
+
+	execTime, err := parseExecutedAt(payload.ExecutedAt)
+	if err != nil {
+		return time.Time{}, 0, err
+	}
+	return execTime, fee, nil
 }
 
 // GetPortfolios lista todos os portfólios do usuário (cria "Principal" se vazio).
@@ -258,35 +313,7 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload.AssetType = strings.ToUpper(strings.TrimSpace(payload.AssetType))
-	if payload.AssetType != "" && !validAssetTypes[payload.AssetType] {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de ativo inválido")
-		return
-	}
-
-	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
-	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT, REVERSE_SPLIT ou BONUS")
-		return
-	}
-
-	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits e bônus)")
-		return
-	}
-
-	if payload.Fee < 0 {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Taxa/Corretagem não pode ser negativa")
-		return
-	}
-
-	fee := payload.Fee
-	if payload.Type == "SPLIT" || payload.Type == "REVERSE_SPLIT" || payload.Type == "BONUS" {
-		fee = 0
-	}
-
-	// Valida e processa data de execução
-	execTime, err := parseExecutedAt(payload.ExecutedAt)
+	execTime, fee, err := validateTransactionPayload(&payload)
 	if err != nil {
 		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -314,6 +341,75 @@ func (h *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputils.RespondWithJSON(w, http.StatusCreated, savedTx)
+}
+
+// ConvertAsset registra atomicamente uma conversão/incorporação societária entre dois ativos.
+func (h *Handler) ConvertAsset(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserIDKey).(string)
+	if !ok || userID == "" {
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Não autorizado")
+		return
+	}
+
+	portfolioID := chi.URLParam(r, "id")
+	if portfolioID == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "ID da carteira é obrigatório")
+		return
+	}
+
+	var payload conversionPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		if middleware.IsMaxBytesError(err) {
+			httputils.RespondWithError(w, http.StatusRequestEntityTooLarge, "Corpo da requisição excede o limite máximo permitido (1MB)")
+			return
+		}
+		httputils.RespondWithError(w, http.StatusBadRequest, "Payload inválido")
+		return
+	}
+
+	payload.SourceTicker = strings.ToUpper(strings.TrimSpace(payload.SourceTicker))
+	payload.TargetTicker = strings.ToUpper(strings.TrimSpace(payload.TargetTicker))
+	payload.TargetAssetType = strings.ToUpper(strings.TrimSpace(payload.TargetAssetType))
+	if payload.TargetAssetType != "" && !validAssetTypes[payload.TargetAssetType] {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de ativo inválido")
+		return
+	}
+	if payload.SourceTicker == "" || payload.TargetTicker == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Tickers de origem e destino são obrigatórios")
+		return
+	}
+	if payload.SourceQuantity <= 0 || payload.TargetQuantity <= 0 || payload.TargetUnitPrice <= 0 {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Quantidades e preço de aquisição do ativo de destino devem ser maiores que zero")
+		return
+	}
+	if payload.SourceUnitPrice < 0 || payload.TargetExchangeRate < 0 {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Preço de saída e câmbio não podem ser negativos")
+		return
+	}
+
+	execTime, err := parseExecutedAt(payload.ExecutedAt)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	res, err := h.service.ConvertAsset(ctxOrDefault(r), userID, portfolioID, ConversionRequest{
+		SourceTicker:       payload.SourceTicker,
+		SourceQuantity:     payload.SourceQuantity,
+		SourceUnitPrice:    payload.SourceUnitPrice,
+		TargetTicker:       payload.TargetTicker,
+		TargetAssetType:    payload.TargetAssetType,
+		TargetQuantity:     payload.TargetQuantity,
+		TargetUnitPrice:    payload.TargetUnitPrice,
+		TargetExchangeRate: payload.TargetExchangeRate,
+		ExecutedAt:         execTime.UTC(),
+	})
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	httputils.RespondWithJSON(w, http.StatusCreated, res)
 }
 
 // DeleteTransaction remove uma operação financeira cadastrada.
@@ -405,34 +501,7 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload.Type = strings.ToUpper(strings.TrimSpace(payload.Type))
-	if payload.Type != "BUY" && payload.Type != "SELL" && payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de transação deve ser BUY, SELL, SPLIT, REVERSE_SPLIT ou BONUS")
-		return
-	}
-
-	payload.AssetType = strings.ToUpper(strings.TrimSpace(payload.AssetType))
-	if payload.AssetType != "" && !validAssetTypes[payload.AssetType] {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Tipo de ativo inválido")
-		return
-	}
-
-	if payload.Quantity <= 0 || (payload.Type != "SPLIT" && payload.Type != "REVERSE_SPLIT" && payload.Type != "BONUS" && payload.UnitPrice <= 0) {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Quantidade deve ser maior que zero (e preço unitário também, exceto para splits e bônus)")
-		return
-	}
-
-	if payload.Fee < 0 {
-		httputils.RespondWithError(w, http.StatusBadRequest, "Taxa/Corretagem não pode ser negativa")
-		return
-	}
-
-	fee := payload.Fee
-	if payload.Type == "SPLIT" || payload.Type == "REVERSE_SPLIT" || payload.Type == "BONUS" {
-		fee = 0
-	}
-
-	execTime, err := parseExecutedAt(payload.ExecutedAt)
+	execTime, fee, err := validateTransactionPayload(&payload)
 	if err != nil {
 		httputils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return

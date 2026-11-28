@@ -680,7 +680,7 @@ paths:
                   example: STOCK_BR
                 type:
                   type: string
-                  enum: [BUY, SELL, SPLIT, REVERSE_SPLIT, BONUS]
+                  enum: [BUY, SELL, SPLIT, REVERSE_SPLIT, BONUS, CONVERSION_OUT, CONVERSION_IN]
                   example: BUY
                 quantity:
                   type: number
